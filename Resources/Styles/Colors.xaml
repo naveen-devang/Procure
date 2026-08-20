@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary 
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Windows 11 Fluent 2 Design System Color Tokens -->
+    <Color x:Key="Primary">#0078D4</Color>
+    <Color x:Key="PrimaryDark">#60CDFF</Color>
+    <Color x:Key="PrimaryDarkText">#001C38</Color>
+    <Color x:Key="Secondary">#2B2B2B</Color>
+    <Color x:Key="SecondaryDarkText">#60CDFF</Color>
+    <Color x:Key="Tertiary">#005FB8</Color>
+
+    <!-- Windows 11 Mica Backgrounds & Surfaces -->
+    <Color x:Key="DarkBackground">#202020</Color>
+    <Color x:Key="LightBackground">#F3F3F3</Color>
+
+    <!-- Card & Surface Layers -->
+    <Color x:Key="DarkSecondaryBackground">#2B2B2B</Color>
+    <Color x:Key="DarkTertiaryBackground">#323232</Color>
+    <Color x:Key="LightSecondaryBackground">#FFFFFF</Color>
+    <Color x:Key="LightTertiaryBackground">#F9F9F9</Color>
+
+    <!-- Typography Text Tokens -->
+    <Color x:Key="LightOnDarkBackground">#FFFFFF</Color>
+    <Color x:Key="DarkOnLightBackground">#1A1A1A</Color>
+    <Color x:Key="TextSecondaryDark">#C5C5C5</Color>
+    <Color x:Key="TextSecondaryLight">#5C5C5C</Color>
+    <Color x:Key="TextTertiary">#8A8A8A</Color>
+
+    <!-- Base Grays / Neutral Ramp -->
+    <Color x:Key="White">#FFFFFF</Color>
+    <Color x:Key="Black">#000000</Color>
+    <Color x:Key="Gray100">#E5E5E5</Color>
+    <Color x:Key="Gray200">#D1D1D1</Color>
+    <Color x:Key="Gray300">#B0B0B0</Color>
+    <Color x:Key="Gray400">#8A8A8A</Color>
+    <Color x:Key="Gray500">#6E6E6E</Color>
+    <Color x:Key="Gray600">#383838</Color>
+    <Color x:Key="Gray700">#2E2E2E</Color>
+    <Color x:Key="Gray800">#262626</Color>
+    <Color x:Key="Gray900">#1C1C1C</Color>
+    <Color x:Key="Gray950">#141414</Color>
+
+    <!-- Windows 11 Semantic Status Colors -->
+    <Color x:Key="FluentSuccess">#107C41</Color>
+    <Color x:Key="FluentSuccessBg">#E7F3ED</Color>
+    <Color x:Key="FluentSuccessBgDark">#143823</Color>
+    <Color x:Key="FluentSuccessTextDark">#6CCB5F</Color>
+
+    <Color x:Key="FluentCaution">#7A4B04</Color>
+    <Color x:Key="FluentCautionBg">#FFF4CE</Color>
+    <Color x:Key="FluentCautionBgDark">#3B2E08</Color>
+    <Color x:Key="FluentCautionTextDark">#FCE100</Color>
+
+    <Color x:Key="FluentCritical">#A80000</Color>
+    <Color x:Key="FluentCriticalBg">#FDE7E9</Color>
+    <Color x:Key="FluentCriticalBgDark">#3F1011</Color>
+    <Color x:Key="FluentCriticalTextDark">#FF99A4</Color>
+
+    <Color x:Key="FluentInfo">#004E8C</Color>
+    <Color x:Key="FluentInfoBg">#EBF3FC</Color>
+    <Color x:Key="FluentInfoBgDark">#142F4C</Color>
+    <Color x:Key="FluentInfoTextDark">#60CDFF</Color>
+
+    <Color x:Key="FluentTeal">#005A70</Color>
+    <Color x:Key="FluentTealBg">#E0F7FA</Color>
+    <Color x:Key="FluentTealBgDark">#103B44</Color>
+    <Color x:Key="FluentTealTextDark">#4DD0E1</Color>
+
+    <Color x:Key="FluentPurple">#4B2BA8</Color>
+    <Color x:Key="FluentPurpleBg">#F0EBF9</Color>
+    <Color x:Key="FluentPurpleBgDark">#281A4C</Color>
+    <Color x:Key="FluentPurpleTextDark">#C4A6FE</Color>
+
+    <!-- Dedicated High-Contrast Lineage & Traceability Badges -->
+    <Color x:Key="BadgeCombinedPrBgLight">#E6F2FB</Color>
+    <Color x:Key="BadgeCombinedPrTextLight">#004578</Color>
+    <Color x:Key="BadgeCombinedPrBorderLight">#CCE4F7</Color>
+    <Color x:Key="BadgeCombinedPrBgDark">#172E48</Color>
+    <Color x:Key="BadgeCombinedPrTextDark">#70B8FF</Color>
+    <Color x:Key="BadgeCombinedPrBorderDark">#244970</Color>
+
+    <Color x:Key="BadgeSharedRfqBgLight">#E0F7FA</Color>
+    <Color x:Key="BadgeSharedRfqTextLight">#005A70</Color>
+    <Color x:Key="BadgeSharedRfqBorderLight">#B2EBF2</Color>
+    <Color x:Key="BadgeSharedRfqBgDark">#103B44</Color>
+    <Color x:Key="BadgeSharedRfqTextDark">#4DD0E1</Color>
+    <Color x:Key="BadgeSharedRfqBorderDark">#1A535F</Color>
+
+    <Color x:Key="BadgeCombinedPoBgLight">#E6F5EC</Color>
+    <Color x:Key="BadgeCombinedPoTextLight">#107C41</Color>
+    <Color x:Key="BadgeCombinedPoBorderLight">#C2E8D3</Color>
+    <Color x:Key="BadgeCombinedPoBgDark">#143823</Color>
+    <Color x:Key="BadgeCombinedPoTextDark">#6BD279</Color>
+    <Color x:Key="BadgeCombinedPoBorderDark">#1E5234</Color>
+
+    <Color x:Key="BadgeMergedBgLight">#EDEBE9</Color>
+    <Color x:Key="BadgeMergedTextLight">#494847</Color>
+    <Color x:Key="BadgeMergedBorderLight">#D2D0CE</Color>
+    <Color x:Key="BadgeMergedBgDark">#2D2C2C</Color>
+    <Color x:Key="BadgeMergedTextDark">#C8C6C4</Color>
+    <Color x:Key="BadgeMergedBorderDark">#403F3E</Color>
+
+    <!-- Unified Metric Strip Pill Tokens -->
+    <Color x:Key="PillBgLight">#F3F3F3</Color>
+    <Color x:Key="PillBorderLight">#E0E0E0</Color>
+    <Color x:Key="PillBgDark">#2B2B2B</Color>
+    <Color x:Key="PillBorderDark">#383838</Color>
+    <Color x:Key="PillTextNeutralLight">#323130</Color>
+    <Color x:Key="PillTextNeutralDark">#E1DFDD</Color>
+
+    <!-- Warm Alert InfoBar Tokens -->
+    <Color x:Key="AlertWarningBgLight">#FFF8F0</Color>
+    <Color x:Key="AlertWarningBorderLight">#F6D3A0</Color>
+    <Color x:Key="AlertWarningIconLight">#8A5700</Color>
+    <Color x:Key="AlertWarningBgDark">#2D2312</Color>
+    <Color x:Key="AlertWarningBorderDark">#5A3F10</Color>
+    <Color x:Key="AlertWarningIconDark">#FFC83B</Color>
+
+    <!-- Solid Color Brushes -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
+    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
+    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
+    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
+    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
+    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
+    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
+    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
+    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
+    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
+    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+</ResourceDictionary>

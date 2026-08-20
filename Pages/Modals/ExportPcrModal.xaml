@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Procure.Models"
+             xmlns:viewmodels="clr-namespace:Procure.PageModels"
+             x:Class="Procure.Pages.Modals.ExportPcrModal"
+             x:DataType="viewmodels:PrListPageModel"
+             IsVisible="{Binding IsExportPcrModalVisible}">
+
+    <!-- Backdrop Dimmer Overlay -->
+    <Grid BackgroundColor="{AppThemeBinding Light=#66000000, Dark=#99000000}">
+        <Grid.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding CloseExportPcrModalCommand}" />
+        </Grid.GestureRecognizers>
+
+        <!-- Centered Modal Dialog Card -->
+        <Border MaximumWidthRequest="600"
+                Margin="24"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="8" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#000000" Offset="0,10" Radius="24" Opacity="0.35" />
+            </Border.Shadow>
+            <Border.GestureRecognizers>
+                <!-- Catch taps inside modal so they don't dismiss -->
+                <TapGestureRecognizer />
+            </Border.GestureRecognizers>
+
+            <Grid RowDefinitions="Auto, *, Auto">
+                <!-- 1. MODAL HEADER -->
+                <Grid Grid.Row="0"
+                      ColumnDefinitions="*, Auto"
+                      Padding="20,16,16,14"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Export Price Comparison Sheet"
+                               FontSize="16"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Label Text="{Binding ExportPcrSubtitle}"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+
+                    <!-- Close Button -->
+                    <Button Grid.Column="1"
+                            Text="✕"
+                            Command="{Binding CloseExportPcrModalCommand}"
+                            FontSize="13"
+                            WidthRequest="32"
+                            HeightRequest="32"
+                            Padding="0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="0"
+                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                            ToolTipProperties.Text="Close Dialog" />
+                </Grid>
+
+                <!-- 2. MODAL BODY (Scrollable) -->
+                <ScrollView Grid.Row="1" MaximumHeightRequest="460" Padding="20,16">
+                    <VerticalStackLayout Spacing="16">
+                        <!-- SECTION 1: Select Supplier Quotations (Max 5) -->
+                        <Border StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                Padding="14">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+
+                            <VerticalStackLayout Spacing="10">
+                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                    <Label Grid.Column="0"
+                                           Text="1. Select Suppliers to Compare"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Border Grid.Column="1" Padding="8,2" StrokeThickness="1"
+                                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="4" />
+                                        </Border.StrokeShape>
+                                        <Label Text="{Binding SelectedRfqCountMessage}"
+                                               FontSize="11"
+                                               FontFamily="SegoeSemibold"
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    </Border>
+                                </Grid>
+
+                                <Label Text="Choose up to 5 supplier quotations to display side-by-side in the comparison table:"
+                                       FontSize="11.5"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                <!-- Supplier Checkboxes List -->
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding ExportRfqSelections}" Spacing="6">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:ExportRfqSelection">
+                                            <Border Padding="10,6" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+
+                                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" VerticalOptions="Center">
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              VerticalOptions="Center" />
+                                                    <Label Grid.Column="1"
+                                                           Text="{Binding DisplaySummary}"
+                                                           FontSize="12"
+                                                           FontFamily="SegoeSemibold"
+                                                           LineBreakMode="TailTruncation"
+                                                           MaxLines="2"
+                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                           VerticalOptions="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- SECTION 2: Remarks (Multiline) -->
+                        <Border StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                Padding="14">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="2. Remarks / Justification"
+                                       FontSize="13"
+                                       FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Enter any additional justification or notes for the approvers. This is saved for future exports."
+                                       FontSize="11.5"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                
+                                <Editor Text="{Binding ExportPcrRemarks, Mode=TwoWay}"
+                                        Placeholder="e.g. Required by Electrical Dept. on Urgent basis"
+                                        HeightRequest="80"
+                                        FontSize="12"
+                                        AutoSize="Disabled"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <!-- 3. MODAL FOOTER ACTION BUTTONS -->
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="Auto, *, Auto, Auto"
+                      ColumnSpacing="8"
+                      Padding="20,14"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <!-- Cancel Button -->
+                    <Button Grid.Column="0"
+                            Text="Cancel"
+                            Command="{Binding CloseExportPcrModalCommand}"
+                            FontSize="12"
+                            HeightRequest="34"
+                            Padding="16,0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="1"
+                            BorderColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- Export PDF Button -->
+                    <Button Grid.Column="2"
+                            Text="Export PDF (.pdf)"
+                            Command="{Binding ExportPcrPdfCommand}"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            HeightRequest="34"
+                            Padding="16,0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- Export Excel Button (Primary) -->
+                    <Button Grid.Column="3"
+                            Text="Export Excel (.xlsx)"
+                            Command="{Binding ExportPcrExcelCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            FontSize="12"
+                            HeightRequest="34"
+                            Padding="18,0"
+                            CornerRadius="4" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentView>

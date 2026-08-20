@@ -1,0 +1,669 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.AddPoModal"
+             x:Name="ThisModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsAddPoModalVisible}">
+
+    <!-- Backdrop Dimmer Overlay -->
+    <Grid BackgroundColor="{AppThemeBinding Light=#66000000, Dark=#99000000}">
+        <Grid.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding CloseAddPoModalCommand}" />
+        </Grid.GestureRecognizers>
+
+        <!-- Centered Modal Dialog Card -->
+        <Border MaximumWidthRequest="980"
+                Margin="24"
+                MaximumHeightRequest="840"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="8" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#000000" Offset="0,10" Radius="24" Opacity="0.35" />
+            </Border.Shadow>
+            <Border.GestureRecognizers>
+                <!-- Catch taps inside modal so they don't dismiss -->
+                <TapGestureRecognizer />
+            </Border.GestureRecognizers>
+
+            <Grid RowDefinitions="Auto, *, Auto">
+                <!-- 1. MODAL HEADER & STEPPER WIZARD BAR -->
+                <Grid Grid.Row="0"
+                      RowDefinitions="Auto, Auto"
+                      Padding="20,14,16,12"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    
+                    <!-- Top Title Bar -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="{Binding PoModalTitle}"
+                                   FontSize="16"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="{Binding AddPoModalSubtitle}"
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </VerticalStackLayout>
+
+                        <!-- Close Button -->
+                        <Button Grid.Column="1"
+                                Text="✕"
+                                Command="{Binding CloseAddPoModalCommand}"
+                                FontSize="13"
+                                WidthRequest="32"
+                                HeightRequest="32"
+                                Padding="0"
+                                BackgroundColor="Transparent"
+                                BorderWidth="0"
+                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                ToolTipProperties.Text="Close Dialog" />
+                    </Grid>
+
+                    <!-- Wizard Stepper Breadcrumb (Hidden when in Edit Mode) -->
+                    <Grid Grid.Row="1"
+                          IsVisible="{Binding IsEditPoMode, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                          ColumnDefinitions="Auto, Auto, Auto" ColumnSpacing="10" Margin="0,10,0,2" VerticalOptions="Center">
+                        <!-- Step 1 Pill -->
+                        <Border Grid.Column="0" Padding="10,4" StrokeThickness="1"
+                                Stroke="{Binding IsPoModalStep1, Converter={StaticResource BoolToFilterChipStrokeConverter}}"
+                                BackgroundColor="{Binding IsPoModalStep1, Converter={StaticResource BoolToFilterChipBgConverter}}">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+                            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                <Label Text="1" FontSize="11" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsPoModalStep1, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+                                <Label Text="Select Supplier Quotes" FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsPoModalStep1, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+                            </HorizontalStackLayout>
+                        </Border>
+
+                        <Label Grid.Column="1" Text="→" FontSize="12" VerticalOptions="Center" TextColor="{StaticResource Gray400}" />
+
+                        <!-- Step 2 Pill -->
+                        <Border Grid.Column="2" Padding="10,4" StrokeThickness="1"
+                                Stroke="{Binding IsPoModalStep2, Converter={StaticResource BoolToFilterChipStrokeConverter}}"
+                                BackgroundColor="{Binding IsPoModalStep2, Converter={StaticResource BoolToFilterChipBgConverter}}">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+                            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                <Label Text="2" FontSize="11" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsPoModalStep2, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+                                <Label Text="Configure PO Details &amp; Quantities" FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsPoModalStep2, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+                            </HorizontalStackLayout>
+                        </Border>
+                    </Grid>
+                </Grid>
+
+                <!-- 2. MODAL BODY (Scrollable Wizard Pages) -->
+                <ScrollView Grid.Row="1" MaximumHeightRequest="600" Padding="20,16">
+                    <Grid>
+                        <!-- ================= PAGE 1: SELECT RFQ QUOTATIONS ================= -->
+                        <VerticalStackLayout IsVisible="{Binding IsPoModalStep1}" Spacing="14">
+                            <!-- Page 1 Header Bar -->
+                            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="Select Supplier Quotation(s) to Award"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Label Text="Select one or more quotes. A separate PO will be created for each selected supplier in the next step:"
+                                           FontSize="11.5"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                </VerticalStackLayout>
+
+                                <Button Grid.Column="1" Text="Select All"
+                                        Command="{Binding SelectAllPoRfqsCommand}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        FontSize="11" HeightRequest="28" Padding="10,0" />
+
+                                <Button Grid.Column="2" Text="Deselect All"
+                                        Command="{Binding DeselectAllPoRfqsCommand}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        FontSize="11" HeightRequest="28" Padding="10,0" />
+                            </Grid>
+
+                            <!-- STEP 1 SKELETON LOADING VIEW -->
+                            <VerticalStackLayout IsVisible="{Binding IsPoModalStep1Loading}" Spacing="10">
+                                <!-- Skeleton Card 1 -->
+                                <Border Padding="14,12" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                        Opacity="0.7">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                        <Border Grid.Column="0" WidthRequest="20" HeightRequest="20" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                            <Border WidthRequest="180" HeightRequest="14" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                            <Border WidthRequest="260" HeightRequest="10" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="2" WidthRequest="90" HeightRequest="16" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Skeleton Card 2 -->
+                                <Border Padding="14,12" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                        Opacity="0.5">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                        <Border Grid.Column="0" WidthRequest="20" HeightRequest="20" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                            <Border WidthRequest="150" HeightRequest="14" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                            <Border WidthRequest="220" HeightRequest="10" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="2" WidthRequest="80" HeightRequest="16" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape></Border>
+                                    </Grid>
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <!-- STEP 1 REAL CONTENT (Quotes List) -->
+                            <VerticalStackLayout IsVisible="{Binding IsPoModalStep1Loading, Converter={StaticResource BoolToInvertedBoolConverter}}" Spacing="10">
+                                <!-- Empty State when no RFQs -->
+                                <Border IsVisible="{Binding HasPoRfqs, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                        Padding="16" Margin="0,4"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+                                    <Label Text="No RFQ or vendor quotes found for this requisition. Please create and price an RFQ first."
+                                           FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                </Border>
+
+                                <!-- Supplier Checkbox Cards List -->
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding PoRfqSelections}" Spacing="8">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PoRfqSelection">
+                                            <Border Padding="14,12" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="6" />
+                                                </Border.StrokeShape>
+
+                                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                                    <!-- CheckBox -->
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              VerticalOptions="Center" />
+
+                                                    <!-- Supplier Details -->
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                                                            <Label Text="{Binding VendorName}"
+                                                                   FontSize="13.5"
+                                                                   FontFamily="SegoeSemibold"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                                            <!-- RFQ Number Pill -->
+                                                            <Border IsVisible="{Binding HasRfqNumber}"
+                                                                    Padding="6,1" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="3" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding RfqNumber}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            </Border>
+
+                                                            <!-- Technical Approval Badge -->
+                                                            <Border IsVisible="{Binding HasTechnicalApproval}"
+                                                                    Padding="6,1" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource FluentSuccessBgDark}, Dark={StaticResource FluentSuccessBg}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource FluentSuccessBg}, Dark={StaticResource FluentSuccessBgDark}}">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="3" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding TechnicalApproval}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                                                            </Border>
+                                                        </HorizontalStackLayout>
+
+                                                        <!-- Terms & Completeness metadata -->
+                                                        <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                                                            <Label Text="{Binding SelectedItemsSummary}"
+                                                                   FontSize="11"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                                            <Label Text="•" FontSize="11" TextColor="{StaticResource Gray400}" />
+
+                                                            <Label Text="{Binding Incoterms}"
+                                                                   FontSize="11"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                                            <Label Text="•" FontSize="11" TextColor="{StaticResource Gray400}" />
+
+                                                            <Label Text="{Binding PaymentTerms}"
+                                                                   FontSize="11"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                        </HorizontalStackLayout>
+                                                    </VerticalStackLayout>
+
+                                                    <!-- Quoted Amount Badge -->
+                                                    <VerticalStackLayout Grid.Column="2" Spacing="2" HorizontalOptions="End" VerticalOptions="Center">
+                                                        <Label Text="{Binding FormattedDisplayAmount}"
+                                                               FontSize="14"
+                                                               FontFamily="SegoeSemibold"
+                                                               HorizontalTextAlignment="End"
+                                                               TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                                                        <Label Text="Total Landed Cost"
+                                                               FontSize="10"
+                                                               HorizontalTextAlignment="End"
+                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                    </VerticalStackLayout>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+
+                        <!-- ================= PAGE 2: CONFIGURE PO DETAILS & PRICING ================= -->
+                        <VerticalStackLayout IsVisible="{Binding IsPoModalStep2}" Spacing="14">
+
+
+                            <!-- Allocation Status Summary Pill -->
+                            <Border IsVisible="{Binding PoAllocationSummaryText, Converter={StaticResource NullToBoolConverter}}"
+                                    Padding="12,8"
+                                    StrokeThickness="1"
+                                    Stroke="{Binding PoAllocationSummaryText, Converter={StaticResource PoFulfillmentStrokeConverter}}"
+                                    BackgroundColor="{Binding PoAllocationSummaryText, Converter={StaticResource PoFulfillmentBgConverter}}">
+                                <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                <Label Text="{Binding PoAllocationSummaryText}"
+                                       FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding PoAllocationSummaryText, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                            </Border>
+
+                            <!-- STEP 2 SKELETON LOADING VIEW -->
+                            <VerticalStackLayout IsVisible="{Binding IsPoModalStep2Loading}" Spacing="14">
+                                <Border Padding="16" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                        Opacity="0.7">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                    <VerticalStackLayout Spacing="12">
+                                        <Border WidthRequest="220" HeightRequest="16" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape></Border>
+                                        <Border WidthRequest="340" HeightRequest="32" HorizontalOptions="Start" BackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape></Border>
+                                        <Border HeightRequest="120" BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape></Border>
+                                        <Border HeightRequest="40" BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"><Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape></Border>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </VerticalStackLayout>
+
+                            <!-- STEP 2 REAL CONTENT (Selected Supplier PO Configuration Cards) -->
+                            <VerticalStackLayout IsVisible="{Binding IsPoModalStep2Loading, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                 BindableLayout.ItemsSource="{Binding PoRfqSelections}" Spacing="16">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PoRfqSelection">
+                                        <!-- Only display card if this RFQ is selected -->
+                                        <Border IsVisible="{Binding IsSelected}"
+                                                StrokeThickness="1"
+                                                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                                Padding="16">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="8" />
+                                            </Border.StrokeShape>
+
+                                            <VerticalStackLayout Spacing="14">
+                                                <!-- Vendor Header Row -->
+                                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                                    <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                                                        <Border WidthRequest="6" HeightRequest="18"
+                                                                BackgroundColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}">
+                                                            <Border.StrokeShape>
+                                                                <RoundRectangle CornerRadius="2" />
+                                                            </Border.StrokeShape>
+                                                        </Border>
+                                                        <Label Text="{Binding VendorName}"
+                                                               FontSize="14"
+                                                               FontFamily="SegoeSemibold"
+                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                               VerticalOptions="Center" />
+                                                        <Border Padding="6,1" StrokeThickness="1"
+                                                                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                                            <Border.StrokeShape>
+                                                                <RoundRectangle CornerRadius="3" />
+                                                            </Border.StrokeShape>
+                                                            <Label Text="{Binding Currency, StringFormat='Currency: {0}'}"
+                                                                   FontSize="10" FontFamily="SegoeSemibold"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                        </Border>
+                                                    </HorizontalStackLayout>
+
+                                                    <!-- PO Total in this card -->
+                                                    <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                                                        <Label Text="PO Amount:" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" />
+                                                        <Label Text="{Binding FormattedDisplayAmount}"
+                                                               FontSize="14"
+                                                               FontFamily="SegoeSemibold"
+                                                               TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}"
+                                                               VerticalOptions="Center" />
+                                                    </HorizontalStackLayout>
+                                                </Grid>
+
+                                                <!-- PO Number Input Field -->
+                                                <Grid ColumnDefinitions="140, 240, *" ColumnSpacing="12" VerticalOptions="Center">
+                                                    <Label Grid.Column="0" Text="PO Number *"
+                                                           FontSize="12"
+                                                           FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                           VerticalOptions="Center" />
+                                                    <Entry Grid.Column="1"
+                                                           Text="{Binding PoNo, Mode=TwoWay}"
+                                                           Placeholder="e.g. PO-2026-101"
+                                                           HeightRequest="34"
+                                                           FontSize="12"
+                                                           FontFamily="SegoeSemibold" />
+                                                    <Label Grid.Column="2"
+                                                           Text="Enter unique PO reference for this supplier"
+                                                           FontSize="11"
+                                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                           VerticalOptions="Center" />
+                                                </Grid>
+
+                                                <!-- LINE ITEMS SECTION (When RFQ has line items) -->
+                                                <VerticalStackLayout IsVisible="{Binding HasItems}" Spacing="8">
+                                                    <!-- Items Table Header & Quick Action Buttons -->
+                                                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                                        <Label Grid.Column="0"
+                                                               Text="PR Line Items, Ordered Quantities &amp; Quoted Rates"
+                                                               FontSize="12"
+                                                               FontFamily="SegoeSemibold"
+                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                        
+                                                        <Button Grid.Column="1" Text="Select All Items"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.SelectAllPoRfqItemsCommand}"
+                                                                CommandParameter="{Binding .}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
+
+                                                        <Button Grid.Column="2" Text="Deselect All Items"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DeselectAllPoRfqItemsCommand}"
+                                                                CommandParameter="{Binding .}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
+                                                    </Grid>
+
+                                                    <!-- Table Column Headers -->
+                                                    <Border Padding="10,6" StrokeThickness="1"
+                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                                        <Border.StrokeShape>
+                                                            <RoundRectangle CornerRadius="4" />
+                                                        </Border.StrokeShape>
+                                                        <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105" ColumnSpacing="8" VerticalOptions="Center">
+                                                            <Label Grid.Column="0" Text="Inc." FontSize="11" FontFamily="SegoeSemibold" HorizontalTextAlignment="Center" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="1" Text="Item &amp; PR Allocation" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="2" Text="PO Qty" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="3" Text="Unit" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="4" Text="Unit Price" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="5" Text="Discount" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            <Label Grid.Column="6" Text="Line Total" FontSize="11" FontFamily="SegoeSemibold" HorizontalTextAlignment="End" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                        </Grid>
+                                                    </Border>
+
+                                                    <!-- Items List Rows -->
+                                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="4">
+                                                        <BindableLayout.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:PoRfqItemSelection">
+                                                                <Border Padding="10,6" StrokeThickness="1"
+                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                                    <Border.StrokeShape>
+                                                                        <RoundRectangle CornerRadius="4" />
+                                                                    </Border.StrokeShape>
+                                                                    <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105" ColumnSpacing="8" VerticalOptions="Center">
+                                                                        <!-- Checkbox -->
+                                                                        <CheckBox Grid.Column="0"
+                                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                                                  CheckedChanged="OnPoItemCheckedChanged"
+                                                                                  HorizontalOptions="Center"
+                                                                                  VerticalOptions="Center" />
+
+                                                                        <!-- Item Name & Allocation Status -->
+                                                                        <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                                                            <Label Text="{Binding ItemName}"
+                                                                                   FontSize="12"
+                                                                                   FontFamily="SegoeSemibold"
+                                                                                   LineBreakMode="TailTruncation"
+                                                                                   MaxLines="2"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                            <Label Text="{Binding AllocationStatusText}"
+                                                                                   FontSize="10.5"
+                                                                                   LineBreakMode="TailTruncation"
+                                                                                   TextColor="{Binding AllocationStatusText, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                                                                        </VerticalStackLayout>
+
+                                                                        <!-- Editable Quantity Entry -->
+                                                                        <Entry Grid.Column="2"
+                                                                               Text="{Binding Quantity, Mode=TwoWay}"
+                                                                               TextChanged="OnPoItemQuantityTextChanged"
+                                                                               Keyboard="Numeric"
+                                                                               HeightRequest="30"
+                                                                               FontSize="11.5"
+                                                                               VerticalOptions="Center" />
+
+                                                                        <!-- Unit Label -->
+                                                                        <Label Grid.Column="3"
+                                                                               Text="{Binding Unit}"
+                                                                               FontSize="11.5"
+                                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                               VerticalOptions="Center" />
+
+                                                                        <!-- Editable Unit Price Entry -->
+                                                                        <Entry Grid.Column="4"
+                                                                               Text="{Binding QuotedUnitPrice, Mode=TwoWay}"
+                                                                               TextChanged="OnPoItemUnitPriceTextChanged"
+                                                                               Placeholder="0.00"
+                                                                               Keyboard="Numeric"
+                                                                               HeightRequest="30"
+                                                                               FontSize="11.5"
+                                                                               VerticalOptions="Center" />
+
+                                                                        <!-- Editable Discount Entry -->
+                                                                        <Entry Grid.Column="5"
+                                                                               Text="{Binding Discount, Mode=TwoWay}"
+                                                                               TextChanged="OnPoItemDiscountTextChanged"
+                                                                               Placeholder="0.00"
+                                                                               Keyboard="Numeric"
+                                                                               HeightRequest="30"
+                                                                               FontSize="11.5"
+                                                                               VerticalOptions="Center" />
+
+                                                                        <!-- Line Total Display -->
+                                                                        <Label Grid.Column="6"
+                                                                               Text="{Binding FormattedLineTotal}"
+                                                                               FontSize="12"
+                                                                               FontFamily="SegoeSemibold"
+                                                                               HorizontalTextAlignment="End"
+                                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                               VerticalOptions="Center" />
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </BindableLayout.ItemTemplate>
+                                                    </VerticalStackLayout>
+                                                </VerticalStackLayout>
+
+                                                <!-- EDITABLE COMMERCIALS & LANDED COST BREAKDOWN BAR -->
+                                                <Border Padding="14,10" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="6" />
+                                                    </Border.StrokeShape>
+                                                    
+                                                    <VerticalStackLayout Spacing="10">
+                                                        <Label Text="Commercial Terms &amp; Landed Cost Breakdown"
+                                                               FontSize="11.5"
+                                                               FontFamily="SegoeSemibold"
+                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                                        <!-- Editable Financial Inputs Grid -->
+                                                        <Grid ColumnDefinitions="*, *, *, *, *" ColumnSpacing="10">
+                                                            <!-- Base Price Input -->
+                                                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                                                <Label Text="Base Price" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding CustomBaseAmount, Mode=TwoWay}" TextChanged="OnPoBaseAmountTextChanged" Placeholder="0.00" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
+                                                            </VerticalStackLayout>
+
+                                                            <!-- Freight Input -->
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                                <Label Text="Freight (+)" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding Freight, Mode=TwoWay}" TextChanged="OnPoFreightTextChanged" Placeholder="0.00" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
+                                                            </VerticalStackLayout>
+
+                                                            <!-- Other Charges Input -->
+                                                            <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                                                <Label Text="Other Charges (+)" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding OtherCharges, Mode=TwoWay}" TextChanged="OnPoOtherChargesTextChanged" Placeholder="0.00" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
+                                                            </VerticalStackLayout>
+
+                                                            <!-- Overall Discount Input -->
+                                                            <VerticalStackLayout Grid.Column="3" Spacing="2">
+                                                                <Label Text="Total Discount (-)" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding OverallDiscount, Mode=TwoWay}" TextChanged="OnPoOverallDiscountTextChanged" Placeholder="0.00" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
+                                                            </VerticalStackLayout>
+
+                                                            <!-- VAT Type Picker -->
+                                                            <VerticalStackLayout Grid.Column="4" Spacing="2">
+                                                                <Label Text="VAT Type" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AvailableVatTypes}"
+                                                                        SelectedItem="{Binding VatType, Mode=TwoWay}"
+                                                                        SelectedIndexChanged="OnPoVatTypeSelectedIndexChanged"
+                                                                        HeightRequest="30" FontSize="11.5" />
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+
+                                                        <!-- Calculated Total PO Value -->
+                                                        <Grid ColumnDefinitions="*, Auto" Margin="0,4,0,0" VerticalOptions="Center">
+                                                            <HorizontalStackLayout Grid.Column="0" Spacing="12" VerticalOptions="Center">
+                                                                <Label Text="{Binding FormattedVatAmount, StringFormat='Calculated VAT: +{0}'}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            </HorizontalStackLayout>
+
+                                                            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                                                <Label Text="Total PO Value:" FontSize="12.5" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" VerticalOptions="Center" />
+                                                                <Label Text="{Binding FormattedDisplayAmount}" FontSize="14" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" VerticalOptions="Center" />
+                                                            </HorizontalStackLayout>
+                                                        </Grid>
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Grid>
+                </ScrollView>
+
+                <!-- 3. MODAL FOOTER ACTION BUTTONS (Dynamic per step) -->
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="Auto, *, Auto, Auto"
+                      ColumnSpacing="10"
+                      Padding="20,14"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    
+                    <!-- STEP 1 FOOTER: Cancel Button -->
+                    <Button Grid.Column="0"
+                            IsVisible="{Binding IsPoModalStep1}"
+                            Text="Cancel"
+                            Command="{Binding CloseAddPoModalCommand}"
+                            FontSize="12"
+                            HeightRequest="36"
+                            Padding="16,0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="1"
+                            BorderColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- STEP 2 FOOTER: Back / Cancel Button -->
+                    <Button Grid.Column="0"
+                            IsVisible="{Binding IsPoModalStep2}"
+                            Text="{Binding PoModalBackButtonText}"
+                            Command="{Binding GoToPoStep1Command}"
+                            FontSize="12"
+                            HeightRequest="36"
+                            Padding="16,0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="1"
+                            BorderColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- Summary Info Pill -->
+                    <Border Grid.Column="1"
+                            Padding="12,6"
+                            StrokeThickness="1"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Center"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="4" />
+                        </Border.StrokeShape>
+                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding SelectedPoRfqCount, StringFormat='Selected: {0} Quote(s)'}"
+                                   FontSize="11.5"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="•" FontSize="11.5" TextColor="{StaticResource Gray400}" />
+                            <Label Text="{Binding TotalPoAmountSummary}"
+                                   FontSize="11.5"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                        </HorizontalStackLayout>
+                    </Border>
+
+                    <!-- STEP 1 FOOTER: Next Button -->
+                    <Button Grid.Column="3"
+                            IsVisible="{Binding IsPoModalStep1}"
+                            Text="Next: Configure PO(s) →"
+                            Command="{Binding GoToPoStep2Command}"
+                            IsEnabled="{Binding CanGoToPoStep2}"
+                            Style="{StaticResource PrimaryButton}"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            HeightRequest="36"
+                            Padding="20,0"
+                            CornerRadius="4" />
+
+                    <!-- STEP 2 FOOTER: Save / Raise POs Button -->
+                    <Button Grid.Column="3"
+                            IsVisible="{Binding IsPoModalStep2}"
+                            Text="{Binding PoModalSaveButtonText}"
+                            Command="{Binding SaveNewPoCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            HeightRequest="36"
+                            Padding="20,0"
+                            CornerRadius="4" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentView>

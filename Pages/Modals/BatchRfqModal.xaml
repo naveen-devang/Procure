@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.BatchRfqModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsBatchRfqModalVisible}">
+
+    <Grid BackgroundColor="#99000000">
+        <Border MaximumWidthRequest="950"
+                Margin="24"
+                MaximumHeightRequest="780"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="24">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
+            </Border.Shadow>
+
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
+                    <!-- Modal Header -->
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="Create Shared RFQ across Selected PRs"
+                                   FontFamily="SegoeSemibold" FontSize="16"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="{Binding BatchRfqPrsSummary}"
+                                   FontSize="11"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1" Text="&#xE711;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                Command="{Binding CloseBatchRfqModalCommand}"
+                                FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
+                                BackgroundColor="Transparent"
+                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                ToolTipProperties.Text="Close" />
+                    </Grid>
+
+                    <!-- SECTION 1: Commercial Header & Terms (2 Clean Rows) -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                            Padding="14">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="12">
+                            <!-- Row 1: RFQ Number (200), Vendor Name (*), Technical Approval (200) -->
+                            <Grid ColumnDefinitions="200, *, 200" ColumnSpacing="12">
+                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                    <Label Text="RFQ Number" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding BatchRfqNo, Mode=TwoWay}" Placeholder="e.g. RFQ-BUNDLE-01" HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="Vendor Name *" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding BatchRfqVendor, Mode=TwoWay}" Placeholder="e.g. Al-Futtaim Engineering" HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                    <Label Text="Technical Approval" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding AvailableTechnicalApprovals}"
+                                            SelectedItem="{Binding BatchRfqTechnicalApproval, Mode=TwoWay}"
+                                            HeightRequest="36" />
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <!-- Row 2: Currency, Payment Terms, Incoterms, Lead Time, Warranty -->
+                            <Grid ColumnDefinitions="110, 160, 120, 160, *" ColumnSpacing="10">
+                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                    <Label Text="Currency" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding AvailableCurrencies}"
+                                            SelectedItem="{Binding BatchRfqCurrency, Mode=TwoWay}"
+                                            SelectedIndexChanged="OnBatchRfqCurrencySelectionChanged"
+                                            HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="Payment Terms" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding BatchRfqPaymentTerms, Mode=TwoWay}" Placeholder="30 Days Net" HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                    <Label Text="Incoterms" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding AvailableIncoterms}"
+                                            SelectedItem="{Binding BatchRfqIncoterms, Mode=TwoWay}"
+                                            HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="3" Spacing="4">
+                                    <Label Text="Delivery / Lead Time" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding BatchRfqDeliveryLeadTime, Mode=TwoWay}" Placeholder="e.g. 2 Weeks" HeightRequest="36" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="4" Spacing="4">
+                                    <Label Text="Warranty" FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding BatchRfqWarranty, Mode=TwoWay}" Placeholder="e.g. 12 Months / 1 Year" HeightRequest="36" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- SECTION 2: Combined Line Items & Quoted Unit Rates Table -->
+                    <Border IsVisible="{Binding HasBatchEditingRfqItems}"
+                            StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                            Padding="14">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="10">
+                            <!-- Items Section Header -->
+                            <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="Consolidated Line Items &amp; Quoted Unit Rates"
+                                           FontFamily="SegoeSemibold" FontSize="13"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Label Text="Select items quoted by the vendor and enter unit prices (paste from Excel supported)."
+                                           FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                </VerticalStackLayout>
+
+                                <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                                    <Button Text="Select All"
+                                            Command="{Binding SelectAllBatchRfqItemsCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" HeightRequest="28" Padding="8,0" />
+                                    <Button Text="Deselect All"
+                                            Command="{Binding DeselectAllBatchRfqItemsCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" HeightRequest="28" Padding="8,0" />
+                                    <Button Text="&#xE8C8; Copy for Email"
+                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                            Command="{Binding CopySelectedBatchRfqItemsForEmailCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" HeightRequest="28" Padding="10,0"
+                                            ToolTipProperties.Text="Copy all selected items across combined PRs as a formatted table ready to paste into email" />
+                                </HorizontalStackLayout>
+                            </Grid>
+
+                            <!-- Table Header -->
+                            <Grid ColumnDefinitions="36, 75, *, 70, 85, 80, 90, 85"
+                                  ColumnSpacing="8"
+                                  Padding="6,4"
+                                  BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                <Label Grid.Column="0" Text="Quote" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="1" Text="Source PR" FontSize="10.5" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="2" Text="Item Description" FontSize="10.5" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="3" Text="Quantity" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="4" Text="Unit Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="5" Text="Discount" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="6" Text="Line Total" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="7" Text="Historical Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </Grid>
+
+                            <!-- Table Rows -->
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding BatchEditingRfqItems}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:RfqItem">
+                                        <Grid ColumnDefinitions="36, 75, *, 70, 85, 80, 90, 85"
+                                              ColumnSpacing="8"
+                                              Padding="4,2"
+                                              VerticalOptions="Center">
+                                            <!-- Quoted CheckBox -->
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding IsQuoted, Mode=TwoWay}"
+                                                      CheckedChanged="OnBatchRfqItemCheckedChanged"
+                                                      VerticalOptions="Center"
+                                                      HorizontalOptions="Center" />
+
+                                            <!-- Source PR Badge -->
+                                            <Border Grid.Column="1" Padding="6,2" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                    VerticalOptions="Center" HorizontalOptions="Start">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding Notes}" FontSize="10" FontFamily="SegoeSemibold"
+                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                            </Border>
+
+                                            <!-- Item Description -->
+                                            <Label Grid.Column="2"
+                                                   Text="{Binding ItemName}"
+                                                   FontSize="12"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                   VerticalOptions="Center"
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation" />
+
+                                            <!-- Quantity & Unit -->
+                                            <Label Grid.Column="3"
+                                                   Text="{Binding FormattedQuantity}"
+                                                   FontSize="11.5"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                   HorizontalOptions="End"
+                                                   VerticalOptions="Center" />
+
+                                            <!-- Unit Price Input -->
+                                            <Entry Grid.Column="4"
+                                                   Text="{Binding QuotedUnitPrice, Mode=TwoWay}"
+                                                   Placeholder="0.00"
+                                                   Keyboard="Numeric"
+                                                   HeightRequest="32"
+                                                   FontSize="12"
+                                                   HorizontalTextAlignment="End"
+                                                   IsEnabled="{Binding IsQuoted}"
+                                                   Loaded="OnBatchRfqUnitPriceEntryLoaded"
+                                                   Unloaded="OnBatchRfqUnitPriceEntryUnloaded"
+                                                   TextChanged="OnBatchRfqUnitPriceTextChanged" />
+
+                                            <!-- Line Discount Input -->
+                                            <Entry Grid.Column="5"
+                                                   Text="{Binding Discount, Mode=TwoWay}"
+                                                   Placeholder="0.00"
+                                                   Keyboard="Numeric"
+                                                   HeightRequest="32"
+                                                   FontSize="12"
+                                                   HorizontalTextAlignment="End"
+                                                   IsEnabled="{Binding IsQuoted}"
+                                                   Loaded="OnBatchRfqDiscountEntryLoaded"
+                                                   Unloaded="OnBatchRfqDiscountEntryUnloaded"
+                                                   TextChanged="OnBatchRfqDiscountTextChanged" />
+
+                                            <!-- Line Total Display -->
+                                            <Label Grid.Column="6"
+                                                   Text="{Binding FormattedLineTotal}"
+                                                   FontSize="12"
+                                                   FontFamily="SegoeSemibold"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                   HorizontalOptions="End"
+                                                   VerticalOptions="Center" />
+
+                                            <!-- Last Price Input -->
+                                            <Entry Grid.Column="7"
+                                                   Text="{Binding LastPrice, Mode=TwoWay}"
+                                                   Placeholder="0.00"
+                                                   Keyboard="Numeric"
+                                                   HeightRequest="32"
+                                                   FontSize="12"
+                                                   HorizontalTextAlignment="End"
+                                                   IsEnabled="{Binding IsQuoted}"
+                                                   Loaded="OnBatchRfqLastPriceEntryLoaded"
+                                                   Unloaded="OnBatchRfqLastPriceEntryUnloaded"
+                                                   TextChanged="OnBatchRfqLastPriceTextChanged" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- SECTION 3: Financial Summary & VAT Breakdown Card -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                            Padding="14">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*, *, *, *, 120" ColumnSpacing="10">
+                                <!-- Base Quote Total -->
+                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                    <Label Text="Base Quote Sum" FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <Entry Text="{Binding BatchRfqQuoteAmount, Mode=TwoWay}"
+                                           Placeholder="0.00"
+                                           Keyboard="Numeric"
+                                           HeightRequest="36"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextChanged="OnBatchRfqQuoteAmountTextChanged" />
+                                </VerticalStackLayout>
+
+                                <!-- Freight Charges -->
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="Freight" FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <Entry Text="{Binding BatchRfqFreight, Mode=TwoWay}"
+                                           Placeholder="0.00"
+                                           Keyboard="Numeric"
+                                           HeightRequest="36"
+                                           TextChanged="OnBatchRfqFreightTextChanged" />
+                                </VerticalStackLayout>
+
+                                <!-- Other Charges -->
+                                <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                    <Label Text="Other Charges" FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <Entry Text="{Binding BatchRfqOtherCharges, Mode=TwoWay}"
+                                           Placeholder="0.00"
+                                           Keyboard="Numeric"
+                                           HeightRequest="36"
+                                           TextChanged="OnBatchRfqOtherChargesTextChanged" />
+                                </VerticalStackLayout>
+
+                                <!-- Overall Discount (Before Tax) -->
+                                <VerticalStackLayout Grid.Column="3" Spacing="4">
+                                    <Label Text="Total Discount" FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <Entry Text="{Binding BatchRfqDiscount, Mode=TwoWay}"
+                                           Placeholder="0.00"
+                                           Keyboard="Numeric"
+                                           HeightRequest="36"
+                                           TextChanged="OnBatchRfqTotalDiscountTextChanged" />
+                                </VerticalStackLayout>
+
+                                <!-- VAT Applicable -->
+                                <VerticalStackLayout Grid.Column="4" Spacing="4">
+                                    <Label Text="VAT Applicable" FontSize="11"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                    <Picker ItemsSource="{Binding AvailableVatTypes}"
+                                            SelectedItem="{Binding BatchRfqVatType, Mode=TwoWay}"
+                                            SelectedIndexChanged="OnBatchRfqVatTypeSelectionChanged"
+                                            HeightRequest="36" />
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <!-- Total Landed Cost Banner (Clean Neutral Border & Bold Amount) -->
+                            <Border Margin="0,4,0,0" Padding="12,10"
+                                    StrokeThickness="1"
+                                    Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="6" />
+                                </Border.StrokeShape>
+                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="Total Landed Cost (Base + Freight + Other Charges - Discount + VAT)"
+                                               FontSize="11"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                        <Label Text="{Binding FormattedCalculatedBatchRfqGrandTotal}"
+                                               FontSize="16"
+                                               FontFamily="SegoeSemibold"
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    </VerticalStackLayout>
+
+                                    <Label Grid.Column="1"
+                                           Text="{Binding CalculatedBatchRfqVatAmount, StringFormat='VAT: {0:N2}'}"
+                                           FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                           VerticalOptions="Center" />
+                                </Grid>
+                            </Border>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Action Buttons -->
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="End" Margin="0,4,0,0">
+                        <Button Text="Cancel" Command="{Binding CloseBatchRfqModalCommand}"
+                                Style="{StaticResource CancelButton}" HeightRequest="36" Padding="16,0" />
+                        <Button Text="Create Shared RFQs" Command="{Binding SaveBatchRfqModalCommand}"
+                                Style="{StaticResource PrimaryButton}" HeightRequest="36" Padding="20,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentView>

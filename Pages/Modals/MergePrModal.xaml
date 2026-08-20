@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.MergePrModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsMergePrModalVisible}">
+
+    <Grid BackgroundColor="#99000000">
+        <Border MaximumWidthRequest="660"
+                Margin="24"
+                MaximumHeightRequest="750"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="26">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
+            </Border.Shadow>
+
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
+                    <!-- Modal Header -->
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Combine Requisitions into Master PR"
+                                   FontFamily="SegoeSemibold" FontSize="18"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="Consolidate multiple requisitions into a single package for unified RFQs, approvals, and POs."
+                                   FontSize="12" TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1" Text="&#xE711;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                Command="{Binding CloseMergePrModalCommand}"
+                                FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
+                                BackgroundColor="Transparent"
+                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                ToolTipProperties.Text="Close" />
+                    </Grid>
+
+                    <!-- Selected PRs Preview Cards -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Selected Source Requisitions to Merge:"
+                               FontSize="12" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Border Padding="10,8" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding SelectedPrsForMerge}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PurchaseRequisition">
+                                        <Grid ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                            <Label Grid.Column="0" Text="{Binding PrNo}" FontFamily="SegoeSemibold" FontSize="12" TextColor="{DynamicResource Primary}" />
+                                            <Label Grid.Column="1" Text="{Binding Description}" FontSize="12" LineBreakMode="TailTruncation" TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                            <Label Grid.Column="2" Text="{Binding Requestor}" FontSize="11" TextColor="{StaticResource Gray400}" />
+                                            <Label Grid.Column="3" Text="{Binding Priority}" FontSize="11" FontFamily="SegoeSemibold" TextColor="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Master PR Number & Priority -->
+                    <Grid ColumnDefinitions="*, 140" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                            <Label Text="Combined PR Number *" FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding MergeMasterPrNo, Mode=TwoWay}" Placeholder="e.g. 12345/6780" HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Priority" FontSize="12"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker ItemsSource="{Binding AllPriorities}"
+                                    SelectedItem="{Binding MergePriority, Mode=TwoWay}"
+                                    HeightRequest="36" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- Requestor -->
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Requestor / Department" FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Entry Text="{Binding MergeRequestor, Mode=TwoWay}" Placeholder="e.g. Consolidated Procurement" HeightRequest="36" />
+                    </VerticalStackLayout>
+
+                    <!-- Combined Description -->
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Combined Description / Line Items *" FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Editor Text="{Binding MergeDescription, Mode=TwoWay}"
+                                Placeholder="Consolidated item list..."
+                                HeightRequest="90" AutoSize="Disabled" />
+                    </VerticalStackLayout>
+
+                    <!-- RFQ Handling Option (Requested by User) -->
+                    <Border Padding="12,10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="6" />
+                        </Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" VerticalOptions="Center">
+                            <CheckBox Grid.Column="0" IsChecked="{Binding MergeCopyChildRfqs, Mode=TwoWay}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Copy existing vendor RFQs &amp; quotes into Master PR"
+                                       FontFamily="SegoeSemibold" FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="If unchecked, the consolidated PR will start with a fresh RFQ slate."
+                                       FontSize="11" TextColor="{StaticResource Gray400}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <!-- Notes / Lineage Tracking -->
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Consolidation Notes &amp; Lineage" FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Editor Text="{Binding MergeNotes, Mode=TwoWay}"
+                                Placeholder="Lineage details..."
+                                HeightRequest="60" AutoSize="Disabled" />
+                    </VerticalStackLayout>
+
+                    <!-- Action Buttons -->
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="End" Margin="0,8,0,0">
+                        <Button Text="Cancel" Command="{Binding CloseMergePrModalCommand}"
+                                Style="{StaticResource CancelButton}" HeightRequest="36" Padding="16,0" />
+                        <Button Text="Combine Requisitions" Command="{Binding ConfirmMergePrModalCommand}"
+                                Style="{StaticResource PrimaryButton}" HeightRequest="36" Padding="20,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentView>

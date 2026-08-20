@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.ManageColumnsPage"
+             x:Name="ThisPage"
+             x:DataType="pageModels:ManageColumnsPageModel"
+             Shell.NavBarIsVisible="False"
+             Title="Custom Columns"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <Grid>
+        <ScrollView Padding="28,24,28,32">
+            <VerticalStackLayout Spacing="22" MaximumWidthRequest="1000" HorizontalOptions="Center">
+
+                <!-- Header -->
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Custom Column Definitions"
+                           FontFamily="SegoeSemibold"
+                           FontSize="26"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Label Text="Define team-specific metadata fields (e.g. Cost Center, GL Account, Department) that dynamically attach to every PR."
+                           FontSize="13"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                </VerticalStackLayout>
+
+                <!-- Add New Column Card -->
+                <Border StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                        Padding="20">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                    </Border.Shadow>
+
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="+ Add New Custom Field"
+                               FontFamily="SegoeSemibold"
+                               FontSize="15"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="14">
+                            <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                <Label Text="Column Name *" FontSize="12" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Entry Text="{Binding NewColumnName, Mode=TwoWay}"
+                                       Placeholder="e.g. Cost Center, GL Code, Department"
+                                       HeightRequest="36" />
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="Data Type *" FontSize="12" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Picker ItemsSource="{Binding AvailableDataTypes}"
+                                        SelectedItem="{Binding NewColumnDataType, Mode=TwoWay}"
+                                        HeightRequest="36" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- Optional Select Options -->
+                        <VerticalStackLayout IsVisible="{Binding ShowOptionsField}" Spacing="4">
+                            <Label Text="Dropdown Options (comma-separated)" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding NewColumnOptions, Mode=TwoWay}"
+                                   Placeholder="e.g. IT, Engineering, Operations, Finance, HR"
+                                   HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <Button Text="Add Column"
+                                Command="{Binding AddColumnCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HorizontalOptions="End"
+                                HeightRequest="36"
+                                Padding="20,0" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Existing Columns List (Optimized BindableLayout) -->
+                <Border StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                        Padding="20">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                    </Border.Shadow>
+
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="Active Custom Columns"
+                               FontFamily="SegoeSemibold"
+                               FontSize="15"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Columns}">
+                            <BindableLayout.EmptyView>
+                                <Label Text="No custom columns defined yet."
+                                       FontSize="13" TextColor="{StaticResource Gray400}"
+                                       Padding="20" HorizontalOptions="Center" />
+                            </BindableLayout.EmptyView>
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:CustomColumnDefinition">
+                                    <Border Margin="0,0,0,10"
+                                            Padding="16,12"
+                                            StrokeThickness="1"
+                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="6" />
+                                        </Border.StrokeShape>
+
+                                        <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                            <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                                <Label Text="{Binding Name}" FontFamily="SegoeSemibold" FontSize="14"
+                                                       LineBreakMode="TailTruncation" MaxLines="1"
+                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                <Label Text="{Binding SelectOptions, StringFormat='Options: {0}'}"
+                                                       IsVisible="{Binding SelectOptions, Converter={StaticResource NullToBoolConverter}}"
+                                                       LineBreakMode="TailTruncation" MaxLines="2"
+                                                       FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                            </VerticalStackLayout>
+
+                                            <!-- Responsive Type Badge -->
+                                            <Border Grid.Column="1"
+                                                    Padding="8,3"
+                                                    StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light='#CCE4F7', Dark='#244970'}"
+                                                    BackgroundColor="{AppThemeBinding Light='#EBF3FC', Dark='#172E48'}"
+                                                    VerticalOptions="Center">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding DataType}"
+                                                       FontSize="11"
+                                                       FontFamily="SegoeSemibold"
+                                                       TextColor="{AppThemeBinding Light='#004E8C', Dark='#70B8FF'}" />
+                                            </Border>
+
+                                            <!-- Responsive Delete Button -->
+                                            <Button Grid.Column="2"
+                                                    Text="&#xE74D;"
+                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeleteColumnCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    FontSize="11"
+                                                    HeightRequest="28"
+                                                    WidthRequest="28"
+                                                    Padding="0"
+                                                    CornerRadius="4"
+                                                    BorderWidth="1"
+                                                    BackgroundColor="{AppThemeBinding Light='#FDE7E9', Dark='#3F1011'}"
+                                                    BorderColor="{AppThemeBinding Light='#F1B0B7', Dark='#5C1B1E'}"
+                                                    TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                    ToolTipProperties.Text="Delete Column" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Hardware-Accelerated Theme Transition Curtain -->
+        <BoxView x:Name="ThemeCurtain"
+                 InputTransparent="True"
+                 IsVisible="False"
+                 Opacity="0"
+                 ZIndex="9999"
+                 HorizontalOptions="Fill"
+                 VerticalOptions="Fill" />
+    </Grid>
+</ContentPage>

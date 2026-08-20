@@ -1,0 +1,1655 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             xmlns:modals="clr-namespace:Procure.Pages.Modals"
+             xmlns:converters="clr-namespace:Procure.Utilities"
+             xmlns:f="clr-namespace:Fonts"
+             x:Class="Procure.Pages.PrListPage"
+             x:Name="ThisPage"
+             x:DataType="pageModels:PrListPageModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <Grid>
+        <!-- Main Scrollable Content -->
+        <ScrollView Padding="28,36,28,36">
+            <VerticalStackLayout Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
+
+                <!-- Page Header: Title + Primary Actions -->
+                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto" Margin="0,6,0,0">
+                    <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
+                        <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                            <Label Text="Purchase Requisitions"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="26"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            
+                            <Border Padding="10,3" StrokeThickness="0"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                    VerticalOptions="Center">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="12" />
+                                </Border.StrokeShape>
+                                <Label Text="{Binding FilteredPrs.Count, StringFormat='{0} requisitions'}"
+                                       FontSize="12"
+                                       FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                            </Border>
+                        </HorizontalStackLayout>
+                        
+                        <Label Text="Manage procurement lifecycle across vendor RFQs, multi-role PCR approvals, and purchase orders."
+                               FontSize="13"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+
+                    <!-- Right Command Buttons -->
+                    <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                        <Button Text="Export CSV"
+                                ImageSource="{StaticResource IconExport}"
+                                Command="{Binding ExportCsvCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="38"
+                                Padding="16,0" />
+
+                        <Button Text="Refresh"
+                                ImageSource="{StaticResource IconRefresh}"
+                                Command="{Binding LoadPrsCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="38"
+                                Padding="14,0" />
+
+                        <Button Text="+ Bulk Create"
+                                Command="{Binding OpenBatchCreateModalCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HeightRequest="38"
+                                Padding="20,0" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Filter & Search Toolbar (Flat Fluent Command Bar - Clean, No Nested Containers) -->
+                <!-- Filter & Search Toolbar (Flat Fluent Command Bar - Native WinUI 3 Controls) -->
+                <Grid ColumnDefinitions="*, 150, Auto, Auto, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                    <!-- Search Input (Direct Native WinUI 3 Control) -->
+                    <Entry Grid.Column="0"
+                           Text="{Binding SearchText, Mode=TwoWay}"
+                           Placeholder="Search by PR #, item, requestor..."
+                           FontSize="13"
+                           HeightRequest="36"
+                           VerticalOptions="Center" />
+
+                    <!-- Status Picker Dropdown (Direct Native WinUI 3 Control) -->
+                    <Picker Grid.Column="1"
+                            ItemsSource="{Binding StatusFilterOptions}"
+                            SelectedItem="{Binding SelectedStatusFilter, Mode=TwoWay}"
+                            FontSize="13"
+                            HeightRequest="36"
+                            VerticalOptions="Center" />
+
+                    <!-- Filter Chip: Overdue SLA (Pill Button) -->
+                    <Button Grid.Column="2"
+                            Text="Overdue SLA"
+                            Command="{Binding ToggleFilterOverdueCommand}"
+                            HeightRequest="36"
+                            Padding="14,0"
+                            CornerRadius="6"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            BorderWidth="1"
+                            BorderColor="{Binding FilterOverdueOnly, Converter={StaticResource BoolToFilterChipStrokeConverter}}"
+                            BackgroundColor="{Binding FilterOverdueOnly, Converter={StaticResource BoolToFilterChipBgConverter}}"
+                            TextColor="{Binding FilterOverdueOnly, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+
+                    <!-- Filter Chip: PCR Awaiting Sign (Pill Button) -->
+                    <Button Grid.Column="3"
+                            Text="PCR Awaiting Sign"
+                            Command="{Binding ToggleFilterPcrPendingCommand}"
+                            HeightRequest="36"
+                            Padding="14,0"
+                            CornerRadius="6"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            BorderWidth="1"
+                            BorderColor="{Binding FilterPcrPendingOnly, Converter={StaticResource BoolToFilterChipStrokeConverter}}"
+                            BackgroundColor="{Binding FilterPcrPendingOnly, Converter={StaticResource BoolToFilterChipBgConverter}}"
+                            TextColor="{Binding FilterPcrPendingOnly, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+
+                    <!-- Filter Chip: Urgent Only (Pill Button) -->
+                    <Button Grid.Column="4"
+                            Text="Urgent Only"
+                            Command="{Binding ToggleFilterUrgentCommand}"
+                            HeightRequest="36"
+                            Padding="14,0"
+                            CornerRadius="6"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            BorderWidth="1"
+                            BorderColor="{Binding FilterUrgentOnly, Converter={StaticResource BoolToFilterChipStrokeConverter}}"
+                            BackgroundColor="{Binding FilterUrgentOnly, Converter={StaticResource BoolToFilterChipBgConverter}}"
+                            TextColor="{Binding FilterUrgentOnly, Converter={StaticResource BoolToFilterChipTextConverter}}" />
+                </Grid>
+
+                <!-- Transient InfoBar / Notification (Clean Windows 11 Inline InfoBar) -->
+                <Border IsVisible="{Binding IsStatusMessageVisible}"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource AlertWarningBorderLight}, Dark={StaticResource AlertWarningBorderDark}}"
+                        Background="{AppThemeBinding Light={StaticResource AlertWarningBgLight}, Dark={StaticResource AlertWarningBgDark}}"
+                        Padding="14,10">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="6" />
+                    </Border.StrokeShape>
+                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                        <Label Grid.Column="0" Text="&#xE7BA;"
+                               FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource AlertWarningIconLight}, Dark={StaticResource AlertWarningIconDark}}"
+                               VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="{Binding StatusMessage}"
+                               FontSize="12"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="2" Text="✕"
+                                Command="{Binding DismissStatusMessageCommand}"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource Gray400}"
+                                FontSize="12" HeightRequest="26" WidthRequest="26" Padding="0" />
+                    </Grid>
+                </Border>
+
+                <!-- Batch Action Bar (Visible when 1 or more PRs are selected) -->
+                <Border IsVisible="{Binding IsBatchSelectionActive}"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                        Padding="16,10">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <Border.Shadow>
+                        <Shadow Brush="#20000000" Offset="0,4" Radius="12" Opacity="0.7" />
+                    </Border.Shadow>
+                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="14" VerticalOptions="Center">
+                        <!-- Selection summary -->
+                        <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                            <Border Padding="6,2" StrokeThickness="0" BackgroundColor="{DynamicResource Primary}" VerticalOptions="Center">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="10" />
+                                </Border.StrokeShape>
+                                <Label Text="{Binding SelectedPrsCount}" FontSize="12" FontFamily="SegoeSemibold" TextColor="White" />
+                            </Border>
+                            <Label Text="{Binding SelectedPrsSummary}"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="13"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <!-- Dynamic Batch Actions (Buttons switch up automatically based on selection state) -->
+                        <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
+                            <!-- Button 1: Combine / Merge PRs vs Split / Unmerge PR -->
+                            <Button Text="{Binding MergeButtonText}"
+                                    Command="{Binding MergeOrSplitPrCommand}"
+                                    IsEnabled="{Binding IsMergeOrSplitPrEnabled}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HeightRequest="34"
+                                    Padding="14,0"
+                                    FontSize="12"
+                                    ToolTipProperties.Text="{Binding MergeButtonToolTip}" />
+
+                            <!-- Button 2: Shared RFQ vs Split Shared RFQ -->
+                            <Button Text="{Binding SharedRfqButtonText}"
+                                    Command="{Binding CreateOrSplitSharedRfqCommand}"
+                                    IsEnabled="{Binding IsSharedRfqActionEnabled}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HeightRequest="34"
+                                    Padding="12,0"
+                                    FontSize="12"
+                                    ToolTipProperties.Text="{Binding SharedRfqButtonToolTip}" />
+
+                            <!-- Button 3: Combined PO vs Split Combined PO -->
+                            <Button Text="{Binding CombinedPoButtonText}"
+                                    Command="{Binding CreateOrSplitCombinedPoCommand}"
+                                    IsEnabled="{Binding IsCombinedPoActionEnabled}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HeightRequest="34"
+                                    Padding="12,0"
+                                    FontSize="12"
+                                    ToolTipProperties.Text="{Binding CombinedPoButtonToolTip}" />
+
+                            <!-- Button 4: Clear Selection -->
+                            <Button Text="Clear"
+                                    Command="{Binding ClearSelectionCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HeightRequest="34"
+                                    Padding="10,0"
+                                    FontSize="12" />
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- ===== SKELETON LOADING (visible while IsBusy = true) ===== -->
+                <!-- 6 placeholder rows that mirror the real PR card structure -->
+                <VerticalStackLayout x:Name="SkeletonContainer"
+                                     IsVisible="{Binding IsBusy}"
+                                     Spacing="14">
+
+                    <!-- Skeleton Card (template, repeated 6×) -->
+                    <!-- Card 1 -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="70" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="140" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 2 (wider description to vary rhythm) -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="55" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="200" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 3 -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="110" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="80" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="120" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 4 -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="105" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="65" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="170" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 5 -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="95" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Card 6 (shorter description, fades the list naturally) -->
+                    <Border StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                            Padding="14,14,18,14">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                            <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                            <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                                <BoxView HeightRequest="13" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                                <BoxView HeightRequest="11" WidthRequest="75" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                                <BoxView HeightRequest="11" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                            </HorizontalStackLayout>
+                            <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                </VerticalStackLayout>
+                <!-- ===== END SKELETON ===== -->
+
+                <!-- PR Cards List (Lightweight BindableLayout - Eliminates CollectionView layout measurement freeze) -->
+                <VerticalStackLayout IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                     BindableLayout.ItemsSource="{Binding FilteredPrs}">
+                    <BindableLayout.EmptyView>
+                        <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
+                            <Label Text="No purchase requisitions match your criteria."
+                                   FontSize="15"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{StaticResource Gray400}"
+                                   HorizontalOptions="Center" />
+                            <Button Text="Reset Filters"
+                                    Command="{Binding LoadPrsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HeightRequest="36"
+                                    HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </BindableLayout.EmptyView>
+
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="models:PurchaseRequisition">
+                            <Border Margin="0,0,0,14"
+                                    StrokeThickness="1"
+                                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                    Padding="0">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+
+                                <VerticalStackLayout Spacing="0">
+
+                                    <!-- CARD HEADER ROW (Clickable to expand/collapse) -->
+                                    <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto"
+                                          RowDefinitions="Auto"
+                                          Padding="14,14,18,14"
+                                          ColumnSpacing="10"
+                                          BackgroundColor="Transparent">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleExpandCommand}"
+                                                                  CommandParameter="{Binding .}" />
+                                        </Grid.GestureRecognizers>
+
+                                        <!-- Multi-Select CheckBox (Native WinUI 3 CheckBox with zero MinWidth/Padding) -->
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  CheckedChanged="OnPrSelectionCheckedChanged"
+                                                  HorizontalOptions="Start"
+                                                  VerticalOptions="Center" />
+
+                                        <!-- Priority Badge (Clickable: toggles Urgent / Normal) -->
+                                        <Button Grid.Column="1"
+                                                Text="{Binding Priority}"
+                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.TogglePriorityCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="11"
+                                                FontFamily="SegoeSemibold"
+                                                HeightRequest="26"
+                                                Padding="8,0"
+                                                CornerRadius="4"
+                                                BorderWidth="1"
+                                                BorderColor="{Binding Priority, Converter={StaticResource PriorityBorderConverter}}"
+                                                BackgroundColor="{Binding Priority, Converter={StaticResource PriorityBgConverter}}"
+                                                TextColor="{Binding Priority, Converter={StaticResource PriorityColorConverter}}"
+                                                VerticalOptions="Center" />
+
+                                        <!-- PR Type & PR Number & Requestor & Plant -->
+                                        <VerticalStackLayout Grid.Column="2" Spacing="3" VerticalOptions="Center" WidthRequest="140">
+                                            <!-- PR Type Badge (Positioned above PR Number) -->
+                                            <Border IsVisible="{Binding PrType, Converter={StaticResource NullToBoolConverter}}"
+                                                    Margin="0,0,0,2" Padding="6,2" StrokeThickness="1"
+                                                    Stroke="{Binding PrType, Converter={StaticResource PrTypeBorderConverter}}"
+                                                    BackgroundColor="{Binding PrType, Converter={StaticResource PrTypeBgConverter}}"
+                                                    HorizontalOptions="Start">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding PrType}"
+                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                       TextColor="{Binding PrType, Converter={StaticResource PrTypeColorConverter}}" />
+                                            </Border>
+
+                                            <Label Text="{Binding PrNo}"
+                                                   FontFamily="SegoeSemibold"
+                                                   FontSize="14"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                            <HorizontalStackLayout Spacing="4" VerticalOptions="Center">
+                                                <Label Text="{Binding Requestor}"
+                                                       FontSize="12"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaximumWidthRequest="80"
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                <Label Text="•"
+                                                       FontSize="10"
+                                                       VerticalOptions="Center"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
+                                                       IsVisible="{Binding Plant, Converter={StaticResource NullToBoolConverter}}" />
+                                                <Label Text="{Binding Plant}"
+                                                       FontSize="11"
+                                                       FontFamily="SegoeSemibold"
+                                                       VerticalOptions="Center"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                       IsVisible="{Binding Plant, Converter={StaticResource NullToBoolConverter}}" />
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+
+                                        <!-- Description & Age & Consolidation Badges -->
+                                        <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                            <!-- Badges Row (Consolidation, Merged, Shared RFQ, Combined PO) -->
+                                            <FlexLayout Wrap="Wrap" AlignItems="Center">
+                                                <!-- Consolidation Master Badge -->
+                                                <Border IsVisible="{Binding IsConsolidatedMaster}"
+                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPrBorderLight}, Dark={StaticResource BadgeCombinedPrBorderDark}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrBgLight}, Dark={StaticResource BadgeCombinedPrBgDark}}"
+                                                        HorizontalOptions="Start">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="{Binding ConsolidatedFrom, StringFormat='Combined: {0}'}"
+                                                           FontSize="10" FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrTextLight}, Dark={StaticResource BadgeCombinedPrTextDark}}"
+                                                           LineBreakMode="TailTruncation"
+                                                           MaximumWidthRequest="320" />
+                                                </Border>
+
+                                                <!-- Merged Child Badge -->
+                                                <Border IsVisible="{Binding IsMergedChild}"
+                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeMergedBorderLight}, Dark={StaticResource BadgeMergedBorderDark}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeMergedBgLight}, Dark={StaticResource BadgeMergedBgDark}}"
+                                                        HorizontalOptions="Start">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="Merged into Master PR"
+                                                           FontSize="10" FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeMergedTextLight}, Dark={StaticResource BadgeMergedTextDark}}" />
+                                                </Border>
+
+                                                <!-- Shared RFQ Badge -->
+                                                <Border IsVisible="{Binding HasSharedRfqs}"
+                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBgLight}, Dark={StaticResource BadgeSharedRfqBgDark}}"
+                                                        HorizontalOptions="Start">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="{Binding SharedRfqsBadgeText, StringFormat='Shared RFQ ({0})'}"
+                                                           FontSize="10" FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}"
+                                                           LineBreakMode="TailTruncation"
+                                                           MaximumWidthRequest="320" />
+                                                </Border>
+
+                                                <!-- Combined PO Badge -->
+                                                <Border IsVisible="{Binding HasCombinedPos}"
+                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPoBorderLight}, Dark={StaticResource BadgeCombinedPoBorderDark}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoBgLight}, Dark={StaticResource BadgeCombinedPoBgDark}}"
+                                                        HorizontalOptions="Start">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="{Binding CombinedPosBadgeText, StringFormat='Combined PO ({0})'}"
+                                                           FontSize="10" FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoTextLight}, Dark={StaticResource BadgeCombinedPoTextDark}}"
+                                                           LineBreakMode="TailTruncation"
+                                                           MaximumWidthRequest="320" />
+                                                </Border>
+                                            </FlexLayout>
+
+                                            <!-- Description (Ellipsized at 2 lines max so cards stay compact & aligned) -->
+                                            <Label Text="{Binding Description}"
+                                                   FontFamily="SegoeSemibold"
+                                                   FontSize="13"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation" />
+
+                                            <!-- Items Count Tag & Age -->
+                                            <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                                                <!-- Total items tag -->
+                                                <Border IsVisible="{Binding HasItems}"
+                                                        Padding="5,1" StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                        BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}"
+                                                        HorizontalOptions="Start"
+                                                        VerticalOptions="Center">
+                                                    <Border.StrokeShape><RoundRectangle CornerRadius="3" /></Border.StrokeShape>
+                                                    <Label Text="{Binding ItemsCount, StringFormat='{0} items'}"
+                                                           FontSize="9.5" FontFamily="SegoeSemibold"
+                                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                </Border>
+
+                                                <!-- Age -->
+                                                <Label Text="{Binding AgeDisplay, StringFormat='Raised {0}'}"
+                                                       FontSize="11"
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextTertiary}, Dark={StaticResource TextTertiary}}"
+                                                       VerticalOptions="Center" />
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+
+                                        <!-- Pipeline Count Pills (Unified Metric Strip) -->
+                                        <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                                            <!-- RFQ Pill -->
+                                            <Border Padding="8,3" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding RfqCount, StringFormat='{0} RFQs'}"
+                                                       FontSize="11"
+                                                       FontFamily="SegoeSemibold"
+                                                       TextColor="{AppThemeBinding Light={StaticResource PillTextNeutralLight}, Dark={StaticResource PillTextNeutralDark}}" />
+                                            </Border>
+
+                                            <!-- PCR Pill -->
+                                            <Border Padding="8,3" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding PcrStatusDisplay}"
+                                                       FontSize="11"
+                                                       FontFamily="SegoeSemibold"
+                                                       TextColor="{Binding PcrStatusDisplay, Converter={StaticResource PcrPillTextColorConverter}}" />
+                                            </Border>
+
+                                            <!-- PO Pill -->
+                                            <Border Padding="8,3" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding FormattedTotalPoValue, StringFormat='PO: {0}'}"
+                                                       FontSize="11"
+                                                       FontFamily="SegoeSemibold"
+                                                       TextColor="{Binding TotalPoValue, Converter={StaticResource PoPillTextColorConverter}}" />
+                                            </Border>
+                                        </HorizontalStackLayout>
+
+                                        <!-- Status InfoBadge (Clickable: opens native button-anchored flyout) -->
+                                        <Button Grid.Column="5"
+                                                Text="{Binding Status}"
+                                                Clicked="OnPrStatusButtonClicked"
+                                                FontSize="12"
+                                                FontFamily="SegoeSemibold"
+                                                HeightRequest="28"
+                                                Padding="12,0"
+                                                CornerRadius="6"
+                                                BorderWidth="0"
+                                                BackgroundColor="{Binding Status, Converter={StaticResource StatusBadgeBgConverter}}"
+                                                TextColor="{Binding Status, Converter={StaticResource StatusColorConverter}}"
+                                                VerticalOptions="Center" />
+
+                                        <!-- Edit & Delete Action Icon Buttons -->
+                                        <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                                            <Button Text="&#xE70F;"
+                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    FontSize="12"
+                                                    HeightRequest="30"
+                                                    WidthRequest="30"
+                                                    Padding="0"
+                                                    CornerRadius="4"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                    TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                    ToolTipProperties.Text="Edit PR" />
+
+                                            <Button Text="&#xE74D;"
+                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePrCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    FontSize="12"
+                                                    HeightRequest="30"
+                                                    WidthRequest="30"
+                                                    Padding="0"
+                                                    CornerRadius="4"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                    TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                    ToolTipProperties.Text="Delete PR" />
+                                        </HorizontalStackLayout>
+
+                                        <!-- Expand / Collapse Indicator Chevron -->
+                                        <Label Grid.Column="7"
+                                                Text="{Binding IsExpanded, Converter={StaticResource BoolToChevronConverter}}"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontSize="11"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray400}}"
+                                                VerticalOptions="Center" />
+                                    </Grid>
+
+                                    <!-- EXPANDED DETAIL VIEW (3-COLUMN NATIVE FLUENT PANEL) -->
+                                    <Border IsVisible="{Binding IsExpanded}"
+                                            StrokeThickness="0"
+                                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkBackground}}"
+                                            Padding="18">
+                                        <VerticalStackLayout Spacing="16">
+
+                                            <!-- Consolidated Master PR Banner in Expanded View -->
+                                            <Border IsVisible="{Binding IsConsolidatedMaster}"
+                                                    Padding="14,10" StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPrBorderLight}, Dark={StaticResource BadgeCombinedPrBorderDark}}"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrBgLight}, Dark={StaticResource BadgeCombinedPrBgDark}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="6" />
+                                                </Border.StrokeShape>
+                                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                                    <Label Grid.Column="0" Text="&#xE8D7;"
+                                                           FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                           FontSize="16"
+                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrTextLight}, Dark={StaticResource BadgeCombinedPrTextDark}}"
+                                                           VerticalOptions="Center" />
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                                        <Label Text="Consolidated Master Requisition" FontFamily="SegoeSemibold" FontSize="12"
+                                                               TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrTextLight}, Dark={StaticResource BadgeCombinedPrTextDark}}" />
+                                                        <Label Text="{Binding ConsolidatedFrom, StringFormat='Combined from source requisitions: {0}'}" FontSize="11"
+                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                    </VerticalStackLayout>
+                                                    <Button Grid.Column="2" Text="&#xE748; Split PR"
+                                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitMasterPrCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            FontSize="11" HeightRequest="28" Padding="10,0"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            ToolTipProperties.Text="Split / unmerge this combined PR back into its source requisitions" />
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- 3 Distinct Fluent Column Cards -->
+                                            <Grid ColumnDefinitions="*, *, *" ColumnSpacing="14">
+
+                                                <!-- COLUMN 1: RFQ & VENDOR QUOTES (Optimized BindableLayout) -->
+                                                <Border Grid.Column="0"
+                                                        StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                        Padding="16">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="8" />
+                                                    </Border.StrokeShape>
+
+                                                    <VerticalStackLayout Spacing="12">
+                                                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                                            <Label Grid.Column="0" Text="1. RFQs &amp; Vendor Quotes"
+                                                                   FontFamily="SegoeSemibold" FontSize="13"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                   VerticalOptions="Center" />
+                                                            <Button Grid.Column="1" Text="+ Add RFQ"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenAddRfqModalCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    FontSize="11" HeightRequest="28" Padding="10,0"
+                                                                    BorderWidth="1"
+                                                                    BorderColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource FluentTealBg}, Dark={StaticResource FluentTealBgDark}}"
+                                                                    TextColor="{AppThemeBinding Light={StaticResource FluentTeal}, Dark={StaticResource FluentTealTextDark}}" />
+                                                        </Grid>
+
+                                                        <!-- RFQs Stack (Lightweight BindableLayout) -->
+                                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rfqs}">
+                                                            <BindableLayout.EmptyView>
+                                                                <Label Text="No RFQs invited yet. Click '+ Add RFQ' to record vendor inquiries."
+                                                                       FontSize="11" TextColor="{StaticResource Gray400}" Padding="6,12" />
+                                                            </BindableLayout.EmptyView>
+                                                            <BindableLayout.ItemTemplate>
+                                                                <DataTemplate x:DataType="models:RequestForQuotation">
+                                                                    <Border Margin="0,0,0,8" Padding="14,12" StrokeThickness="1"
+                                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                                                        <Border.StrokeShape>
+                                                                            <RoundRectangle CornerRadius="6" />
+                                                                        </Border.StrokeShape>
+                                                                        
+                                                                        <VerticalStackLayout Spacing="8">
+                                                                            <!-- Row 1: Vendor Name (Left) | Action Icons (Right) -->
+                                                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                                                                <Label Grid.Column="0"
+                                                                                       Text="{Binding Vendor}"
+                                                                                       FontFamily="SegoeSemibold"
+                                                                                       FontSize="13.5"
+                                                                                       LineBreakMode="TailTruncation"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                                       VerticalOptions="Center" />
+
+                                                                                <!-- Right: Action Icons -->
+                                                                                <HorizontalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                                                                    <!-- Split / Unlink Shared RFQ Button -->
+                                                                                    <Button Text="&#xE748;"
+                                                                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitSharedRfqCommand}"
+                                                                                            CommandParameter="{Binding .}"
+                                                                                            IsVisible="{Binding IsSharedRfq}"
+                                                                                            FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                            BackgroundColor="Transparent"
+                                                                                            BorderWidth="0"
+                                                                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                            ToolTipProperties.Text="Split / Unlink shared RFQ bundle into independent quotations" />
+
+                                                                                    <!-- Edit Icon Button -->
+                                                                                    <Button Text="&#xE70F;"
+                                                                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditRfqModalCommand}"
+                                                                                            CommandParameter="{Binding .}"
+                                                                                            FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                            BackgroundColor="Transparent"
+                                                                                            BorderWidth="0"
+                                                                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                            ToolTipProperties.Text="Edit RFQ" />
+
+                                                                                    <!-- Delete Icon Button -->
+                                                                                    <Button Text="&#xE74D;"
+                                                                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeleteRfqCommand}"
+                                                                                            CommandParameter="{Binding .}"
+                                                                                            FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                            BackgroundColor="Transparent"
+                                                                                            BorderWidth="0"
+                                                                                            TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                                                            ToolTipProperties.Text="Delete RFQ" />
+                                                                                </HorizontalStackLayout>
+                                                                            </Grid>
+
+                                                                            <!-- Row 2: RFQ Number (+ Shared Badge) (Left) | Status Button (Right) -->
+                                                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                                                                <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                                                                                    <Label Text="{Binding RfqNo}"
+                                                                                           FontSize="11"
+                                                                                           FontFamily="SegoeSemibold"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                           VerticalOptions="Center" />
+
+                                                                                    <!-- Shared RFQ Badge -->
+                                                                                    <Border IsVisible="{Binding IsSharedRfq}"
+                                                                                            Padding="5,1.5" StrokeThickness="1"
+                                                                                            Stroke="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
+                                                                                            BackgroundColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBgLight}, Dark={StaticResource BadgeSharedRfqBgDark}}"
+                                                                                            VerticalOptions="Center">
+                                                                                        <Border.StrokeShape>
+                                                                                            <RoundRectangle CornerRadius="3" />
+                                                                                        </Border.StrokeShape>
+                                                                                        <Label Text="{Binding SharedPrs, StringFormat='Shared ({0})'}"
+                                                                                               FontSize="9" FontFamily="SegoeSemibold"
+                                                                                               TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}" />
+                                                                                    </Border>
+                                                                                </HorizontalStackLayout>
+
+                                                                                <!-- Right: Status Button (Neutral Monochrome with native anchored flyout) -->
+                                                                                <Button Grid.Column="1"
+                                                                                        Text="{Binding Status}"
+                                                                                        Clicked="OnRfqStatusButtonClicked"
+                                                                                        FontSize="10.5" HeightRequest="24" Padding="8,0"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                                        BorderWidth="1"
+                                                                                        BorderColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        CornerRadius="4"
+                                                                                        VerticalOptions="Center" />
+                                                                            </Grid>
+
+                                                                            <!-- Row 3: Left (Financial Breakdown) | Right (Total Amount) -->
+                                                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                                                                <Label Grid.Column="0"
+                                                                                       Text="{Binding FinancialBreakdownSummary}"
+                                                                                       FontSize="11"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                       VerticalOptions="Center"
+                                                                                       VerticalTextAlignment="Center" />
+
+                                                                                <!-- Total Amount (Neutral Monochrome on Row 3) -->
+                                                                                <Label Grid.Column="1"
+                                                                                       Text="{Binding FormattedDisplayAmount}"
+                                                                                       FontSize="13.5"
+                                                                                       FontFamily="SegoeSemibold"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                                       VerticalOptions="Center"
+                                                                                       VerticalTextAlignment="Center"
+                                                                                       HorizontalOptions="End" />
+                                                                            </Grid>
+
+                                                                            <!-- Row 4: Dedicated Tags Row (Centered, Matching Text Colors) -->
+                                                                            <FlexLayout Wrap="Wrap" AlignItems="Center" Margin="0,2,0,0">
+                                                                                <!-- Quote Completeness Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
+                                                                                        IsVisible="{Binding HasQuoteCompletenessBadge}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBgLight}, Dark={StaticResource BadgeSharedRfqBgDark}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding QuoteCompletenessBadge}" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}" />
+                                                                                </Border>
+
+                                                                                <!-- Incoterms Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center"
+                                                                                        IsVisible="{Binding HasIncoterms}">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding Incoterms}" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- VAT Status Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding VatBadgeText}" FontSize="9.5"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- Payment Terms Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        IsVisible="{Binding HasPaymentTerms}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding FormattedPaymentTermsBadge}" FontSize="9.5"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- Lead Time Micro-Chip (strictly guarded) -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        IsVisible="{Binding HasDeliveryLeadTime}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding FormattedLeadTimeBadge}" FontSize="9.5"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- Freight Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        IsVisible="{Binding HasFreight}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding FormattedFreightBadge}" FontSize="9.5"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- Other Charges Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                                                        IsVisible="{Binding HasOtherCharges}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding FormattedOtherChargesBadge}" FontSize="9.5"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                </Border>
+
+                                                                                <!-- Technical Approval (Approved) Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}"
+                                                                                        IsVisible="{Binding IsTechnicallyApproved}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource FluentSuccessBg}, Dark={StaticResource FluentSuccessBgDark}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="Tech Approved" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                                                                                </Border>
+
+                                                                                <!-- Technical Approval (Not Approved) Micro-Chip -->
+                                                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                                                        IsVisible="{Binding IsTechnicallyNotApproved}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource FluentCriticalBg}, Dark={StaticResource FluentCriticalBgDark}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="4" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="Tech: Not Approved" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                                                           LineBreakMode="NoWrap"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}" />
+                                                                                </Border>
+                                                                            </FlexLayout>
+                                                                        </VerticalStackLayout>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </BindableLayout.ItemTemplate>
+                                                        </VerticalStackLayout>
+                                                    </VerticalStackLayout>
+                                                </Border>
+
+                                                <!-- COLUMN 2: PRICE COMPARISON & CUSTOMIZABLE APPROVALS (PCR) (Optimized BindableLayout) -->
+                                                <Border Grid.Column="1"
+                                                        StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                        Padding="16">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="8" />
+                                                    </Border.StrokeShape>
+
+                                                    <VerticalStackLayout Spacing="12">
+                                                        <Grid ColumnDefinitions="*, Auto, Auto, Auto" ColumnSpacing="4" VerticalOptions="Center">
+                                                            <Label Grid.Column="0" Text="2. PCR &amp; Approvals"
+                                                                   FontFamily="SegoeSemibold" FontSize="13"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                   VerticalOptions="Center" />
+                                                            
+                                                            <Border Grid.Column="1" Padding="8,2" StrokeThickness="1"
+                                                                    IsVisible="{Binding HasPcr}"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}"
+                                                                    VerticalOptions="Center">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="4" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding Pcr.ApprovalSummary}"
+                                                                       FontSize="11" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                            </Border>
+
+                                                            <!-- Native WinUI 3 Export Price Comparison Button -->
+                                                            <Button Grid.Column="2"
+                                                                    Text="&#xEDE1;"
+                                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                    IsVisible="{Binding HasPcr}"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenExportPcrModalCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0"
+                                                                    BackgroundColor="Transparent"
+                                                                    BorderWidth="0"
+                                                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                    ToolTipProperties.Text="Export Price Comparison Sheet (Excel / PDF)"
+                                                                    VerticalOptions="Center" />
+
+                                                            <!-- Native WinUI 3 Settings Gear Icon (Clean Frameless Button) -->
+                                                            <Button Grid.Column="3"
+                                                                    Text="&#xE713;"
+                                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenApprovalConfigModalCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    FontSize="14" WidthRequest="28" HeightRequest="28" Padding="0"
+                                                                    BackgroundColor="Transparent"
+                                                                    BorderWidth="0"
+                                                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                    ToolTipProperties.Text="Configure Approval Stages"
+                                                                    VerticalOptions="Center" />
+                                                        </Grid>
+
+                                                        <!-- If PCR exists: Show Customizable Approval Cards (Scrollable only above 4 stages) -->
+                                                        <ScrollView IsVisible="{Binding HasPcr}"
+                                                                    MaximumHeightRequest="335"
+                                                                    VerticalScrollBarVisibility="Default">
+                                                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Pcr.Approvals}" Spacing="6">
+                                                                <BindableLayout.ItemTemplate>
+                                                                    <DataTemplate x:DataType="models:Approval">
+                                                                        <Border Padding="12,8" StrokeThickness="1"
+                                                                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                                                            <Border.StrokeShape>
+                                                                                <RoundRectangle CornerRadius="6" />
+                                                                            </Border.StrokeShape>
+
+                                                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                                                                <!-- Left Column: Role Title & Colored Status Subtext -->
+                                                                                <VerticalStackLayout Grid.Column="0" VerticalOptions="Center" Spacing="2">
+                                                                                    <Label Text="{Binding RoleDisplayName}"
+                                                                                           FontFamily="SegoeSemibold"
+                                                                                           FontSize="13"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                    <Label Text="{Binding StatusText}"
+                                                                                           FontSize="11"
+                                                                                           FontFamily="SegoeSemibold"
+                                                                                           TextColor="{Binding StatusText, Converter={StaticResource BoolToApprovalStatusColorConverter}}" />
+                                                                                </VerticalStackLayout>
+
+                                                                                <!-- Right Column: Date Pickers Stacked Vertically (Compact, Exact Width Alignment) -->
+                                                                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4" WidthRequest="180">
+                                                                                    <!-- 1. SENT TO SIGN ROW -->
+                                                                                    <Grid ColumnDefinitions="34, 142" ColumnSpacing="4" VerticalOptions="Center" IsVisible="{Binding RequiresMultipleDates}">
+                                                                                        <Label Grid.Column="0" Text="Sent:" FontSize="10" VerticalOptions="Center"
+                                                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                               FontFamily="SegoeSemibold" />
+
+                                                                                        <!-- Unset: Clean Button Filling 142px -->
+                                                                                        <Button Grid.Column="1" Text="+ Sent Date"
+                                                                                                IsVisible="{Binding HasSentDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SetApprovalSentTodayCommand}"
+                                                                                                CommandParameter="{Binding .}"
+                                                                                                FontSize="10" HeightRequest="26" Padding="6,0"
+                                                                                                HorizontalOptions="Fill"
+                                                                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                                                CornerRadius="4" />
+
+                                                                                        <!-- Set: Direct DatePicker + Clear button (No gap) -->
+                                                                                        <Grid Grid.Column="1" IsVisible="{Binding HasSentDate}" ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
+                                                                                            <DatePicker Grid.Column="0"
+                                                                                                        Date="{Binding SentDatePickerValue, Mode=TwoWay}"
+                                                                                                        Format="MMM dd, yyyy"
+                                                                                                        FontSize="10"
+                                                                                                        WidthRequest="120"
+                                                                                                        HeightRequest="26"
+                                                                                                        DateSelected="OnApprovalDateSelected"
+                                                                                                        VerticalOptions="Center" />
+                                                                                            <Button Grid.Column="1" Text="✕"
+                                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ClearSentDateCommand}"
+                                                                                                    CommandParameter="{Binding .}"
+                                                                                                    FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
+                                                                                                    BackgroundColor="Transparent"
+                                                                                                    TextColor="{StaticResource Gray400}"
+                                                                                                    ToolTipProperties.Text="Clear Sent Date"
+                                                                                                    VerticalOptions="Center" />
+                                                                                        </Grid>
+                                                                                    </Grid>
+
+                                                                                    <!-- 2. DATE RECEIVED ROW -->
+                                                                                    <Grid ColumnDefinitions="34, 142" ColumnSpacing="4" VerticalOptions="Center">
+                                                                                        <Label Grid.Column="0" Text="Recv:" FontSize="10" VerticalOptions="Center"
+                                                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                               FontFamily="SegoeSemibold" />
+
+                                                                                        <!-- Unset: Clean Button Filling 142px -->
+                                                                                        <Button Grid.Column="1" Text="+ Received Date"
+                                                                                                IsVisible="{Binding HasReceivedDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SetApprovalReceivedTodayCommand}"
+                                                                                                CommandParameter="{Binding .}"
+                                                                                                FontSize="10" HeightRequest="26" Padding="6,0"
+                                                                                                HorizontalOptions="Fill"
+                                                                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                                                CornerRadius="4" />
+
+                                                                                        <!-- Set: Direct DatePicker + Clear button (No gap) -->
+                                                                                        <Grid Grid.Column="1" IsVisible="{Binding HasReceivedDate}" ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
+                                                                                            <DatePicker Grid.Column="0"
+                                                                                                        Date="{Binding ReceivedDatePickerValue, Mode=TwoWay}"
+                                                                                                        Format="MMM dd, yyyy"
+                                                                                                        FontSize="10"
+                                                                                                        WidthRequest="120"
+                                                                                                        HeightRequest="26"
+                                                                                                        DateSelected="OnApprovalDateSelected"
+                                                                                                        VerticalOptions="Center" />
+                                                                                            <Button Grid.Column="1" Text="✕"
+                                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ClearReceivedDateCommand}"
+                                                                                                    CommandParameter="{Binding .}"
+                                                                                                    FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
+                                                                                                    BackgroundColor="Transparent"
+                                                                                                    TextColor="{StaticResource Gray400}"
+                                                                                                    ToolTipProperties.Text="Clear Received Date"
+                                                                                                    VerticalOptions="Center" />
+                                                                                        </Grid>
+                                                                                    </Grid>
+                                                                                </VerticalStackLayout>
+                                                                            </Grid>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </BindableLayout.ItemTemplate>
+                                                            </VerticalStackLayout>
+                                                        </ScrollView>
+
+                                                        <!-- If no PCR exists yet: Button to create PCR -->
+                                                        <Border IsVisible="{Binding HasPcr, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                                Padding="16" StrokeThickness="1"
+                                                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                                            <Border.StrokeShape>
+                                                                <RoundRectangle CornerRadius="6" />
+                                                            </Border.StrokeShape>
+                                                            <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                                                                <Label Text="Ready to compare received quotes?"
+                                                                       FontSize="12"
+                                                                       TextColor="{StaticResource Gray400}"
+                                                                       HorizontalOptions="Center" />
+                                                                <Button Text="+ Create &amp; Submit PCR"
+                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.CreatePcrForPrCommand}"
+                                                                        CommandParameter="{Binding .}"
+                                                                        Style="{StaticResource PrimaryButton}"
+                                                                        FontSize="12" HeightRequest="32" Padding="14,0" />
+                                                            </VerticalStackLayout>
+                                                        </Border>
+                                                    </VerticalStackLayout>
+                                                </Border>
+
+                                                <!-- COLUMN 3: PURCHASE ORDERS (POs) (Optimized BindableLayout) -->
+                                                <Border Grid.Column="2"
+                                                        StrokeThickness="1"
+                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                        Padding="16">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="8" />
+                                                    </Border.StrokeShape>
+
+                                                    <VerticalStackLayout Spacing="12">
+                                                        <!-- Header Area (Two Rows: Title & Action on Row 1, PO Fulfillment Alert on Row 2) -->
+                                                        <VerticalStackLayout Spacing="6">
+                                                            <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                                                <Label Grid.Column="0" Text="3. Purchase Orders"
+                                                                       FontFamily="SegoeSemibold" FontSize="13"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                       VerticalOptions="Center" />
+                                                                
+                                                                <Button Grid.Column="1" Text="+ Add PO"
+                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenAddPoModalCommand}"
+                                                                        CommandParameter="{Binding .}"
+                                                                        FontSize="11" HeightRequest="28" Padding="10,0"
+                                                                        BorderWidth="1"
+                                                                        BorderColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoBorderLight}, Dark={StaticResource BadgeCombinedPoBorderDark}}"
+                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource FluentSuccessBg}, Dark={StaticResource FluentSuccessBgDark}}"
+                                                                        TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                                                            </Grid>
+
+                                                            <!-- PO Fulfillment Badge (Row 2, Unordered / Ordered Alert) -->
+                                                            <Border IsVisible="{Binding HasItems}"
+                                                                    Padding="8,3" StrokeThickness="1"
+                                                                    HorizontalOptions="Start"
+                                                                    Stroke="{Binding PoFulfillmentBadgeText, Converter={StaticResource PoFulfillmentStrokeConverter}}"
+                                                                    BackgroundColor="{Binding PoFulfillmentBadgeText, Converter={StaticResource PoFulfillmentBgConverter}}"
+                                                                    VerticalOptions="Center">
+                                                                <Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape>
+                                                                <Label Text="{Binding PoFulfillmentBadgeText}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{Binding PoFulfillmentBadgeText, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                                                            </Border>
+                                                        </VerticalStackLayout>
+
+                                                        <!-- POs Stack (Lightweight BindableLayout) -->
+                                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Pos}">
+                                                            <BindableLayout.EmptyView>
+                                                                <Label Text="No PO raised yet. Click '+ Add PO' once PCR approval is signed."
+                                                                       FontSize="11" TextColor="{StaticResource Gray400}" Padding="6,12" />
+                                                            </BindableLayout.EmptyView>
+                                                            <BindableLayout.ItemTemplate>
+                                                                <DataTemplate x:DataType="models:PurchaseOrder">
+                                                                    <Border Margin="0,0,0,8" Padding="12,10" StrokeThickness="1"
+                                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                                                        <Border.StrokeShape>
+                                                                            <RoundRectangle CornerRadius="6" />
+                                                                        </Border.StrokeShape>
+
+                                                                        <Grid ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="10" RowSpacing="4">
+                                                                            <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                                                                                <Label Text="{Binding PoNo}"
+                                                                                       FontFamily="SegoeSemibold"
+                                                                                       FontSize="13"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                                                                <!-- Combined PO Badge -->
+                                                                                <Border IsVisible="{Binding IsCombinedPo}"
+                                                                                        Padding="5,1" StrokeThickness="1"
+                                                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPoBorderLight}, Dark={StaticResource BadgeCombinedPoBorderDark}}"
+                                                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoBgLight}, Dark={StaticResource BadgeCombinedPoBgDark}}"
+                                                                                        VerticalOptions="Center">
+                                                                                    <Border.StrokeShape>
+                                                                                        <RoundRectangle CornerRadius="3" />
+                                                                                    </Border.StrokeShape>
+                                                                                    <Label Text="{Binding CombinedPrs, StringFormat='Combined ({0})'}"
+                                                                                           FontSize="9" FontFamily="SegoeSemibold"
+                                                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoTextLight}, Dark={StaticResource BadgeCombinedPoTextDark}}" />
+                                                                                </Border>
+                                                                            </HorizontalStackLayout>
+
+                                                                            <Label Grid.Row="0" Grid.Column="1"
+                                                                                   Text="{Binding FormattedValue}"
+                                                                                   FontSize="13.5"
+                                                                                   FontFamily="SegoeSemibold"
+                                                                                   HorizontalOptions="End"
+                                                                                   VerticalOptions="Center"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                                                            <!-- Edit PO Button (Row 0, directly above Delete button) -->
+                                                                            <Button Grid.Row="0" Grid.Column="2"
+                                                                                    Text="&#xE70F;"
+                                                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPoModalCommand}"
+                                                                                    CommandParameter="{Binding .}"
+                                                                                    FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                    BackgroundColor="Transparent"
+                                                                                    BorderWidth="0"
+                                                                                    HorizontalOptions="Center" VerticalOptions="Center"
+                                                                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                    ToolTipProperties.Text="Edit Purchase Order &amp; Rates" />
+
+                                                                            <Label Grid.Row="1" Grid.Column="0"
+                                                                                   Text="{Binding Vendor}"
+                                                                                   FontSize="11"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                   VerticalOptions="Center" />
+
+                                                                            <!-- PO Status Button -->
+                                                                            <Button Grid.Row="1" Grid.Column="1"
+                                                                                    Text="{Binding Status}"
+                                                                                    Clicked="OnPoStatusButtonClicked"
+                                                                                    FontSize="10" HeightRequest="24" Padding="8,0"
+                                                                                    HorizontalOptions="End" VerticalOptions="Center"
+                                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource FluentCautionBg}, Dark={StaticResource FluentCautionBgDark}}"
+                                                                                    TextColor="{AppThemeBinding Light={StaticResource FluentCaution}, Dark={StaticResource FluentCautionTextDark}}" />
+
+                                                                            <!-- Action Buttons (Row 1, directly aligned below Edit) -->
+                                                                            <HorizontalStackLayout Grid.Row="1" Grid.Column="2" Spacing="4" HorizontalOptions="Center" VerticalOptions="Center">
+                                                                                <!-- Split Combined PO Button -->
+                                                                                <Button Text="&#xE748;"
+                                                                                        FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitCombinedPoCommand}"
+                                                                                        CommandParameter="{Binding .}"
+                                                                                        IsVisible="{Binding IsCombinedPo}"
+                                                                                        FontSize="10" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                        BackgroundColor="Transparent"
+                                                                                        BorderWidth="0"
+                                                                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                        ToolTipProperties.Text="Split / Unlink combined purchase order into independent orders" />
+
+                                                                                <!-- Delete PO Button -->
+                                                                                <Button Text="&#xE74D;"
+                                                                                        FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePoCommand}"
+                                                                                        CommandParameter="{Binding .}"
+                                                                                        FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
+                                                                                        BackgroundColor="Transparent"
+                                                                                        BorderWidth="0"
+                                                                                        TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                                                        ToolTipProperties.Text="Delete this purchase order" />
+                                                                            </HorizontalStackLayout>
+                                                                        </Grid>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </BindableLayout.ItemTemplate>
+                                                        </VerticalStackLayout>
+                                                    </VerticalStackLayout>
+                                                </Border>
+
+                                            </Grid>
+
+                                            <!-- Line Items Card (Visible when PR has items) -->
+                                            <Border IsVisible="{Binding HasItems}"
+                                                    StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                    Padding="16">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="8" />
+                                                </Border.StrokeShape>
+                                                <VerticalStackLayout Spacing="10">
+                                                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                                        <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                                                            <Label Text="&#xE74C;"
+                                                                   FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                   FontSize="14"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                                   VerticalOptions="Center" />
+                                                            <Label Text="Requisition Line Items" FontFamily="SegoeSemibold" FontSize="13"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                                   VerticalOptions="Center" />
+                                                            <Border Padding="6,2" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}">
+                                                                <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                                                <Label Text="{Binding ItemsCount, StringFormat='{0} items'}" FontSize="11" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
+                                                            </Border>
+                                                        </HorizontalStackLayout>
+
+                                                        <!-- Pending Items Alert Pill -->
+                                                        <Border Grid.Column="1"
+                                                                IsVisible="{Binding HasPendingItemsSummary}"
+                                                                Padding="8,2" StrokeThickness="1"
+                                                                Stroke="{AppThemeBinding Light={StaticResource FluentCautionBgDark}, Dark={StaticResource FluentCautionBg}}"
+                                                                BackgroundColor="{AppThemeBinding Light={StaticResource FluentCautionBg}, Dark={StaticResource FluentCautionBgDark}}"
+                                                                VerticalOptions="Center">
+                                                            <Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape>
+                                                            <Label Text="{Binding PendingItemsSummaryText}"
+                                                                   FontSize="10" FontFamily="SegoeSemibold"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource FluentCaution}, Dark={StaticResource FluentCautionTextDark}}" />
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6">
+                                                        <BindableLayout.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:PrItem">
+                                                                <Border Padding="12,8" StrokeThickness="1"
+                                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                                                    <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                                                    <Grid ColumnDefinitions="*, Auto, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                                                        <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                                                            <Label Text="{Binding ItemName}" FontFamily="SegoeSemibold" FontSize="12.5"
+                                                                                   LineBreakMode="TailTruncation" MaxLines="2"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                            <Label Text="{Binding Notes}" FontSize="11"
+                                                                                   LineBreakMode="TailTruncation" MaxLines="2"
+                                                                                   IsVisible="{Binding Notes, Converter={StaticResource NullToBoolConverter}}"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                        </VerticalStackLayout>
+
+                                                                        <!-- PO Fulfillment Status Tag per Item -->
+                                                                        <Border Grid.Column="1" Padding="8,3" StrokeThickness="1"
+                                                                                Stroke="{Binding FulfillmentBadgeText, Converter={StaticResource PoFulfillmentStrokeConverter}}"
+                                                                                BackgroundColor="{Binding FulfillmentBadgeText, Converter={StaticResource PoFulfillmentBgConverter}}"
+                                                                                VerticalOptions="Center">
+                                                                            <Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape>
+                                                                            <Label Text="{Binding FulfillmentBadgeText}" FontSize="10.5" FontFamily="SegoeSemibold"
+                                                                                   TextColor="{Binding FulfillmentBadgeText, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                                                                        </Border>
+
+                                                                        <Border Grid.Column="2" Padding="8,3" StrokeThickness="1"
+                                                                                Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                                                BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}"
+                                                                                VerticalOptions="Center">
+                                                                            <Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape>
+                                                                            <Label Text="{Binding FormattedQuantity}" FontSize="11" FontFamily="SegoeSemibold"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                        </Border>
+
+                                                                        <Label Grid.Column="3"
+                                                                               Text="{Binding EstimatedTotalPrice, StringFormat='Est: {0:C2}'}"
+                                                                               IsVisible="{Binding EstimatedTotalPrice, Converter={StaticResource NullToBoolConverter}}"
+                                                                               FontSize="12" FontFamily="SegoeSemibold"
+                                                                               TextColor="{AppThemeBinding Light={StaticResource FluentTeal}, Dark={StaticResource FluentTealTextDark}}"
+                                                                               VerticalOptions="Center" />
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </BindableLayout.ItemTemplate>
+                                                    </VerticalStackLayout>
+                                                </VerticalStackLayout>
+                                            </Border>
+
+                                            <!-- CUSTOM FIELDS & NOTES FOOTER (Optimized BindableLayout) -->
+                                            <Border StrokeThickness="1"
+                                                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                    Padding="14,12">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="8" />
+                                                </Border.StrokeShape>
+                                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                                    <VerticalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                                                        <Label Text="{Binding Notes, StringFormat='Notes: {0}'}"
+                                                               FontSize="12"
+                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                                        <!-- Custom Values Tags Stack -->
+                                                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                                                            <Label Text="Team Fields:" FontSize="11" FontFamily="SegoeSemibold" VerticalOptions="Center"
+                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                            
+                                                            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding CustomValues}">
+                                                                <BindableLayout.ItemTemplate>
+                                                                    <DataTemplate x:DataType="models:CustomFieldValue">
+                                                                        <Border Margin="0,0,8,0" Padding="8,3" StrokeThickness="1"
+                                                                                IsVisible="{Binding HasValue}"
+                                                                                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                                                                            <Border.StrokeShape>
+                                                                                <RoundRectangle CornerRadius="4" />
+                                                                            </Border.StrokeShape>
+                                                                            <HorizontalStackLayout Spacing="4">
+                                                                                <Label Text="{Binding ColumnName, StringFormat='{0}:'}" FontSize="11" TextColor="{StaticResource Gray400}" />
+                                                                                <Label Text="{Binding Value}" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                            </HorizontalStackLayout>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </BindableLayout.ItemTemplate>
+                                                            </HorizontalStackLayout>
+                                                        </HorizontalStackLayout>
+                                                    </VerticalStackLayout>
+
+                                                    <Button Grid.Column="1"
+                                                            Text="Edit Requisition &amp; Fields"
+                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            FontSize="12" HeightRequest="32" Padding="14,0"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            VerticalOptions="Center" />
+                                                </Grid>
+                                            </Border>
+
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <!-- Fluent Pagination Bar (Fast 0ms Navigation) -->
+                <Grid IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                      ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,8,0,16">
+                    <!-- Left: Summary ("Showing 1–10 of 48 requisitions") -->
+                    <Label Grid.Column="0"
+                           Text="{Binding PaginationSummary}"
+                           FontSize="12"
+                           FontFamily="SegoeSemibold"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                           VerticalOptions="Center" />
+
+                    <!-- Right: Page Size Selector & Navigation Buttons -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
+                        <Label Text="Rows per page:"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                               VerticalOptions="Center" />
+
+                        <Picker ItemsSource="{Binding PageSizeOptions}"
+                                SelectedItem="{Binding PageSize, Mode=TwoWay}"
+                                FontSize="12"
+                                HeightRequest="32"
+                                WidthRequest="80"
+                                VerticalOptions="Center" />
+
+                        <Label Text="{Binding CurrentPage, StringFormat='Page {0} of '}"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                               VerticalOptions="Center" />
+                        <Label Text="{Binding TotalPages}"
+                               FontSize="12"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+
+                        <!-- Navigation Buttons -->
+                        <Button Text="&#xE892;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="12"
+                                Command="{Binding FirstPageCommand}"
+                                IsEnabled="{Binding CanGoPrevious}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="32" WidthRequest="36" Padding="0" />
+
+                        <Button Text="&#xE76B;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="12"
+                                Command="{Binding PreviousPageCommand}"
+                                IsEnabled="{Binding CanGoPrevious}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="32" WidthRequest="36" Padding="0" />
+
+                        <Button Text="&#xE76C;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="12"
+                                Command="{Binding NextPageCommand}"
+                                IsEnabled="{Binding CanGoNext}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="32" WidthRequest="36" Padding="0" />
+
+                        <Button Text="&#xE893;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="12"
+                                Command="{Binding LastPageCommand}"
+                                IsEnabled="{Binding CanGoNext}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="32" WidthRequest="36" Padding="0" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ================= MODALS LAYER (Modular ContentView Components) ================= -->
+        <modals:EditPrModal />
+        <modals:AddRfqModal />
+        <modals:AddPoModal />
+        <modals:ApprovalConfigModal />
+        <modals:ExportPcrModal />
+        <modals:MergePrModal />
+        <modals:SplitPrModal />
+        <modals:BatchRfqModal />
+        <modals:BatchPoModal />
+        <modals:BatchCreateModal />
+
+        <!-- Hardware-Accelerated Smooth Theme Transition Curtain -->
+        <BoxView x:Name="ThemeCurtain"
+                 IsVisible="False"
+                 Opacity="0"
+                 InputTransparent="True"
+                 HorizontalOptions="Fill"
+                 VerticalOptions="Fill"
+                 ZIndex="9999" />
+
+    </Grid>
+</ContentPage>

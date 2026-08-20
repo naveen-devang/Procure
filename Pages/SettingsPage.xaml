@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.SettingsPage"
+             x:Name="ThisSettingsPage"
+             x:DataType="pageModels:SettingsPageModel"
+             Shell.NavBarIsVisible="False"
+             Title="Settings"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <ScrollView Padding="28,24,28,32">
+        <VerticalStackLayout Spacing="22" MaximumWidthRequest="950" HorizontalOptions="Center">
+
+            <!-- Header -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Settings &amp; Configuration"
+                       FontFamily="SegoeSemibold"
+                       FontSize="26"
+                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                <Label Text="Personalize appearance, automatic GitHub updates, SLA thresholds, and SQLite storage."
+                       FontSize="13"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+            </VerticalStackLayout>
+
+            <!-- Section 1: Appearance & Theme Personalization -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="18">
+                    <Label Text="Appearance &amp; Theme Personalization"
+                           FontFamily="SegoeSemibold"
+                           FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <!-- Theme Mode Selector (Dark / Light / System) -->
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Color Mode" FontSize="13" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                        <Grid ColumnDefinitions="*, *, *" ColumnSpacing="12">
+                            <!-- Dark Mode -->
+                            <Button Grid.Column="0"
+                                    Text="&#xE708;  Dark Mode"
+                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    Command="{Binding SelectThemeModeCommand}"
+                                    CommandParameter="Dark"
+                                    HeightRequest="40"
+                                    FontSize="13"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                            <!-- Light Mode -->
+                            <Button Grid.Column="1"
+                                    Text="&#xE706;  Light Mode"
+                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    Command="{Binding SelectThemeModeCommand}"
+                                    CommandParameter="Light"
+                                    HeightRequest="40"
+                                    FontSize="13"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                            <!-- System Default -->
+                            <Button Grid.Column="2"
+                                    Text="&#xE7F8;  System Default"
+                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    Command="{Binding SelectThemeModeCommand}"
+                                    CommandParameter="System"
+                                    HeightRequest="40"
+                                    FontSize="13"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <!-- Pastel Accent Color Palettes -->
+                    <VerticalStackLayout Spacing="8" Margin="0,6,0,0">
+                        <Label Text="Pastel Accent Theme Palette" FontSize="13" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Label Text="Choose your accent highlight color for buttons, badges, and status indicators across the entire app."
+                               FontSize="11" TextColor="{StaticResource Gray400}" />
+
+                        <!-- Grid of 8 Pastel Color Themes -->
+                        <Grid ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12" RowSpacing="10" Margin="0,4,0,0">
+                            <!-- Blue -->
+                            <Button Grid.Row="0" Grid.Column="0"
+                                    Text="Pastel Blue"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Blue"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1A3A82EE"
+                                    TextColor="#60CDFF" />
+
+                            <!-- Purple -->
+                            <Button Grid.Row="0" Grid.Column="1"
+                                    Text="Pastel Purple"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Purple"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1A8B6CE8"
+                                    TextColor="#B198F0" />
+
+                            <!-- Mint -->
+                            <Button Grid.Row="0" Grid.Column="2"
+                                    Text="Pastel Mint"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Mint"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1A2E9E6D"
+                                    TextColor="#6CCB5F" />
+
+                            <!-- Coral -->
+                            <Button Grid.Row="0" Grid.Column="3"
+                                    Text="Pastel Coral"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Coral"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1AE07238"
+                                    TextColor="#FFA043" />
+
+                            <!-- Pink / Rose -->
+                            <Button Grid.Row="1" Grid.Column="0"
+                                    Text="Pastel Rose"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Pink"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1AD95382"
+                                    TextColor="#FF99A4" />
+
+                            <!-- Crimson / Red -->
+                            <Button Grid.Row="1" Grid.Column="1"
+                                    Text="Pastel Crimson"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Red"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1AC83E4D"
+                                    TextColor="#FF7B7B" />
+
+                            <!-- Amber / Yellow -->
+                            <Button Grid.Row="1" Grid.Column="2"
+                                    Text="Pastel Amber"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Yellow"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1AD48B17"
+                                    TextColor="#FCE100" />
+
+                            <!-- Teal / Aqua -->
+                            <Button Grid.Row="1" Grid.Column="3"
+                                    Text="Pastel Teal"
+                                    Command="{Binding SelectAccentThemeCommand}"
+                                    CommandParameter="Teal"
+                                    HeightRequest="38"
+                                    FontSize="12"
+                                    FontFamily="SegoeSemibold"
+                                    BackgroundColor="#1A1E989B"
+                                    TextColor="#48CAE4" />
+                        </Grid>
+                    </VerticalStackLayout>
+
+                    <!-- Navigation & Sidebar Display Settings -->
+                    <VerticalStackLayout Spacing="12" Margin="0,8,0,0">
+                        <BoxView HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+
+                        <Label Text="Navigation &amp; Sidebar" FontSize="13" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Compact Sidebar Mode" FontSize="13" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Collapse the left navigation pane to icon-only mode to maximize workspace area."
+                                       FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1"
+                                    IsToggled="{Binding IsSidebarCompact}"
+                                    OnColor="{DynamicResource Primary}"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Auto-collapse on Narrow Windows" FontSize="13" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Automatically switch to compact mode when window width is reduced below 1024px."
+                                       FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1"
+                                    IsToggled="{Binding AutoCollapseSidebarOnNarrow}"
+                                    OnColor="{DynamicResource Primary}"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*, 140" VerticalOptions="Center">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Default Currency" FontSize="13" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Default currency applied when creating new RFQs and purchase requisitions."
+                                       FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                            <Picker Grid.Column="1"
+                                    ItemsSource="{Binding AvailableCurrencies}"
+                                    SelectedItem="{Binding DefaultCurrency, Mode=TwoWay}"
+                                    HeightRequest="36"
+                                    VerticalOptions="Center" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Section 2: Software Updates & GitHub Releases -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Software Updates"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="15"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                <Label Text="Installed Version:" FontSize="12" TextColor="{StaticResource Gray400}" />
+                                <Label Text="{Binding CurrentVersion}" FontSize="12" FontFamily="SegoeSemibold"
+                                       TextColor="{DynamicResource Primary}" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1"
+                                Text="Check for Updates"
+                                Command="{Binding CheckForUpdatesCommand}"
+                                IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="36"
+                                Padding="16,0" />
+                    </Grid>
+
+                    <!-- Auto-check Setting -->
+                    <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                        <CheckBox IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}" VerticalOptions="Center" />
+                        <Label Text="Automatically check for new releases when app starts"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <!-- Status Message & Loading -->
+                    <HorizontalStackLayout Spacing="10" VerticalOptions="Center"
+                                           IsVisible="{Binding UpdateStatusMessage, Converter={StaticResource NullToBoolConverter}}">
+                        <ActivityIndicator IsRunning="{Binding IsCheckingForUpdates}"
+                                           IsVisible="{Binding IsCheckingForUpdates}"
+                                           WidthRequest="18" HeightRequest="18" />
+                        <Label Text="{Binding UpdateStatusMessage}"
+                               FontSize="12"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <!-- Update Available Card Details -->
+                    <Border IsVisible="{Binding IsUpdateAvailable}"
+                            Padding="16"
+                            StrokeThickness="1"
+                            Stroke="{DynamicResource Primary}"
+                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="6" />
+                        </Border.StrokeShape>
+
+                        <VerticalStackLayout Spacing="12">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="{Binding UpdateInfo.Title}"
+                                           FontFamily="SegoeSemibold"
+                                           FontSize="14"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                                        <Label Text="{Binding UpdateInfo.TagName, StringFormat='Release Tag: {0}'}"
+                                               FontSize="11" TextColor="{StaticResource Gray400}" />
+                                        <Label Text="•" FontSize="11" TextColor="{StaticResource Gray400}"
+                                               IsVisible="{Binding UpdateInfo.FormattedSize, Converter={StaticResource NullToBoolConverter}}" />
+                                        <Label Text="{Binding UpdateInfo.FormattedSize}"
+                                               FontSize="11" TextColor="{StaticResource Gray400}" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+
+                                <Border Grid.Column="1"
+                                        Padding="8,3"
+                                        StrokeThickness="0"
+                                        BackgroundColor="{StaticResource FluentSuccessBg}"
+                                        VerticalOptions="Center">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="4" />
+                                    </Border.StrokeShape>
+                                    <Label Text="New Update Available"
+                                           FontSize="11"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{StaticResource FluentSuccess}" />
+                                </Border>
+                            </Grid>
+
+                            <!-- Release Notes Excerpt -->
+                            <Border Padding="10" StrokeThickness="0"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                    IsVisible="{Binding UpdateInfo.ReleaseNotes, Converter={StaticResource NullToBoolConverter}}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="4" />
+                                </Border.StrokeShape>
+                                <Label Text="{Binding UpdateInfo.ReleaseNotes}"
+                                       FontSize="12"
+                                       MaxLines="6"
+                                       LineBreakMode="TailTruncation"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </Border>
+
+                            <!-- Download Progress Bar -->
+                            <VerticalStackLayout Spacing="4" IsVisible="{Binding IsDownloading}">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Label Grid.Column="0" Text="Downloading update..." FontSize="11" TextColor="{StaticResource Gray400}" />
+                                    <Label Grid.Column="1" Text="{Binding DownloadPercentageText}" FontSize="11" FontFamily="SegoeSemibold" TextColor="{DynamicResource Primary}" />
+                                </Grid>
+                                <ProgressBar Progress="{Binding DownloadProgress}" HeightRequest="6" />
+                            </VerticalStackLayout>
+
+                            <!-- Action Buttons -->
+                            <HorizontalStackLayout Spacing="10" Margin="0,4,0,0">
+                                <Button Text="Download &amp; Install Update"
+                                        Command="{Binding DownloadAndInstallUpdateCommand}"
+                                        IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        HeightRequest="36"
+                                        Padding="18,0" />
+
+                                <Button Text="View Release on GitHub ↗"
+                                        Command="{Binding OpenReleasePageCommand}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        HeightRequest="36"
+                                        Padding="16,0" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Section 3: SLA Overdue Alert Thresholds -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Procurement SLA Overdue Thresholds"
+                           FontFamily="SegoeSemibold"
+                           FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                            <Label Text="Urgent Priority (Days) *" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding UrgentDays, Mode=TwoWay}"
+                                   Keyboard="Numeric" HeightRequest="36" />
+                            <Label Text="Flagged as overdue after this many days"
+                                   FontSize="11" TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Normal Priority (Days) *" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding NormalDays, Mode=TwoWay}"
+                                   Keyboard="Numeric" HeightRequest="36" />
+                            <Label Text="Standard PR overdue warning threshold"
+                                   FontSize="11" TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Button Text="Save Settings"
+                            Command="{Binding SaveSettingsCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            HorizontalOptions="End"
+                            HeightRequest="36"
+                            Padding="20,0" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Section 4: Default PCR Approval Stages Template -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Default PCR Approval Stages"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="15"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="Global approval stage sequence automatically copied when a new PCR is created."
+                                   FontSize="12" TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1"
+                                Text="Reset to 4 Default Roles"
+                                Command="{Binding ResetDefaultStagesToPresetCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                FontSize="11"
+                                HeightRequest="32"
+                                Padding="12,0" />
+                    </Grid>
+
+                    <!-- Active Default Stages List -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding DefaultApprovalStages}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Border Padding="12,8" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+
+                                    <Grid ColumnDefinitions="*, Auto, Auto, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                        <Label Grid.Column="0" Text="{Binding .}"
+                                               FontFamily="SegoeSemibold" FontSize="13"
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                               VerticalOptions="Center" />
+
+                                        <Button Grid.Column="1" Text="&#xE70E;"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageUpCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Move Up" />
+
+                                        <Button Grid.Column="2" Text="&#xE70D;"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageDownCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Move Down" />
+
+                                        <Button Grid.Column="3" Text="&#xE74D;"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.RemoveDefaultStageCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{StaticResource FluentCritical}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Remove Default Stage" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <!-- Add New Default Stage Bar -->
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                        <Entry Grid.Column="0" Text="{Binding NewDefaultStageName, Mode=TwoWay}"
+                               Placeholder="Enter stage title (e.g. Legal Counsel, Managing Director)..."
+                               HeightRequest="36" />
+                        <Button Grid.Column="1" Text="+ Add Default Stage"
+                                Command="{Binding AddNewDefaultStageCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HeightRequest="36" Padding="16,0" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Section 4: Database Storage (Folder-based SQLite) -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="SQLite Storage &amp; Database Location"
+                           FontFamily="SegoeSemibold"
+                           FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Current Database File Path:" FontSize="12" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Border Padding="12,10" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="4" />
+                            </Border.StrokeShape>
+                            <Label Text="{Binding DatabasePath}"
+                                   FontSize="12"
+                                   FontFamily="Consolas"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   LineBreakMode="CharacterWrap" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <HorizontalStackLayout Spacing="10">
+                        <Button Text="Open DB Folder in Explorer"
+                                Command="{Binding OpenDatabaseFolderCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="36"
+                                Padding="16,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Section 5: Data Management -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Database Reset &amp; Demo Data"
+                           FontFamily="SegoeSemibold"
+                           FontSize="15"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Label Text="Reset the local database and populate with realistic sample requisitions, RFQs, PCR approvals, POs, and custom fields."
+                           FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                    <Button Text="Reset &amp; Re-Seed Sample Data"
+                            Command="{Binding ResetDatabaseCommand}"
+                            BackgroundColor="{StaticResource FluentCriticalBg}"
+                            TextColor="{StaticResource FluentCritical}"
+                            HorizontalOptions="Start"
+                            HeightRequest="36"
+                            Padding="16,0" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

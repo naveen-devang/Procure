@@ -1,0 +1,79 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Procure"
+             xmlns:converters="clr-namespace:Procure.Utilities"
+             xmlns:f="clr-namespace:Fonts"
+             x:Class="Procure.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+                <ResourceDictionary Source="Resources/Styles/AppStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converters -->
+            <converters:StatusColorConverter x:Key="StatusColorConverter" />
+            <converters:StatusBadgeBgConverter x:Key="StatusBadgeBgConverter" />
+            <converters:PriorityColorConverter x:Key="PriorityColorConverter" />
+            <converters:PriorityBgConverter x:Key="PriorityBgConverter" />
+            <converters:PriorityBorderConverter x:Key="PriorityBorderConverter" />
+            <converters:PoPillTextColorConverter x:Key="PoPillTextColorConverter" />
+            <converters:PcrPillTextColorConverter x:Key="PcrPillTextColorConverter" />
+            <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <converters:BoolToInvertedBoolConverter x:Key="BoolToInvertedBoolConverter" />
+            <converters:BoolToFilterChipBgConverter x:Key="BoolToFilterChipBgConverter" />
+            <converters:BoolToFilterChipStrokeConverter x:Key="BoolToFilterChipStrokeConverter" />
+            <converters:BoolToFilterChipTextConverter x:Key="BoolToFilterChipTextConverter" />
+            <converters:BoolToChevronConverter x:Key="BoolToChevronConverter" />
+            <converters:BoolToApprovalStatusColorConverter x:Key="BoolToApprovalStatusColorConverter" />
+            <converters:BoolToApprovalInclusionBgConverter x:Key="BoolToApprovalInclusionBgConverter" />
+            <converters:BoolToApprovalInclusionStrokeConverter x:Key="BoolToApprovalInclusionStrokeConverter" />
+            <converters:BoolToApprovalInclusionCheckColorConverter x:Key="BoolToApprovalInclusionCheckColorConverter" />
+            <converters:PoFulfillmentColorConverter x:Key="PoFulfillmentColorConverter" />
+            <converters:PoFulfillmentBgConverter x:Key="PoFulfillmentBgConverter" />
+            <converters:PoFulfillmentStrokeConverter x:Key="PoFulfillmentStrokeConverter" />
+            <converters:PrTypeColorConverter x:Key="PrTypeColorConverter" />
+            <converters:PrTypeBgConverter x:Key="PrTypeBgConverter" />
+            <converters:PrTypeBorderConverter x:Key="PrTypeBorderConverter" />
+
+            <!-- Additional Fluent Icons -->
+            <FontImageSource x:Key="IconRefresh"
+                             Glyph="{x:Static f:FluentUI.arrow_clockwise_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="18" />
+
+            <FontImageSource x:Key="IconExport"
+                             Glyph="{x:Static f:FluentUI.arrow_download_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="18" />
+
+            <FontImageSource x:Key="IconDashboard"
+                             Glyph="{x:Static f:FluentUI.desktop_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
+
+            <FontImageSource x:Key="IconProjects"
+                             Glyph="{x:Static f:FluentUI.document_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
+
+            <FontImageSource x:Key="IconSettings"
+                             Glyph="{x:Static f:FluentUI.settings_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
+
+            <FontImageSource x:Key="IconColumns"
+                             Glyph="{x:Static f:FluentUI.table_settings_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

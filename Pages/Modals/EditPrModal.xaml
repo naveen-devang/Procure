@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.EditPrModal"
+             x:Name="ThisModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsEditModalVisible}">
+
+    <Grid BackgroundColor="#99000000">
+        <Border MaximumWidthRequest="650"
+                Margin="24"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="24">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
+            </Border.Shadow>
+
+            <ScrollView MaximumHeightRequest="650">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label Grid.Column="0" Text="{Binding EditModalTitle}"
+                               FontFamily="SegoeSemibold" FontSize="18"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Button Grid.Column="1" Text="✕"
+                                Command="{Binding CloseEditModalCommand}"
+                                BackgroundColor="Transparent" TextColor="{StaticResource Gray400}"
+                                HeightRequest="30" WidthRequest="30" Padding="0" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, *, 100, 140" ColumnSpacing="12" RowDefinitions="Auto">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                            <Label Text="PR Number *" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding CurrentEditingPr.PrNo, Mode=TwoWay}"
+                                   Placeholder="e.g. PR-2026-001" HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Requestor Name *" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Entry Text="{Binding CurrentEditingPr.Requestor, Mode=TwoWay}"
+                                   Placeholder="e.g. Sarah Lin" HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="2" Spacing="4">
+                            <Label Text="Plant" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker ItemsSource="{Binding AllPlants}"
+                                    SelectedItem="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="3" Spacing="4">
+                            <Label Text="PR Type *" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker ItemsSource="{Binding AllPrTypes}"
+                                    SelectedItem="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" HeightRequest="36" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Description *" FontSize="12" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Entry Text="{Binding CurrentEditingPr.Description, Mode=TwoWay}"
+                               Placeholder="Item or service requested..." HeightRequest="36" />
+                    </VerticalStackLayout>
+
+                    <!-- Line Items & Quantities Section -->
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                            <Label Grid.Column="0" Text="Line Items &amp; Quantities" FontFamily="SegoeSemibold" FontSize="14"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   VerticalOptions="Center" />
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                <Button Text="Paste from Excel"
+                                        Command="{Binding PasteEditingPrItemsFromClipboardCommand}"
+                                        ToolTipProperties.Text="Paste items copied from Excel or clipboard (Ctrl+V table or list)"
+                                        Style="{StaticResource SecondaryButton}"
+                                        FontSize="11" HeightRequest="28" Padding="10,0"
+                                        VerticalOptions="Center" />
+                                <Button Text="+ Add Item"
+                                        Command="{Binding AddEditingPrItemCommand}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        FontSize="11" HeightRequest="28" Padding="10,0"
+                                        VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding EditingPrItems}" Spacing="6">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:PrItem">
+                                    <Grid ColumnDefinitions="*, 75, 70, 90, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                        <Entry Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
+                                               Loaded="OnEditingItemNameEntryLoaded"
+                                               TextChanged="OnEditingItemNameTextChanged"
+                                               Placeholder="Item name / spec..." HeightRequest="34" FontSize="12" />
+                                        <Entry Grid.Column="1" Text="{Binding Quantity, Mode=TwoWay}"
+                                               Loaded="OnEditingItemQuantityEntryLoaded"
+                                               TextChanged="OnEditingItemQuantityTextChanged"
+                                               Placeholder="Qty" Keyboard="Numeric" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
+                                        <Entry Grid.Column="2" Text="{Binding Unit, Mode=TwoWay}"
+                                               Loaded="OnEditingItemUnitEntryLoaded"
+                                               TextChanged="OnEditingItemUnitTextChanged"
+                                               Placeholder="pcs" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
+                                        <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
+                                               Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
+                                        <Button Grid.Column="4" Text="&#xE74D;"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveEditingPrItemCommand}"
+                                                CommandParameter="{Binding .}"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{StaticResource FluentCritical}"
+                                                ToolTipProperties.Text="Remove Item"
+                                                HeightRequest="28" WidthRequest="28" Padding="0" FontSize="11" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                            <Label Text="Priority" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker ItemsSource="{Binding AllPriorities}"
+                                    SelectedItem="{Binding CurrentEditingPr.Priority, Mode=TwoWay}"
+                                    HeightRequest="36" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="Status" FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker ItemsSource="{Binding AllStatuses}"
+                                    SelectedItem="{Binding CurrentEditingPr.Status, Mode=TwoWay}"
+                                    HeightRequest="36" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Notes &amp; Justification" FontSize="12" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Editor Text="{Binding CurrentEditingPr.Notes, Mode=TwoWay}"
+                                Placeholder="Additional procurement details or notes..."
+                                HeightRequest="70" />
+                    </VerticalStackLayout>
+
+                    <!-- Dynamic Custom Fields Section (Optimized BindableLayout) -->
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Team Custom Fields" FontFamily="SegoeSemibold" FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding EditingCustomValues}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:CustomFieldValue">
+                                    <VerticalStackLayout Margin="0,0,0,8" Spacing="4">
+                                        <Label Text="{Binding ColumnName}" FontSize="12" FontFamily="SegoeSemibold"
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                        <!-- Select (Dropdown Picker) -->
+                                        <Picker IsVisible="{Binding IsSelect}"
+                                                ItemsSource="{Binding OptionsList}"
+                                                SelectedItem="{Binding Value, Mode=TwoWay}"
+                                                HorizontalOptions="Fill"
+                                                HeightRequest="36" FontSize="12" />
+
+                                        <!-- Date (DatePicker) -->
+                                        <DatePicker IsVisible="{Binding IsDate}"
+                                                    Date="{Binding DateValue, Mode=TwoWay}"
+                                                    Format="yyyy-MM-dd"
+                                                    HorizontalOptions="Fill"
+                                                    HeightRequest="36" FontSize="12" />
+
+                                        <!-- Number -->
+                                        <Entry IsVisible="{Binding IsNumber}"
+                                               Text="{Binding Value, Mode=TwoWay}"
+                                               Keyboard="Numeric"
+                                               HorizontalOptions="Fill"
+                                               HeightRequest="36" />
+
+                                        <!-- Text / Default -->
+                                        <Entry IsVisible="{Binding IsText}"
+                                               Text="{Binding Value, Mode=TwoWay}"
+                                               HorizontalOptions="Fill"
+                                               HeightRequest="36" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                    <!-- Modal Actions -->
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="End" Margin="0,10,0,0">
+                        <Button Text="Cancel"
+                                Command="{Binding CloseEditModalCommand}"
+                                Style="{StaticResource CancelButton}"
+                                HeightRequest="36" Padding="16,0" />
+                        <Button Text="Save Requisition"
+                                Command="{Binding SavePrModalCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HeightRequest="36" Padding="20,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentView>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Border xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+        x:Class="Procure.Pages.Controls.MetricCard"
+        x:Name="RootBorder"
+        StrokeThickness="1"
+        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+        Padding="18,16"
+        MinimumWidthRequest="140">
+    <Border.StrokeShape>
+        <RoundRectangle CornerRadius="8" />
+    </Border.StrokeShape>
+    <Border.Shadow>
+        <Shadow Brush="#0A000000" Offset="0,2" Radius="4" Opacity="0.4" />
+    </Border.Shadow>
+
+    <VerticalStackLayout Spacing="6" VerticalOptions="Center">
+        <Label Text="{Binding Title, Source={x:Reference RootBorder}}"
+               FontSize="12"
+               FontFamily="SegoeSemibold"
+               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+               LineBreakMode="TailTruncation" />
+
+        <Label Text="{Binding Value, Source={x:Reference RootBorder}}"
+               FontSize="24"
+               FontFamily="SegoeSemibold"
+               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+    </VerticalStackLayout>
+</Border>

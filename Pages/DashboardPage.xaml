@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             xmlns:controls="clr-namespace:Procure.Pages.Controls"
+             xmlns:f="clr-namespace:Fonts"
+             x:Class="Procure.Pages.DashboardPage"
+             x:Name="ThisDashboardPage"
+             x:DataType="pageModels:DashboardPageModel"
+             Shell.NavBarIsVisible="False"
+             Title="Dashboard"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <Grid>
+        <ScrollView Padding="28,24,28,32">
+        <VerticalStackLayout Spacing="24" MaximumWidthRequest="1600" HorizontalOptions="Fill">
+
+            <!-- Top Header & Actions -->
+            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto">
+                <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
+                    <Label Text="Procurement Overview"
+                           FontFamily="SegoeSemibold"
+                           FontSize="26"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Label Text="Real-time pipeline metrics, pending multi-role approvals, and SLA tracking."
+                           FontSize="13"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                </VerticalStackLayout>
+
+                <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                    <Button Text="Refresh"
+                            ImageSource="{StaticResource IconRefresh}"
+                            Command="{Binding LoadDataCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            HeightRequest="38"
+                            Padding="14,0" />
+
+                    <Button Text="+ Bulk Create"
+                            Command="{Binding CreateNewPrCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            HeightRequest="38"
+                            Padding="20,0" />
+                </HorizontalStackLayout>
+            </Grid>
+
+            <!-- 5 KPI Metric Cards Grid -->
+            <Grid ColumnDefinitions="*, *, *, *, *" ColumnSpacing="14">
+                <controls:MetricCard Grid.Column="0"
+                                     Title="Total Requisitions"
+                                     Value="{Binding Metrics.TotalPrs}" />
+
+                <controls:MetricCard Grid.Column="1"
+                                     Title="RFQs Awaiting Quote"
+                                     Value="{Binding Metrics.RfqsAwaitingQuote}" />
+
+                <controls:MetricCard Grid.Column="2"
+                                     Title="PCRs Pending Sign"
+                                     Value="{Binding Metrics.PcrsAwaitingSignature}" />
+
+                <controls:MetricCard Grid.Column="3"
+                                     Title="POs Raised"
+                                     Value="{Binding Metrics.PosRaised}" />
+
+                <controls:MetricCard Grid.Column="4"
+                                     Title="Overdue / SLA Alert"
+                                     Value="{Binding Metrics.OverdueCount}" />
+            </Grid>
+
+            <!-- Action Required & Urgent Requisitions Section -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <Grid RowDefinitions="Auto, Auto">
+                    <!-- Card Header -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" VerticalOptions="Center" Margin="0,0,0,16">
+                        <Label Grid.Column="0"
+                               Text="Action Required &amp; Urgent Requisitions"
+                               FontFamily="SegoeSemibold"
+                               FontSize="15"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+
+                        <Button Grid.Column="1"
+                                Text="Open PR Board &#x2192;"
+                                Command="{Binding NavigateToPrBoardCommand}"
+                                FontSize="12"
+                                HeightRequest="28"
+                                Padding="8,0"
+                                LineBreakMode="NoWrap"
+                                BackgroundColor="Transparent"
+                                TextColor="{DynamicResource Primary}" />
+                    </Grid>
+
+                    <!-- Items List -->
+                    <VerticalStackLayout Grid.Row="1" BindableLayout.ItemsSource="{Binding Metrics.NeedsAttentionPrs}">
+                        <BindableLayout.EmptyView>
+                            <VerticalStackLayout Padding="40" Spacing="8" HorizontalOptions="Center">
+                                <Label Text="All requisitions are running smoothly without overdue delays."
+                                       FontSize="13"
+                                       TextColor="{StaticResource Gray400}"
+                                       HorizontalOptions="Center" />
+                            </VerticalStackLayout>
+                        </BindableLayout.EmptyView>
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:PurchaseRequisition">
+                                <Border Margin="0,0,0,10"
+                                        Padding="14,10"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                        <!-- Column 0: Priority Badge -->
+                                        <Border Grid.Column="0"
+                                                Padding="8,3"
+                                                StrokeThickness="1"
+                                                Stroke="{Binding Priority, Converter={StaticResource PriorityBorderConverter}}"
+                                                VerticalOptions="Center"
+                                                BackgroundColor="{Binding Priority, Converter={StaticResource PriorityBgConverter}}">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding Priority}"
+                                                   FontSize="11"
+                                                   FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding Priority, Converter={StaticResource PriorityColorConverter}}" />
+                                        </Border>
+
+                                        <!-- Column 1: PR Info & Description -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                                <Label Text="{Binding PrNo}"
+                                                       FontFamily="SegoeSemibold"
+                                                       FontSize="13"
+                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                <Label Text="•" TextColor="{StaticResource Gray400}" FontSize="11" />
+                                                <Label Text="{Binding Requestor}"
+                                                       FontSize="12"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaxLines="1"
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                            </HorizontalStackLayout>
+
+                                            <Label Text="{Binding Description}"
+                                                   FontSize="12"
+                                                   MaxLines="1"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                   LineBreakMode="TailTruncation" />
+                                        </VerticalStackLayout>
+
+                                        <!-- Column 2: Status & Age Right-Aligned -->
+                                        <VerticalStackLayout Grid.Column="2" Spacing="3" HorizontalOptions="End" VerticalOptions="Center" MinimumWidthRequest="100">
+                                            <Border Padding="8,2" StrokeThickness="0"
+                                                    HorizontalOptions="End"
+                                                    BackgroundColor="{Binding Status, Converter={StaticResource StatusBadgeBgConverter}}">
+                                                <Border.StrokeShape>
+                                                    <RoundRectangle CornerRadius="4" />
+                                                </Border.StrokeShape>
+                                                <Label Text="{Binding Status}"
+                                                       FontSize="10"
+                                                       FontFamily="SegoeSemibold"
+                                                       TextColor="{Binding Status, Converter={StaticResource StatusColorConverter}}" />
+                                            </Border>
+
+                                            <Label Text="{Binding AgeDisplay}"
+                                                   FontSize="10"
+                                                   HorizontalOptions="End"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextTertiary}, Dark={StaticResource TextTertiary}}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+    <!-- Hardware-Accelerated Smooth Theme Transition Curtain -->
+    <BoxView x:Name="ThemeCurtain"
+             IsVisible="False"
+             Opacity="0"
+             InputTransparent="True"
+             HorizontalOptions="Fill"
+             VerticalOptions="Fill"
+             ZIndex="9999" />
+</Grid>
+</ContentPage>

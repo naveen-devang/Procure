@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Procure.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:Procure.Pages"
+    xmlns:f="clr-namespace:Fonts"
+    Shell.FlyoutBehavior="Locked"
+    FlyoutWidth="{DynamicResource SidebarExpandedWidth}"
+    Shell.NavBarIsVisible="False"
+    Shell.BackgroundColor="Transparent"
+    Shell.ForegroundColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+    FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}"
+    Title="RWC  MM Tracker">
+
+    <!-- Flyout App Header with Responsive Collapse/Expand Toggle -->
+    <Shell.FlyoutHeader>
+        <Grid x:Name="FlyoutHeaderGrid"
+              Padding="14,14,14,8"
+              ColumnDefinitions="Auto, *"
+              BackgroundColor="Transparent">
+
+            <!-- Sidebar Collapse / Expand Toggle Button -->
+            <Button x:Name="SidebarToggleBtn"
+                    Grid.Column="0"
+                    Text="&#xE700;"
+                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                    FontSize="15"
+                    WidthRequest="38"
+                    HeightRequest="36"
+                    Padding="0"
+                    CornerRadius="6"
+                    Clicked="OnToggleSidebarClicked"
+                    BackgroundColor="Transparent"
+                    ToolTipProperties.Text="Toggle Sidebar"
+                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <!-- Navigation Items with Tooltips for Compact Mode -->
+    <ShellContent
+        x:Name="DashboardContent"
+        Title="Dashboard"
+        ToolTipProperties.Text="Dashboard"
+        Icon="{StaticResource IconDashboard}"
+        Route="main" />
+
+    <ShellContent
+        x:Name="PrBoardContent"
+        Title="PR Board"
+        ToolTipProperties.Text="PR Board"
+        Icon="{StaticResource IconProjects}"
+        Route="prboard" />
+
+    <ShellContent
+        x:Name="ColumnsContent"
+        Title="Custom Columns"
+        ToolTipProperties.Text="Custom Columns"
+        Icon="{StaticResource IconColumns}"
+        Route="columns" />
+
+    <ShellContent
+        x:Name="SettingsContent"
+        Title="Settings"
+        ToolTipProperties.Text="Settings"
+        Icon="{StaticResource IconSettings}"
+        Route="settings" />
+
+    <!-- Flyout Footer: Responsive Theme Switcher -->
+    <Shell.FlyoutFooter>
+        <Grid BackgroundColor="Transparent">
+            <!-- Expanded Footer Layout: Full Two-Button Theme Switcher -->
+            <Grid x:Name="ExpandedFooterLayout"
+                  Padding="16,14"
+                  ColumnDefinitions="*, Auto"
+                  BackgroundColor="Transparent">
+                <Label Grid.Column="0"
+                       Text="Theme"
+                       FontSize="12"
+                       FontFamily="SegoeSemibold"
+                       VerticalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                <Border Grid.Column="1"
+                        StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                        Padding="4,2">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="6" />
+                    </Border.StrokeShape>
+                    <HorizontalStackLayout Spacing="4" VerticalOptions="Center">
+                        <Button x:Name="LightModeBtn"
+                                Text="&#xE706;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="13"
+                                WidthRequest="32" HeightRequest="28"
+                                Padding="0"
+                                CornerRadius="4"
+                                Clicked="OnLightModeClicked"
+                                BackgroundColor="Transparent"
+                                ToolTipProperties.Text="Light Theme"
+                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource Gray400}}" />
+
+                        <Button x:Name="DarkModeBtn"
+                                Text="&#xE708;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontSize="13"
+                                WidthRequest="32" HeightRequest="28"
+                                Padding="0"
+                                CornerRadius="4"
+                                Clicked="OnDarkModeClicked"
+                                BackgroundColor="Transparent"
+                                ToolTipProperties.Text="Dark Theme"
+                                TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource LightOnDarkBackground}}" />
+                    </HorizontalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- Compact Footer Layout: Single Centered Theme Button -->
+            <Grid x:Name="CompactFooterLayout"
+                  Padding="0,12"
+                  HorizontalOptions="Center"
+                  IsVisible="False"
+                  BackgroundColor="Transparent">
+                <Button x:Name="CompactThemeBtn"
+                        Text="&#xE708;"
+                        FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                        FontSize="14"
+                        WidthRequest="36"
+                        HeightRequest="36"
+                        Padding="0"
+                        CornerRadius="8"
+                        Clicked="OnCompactThemeClicked"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                        ToolTipProperties.Text="Toggle Theme" />
+            </Grid>
+        </Grid>
+    </Shell.FlyoutFooter>
+
+</Shell>

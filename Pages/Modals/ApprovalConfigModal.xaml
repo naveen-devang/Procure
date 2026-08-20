@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.ApprovalConfigModal"
+             x:Name="ThisModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsApprovalConfigModalVisible}">
+
+    <Grid BackgroundColor="#99000000">
+        <Border MaximumWidthRequest="660"
+                Margin="24"
+                MaximumHeightRequest="660"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="24">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
+            </Border.Shadow>
+
+            <VerticalStackLayout Spacing="16">
+                <!-- Modal Header -->
+                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Configure Approval Stages"
+                               FontFamily="SegoeSemibold" FontSize="16"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Label Text="Add, remove, rename, and drag to reorder approval stages."
+                               FontSize="12" TextColor="{StaticResource Gray400}" />
+                    </VerticalStackLayout>
+
+                    <Button Grid.Column="1" Text="&#xE711;"
+                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                            Command="{Binding CloseApprovalConfigModalCommand}"
+                            FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
+                            BackgroundColor="Transparent"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            ToolTipProperties.Text="Close" />
+                </Grid>
+
+                <!-- Stages List in ScrollView with Drag-and-Drop Reordering -->
+                <ScrollView MaximumHeightRequest="320">
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ConfiguringApprovals}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:Approval">
+                                <Border Padding="10,8" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+                                    <Border.GestureRecognizers>
+                                        <DragGestureRecognizer CanDrag="True"
+                                                               DragStarting="OnApprovalDragStarting" />
+                                        <DropGestureRecognizer AllowDrop="True"
+                                                               Drop="OnApprovalDrop" />
+                                    </Border.GestureRecognizers>
+
+                                    <Grid ColumnDefinitions="Auto, Auto, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                        <!-- Drag Handle Gripper (Native 6-dots vector grip) -->
+                                        <Grid Grid.Column="0" WidthRequest="10" HeightRequest="16"
+                                              ColumnDefinitions="4, 4" RowDefinitions="4, 4, 4"
+                                              ColumnSpacing="2" RowSpacing="2"
+                                              VerticalOptions="Center" Margin="2,0,0,0"
+                                              ToolTipProperties.Text="Drag up or down to reorder">
+                                            <BoxView Grid.Row="0" Grid.Column="0" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                            <BoxView Grid.Row="0" Grid.Column="1" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                            <BoxView Grid.Row="1" Grid.Column="0" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                            <BoxView Grid.Row="1" Grid.Column="1" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                            <BoxView Grid.Row="2" Grid.Column="0" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                            <BoxView Grid.Row="2" Grid.Column="1" WidthRequest="3" HeightRequest="3" CornerRadius="1.5" Color="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                                        </Grid>
+
+                                        <!-- Stage Active / Inclusion Checkbox -->
+                                        <Border Grid.Column="1"
+                                                WidthRequest="20" HeightRequest="20"
+                                                Padding="0"
+                                                StrokeThickness="1.5"
+                                                Stroke="{Binding IsIncluded, Converter={StaticResource BoolToApprovalInclusionStrokeConverter}}"
+                                                BackgroundColor="{Binding IsIncluded, Converter={StaticResource BoolToApprovalInclusionBgConverter}}"
+                                                VerticalOptions="Center"
+                                                HorizontalOptions="Center">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.ToggleApprovalInclusionCommand}"
+                                                                      CommandParameter="{Binding .}" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="&#xE73E;"
+                                                   FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                   FontSize="10"
+                                                   FontAttributes="Bold"
+                                                   IsVisible="{Binding IsIncluded}"
+                                                   TextColor="{Binding IsIncluded, Converter={StaticResource BoolToApprovalInclusionCheckColorConverter}}"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center" />
+                                        </Border>
+
+                                        <!-- Editable Stage Name -->
+                                        <Entry Grid.Column="2" Text="{Binding Role, Mode=TwoWay}"
+                                               Placeholder="Stage Title (e.g. Finance Controller)"
+                                               FontSize="13" HeightRequest="36" VerticalOptions="Center"
+                                               HorizontalOptions="Fill" />
+
+                                        <!-- Delete Button in Right Corner -->
+                                        <Button Grid.Column="3" Text="&#xE74D;"
+                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveStageFromConfigCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12" WidthRequest="32" HeightRequest="32" Padding="0"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Remove Stage" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <!-- Add New Stage Bar -->
+                <Border Padding="10,8" StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="6" />
+                    </Border.StrokeShape>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                        <Entry Grid.Column="0" Text="{Binding NewStageRoleName, Mode=TwoWay}"
+                               Placeholder="New stage title (e.g. Legal Counsel, Compliance)..."
+                               FontSize="13" HeightRequest="36" VerticalOptions="Center"
+                               HorizontalOptions="Fill" />
+
+                        <Button Grid.Column="1" Text="+ Add Stage"
+                                Command="{Binding AddNewStageToConfigCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                FontSize="12" HeightRequest="34" Padding="16,0" VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- Modal Action Buttons -->
+                <HorizontalStackLayout Spacing="10" HorizontalOptions="End" Margin="0,6,0,0">
+                    <Button Text="Cancel"
+                            Command="{Binding CloseApprovalConfigModalCommand}"
+                            Style="{StaticResource CancelButton}"
+                            HeightRequest="36" Padding="16,0" />
+                    <Button Text="Save Stages"
+                            Command="{Binding SaveApprovalConfigModalCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            HeightRequest="36" Padding="20,0" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentView>

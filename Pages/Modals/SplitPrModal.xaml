@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.Modals.SplitPrModal"
+             x:Name="ThisSplitModal"
+             x:DataType="pageModels:PrListPageModel"
+             IsVisible="{Binding IsSplitPrModalVisible}">
+
+    <Grid BackgroundColor="#99000000">
+        <Border MaximumWidthRequest="660"
+                Margin="24"
+                MaximumHeightRequest="750"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="26">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
+            </Border.Shadow>
+
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
+                    <!-- Header -->
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Split Combined Requisition"
+                                   FontFamily="SegoeSemibold" FontSize="18"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="{Binding SplitTargetMasterPr.PrNo, StringFormat='Master Requisition: {0}'}"
+                                   FontSize="12" TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                   FontFamily="SegoeSemibold" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1" Text="&#xE711;"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                Command="{Binding CloseSplitPrModalCommand}"
+                                FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
+                                BackgroundColor="Transparent"
+                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                ToolTipProperties.Text="Close" />
+                    </Grid>
+
+                    <!-- Instruction Callout -->
+                    <Border Padding="12,10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="6" />
+                        </Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" VerticalOptions="Center">
+                            <Label Grid.Column="0" Text="&#xE946;"
+                                   FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                   FontSize="16"
+                                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                   VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="Select which requisitions to keep combined:"
+                                       FontFamily="SegoeSemibold" FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Requisitions with a checked box stay combined together. Unchecked requisitions will be separated back into standalone active PRs on your board."
+                                       FontSize="11" TextColor="{StaticResource Gray400}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <!-- Toolbar / Quick Select -->
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <Label Grid.Column="0" Text="{Binding SplitPrEntries.Count, StringFormat='Source Requisitions ({0}):'}"
+                               FontSize="12" FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                               VerticalOptions="Center" />
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                            <Button Text="Keep All"
+                                    Command="{Binding SelectAllKeepCombinedCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    FontSize="11" HeightRequest="28" Padding="12,0" />
+                            <Button Text="Split All"
+                                    Command="{Binding SelectNoneKeepCombinedCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    FontSize="11" HeightRequest="28" Padding="12,0" />
+                        </HorizontalStackLayout>
+                    </Grid>
+
+                    <!-- Requisition Entries List -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SplitPrEntries}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:SplitPrEntry">
+                                <Border Padding="12,10" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
+                                        <!-- CheckBox to keep combined -->
+                                        <CheckBox Grid.Column="0"
+                                                  IsChecked="{Binding IsKeepCombined, Mode=TwoWay}"
+                                                  VerticalOptions="Center" />
+
+                                        <!-- PR Details -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center">
+                                            <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                                <Label Text="{Binding PrNo}" FontFamily="SegoeSemibold" FontSize="13"
+                                                       TextColor="{DynamicResource Primary}" />
+                                                <Label Text="•" FontSize="10" TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
+                                                <Label Text="{Binding Requestor}" FontSize="12"
+                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                       VerticalOptions="Center" />
+                                                <Label Text="•" FontSize="10" TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
+                                                <Label Text="{Binding Plant}" FontSize="11" FontFamily="SegoeSemibold"
+                                                       TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                       VerticalOptions="Center" />
+                                                <Label Text="•" FontSize="10" TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
+                                                <Label Text="{Binding Priority}" FontSize="11" FontFamily="SegoeSemibold"
+                                                       TextColor="{Binding Priority, Converter={StaticResource PriorityColorConverter}}"
+                                                       VerticalOptions="Center" />
+                                            </HorizontalStackLayout>
+
+                                            <!-- Items Summary / Description -->
+                                            <Label Text="{Binding ItemsSummary}" FontSize="11" LineBreakMode="TailTruncation"
+                                                   TextColor="{StaticResource Gray400}" />
+                                        </VerticalStackLayout>
+
+                                        <!-- Status indicator badge -->
+                                        <Border Grid.Column="2" Padding="8,3" StrokeThickness="1"
+                                                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                                VerticalOptions="Center">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Label FontSize="10" FontFamily="SegoeSemibold" VerticalOptions="Center">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsKeepCombined}" Value="True">
+                                                        <Setter Property="Text" Value="Keep Combined" />
+                                                        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding IsKeepCombined}" Value="False">
+                                                        <Setter Property="Text" Value="Will Separate" />
+                                                        <Setter Property="TextColor" Value="{StaticResource Gray400}" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <!-- Live Action Summary Banner -->
+                    <Border Padding="12,10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="6" />
+                        </Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" VerticalOptions="Center">
+                            <Label Grid.Column="0" Text="&#xE748;"
+                                   FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                   FontSize="15"
+                                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                   VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding SplitActionSummary}"
+                                   FontSize="12" FontFamily="SegoeSemibold"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Action Buttons -->
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="End" Margin="0,4,0,0">
+                        <Button Text="Cancel" Command="{Binding CloseSplitPrModalCommand}"
+                                Style="{StaticResource CancelButton}" HeightRequest="36" Padding="16,0" />
+                        <Button Text="Confirm Split" Command="{Binding ConfirmSplitPrModalCommand}"
+                                IsEnabled="{Binding CanConfirmSplit}"
+                                Style="{StaticResource PrimaryButton}" HeightRequest="36" Padding="20,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentView>
