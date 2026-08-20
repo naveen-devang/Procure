@@ -39,9 +39,12 @@ namespace Procure.Utilities
             var expanded = (bool)newValue;
 
             if (expanded && expander.Content is null && expander.ContentTemplate is not null)
+            {
                 expander.Content = (View)expander.ContentTemplate.CreateContent();
+            }
 
             expander.IsVisible = expanded;
         }
+
     }
 }

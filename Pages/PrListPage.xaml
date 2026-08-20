@@ -13,11 +13,8 @@
 
     <Grid>
         <!-- Main Scrollable Content -->
-        <Grid RowDefinitions="Auto, *, Auto">
-
-            <!-- ROW 0: command area, pinned so search/filters/batch actions stay reachable -->
-            <VerticalStackLayout Grid.Row="0" Spacing="20" Padding="28,36,28,12"
-                                 MaximumWidthRequest="1600" HorizontalOptions="Fill">
+        <ScrollView Padding="28,36,28,36">
+            <VerticalStackLayout Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
 
                 <!-- Page Header: Title + Primary Actions -->
                 <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto" Margin="0,6,0,0">
@@ -230,12 +227,6 @@
                     </Grid>
                 </Border>
 
-            </VerticalStackLayout>
-
-            <!-- ROW 1a: skeleton while loading -->
-            <ScrollView Grid.Row="1" Padding="28,0,28,16" IsVisible="{Binding IsBusy}">
-                <VerticalStackLayout MaximumWidthRequest="1600" HorizontalOptions="Fill">
-
                 <!-- ===== SKELETON LOADING (visible while IsBusy = true) ===== -->
                 <!-- 6 placeholder rows that mirror the real PR card structure -->
                 <VerticalStackLayout x:Name="SkeletonContainer"
@@ -431,23 +422,11 @@
 
                 </VerticalStackLayout>
                 <!-- ===== END SKELETON ===== -->
-                </VerticalStackLayout>
-            </ScrollView>
 
-            <!-- ROW 1b: virtualized card list. The CollectionView owns the scrolling and must NOT be
-                 nested in a ScrollView - that hands it infinite height and switches virtualization off,
-                 which is what the earlier BindableLayout-in-ScrollView arrangement worked around. -->
-            <CollectionView Grid.Row="1"
-                            ItemsSource="{Binding FilteredPrs}"
-                            IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                            SelectionMode="None"
-                            ItemsUpdatingScrollMode="KeepItemsInView"
-                            VerticalScrollBarVisibility="Default"
-                            Margin="28,0,28,0"
-                            MaximumWidthRequest="1600"
-                            HorizontalOptions="Fill">
-
-                <CollectionView.EmptyView>
+                <!-- PR Cards List (Lightweight BindableLayout - Eliminates CollectionView layout measurement freeze) -->
+                <VerticalStackLayout IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                     BindableLayout.ItemsSource="{Binding FilteredPrs}">
+                    <BindableLayout.EmptyView>
                         <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
                             <Label Text="No purchase requisitions match your criteria."
                                    FontSize="15"
@@ -460,9 +439,9 @@
                                     HeightRequest="36"
                                     HorizontalOptions="Center" />
                         </VerticalStackLayout>
-                </CollectionView.EmptyView>
+                    </BindableLayout.EmptyView>
 
-                <CollectionView.ItemTemplate>
+                    <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="models:PurchaseRequisition">
                             <Border Margin="0,0,0,14"
                                     StrokeThickness="1"
@@ -1578,11 +1557,11 @@
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
 
-            <!-- ROW 2: pagination, pinned to the bottom edge -->
-                <Grid Grid.Row="2" Padding="28,4,28,14" IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                <!-- Fluent Pagination Bar (Fast 0ms Navigation) -->
+                <Grid IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
                       ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,8,0,16">
                     <!-- Left: Summary ("Showing 1–10 of 48 requisitions") -->
                     <Label Grid.Column="0"
@@ -1651,8 +1630,8 @@
                     </HorizontalStackLayout>
                 </Grid>
 
-        </Grid>
-
+            </VerticalStackLayout>
+        </ScrollView>
 
         <!-- ================= MODALS LAYER (Modular ContentView Components) ================= -->
         <converters:LazyExpander IsExpanded="{Binding IsEditModalVisible}">
