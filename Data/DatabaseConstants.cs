@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
     Unit TEXT DEFAULT 'pcs',
     UnitPrice REAL DEFAULT 0,
     Discount REAL DEFAULT 0,
-    LineTotal REAL DEFAULT 0
+    LineTotal REAL DEFAULT 0,
+    SortOrder INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
 

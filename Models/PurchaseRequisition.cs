@@ -250,6 +250,11 @@ namespace Procure.Models
             }
         }
 
+        /// <summary>Raises only what a Status or Priority edit can change. Status and Priority notify
+        /// themselves via [ObservableProperty]; IsMergedChild is derived from Status and does not.
+        /// Use this instead of NotifyHierarchyChanged when no child collection was touched.</summary>
+        public void NotifyStatusChanged() => OnPropertyChanged(nameof(IsMergedChild));
+
         public void NotifyHierarchyChanged()
         {
             CalculateItemFulfillments();

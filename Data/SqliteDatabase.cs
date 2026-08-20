@@ -81,6 +81,7 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "OtherCharges", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "Discount", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "VatType", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
         }
 
         private static async Task EnsureColumnExistsAsync(SqliteConnection connection, string tableName, string columnName, string columnType)

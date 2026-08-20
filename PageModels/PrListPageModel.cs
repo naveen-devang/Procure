@@ -805,8 +805,15 @@ namespace Procure.PageModels
         {
             var normalDays = _settingsService.NormalOverdueDays;
             var urgentDays = _settingsService.UrgentOverdueDays;
-            var overdue = _allPrs.Count(p => p.IsOverdue(normalDays, urgentDays));
-            var pcrPending = _allPrs.Count(p => p.Pcr != null && !p.Pcr.IsFullyApproved);
+
+            // One walk, two counters — this used to run Count() twice over the same list.
+            var overdue = 0;
+            var pcrPending = 0;
+            foreach (var p in _allPrs)
+            {
+                if (p.IsOverdue(normalDays, urgentDays)) overdue++;
+                if (p.Pcr != null && !p.Pcr.IsFullyApproved) pcrPending++;
+            }
 
             if (overdue > 0 || pcrPending > 0)
             {
@@ -843,7 +850,7 @@ namespace Procure.PageModels
             {
                 pr.Status = newStatus;
                 await _prRepo.SavePrFieldsAsync(pr);
-                pr.NotifyHierarchyChanged();
+                pr.NotifyStatusChanged();
                 ApplyFilters();
                 UpdateStatusBanner();
             }
@@ -931,7 +938,7 @@ namespace Procure.PageModels
                     : ProcurementPriority.Urgent;
 
                 await _prRepo.SavePrFieldsAsync(pr);
-                pr.NotifyHierarchyChanged();
+                pr.NotifyStatusChanged();
                 ApplyFilters();
                 UpdateStatusBanner();
             }

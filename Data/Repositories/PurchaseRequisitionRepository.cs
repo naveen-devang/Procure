@@ -230,8 +230,9 @@ FROM PurchaseOrder;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal
-FROM PurchaseOrderItem;";
+SELECT Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal, SortOrder
+FROM PurchaseOrderItem
+ORDER BY SortOrder ASC;";
                 using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
                 {
@@ -252,7 +253,8 @@ FROM PurchaseOrderItem;";
                         Quantity = (decimal)reader.GetDouble(5),
                         Unit = reader.IsDBNull(6) ? "pcs" : reader.GetString(6),
                         UnitPrice = reader.IsDBNull(7) ? null : (decimal)reader.GetDouble(7),
-                        Discount = reader.IsDBNull(8) ? null : (decimal)reader.GetDouble(8)
+                        Discount = reader.IsDBNull(8) ? null : (decimal)reader.GetDouble(8),
+                        SortOrder = reader.IsDBNull(10) ? 0 : reader.GetInt32(10)
                     });
                 }
             }
@@ -427,6 +429,47 @@ ON CONFLICT(Id) DO UPDATE SET
             await UpsertPrRowAsync(connection, null, pr);
         }
 
+
+        /// <summary>Replaces a PR's item rows to match <paramref name="pr"/>.Items. Callers that only
+        /// change scalar PR fields must use SavePrFieldsAsync instead — this rewrites every row.</summary>
+        private static async Task SyncPrItemsAsync(SqliteConnection connection, SqliteTransaction? tx, PurchaseRequisition pr)
+        {
+            using (var deleteItemCmd = connection.CreateCommand())
+            {
+                deleteItemCmd.Transaction = tx;
+                deleteItemCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @PrId;";
+                deleteItemCmd.Parameters.AddWithValue("@PrId", pr.Id.ToString());
+                await deleteItemCmd.ExecuteNonQueryAsync();
+            }
+
+            if (pr.Items == null || pr.Items.Count == 0) return;
+
+            int sortOrder = 0;
+            foreach (var item in pr.Items)
+            {
+                if (string.IsNullOrWhiteSpace(item.ItemName)) continue;
+                item.PrId = pr.Id;
+                item.SortOrder = sortOrder++;
+
+                using var insItemCmd = connection.CreateCommand();
+                insItemCmd.Transaction = tx;
+                insItemCmd.CommandText = @"
+INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
+
+                insItemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
+                insItemCmd.Parameters.AddWithValue("@PrId", item.PrId.ToString());
+                insItemCmd.Parameters.AddWithValue("@ItemName", item.ItemName.Trim());
+                insItemCmd.Parameters.AddWithValue("@Quantity", (double)item.Quantity);
+                insItemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim());
+                insItemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value);
+                insItemCmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
+                insItemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
+
+                await insItemCmd.ExecuteNonQueryAsync();
+            }
+        }
+
         public async Task SaveAsync(PurchaseRequisition pr)
         {
             await _db.InitializeAsync();
@@ -438,42 +481,7 @@ ON CONFLICT(Id) DO UPDATE SET
 
             await UpsertPrRowAsync(connection, tx, pr);
 
-            // Sync PrItems
-            using (var deleteItemCmd = connection.CreateCommand())
-            {
-                deleteItemCmd.Transaction = tx;
-                deleteItemCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @PrId;";
-                deleteItemCmd.Parameters.AddWithValue("@PrId", pr.Id.ToString());
-                await deleteItemCmd.ExecuteNonQueryAsync();
-            }
-
-            if (pr.Items != null && pr.Items.Count > 0)
-            {
-                int sortOrder = 0;
-                foreach (var item in pr.Items)
-                {
-                    if (string.IsNullOrWhiteSpace(item.ItemName)) continue;
-                    item.PrId = pr.Id;
-                    item.SortOrder = sortOrder++;
-
-                    using var insItemCmd = connection.CreateCommand();
-                    insItemCmd.Transaction = tx;
-                    insItemCmd.CommandText = @"
-INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
-
-                    insItemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
-                    insItemCmd.Parameters.AddWithValue("@PrId", item.PrId.ToString());
-                    insItemCmd.Parameters.AddWithValue("@ItemName", item.ItemName.Trim());
-                    insItemCmd.Parameters.AddWithValue("@Quantity", (double)item.Quantity);
-                    insItemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim());
-                    insItemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value);
-                    insItemCmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
-                    insItemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
-
-                    await insItemCmd.ExecuteNonQueryAsync();
-                }
-            }
+            await SyncPrItemsAsync(connection, tx, pr);
 
             await tx.CommitAsync();
 
@@ -495,74 +503,8 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             foreach (var pr in prs)
             {
                 pr.UpdatedAt = DateTime.Now;
-                using var cmd = connection.CreateCommand();
-                cmd.Transaction = tx;
-                cmd.CommandText = @"
-INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType)
-VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType)
-ON CONFLICT(Id) DO UPDATE SET
-    PrNo = excluded.PrNo,
-    Description = excluded.Description,
-    Requestor = excluded.Requestor,
-    Plant = excluded.Plant,
-    PrType = excluded.PrType,
-    Priority = excluded.Priority,
-    Status = excluded.Status,
-    Notes = excluded.Notes,
-    UpdatedAt = excluded.UpdatedAt,
-    ParentPrId = excluded.ParentPrId,
-    ConsolidatedFrom = excluded.ConsolidatedFrom;";
-
-                cmd.Parameters.AddWithValue("@Id", pr.Id.ToString());
-                cmd.Parameters.AddWithValue("@PrNo", pr.PrNo);
-                cmd.Parameters.AddWithValue("@Description", pr.Description);
-                cmd.Parameters.AddWithValue("@Requestor", pr.Requestor);
-                cmd.Parameters.AddWithValue("@Plant", string.IsNullOrWhiteSpace(pr.Plant) ? ProcurementPlant.RW01 : pr.Plant);
-                cmd.Parameters.AddWithValue("@PrType", string.IsNullOrWhiteSpace(pr.PrType) ? ProcurementPrType.StoresAndSpares : pr.PrType);
-                cmd.Parameters.AddWithValue("@Priority", pr.Priority);
-                cmd.Parameters.AddWithValue("@Status", pr.Status);
-                cmd.Parameters.AddWithValue("@Notes", pr.Notes);
-                cmd.Parameters.AddWithValue("@CreatedAt", pr.CreatedAt.ToString("o"));
-                cmd.Parameters.AddWithValue("@UpdatedAt", pr.UpdatedAt.ToString("o"));
-                cmd.Parameters.AddWithValue("@ParentPrId", pr.ParentPrId.HasValue ? pr.ParentPrId.Value.ToString() : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@ConsolidatedFrom", pr.ConsolidatedFrom ?? string.Empty);
-
-                await cmd.ExecuteNonQueryAsync();
-
-                // Save PrItems
-                using var delItemCmd = connection.CreateCommand();
-                delItemCmd.Transaction = tx;
-                delItemCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @PrId;";
-                delItemCmd.Parameters.AddWithValue("@PrId", pr.Id.ToString());
-                await delItemCmd.ExecuteNonQueryAsync();
-
-                if (pr.Items != null && pr.Items.Count > 0)
-                {
-                    int sortOrder = 0;
-                    foreach (var item in pr.Items)
-                    {
-                        if (string.IsNullOrWhiteSpace(item.ItemName)) continue;
-                        item.PrId = pr.Id;
-                        item.SortOrder = sortOrder++;
-
-                        using var insItemCmd = connection.CreateCommand();
-                        insItemCmd.Transaction = tx;
-                        insItemCmd.CommandText = @"
-INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
-
-                        insItemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
-                        insItemCmd.Parameters.AddWithValue("@PrId", item.PrId.ToString());
-                        insItemCmd.Parameters.AddWithValue("@ItemName", item.ItemName.Trim());
-                        insItemCmd.Parameters.AddWithValue("@Quantity", (double)item.Quantity);
-                        insItemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim());
-                        insItemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value);
-                        insItemCmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
-                        insItemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
-
-                        await insItemCmd.ExecuteNonQueryAsync();
-                    }
-                }
+                await UpsertPrRowAsync(connection, tx, pr);
+                await SyncPrItemsAsync(connection, tx, pr);
             }
 
             await tx.CommitAsync();
@@ -881,20 +823,21 @@ ON CONFLICT(Id) DO UPDATE SET
 
                 // Save PO Items: drop only the departed rows, then UPSERT the survivors, so a PO
                 // whose items did not change writes no item rows at all.
-                // ponytail: PurchaseOrderItem has no SortOrder column, so load order is rowid order,
-                // which is now first-insert order instead of last-save order. Add a SortOrder column
-                // if PO line ordering ever becomes user-editable.
+                // Line order is persisted in SortOrder, so it survives the switch from
+                // delete-and-reinsert to UPSERT.
                 await DeleteDepartedChildrenAsync(connection, tx, "PurchaseOrderItem", "PoId", po.Id, po.Items?.Select(i => i.Id).ToList() ?? new List<Guid>());
 
                 if (po.Items != null && po.Items.Count > 0)
                 {
+                    int poSortOrder = 0;
                     foreach (var item in po.Items)
                     {
+                        item.SortOrder = poSortOrder++;
                         using var itemCmd = connection.CreateCommand();
                         itemCmd.Transaction = tx;
                         itemCmd.CommandText = @"
-INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal)
-VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal)
+INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal, SortOrder)
+VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal, @SortOrder)
 ON CONFLICT(Id) DO UPDATE SET
     PoId = excluded.PoId,
     PrItemId = excluded.PrItemId,
@@ -904,8 +847,10 @@ ON CONFLICT(Id) DO UPDATE SET
     Unit = excluded.Unit,
     UnitPrice = excluded.UnitPrice,
     Discount = excluded.Discount,
-    LineTotal = excluded.LineTotal;";
+    LineTotal = excluded.LineTotal,
+    SortOrder = excluded.SortOrder;";
 
+                        itemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
                         itemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
                         itemCmd.Parameters.AddWithValue("@PoId", po.Id.ToString());
                         itemCmd.Parameters.AddWithValue("@PrItemId", item.PrItemId.HasValue ? item.PrItemId.Value.ToString() : (object)DBNull.Value);

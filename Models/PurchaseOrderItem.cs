@@ -40,6 +40,9 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
         public partial decimal? Discount { get; set; }
 
+        [ObservableProperty]
+        public partial int SortOrder { get; set; }
+
         public decimal LineTotal => (UnitPrice.HasValue && UnitPrice.Value > 0)
             ? Quantity * Math.Max(0m, UnitPrice.Value - (Discount ?? 0m))
             : 0m;
