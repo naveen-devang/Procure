@@ -4,7 +4,6 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.SettingsPage"
-             x:Name="ThisSettingsPage"
              x:DataType="pageModels:SettingsPageModel"
              Shell.NavBarIsVisible="False"
              Title="Settings"
@@ -472,7 +471,7 @@
 
                                         <Button Grid.Column="1" Text="&#xE70E;"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageUpCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:SettingsPageModel}}, Path=MoveDefaultStageUpCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
@@ -482,7 +481,7 @@
 
                                         <Button Grid.Column="2" Text="&#xE70D;"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageDownCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:SettingsPageModel}}, Path=MoveDefaultStageDownCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
@@ -492,7 +491,7 @@
 
                                         <Button Grid.Column="3" Text="&#xE74D;"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.RemoveDefaultStageCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:SettingsPageModel}}, Path=RemoveDefaultStageCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
                                                 BackgroundColor="Transparent"

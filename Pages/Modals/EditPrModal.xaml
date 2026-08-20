@@ -4,7 +4,6 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.Modals.EditPrModal"
-             x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsEditModalVisible}">
 
@@ -114,7 +113,7 @@
                                                Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
                                         <Button Grid.Column="4" Text="&#xE74D;"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveEditingPrItemCommand}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=RemoveEditingPrItemCommand}"
                                                 CommandParameter="{Binding .}"
                                                 BackgroundColor="Transparent"
                                                 TextColor="{StaticResource FluentCritical}"
