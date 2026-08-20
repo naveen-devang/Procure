@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Storage;
-using Procure.Data;
 using Procure.Models;
 
 namespace Procure.Services
@@ -22,7 +20,19 @@ namespace Procure.Services
         private const string KeyAutoCollapseOnNarrow = "Procure_AutoCollapseOnNarrow";
         private const string KeyDefaultCurrency = "Procure_DefaultCurrency";
 
-        public event EventHandler? SettingsChanged;
+        // Cached values. Preferences (a registry read on unpackaged WinUI) is hit at most
+        // once per key, lazily on first get; setters keep the cache in sync afterwards.
+        private int? _urgentOverdueDays;
+        private int? _normalOverdueDays;
+        private string? _appTheme;
+        private string? _accentTheme;
+        private bool? _autoCheckUpdatesOnStartup;
+        private bool? _isSidebarCompact;
+        private bool? _autoCollapseSidebarOnNarrow;
+        private string? _defaultCurrency;
+        private List<string>? _defaultApprovalRoles;
+
+        public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
 
         public static readonly List<PastelThemeOption> PastelPalettes = new()
         {
@@ -96,21 +106,23 @@ namespace Procure.Services
 
         public int UrgentOverdueDays
         {
-            get => Preferences.Default.Get(KeyUrgentDays, 5);
+            get => _urgentOverdueDays ??= Preferences.Default.Get(KeyUrgentDays, 5);
             set
             {
                 Preferences.Default.Set(KeyUrgentDays, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _urgentOverdueDays = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(UrgentOverdueDays)));
             }
         }
 
         public int NormalOverdueDays
         {
-            get => Preferences.Default.Get(KeyNormalDays, 10);
+            get => _normalOverdueDays ??= Preferences.Default.Get(KeyNormalDays, 10);
             set
             {
                 Preferences.Default.Set(KeyNormalDays, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _normalOverdueDays = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(NormalOverdueDays)));
             }
         }
 
@@ -120,73 +132,89 @@ namespace Procure.Services
             set
             {
                 DatabaseConstants.DatabaseDirectory = value;
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(DatabaseDirectory)));
             }
         }
 
         public string AppTheme
         {
-            get => Preferences.Default.Get(KeyAppTheme, "Dark");
+            get => _appTheme ??= Preferences.Default.Get(KeyAppTheme, "Dark");
             set
             {
                 Preferences.Default.Set(KeyAppTheme, value);
+                _appTheme = value;
                 ApplyThemeMode(value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AppTheme)));
             }
         }
 
         public string AccentTheme
         {
-            get => Preferences.Default.Get(KeyAccentTheme, "Blue");
+            get => _accentTheme ??= Preferences.Default.Get(KeyAccentTheme, "Blue");
             set
             {
                 Preferences.Default.Set(KeyAccentTheme, value);
+                _accentTheme = value;
                 ApplyAccentColor(value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AccentTheme)));
             }
         }
 
         public bool AutoCheckUpdatesOnStartup
         {
-            get => Preferences.Default.Get(KeyAutoCheckUpdates, true);
+            get => _autoCheckUpdatesOnStartup ??= Preferences.Default.Get(KeyAutoCheckUpdates, true);
             set
             {
                 Preferences.Default.Set(KeyAutoCheckUpdates, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _autoCheckUpdatesOnStartup = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AutoCheckUpdatesOnStartup)));
             }
         }
 
         public bool IsSidebarCompact
         {
-            get => Preferences.Default.Get(KeySidebarCompact, false);
+            get => _isSidebarCompact ??= Preferences.Default.Get(KeySidebarCompact, false);
             set
             {
                 Preferences.Default.Set(KeySidebarCompact, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _isSidebarCompact = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(IsSidebarCompact)));
             }
         }
 
         public bool AutoCollapseSidebarOnNarrow
         {
-            get => Preferences.Default.Get(KeyAutoCollapseOnNarrow, true);
+            get => _autoCollapseSidebarOnNarrow ??= Preferences.Default.Get(KeyAutoCollapseOnNarrow, true);
             set
             {
                 Preferences.Default.Set(KeyAutoCollapseOnNarrow, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _autoCollapseSidebarOnNarrow = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AutoCollapseSidebarOnNarrow)));
             }
         }
 
         public string DefaultCurrency
         {
-            get => Preferences.Default.Get(KeyDefaultCurrency, "AED");
+            get => _defaultCurrency ??= Preferences.Default.Get(KeyDefaultCurrency, "AED");
             set
             {
                 Preferences.Default.Set(KeyDefaultCurrency, value);
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                _defaultCurrency = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(DefaultCurrency)));
             }
         }
 
-        public List<string> GetDefaultApprovalRoles()
+        public List<string> GetDefaultApprovalRoles() => new(_defaultApprovalRoles ??= LoadDefaultApprovalRoles());
+
+        public void SetDefaultApprovalRoles(IEnumerable<string> roles)
+        {
+            var list = roles.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).ToList();
+            Preferences.Default.Set(KeyDefaultApprovalRoles, string.Join("|||", list));
+            _defaultApprovalRoles = list;
+            SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(GetDefaultApprovalRoles)));
+        }
+
+        private static List<string> LoadDefaultApprovalRoles()
         {
             var raw = Preferences.Default.Get(KeyDefaultApprovalRoles, string.Empty);
             if (!string.IsNullOrWhiteSpace(raw))
@@ -201,13 +229,6 @@ namespace Procure.Services
                 ApprovalRoles.Cfo,
                 ApprovalRoles.Ceo
             };
-        }
-
-        public void SetDefaultApprovalRoles(IEnumerable<string> roles)
-        {
-            var str = string.Join("|||", roles.Where(r => !string.IsNullOrWhiteSpace(r)));
-            Preferences.Default.Set(KeyDefaultApprovalRoles, str);
-            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void ApplySavedTheme()
@@ -226,6 +247,8 @@ namespace Procure.Services
                 "Dark" => Microsoft.Maui.ApplicationModel.AppTheme.Dark,
                 _ => Microsoft.Maui.ApplicationModel.AppTheme.Unspecified
             };
+
+            ThemeHelper.Invalidate();
         }
 
         private void ApplyAccentColor(string accentId)

@@ -9,7 +9,6 @@ namespace Procure
     public partial class AppShell : Shell
     {
         private readonly ISettingsService _settingsService;
-        private readonly IMemoryOptimizerService _memoryOptimizer;
         private bool _isManuallyToggled;
 
         public AppShell(
@@ -17,11 +16,9 @@ namespace Procure
             PrListPage prListPage,
             ManageColumnsPage manageColumnsPage,
             SettingsPage settingsPage,
-            ISettingsService settingsService,
-            IMemoryOptimizerService memoryOptimizer)
+            ISettingsService settingsService)
         {
             _settingsService = settingsService;
-            _memoryOptimizer = memoryOptimizer;
             InitializeComponent();
 
             DashboardContent.Content = dashboardPage;
@@ -29,21 +26,46 @@ namespace Procure
             ColumnsContent.Content = manageColumnsPage;
             SettingsContent.Content = settingsPage;
 
-            _settingsService.SettingsChanged += (s, e) =>
-            {
-                UpdateThemeButtonHighlights();
-                UpdateSidebarLayout(_settingsService.IsSidebarCompact);
-            };
-
             UpdateThemeButtonHighlights();
             UpdateSidebarLayout(_settingsService.IsSidebarCompact);
+        }
 
+        // Subscribe/unsubscribe in matching pairs, tied to the handler lifetime. Subscribing in the
+        // constructor instead would leave these dead after any disconnect/reconnect cycle, silently
+        // killing sidebar auto-collapse and the theme-button highlight.
+        protected override void OnHandlerChanged()
+        {
+            base.OnHandlerChanged();
+
+            _settingsService.SettingsChanged -= OnSettingsChanged;
+            _settingsService.SettingsChanged += OnSettingsChanged;
+            SizeChanged -= OnShellSizeChanged;
             SizeChanged += OnShellSizeChanged;
+        }
 
-            Navigated += (s, e) =>
+        protected override void OnHandlerChanging(HandlerChangingEventArgs args)
+        {
+            base.OnHandlerChanging(args);
+
+            if (args.NewHandler is null)
             {
-                _memoryOptimizer.RecordActivity();
-            };
+                _settingsService.SettingsChanged -= OnSettingsChanged;
+                SizeChanged -= OnShellSizeChanged;
+            }
+        }
+
+        private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
+        {
+            switch (e.Key)
+            {
+                case nameof(ISettingsService.AppTheme):
+                case nameof(ISettingsService.AccentTheme):
+                    UpdateThemeButtonHighlights();
+                    break;
+                case nameof(ISettingsService.IsSidebarCompact):
+                    UpdateSidebarLayout(_settingsService.IsSidebarCompact);
+                    break;
+            }
         }
 
         private void OnShellSizeChanged(object? sender, EventArgs e)

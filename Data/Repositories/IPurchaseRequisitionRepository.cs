@@ -10,6 +10,8 @@ namespace Procure.Data.Repositories
         Task<List<PurchaseRequisition>> GetAllAsync();
         Task<int> GetCountAsync();
         Task SaveAsync(PurchaseRequisition pr);
+        /// <summary>UPSERTs the PurchaseRequisition row only - no PrItem, no CustomFieldValue writes.</summary>
+        Task SavePrFieldsAsync(PurchaseRequisition pr);
         Task DeleteAsync(Guid id);
 
         Task SaveRfqAsync(RequestForQuotation rfq);

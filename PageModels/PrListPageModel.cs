@@ -19,14 +19,13 @@ using Procure.Utilities;
 namespace Procure.PageModels
 {
     [QueryProperty(nameof(ActionParam), "action")]
-    public partial class PrListPageModel : ObservableObject
+    public partial class PrListPageModel : ObservableObject, IDisposable
     {
         private readonly IPurchaseRequisitionRepository _prRepo;
         private readonly ICustomColumnRepository _customColumnRepo;
         private readonly ICsvExportService _csvExportService;
         private readonly IPcrExportService _pcrExportService;
         private readonly ISettingsService _settingsService;
-        private readonly IMemoryOptimizerService _memoryOptimizer;
         private readonly IErrorHandler _errorHandler;
 
         private List<PurchaseRequisition> _allPrs = new();
@@ -300,9 +299,6 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string SelectedPrsSummary { get; set; } = string.Empty;
 
-        [ObservableProperty]
-        public partial bool IsAllSelected { get; set; }
-
         // Dynamic toolbar buttons state
         [ObservableProperty]
         public partial string MergeButtonText { get; set; } = "Combine / Merge PRs";
@@ -498,7 +494,6 @@ namespace Procure.PageModels
             ICsvExportService csvExportService,
             IPcrExportService pcrExportService,
             ISettingsService settingsService,
-            IMemoryOptimizerService memoryOptimizer,
             IErrorHandler errorHandler)
         {
             _prRepo = prRepo;
@@ -506,30 +501,75 @@ namespace Procure.PageModels
             _csvExportService = csvExportService;
             _pcrExportService = pcrExportService;
             _settingsService = settingsService;
-            _memoryOptimizer = memoryOptimizer;
             _errorHandler = errorHandler;
 
-            _settingsService.SettingsChanged += (s, e) => OnThemeOrSettingsChanged();
+            _settingsService.SettingsChanged += OnSettingsChanged;
             if (Application.Current != null)
             {
-                Application.Current.RequestedThemeChanged += (s, e) => OnThemeOrSettingsChanged();
+                Application.Current.RequestedThemeChanged += OnAppRequestedThemeChanged;
             }
         }
 
-        private void OnThemeOrSettingsChanged()
+        // Registered as a DI singleton, so the container disposes it at shutdown — that is the
+        // only point at which these two subscriptions may be released.
+        public void Dispose()
         {
+            _settingsService.SettingsChanged -= OnSettingsChanged;
+            if (Application.Current != null)
+            {
+                Application.Current.RequestedThemeChanged -= OnAppRequestedThemeChanged;
+            }
+            _searchDebounce?.Cancel();
+            _searchDebounce?.Dispose();
+            _searchDebounce = null;
+        }
+
+        private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
+        {
+            switch (e.Key)
+            {
+                // Thresholds feed the overdue filter and the banner only — nothing on a card is bound to them.
+                case nameof(ISettingsService.NormalOverdueDays):
+                case nameof(ISettingsService.UrgentOverdueDays):
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        ApplyFilters();
+                        UpdateStatusBanner();
+                    });
+                    break;
+
+                // Theme repaints every converter-bound brush; currency reformats every money label.
+                case nameof(ISettingsService.AppTheme):
+                case nameof(ISettingsService.AccentTheme):
+                case nameof(ISettingsService.DefaultCurrency):
+                    RefreshCardVisuals();
+                    break;
+            }
+        }
+
+        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e) => RefreshCardVisuals();
+
+        private int _cardVisualsRefreshQueued;
+
+        private void RefreshCardVisuals()
+        {
+            // Setting AppTheme raises BOTH SettingsChanged and Application.RequestedThemeChanged, so a
+            // single theme click lands here twice. Coalesce — one queued pass repaints everything.
+            if (Interlocked.CompareExchange(ref _cardVisualsRefreshQueued, 1, 0) != 0) return;
+
             MainThread.BeginInvokeOnMainThread(() =>
             {
+                Interlocked.Exchange(ref _cardVisualsRefreshQueued, 0);
+
                 OnPropertyChanged(nameof(FilterOverdueOnly));
                 OnPropertyChanged(nameof(FilterPcrPendingOnly));
                 OnPropertyChanged(nameof(FilterUrgentOnly));
 
-                if (_allPrs == null || _allPrs.Count == 0) return;
-                foreach (var pr in _allPrs)
+                // Only the current page is bound; off-page PRs repaint when ApplyFilters brings them in.
+                foreach (var pr in FilteredPrs)
                 {
                     pr.NotifyHierarchyChanged();
                 }
-                ApplyFilters();
             });
         }
 
@@ -546,15 +586,10 @@ namespace Procure.PageModels
                 var defs = await Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync()).ConfigureAwait(true);
                 CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defs);
 
-                // Load PRs on thread pool; NotifyHierarchyChanged is safe on background threads
-                // (it only fires on individual model properties, not on bound UI collections)
-                var loadedPrs = await Task.Run(async () =>
-                {
-                    var list = await _prRepo.GetAllAsync();
-                    foreach (var pr in list)
-                        pr.NotifyHierarchyChanged();
-                    return list;
-                }).ConfigureAwait(true);
+                // Load PRs on the thread pool. No NotifyHierarchyChanged pass here: nothing is bound
+                // to these objects yet (FilteredPrs is populated below), so the ~861 PropertyChanged
+                // events it raised had no subscribers. GetAllAsync already computed fulfilments.
+                var loadedPrs = await Task.Run(() => _prRepo.GetAllAsync()).ConfigureAwait(true);
 
                 // Back on UI thread: assign _allPrs and update bound collections
                 _allPrs = loadedPrs;
@@ -581,6 +616,7 @@ namespace Procure.PageModels
             // Debounce search — cancel any pending filter and wait 300ms
             // to avoid re-filtering on every single keystroke
             _searchDebounce?.Cancel();
+            _searchDebounce?.Dispose();
             _searchDebounce = new CancellationTokenSource();
             var token = _searchDebounce.Token;
 
@@ -691,7 +727,9 @@ namespace Procure.PageModels
             // Overdue filter
             if (FilterOverdueOnly)
             {
-                query = query.Where(p => p.IsOverdue(_settingsService.NormalOverdueDays, _settingsService.UrgentOverdueDays));
+                var normalDays = _settingsService.NormalOverdueDays;
+                var urgentDays = _settingsService.UrgentOverdueDays;
+                query = query.Where(p => p.IsOverdue(normalDays, urgentDays));
             }
 
             // PCR Pending filter
@@ -735,21 +773,39 @@ namespace Procure.PageModels
                 PaginationSummary = $"Showing {startIndex + 1}–{endIndex} of {TotalFilteredCount} requisitions";
             }
 
-            // Replace the collection in a single assignment rather than Clear + N individual Adds.
-            // This fires exactly one CollectionChanged event instead of N+1, preventing
-            // N BindableLayout re-measures on every filter/page change.
+            // Reconcile the existing collection instead of replacing the instance: replacing it makes the
+            // bound BindableLayout tear down and rebuild every card, which also wipes each card's expanded
+            // and selected state. Removals first, then insert/move into position.
+            // ponytail: O(n^2) diff via IndexOf — fine while a page is PageSizeOptions-sized (max 50);
+            // swap in an index map if paging ever goes into the hundreds.
             if (!FilteredPrs.SequenceEqual(pagedList))
             {
-                FilteredPrs = new ObservableCollection<PurchaseRequisition>(pagedList);
+                for (var i = FilteredPrs.Count - 1; i >= 0; i--)
+                {
+                    if (!pagedList.Contains(FilteredPrs[i]))
+                        FilteredPrs.RemoveAt(i);
+                }
+
+                for (var i = 0; i < pagedList.Count; i++)
+                {
+                    var existing = FilteredPrs.IndexOf(pagedList[i]);
+                    if (existing < 0)
+                        FilteredPrs.Insert(i, pagedList[i]);
+                    else if (existing != i)
+                        FilteredPrs.Move(existing, i);
+                }
             }
 
-            UpdateSelectionState();
-            _memoryOptimizer.RecordActivity();
+            // No UpdateSelectionState() here: filtering never touches pr.IsSelected, and the method
+            // scans _allPrs rather than the page, so its result cannot change. The checkbox handler
+            // and the batch commands call it directly when selection actually moves.
         }
 
         private void UpdateStatusBanner()
         {
-            var overdue = _allPrs.Count(p => p.IsOverdue(_settingsService.NormalOverdueDays, _settingsService.UrgentOverdueDays));
+            var normalDays = _settingsService.NormalOverdueDays;
+            var urgentDays = _settingsService.UrgentOverdueDays;
+            var overdue = _allPrs.Count(p => p.IsOverdue(normalDays, urgentDays));
             var pcrPending = _allPrs.Count(p => p.Pcr != null && !p.Pcr.IsFullyApproved);
 
             if (overdue > 0 || pcrPending > 0)
@@ -786,7 +842,7 @@ namespace Procure.PageModels
             try
             {
                 pr.Status = newStatus;
-                await _prRepo.SaveAsync(pr);
+                await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
                 ApplyFilters();
                 UpdateStatusBanner();
@@ -811,12 +867,12 @@ namespace Procure.PageModels
                     if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
                     {
                         parentPr.Status = ProcurementStatus.Delivered;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
                     else if (parentPr.Pos.Any(p => p.Status == PoStatus.Delivered))
                     {
                         parentPr.Status = ProcurementStatus.PartiallyDelivered;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 
                     parentPr.NotifyHierarchyChanged();
@@ -850,7 +906,7 @@ namespace Procure.PageModels
                     if (parentPr.Rfqs.All(r => r.IsQuoteReceived) && parentPr.Status == ProcurementStatus.RfqSent)
                     {
                         parentPr.Status = ProcurementStatus.QuotesReceived;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 
                     parentPr.NotifyHierarchyChanged();
@@ -874,7 +930,7 @@ namespace Procure.PageModels
                     ? ProcurementPriority.Normal
                     : ProcurementPriority.Urgent;
 
-                await _prRepo.SaveAsync(pr);
+                await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
                 ApplyFilters();
                 UpdateStatusBanner();
@@ -1497,7 +1553,7 @@ namespace Procure.PageModels
                 if (TargetPrForRfq.Status == ProcurementStatus.PrRaised)
                 {
                     TargetPrForRfq.Status = ProcurementStatus.RfqSent;
-                    await _prRepo.SaveAsync(TargetPrForRfq);
+                    await _prRepo.SavePrFieldsAsync(TargetPrForRfq);
                 }
 
                 rfq.NotifyCalculationsChanged();
@@ -1557,7 +1613,7 @@ namespace Procure.PageModels
                     if (parentPr.Rfqs.All(r => r.Status == RfqStatus.QuoteReceived))
                     {
                         parentPr.Status = ProcurementStatus.QuotesReceived;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
                     parentPr.NotifyHierarchyChanged();
                 }
@@ -1608,7 +1664,7 @@ namespace Procure.PageModels
                 await _prRepo.SavePcrAsync(pcr);
                 pr.Pcr = pcr;
                 pr.Status = ProcurementStatus.PcrSubmitted;
-                await _prRepo.SaveAsync(pr);
+                await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
                 UpdateStatusBanner();
             }
@@ -1818,12 +1874,12 @@ namespace Procure.PageModels
                 if (pcr.IsFullyApproved)
                 {
                     ConfiguringPr.Status = ProcurementStatus.PcrApproved;
-                    await _prRepo.SaveAsync(ConfiguringPr);
+                    await _prRepo.SavePrFieldsAsync(ConfiguringPr);
                 }
                 else if (ConfiguringPr.Status == ProcurementStatus.PcrApproved)
                 {
                     ConfiguringPr.Status = ProcurementStatus.PcrSubmitted;
-                    await _prRepo.SaveAsync(ConfiguringPr);
+                    await _prRepo.SavePrFieldsAsync(ConfiguringPr);
                 }
 
                 ConfiguringPr.NotifyHierarchyChanged();
@@ -1847,12 +1903,12 @@ namespace Procure.PageModels
                     if (parentPr.Pcr.IsFullyApproved)
                     {
                         parentPr.Status = ProcurementStatus.PcrApproved;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
                     else if (parentPr.Status == ProcurementStatus.PcrApproved)
                     {
                         parentPr.Status = ProcurementStatus.PcrSubmitted;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 
                     parentPr.Pcr.NotifyApprovalsChanged();
@@ -2084,15 +2140,15 @@ namespace Procure.PageModels
 
                 if (HasPoQuantityValidationErrors)
                 {
-                    PoAllocationSummaryText = $"⚠️ Over-allocated: {PoQuantityValidationErrorMessage}";
+                    PoAllocationSummaryText = $"Over-allocated: {PoQuantityValidationErrorMessage}";
                 }
                 else if (pendingItemsCount == 0 && balancedItemsCount > 0)
                 {
-                    PoAllocationSummaryText = $"✓ All {balancedItemsCount} items complete";
+                    PoAllocationSummaryText = $"All {balancedItemsCount} items complete";
                 }
                 else if (TargetPrForPo.Items.Count > 0)
                 {
-                    PoAllocationSummaryText = $"⚠️ {balancedItemsCount}/{TargetPrForPo.Items.Count} items complete ({pendingItemsCount} pending)";
+                    PoAllocationSummaryText = $"{balancedItemsCount}/{TargetPrForPo.Items.Count} items complete ({pendingItemsCount} pending)";
                 }
                 else
                 {
@@ -2394,11 +2450,10 @@ namespace Procure.PageModels
                         TargetPrForPo.Status == ProcurementStatus.PrRaised)
                     {
                         TargetPrForPo.Status = ProcurementStatus.PoRaised;
-                        await _prRepo.SaveAsync(TargetPrForPo);
+                        await _prRepo.SavePrFieldsAsync(TargetPrForPo);
                     }
                 }
 
-                TargetPrForPo.CalculateItemFulfillments();
                 TargetPrForPo.NotifyHierarchyChanged();
                 UpdateStatusBanner();
                 CloseAddPoModal();
@@ -2457,7 +2512,7 @@ namespace Procure.PageModels
                     if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
                     {
                         parentPr.Status = ProcurementStatus.Delivered;
-                        await _prRepo.SaveAsync(parentPr);
+                        await _prRepo.SavePrFieldsAsync(parentPr);
                     }
                     parentPr.NotifyHierarchyChanged();
                 }
@@ -2717,25 +2772,6 @@ namespace Procure.PageModels
         // ================= BATCH SELECTION & ACTIONS =================
 
         [RelayCommand]
-        public void TogglePrSelection(PurchaseRequisition pr)
-        {
-            if (pr == null) return;
-            pr.IsSelected = !pr.IsSelected;
-            UpdateSelectionState();
-        }
-
-        [RelayCommand]
-        public void SelectAllFilteredPrs()
-        {
-            var select = !IsAllSelected;
-            foreach (var pr in FilteredPrs)
-            {
-                pr.IsSelected = select;
-            }
-            UpdateSelectionState();
-        }
-
-        [RelayCommand]
         public void ClearSelection()
         {
             foreach (var pr in _allPrs)
@@ -2751,7 +2787,6 @@ namespace Procure.PageModels
             SelectedPrsCount = selected.Count;
             IsBatchSelectionActive = selected.Count > 0;
             SelectedPrsSummary = selected.Count == 1 ? "1 requisition selected" : $"{selected.Count} requisitions selected";
-            IsAllSelected = FilteredPrs.Count > 0 && FilteredPrs.All(p => p.IsSelected);
 
             // 1. First button: Combine / Merge PRs vs Split / Unmerge PR
             if (selected.Count == 1 && selected[0].IsConsolidatedMaster)

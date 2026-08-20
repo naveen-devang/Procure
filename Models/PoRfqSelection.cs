@@ -107,35 +107,35 @@ namespace Procure.Models
 
                 if (IsOverAllocated)
                 {
-                    return $"⚠️ Exceeds PR target by {OverAllocatedQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (PR Target: {PrTargetQuantity:G29} {unitStr})";
+                    return $"Exceeds PR target by {OverAllocatedQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (PR Target: {PrTargetQuantity:G29} {unitStr})";
                 }
 
                 if (IsFullyAllocated)
                 {
                     if (thisPoQty > 0 && OtherPosOrderedQuantity > 0)
-                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • ✓ Fully Allocated";
+                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • Fully Allocated";
                     if (thisPoQty == 0 && OtherPosOrderedQuantity > 0)
-                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • ✓ Fully Allocated";
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • ✓ Fully Allocated";
+                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • Fully Allocated";
+                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • Fully Allocated";
                 }
 
                 var pending = PendingQuantity;
                 if (thisPoQty > 0 && OtherPosOrderedQuantity > 0)
                 {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • ⚠️ {pending:G29} {unitStr} Pending";
+                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • {pending:G29} {unitStr} Pending";
                 }
 
                 if (thisPoQty > 0)
                 {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (This PO: {thisPoQty:G29}) • ⚠️ {pending:G29} {unitStr} Pending";
+                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (This PO: {thisPoQty:G29}) • {pending:G29} {unitStr} Pending";
                 }
 
                 if (OtherPosOrderedQuantity > 0)
                 {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • ⚠️ {pending:G29} {unitStr} Pending";
+                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • {pending:G29} {unitStr} Pending";
                 }
 
-                return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • ⚠️ {pending:G29} {unitStr} Pending (Unallocated)";
+                return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {pending:G29} {unitStr} Pending (Unallocated)";
             }
         }
 

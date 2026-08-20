@@ -4,6 +4,11 @@ using Procure.Models;
 
 namespace Procure.Services
 {
+    public sealed class SettingsChangedEventArgs(string key) : EventArgs
+    {
+        public string Key { get; } = key;
+    }
+
     public interface ISettingsService
     {
         int UrgentOverdueDays { get; set; }
@@ -19,6 +24,6 @@ namespace Procure.Services
         List<string> GetDefaultApprovalRoles();
         void SetDefaultApprovalRoles(IEnumerable<string> roles);
         void ApplySavedTheme();
-        event EventHandler? SettingsChanged;
+        event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
     }
 }

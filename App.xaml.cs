@@ -15,6 +15,9 @@ namespace Procure
             InitializeComponent();
             _services = services;
 
+            // OS theme flips must drop ThemeHelper's cached value. App lives for the process lifetime.
+            RequestedThemeChanged += OnRequestedThemeChanged;
+
             // Apply persisted theme mode and pastel accent color
             var settings = _services.GetRequiredService<ISettingsService>();
             settings.ApplySavedTheme();
@@ -25,6 +28,9 @@ namespace Procure
                 _ = CheckForUpdatesInBackgroundAsync();
             }
         }
+
+        private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+            => Procure.Utilities.ThemeHelper.Invalidate();
 
         private async Task CheckForUpdatesInBackgroundAsync()
         {

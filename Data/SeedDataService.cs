@@ -20,10 +20,18 @@ namespace Procure.Data
             _customColumnRepo = customColumnRepo;
         }
 
+        private bool _checked;
+
         public async Task EnsureDataSeededAsync()
         {
+            // Seeding is once-per-database work, so once the check has run there is nothing left to
+            // decide. This makes repeat calls (the Dashboard reloads on every appearance) free
+            // instead of costing a COUNT round-trip each time.
+            if (_checked) return;
+
             // Use lightweight count check — avoids loading all PR data just to test for existence
             var count = await _prRepo.GetCountAsync();
+            _checked = true;
             if (count > 0) return;
 
             // 1. Seed Custom Columns

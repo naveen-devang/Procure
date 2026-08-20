@@ -9,40 +9,45 @@ namespace Procure.Utilities
 {
     public static class ThemeHelper
     {
-        public static bool IsDark
+        // Cached resolved theme. A bool holds no UI reference, so it cannot leak.
+        private static bool? _isDark;
+
+        /// <summary>Clears the cached theme so the next read re-resolves it.</summary>
+        public static void Invalidate() => _isDark = null;
+
+        public static bool IsDark => _isDark ??= Resolve();
+
+        private static bool Resolve()
         {
-            get
+            try
             {
-                try
+                var app = Application.Current;
+                if (app != null)
                 {
-                    var app = Application.Current;
-                    if (app != null)
-                    {
-                        if (app.UserAppTheme == AppTheme.Dark) return true;
-                        if (app.UserAppTheme == AppTheme.Light) return false;
-                    }
+                    if (app.UserAppTheme == AppTheme.Dark) return true;
+                    if (app.UserAppTheme == AppTheme.Light) return false;
+                }
 
-                    var savedTheme = Preferences.Default.Get("Procure_AppTheme", string.Empty);
-                    if (string.Equals(savedTheme, "Dark", StringComparison.OrdinalIgnoreCase)) return true;
-                    if (string.Equals(savedTheme, "Light", StringComparison.OrdinalIgnoreCase)) return false;
+                var savedTheme = Preferences.Default.Get("Procure_AppTheme", string.Empty);
+                if (string.Equals(savedTheme, "Dark", StringComparison.OrdinalIgnoreCase)) return true;
+                if (string.Equals(savedTheme, "Light", StringComparison.OrdinalIgnoreCase)) return false;
 
-                    if (app != null)
-                    {
-                        if (app.RequestedTheme == AppTheme.Dark) return true;
-                        if (app.RequestedTheme == AppTheme.Light) return false;
-                        if (app.PlatformAppTheme == AppTheme.Dark) return true;
-                        if (app.PlatformAppTheme == AppTheme.Light) return false;
-                    }
+                if (app != null)
+                {
+                    if (app.RequestedTheme == AppTheme.Dark) return true;
+                    if (app.RequestedTheme == AppTheme.Light) return false;
+                    if (app.PlatformAppTheme == AppTheme.Dark) return true;
+                    if (app.PlatformAppTheme == AppTheme.Light) return false;
+                }
 
 #if WINDOWS
-                    var uiSettings = new Windows.UI.ViewManagement.UISettings();
-                    var color = uiSettings.GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
-                    return color.R < 128;
+                var uiSettings = new Windows.UI.ViewManagement.UISettings();
+                var color = uiSettings.GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
+                return color.R < 128;
 #endif
-                }
-                catch { }
-                return false;
             }
+            catch { }
+            return false;
         }
     }
 

@@ -44,24 +44,6 @@ namespace Procure
                             {
                                 // Fallback to standard window sizing
                             }
-
-                            window.VisibilityChanged += (s, e) =>
-                            {
-                                if (!e.Visible)
-                                {
-                                    var memoryOptimizer = Application.Current?.Handler?.MauiContext?.Services?.GetService<IMemoryOptimizerService>();
-                                    memoryOptimizer?.TrimMemory();
-                                }
-                            };
-
-                            window.Activated += (s, e) =>
-                            {
-                                if (e.WindowActivationState == Microsoft.UI.Xaml.WindowActivationState.Deactivated)
-                                {
-                                    var memoryOptimizer = Application.Current?.Handler?.MauiContext?.Services?.GetService<IMemoryOptimizerService>();
-                                    memoryOptimizer?.TrimMemory();
-                                }
-                            };
                         });
                     });
 #endif
@@ -112,7 +94,6 @@ namespace Procure
             builder.Services.AddSingleton<ICsvExportService, CsvExportService>();
             builder.Services.AddSingleton<IPcrExportService, PcrExportService>();
             builder.Services.AddSingleton<IUpdateService, UpdateService>();
-            builder.Services.AddSingleton<IMemoryOptimizerService, MemoryOptimizerService>();
             builder.Services.AddSingleton<SeedDataService>();
             builder.Services.AddSingleton<IErrorHandler, ModalErrorHandler>();
 

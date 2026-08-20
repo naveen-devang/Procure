@@ -59,8 +59,9 @@ namespace Procure.Pages
                 parentAnimation.Add(0.0, 0.5, fadeOut);
                 parentAnimation.Add(0.5, 1.0, fadeIn);
 
-                // 8ms rate matches native 120Hz high refresh displays with zero frame jitter
-                parentAnimation.Commit(this, ShimmerAnimationKey, rate: 8, length: 1400, repeat: () => _viewModel.IsBusy);
+                // ~30fps. MAUI's animation timer is not display-synced, so a faster rate buys no
+                // smoothness on an opacity pulse - it only steals main-thread time from the card build.
+                parentAnimation.Commit(this, ShimmerAnimationKey, rate: 33, length: 1400, repeat: () => _viewModel.IsBusy);
             });
         }
 

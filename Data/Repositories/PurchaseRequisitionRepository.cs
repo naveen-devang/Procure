@@ -375,15 +375,10 @@ ORDER BY SortOrder ASC;";
             return Convert.ToInt32(result);
         }
 
-        public async Task SaveAsync(PurchaseRequisition pr)
+        // UPSERTs the PurchaseRequisition row only. Shared by SaveAsync (inside its transaction)
+        // and SavePrFieldsAsync (standalone), so the UPSERT SQL exists exactly once.
+        private static async Task UpsertPrRowAsync(SqliteConnection connection, SqliteTransaction? tx, PurchaseRequisition pr)
         {
-            await _db.InitializeAsync();
-            pr.UpdatedAt = DateTime.Now;
-
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
-            using var tx = connection.BeginTransaction();
-
             using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"
@@ -417,6 +412,31 @@ ON CONFLICT(Id) DO UPDATE SET
             cmd.Parameters.AddWithValue("@ConsolidatedFrom", pr.ConsolidatedFrom ?? string.Empty);
 
             await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Scalar-field-only save: writes the PurchaseRequisition row and nothing else.
+        // Use instead of SaveAsync when Items and CustomValues are untouched.
+        public async Task SavePrFieldsAsync(PurchaseRequisition pr)
+        {
+            await _db.InitializeAsync();
+            pr.UpdatedAt = DateTime.Now;
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+
+            await UpsertPrRowAsync(connection, null, pr);
+        }
+
+        public async Task SaveAsync(PurchaseRequisition pr)
+        {
+            await _db.InitializeAsync();
+            pr.UpdatedAt = DateTime.Now;
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync();
+            using var tx = connection.BeginTransaction();
+
+            await UpsertPrRowAsync(connection, tx, pr);
 
             // Sync PrItems
             using (var deleteItemCmd = connection.CreateCommand())
@@ -570,6 +590,34 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             await cmd.ExecuteNonQueryAsync();
         }
 
+        // Deletes only the child rows that are gone from memory, so an unchanged child set writes nothing.
+        // Table and column names are compile-time constants; every value is parameterised.
+        // ponytail: one @Keep parameter per surviving child - SQLite's 32766-parameter cap is the ceiling.
+        // If a parent ever holds more children than that, switch to a temp table of ids.
+        private static async Task DeleteDepartedChildrenAsync(SqliteConnection connection, SqliteTransaction tx, string table, string parentColumn, Guid parentId, IReadOnlyList<Guid> keepIds)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.Parameters.AddWithValue("@ParentId", parentId.ToString());
+
+            if (keepIds.Count == 0)
+            {
+                cmd.CommandText = $"DELETE FROM {table} WHERE {parentColumn} = @ParentId;";
+            }
+            else
+            {
+                var names = new string[keepIds.Count];
+                for (int i = 0; i < keepIds.Count; i++)
+                {
+                    names[i] = "@Keep" + i;
+                    cmd.Parameters.AddWithValue(names[i], keepIds[i].ToString());
+                }
+                cmd.CommandText = $"DELETE FROM {table} WHERE {parentColumn} = @ParentId AND Id NOT IN ({string.Join(",", names)});";
+            }
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         public async Task SaveRfqAsync(RequestForQuotation rfq)
         {
             await _db.InitializeAsync();
@@ -628,21 +676,7 @@ ON CONFLICT(Id) DO UPDATE SET
             // Save RfqItems
             if (rfq.Items != null)
             {
-                var activeItemIds = rfq.Items.Select(i => $"'{i.Id}'").ToList();
-                if (activeItemIds.Count > 0)
-                {
-                    using var deleteCmd = connection.CreateCommand();
-                    deleteCmd.Transaction = tx;
-                    deleteCmd.CommandText = $"DELETE FROM RfqItem WHERE RfqId = '{rfq.Id}' AND Id NOT IN ({string.Join(",", activeItemIds)});";
-                    await deleteCmd.ExecuteNonQueryAsync();
-                }
-                else
-                {
-                    using var deleteCmd = connection.CreateCommand();
-                    deleteCmd.Transaction = tx;
-                    deleteCmd.CommandText = $"DELETE FROM RfqItem WHERE RfqId = '{rfq.Id}';";
-                    await deleteCmd.ExecuteNonQueryAsync();
-                }
+                await DeleteDepartedChildrenAsync(connection, tx, "RfqItem", "RfqId", rfq.Id, rfq.Items.Select(i => i.Id).ToList());
 
                 int sortOrder = 0;
                 foreach (var item in rfq.Items)
@@ -725,13 +759,9 @@ ON CONFLICT(Id) DO UPDATE SET
             pcr.EnsureDefaultApprovals();
 
             // Delete any approvals removed from memory
-            var activeIds = pcr.Approvals.Select(a => $"'{a.Id}'").ToList();
-            if (activeIds.Count > 0)
+            if (pcr.Approvals.Count > 0)
             {
-                using var deleteCmd = connection.CreateCommand();
-                deleteCmd.Transaction = tx;
-                deleteCmd.CommandText = $"DELETE FROM Approval WHERE PcrId = '{pcr.Id}' AND Id NOT IN ({string.Join(",", activeIds)});";
-                await deleteCmd.ExecuteNonQueryAsync();
+                await DeleteDepartedChildrenAsync(connection, tx, "Approval", "PcrId", pcr.Id, pcr.Approvals.Select(a => a.Id).ToList());
             }
 
             foreach (var approval in pcr.Approvals)
@@ -849,12 +879,12 @@ ON CONFLICT(Id) DO UPDATE SET
 
                 await cmd.ExecuteNonQueryAsync();
 
-                // Save PO Items
-                using var delCmd = connection.CreateCommand();
-                delCmd.Transaction = tx;
-                delCmd.CommandText = "DELETE FROM PurchaseOrderItem WHERE PoId = @PoId;";
-                delCmd.Parameters.AddWithValue("@PoId", po.Id.ToString());
-                await delCmd.ExecuteNonQueryAsync();
+                // Save PO Items: drop only the departed rows, then UPSERT the survivors, so a PO
+                // whose items did not change writes no item rows at all.
+                // ponytail: PurchaseOrderItem has no SortOrder column, so load order is rowid order,
+                // which is now first-insert order instead of last-save order. Add a SortOrder column
+                // if PO line ordering ever becomes user-editable.
+                await DeleteDepartedChildrenAsync(connection, tx, "PurchaseOrderItem", "PoId", po.Id, po.Items?.Select(i => i.Id).ToList() ?? new List<Guid>());
 
                 if (po.Items != null && po.Items.Count > 0)
                 {
@@ -864,7 +894,17 @@ ON CONFLICT(Id) DO UPDATE SET
                         itemCmd.Transaction = tx;
                         itemCmd.CommandText = @"
 INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal)
-VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal);";
+VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal)
+ON CONFLICT(Id) DO UPDATE SET
+    PoId = excluded.PoId,
+    PrItemId = excluded.PrItemId,
+    RfqItemId = excluded.RfqItemId,
+    ItemName = excluded.ItemName,
+    Quantity = excluded.Quantity,
+    Unit = excluded.Unit,
+    UnitPrice = excluded.UnitPrice,
+    Discount = excluded.Discount,
+    LineTotal = excluded.LineTotal;";
 
                         itemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
                         itemCmd.Parameters.AddWithValue("@PoId", po.Id.ToString());

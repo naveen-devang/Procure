@@ -63,13 +63,13 @@ namespace Procure.Models
                 var unitStr = string.IsNullOrWhiteSpace(Unit) ? "pcs" : Unit;
                 if (IsFullyOrdered)
                 {
-                    return $"✓ Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Complete)";
+                    return $"Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Complete)";
                 }
                 if (IsPartiallyOrdered)
                 {
-                    return $"⚠️ Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {PendingQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending";
+                    return $"Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {PendingQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending";
                 }
-                return $"⚠️ Unordered: 0/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending";
+                return $"Unordered: 0/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending";
             }
         }
 

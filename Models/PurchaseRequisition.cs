@@ -237,16 +237,16 @@ namespace Procure.Models
 
                 if (IsPoFullyOrdered)
                 {
-                    return $"✓ PO: Complete ({fullyOrderedCount}/{totalCount} items)";
+                    return $"PO: Complete ({fullyOrderedCount}/{totalCount} items)";
                 }
 
                 var pendingQty = TotalPendingItemQuantity;
                 if (Pos == null || Pos.Count == 0)
                 {
-                    return $"⚠️ PO: Unordered (0/{totalCount} items • {pendingQty:G29} pending)";
+                    return $"PO: Unordered (0/{totalCount} items • {pendingQty:G29} pending)";
                 }
 
-                return $"⚠️ PO: Partial ({fullyOrderedCount}/{totalCount} items • {pendingQty:G29} pending)";
+                return $"PO: Partial ({fullyOrderedCount}/{totalCount} items • {pendingQty:G29} pending)";
             }
         }
 
@@ -267,8 +267,6 @@ namespace Procure.Models
             OnPropertyChanged(nameof(ItemsCount));
             OnPropertyChanged(nameof(HasItems));
             OnPropertyChanged(nameof(TotalItemQuantity));
-            OnPropertyChanged(nameof(TotalOrderedItemQuantity));
-            OnPropertyChanged(nameof(TotalPendingItemQuantity));
             OnPropertyChanged(nameof(ItemsSummary));
             OnPropertyChanged(nameof(PrimaryItemDisplay));
             OnPropertyChanged(nameof(RfqCount));
@@ -285,9 +283,8 @@ namespace Procure.Models
             OnPropertyChanged(nameof(SharedRfqsBadgeText));
             OnPropertyChanged(nameof(HasCombinedPos));
             OnPropertyChanged(nameof(CombinedPosBadgeText));
-            OnPropertyChanged(nameof(PoFulfillmentBadgeText));
-            OnPropertyChanged(nameof(IsPoFullyOrdered));
-            OnPropertyChanged(nameof(IsPoPartiallyOrdered));
+            // PoFulfillmentBadgeText, IsPoFullyOrdered, IsPoPartiallyOrdered, TotalOrderedItemQuantity
+            // and TotalPendingItemQuantity are already raised by CalculateItemFulfillments() above.
         }
     }
 }
