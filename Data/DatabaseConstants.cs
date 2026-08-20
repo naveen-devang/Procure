@@ -7,6 +7,13 @@ namespace Procure.Data
     public static class DatabaseConstants
     {
         public const string DatabaseFilename = "procure_tracker.db3";
+
+        /// <summary>
+        /// Stamped into PRAGMA user_version once the schema is current. Bump this whenever
+        /// SqlCreateTables or MigrateSchemaAsync changes, or existing databases will not be
+        /// re-checked and the new column will be missing at runtime.
+        /// </summary>
+        public const int SchemaVersion = 1;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;

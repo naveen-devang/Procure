@@ -786,19 +786,48 @@ namespace Procure.PageModels
                         FilteredPrs.RemoveAt(i);
                 }
 
-                for (var i = 0; i < pagedList.Count; i++)
-                {
-                    var existing = FilteredPrs.IndexOf(pagedList[i]);
-                    if (existing < 0)
-                        FilteredPrs.Insert(i, pagedList[i]);
-                    else if (existing != i)
-                        FilteredPrs.Move(existing, i);
-                }
+                // Each insert makes the bound layout build a whole card synchronously (~75ms on a
+                // Debug build), so filling a full page in one pass freezes the UI for most of a
+                // second. Place the first rows now and let the rest arrive over following ticks:
+                // the board paints almost immediately and completes while the user is reading it.
+                var generation = ++_fillGeneration;
+                FillPage(pagedList, 0, generation);
             }
 
             // No UpdateSelectionState() here: filtering never touches pr.IsSelected, and the method
             // scans _allPrs rather than the page, so its result cannot change. The checkbox handler
             // and the batch commands call it directly when selection actually moves.
+        }
+
+
+        // Rows placed before yielding to the UI thread. Enough to fill the top of the viewport so
+        // the board looks populated immediately; the rest stream in behind it.
+        private const int FirstFillBatch = 3;
+        private const int FillBatchSize = 2;
+
+        // Bumped on every ApplyFilters so an in-flight fill from a superseded filter stops quietly.
+        private int _fillGeneration;
+
+        private void FillPage(List<PurchaseRequisition> pagedList, int start, int generation)
+        {
+            if (generation != _fillGeneration) return;
+
+            var take = start == 0 ? FirstFillBatch : FillBatchSize;
+            var end = Math.Min(start + take, pagedList.Count);
+
+            for (var i = start; i < end; i++)
+            {
+                var existing = FilteredPrs.IndexOf(pagedList[i]);
+                if (existing < 0)
+                    FilteredPrs.Insert(i, pagedList[i]);
+                else if (existing != i)
+                    FilteredPrs.Move(existing, i);
+            }
+
+            if (end < pagedList.Count)
+            {
+                MainThread.BeginInvokeOnMainThread(() => FillPage(pagedList, end, generation));
+            }
         }
 
         private void UpdateStatusBanner()

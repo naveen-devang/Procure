@@ -28,6 +28,11 @@ namespace Procure
 
             UpdateThemeButtonHighlights();
             UpdateSidebarLayout(_settingsService.IsSidebarCompact);
+
+            // Warm the PR Board's data while the user is still on the Dashboard. Opening the board
+            // otherwise pays SQLite provider start-up plus the full load on the click itself.
+            // Fire and forget: PrListPageModel handles its own errors and guards re-entry.
+            prListPage.PreloadAsync();
         }
 
         // Subscribe/unsubscribe in matching pairs, tied to the handler lifetime. Subscribing in the

@@ -24,6 +24,17 @@ namespace Procure.Pages
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
 
+        /// <summary>
+        /// Loads the board's data ahead of first navigation. OnAppearing then finds it already
+        /// loaded and skips straight to rendering.
+        /// </summary>
+        internal void PreloadAsync()
+        {
+            if (_hasLoadedOnce) return;
+            _hasLoadedOnce = true;
+            Dispatcher.Dispatch(async () => await _viewModel.LoadPrsAsync());
+        }
+
         protected override async void OnAppearing()
         {
             base.OnAppearing();
@@ -31,7 +42,6 @@ namespace Procure.Pages
             {
                 _hasLoadedOnce = true;
                 await _viewModel.LoadPrsAsync();
-                WarmDetailTemplate();
             }
         }
 
@@ -86,43 +96,6 @@ namespace Procure.Pages
                 await _viewModel.HandleApprovalDateChangedAsync(approval);
             }
         }
-
-        private bool _warmedDetailTemplate;
-
-        /// <summary>
-        /// Builds one throwaway copy of the card's detail panel after the board is on screen.
-        /// Expanding a data-heavy PR was measured at 679 ms on the first click but 232 ms once the
-        /// types were warm, so most of that first click is one-off JIT and handler initialisation.
-        /// Paying it here moves it off the click path; the instance is discarded immediately.
-        /// ponytail: costs one build's worth of allocation at idle. If the detail panel ever grows
-        /// enough that this is visible, chunk it or drop it - correctness does not depend on it.
-        /// </summary>
-        private void WarmDetailTemplate()
-        {
-            if (_warmedDetailTemplate) return;
-            _warmedDetailTemplate = true;
-
-            Dispatcher.Dispatch(() =>
-            {
-                try
-                {
-                    var expander = this.GetVisualTreeDescendants()
-                                       .OfType<Procure.Utilities.LazyExpander>()
-                                       .FirstOrDefault(e => e.ContentTemplate is not null);
-                    if (expander?.ContentTemplate?.CreateContent() is View warm)
-                    {
-                        // Give it a real PR so the bindings and value converters actually run -
-                        // without a BindingContext they stay cold and the first real expand still pays.
-                        warm.BindingContext = _viewModel.FilteredPrs.FirstOrDefault();
-                    }
-                }
-                catch
-                {
-                    // Warm-up only - never let it affect the page.
-                }
-            });
-        }
-
         private void OnPrSelectionCheckedChanged(object? sender, CheckedChangedEventArgs e)
         {
             if (sender is CheckBox checkBox && checkBox.BindingContext is PurchaseRequisition pr)

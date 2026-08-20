@@ -43,12 +43,21 @@ namespace Procure.Data
                 using var connection = CreateConnection();
                 await connection.OpenAsync().ConfigureAwait(false);
 
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = DatabaseConstants.SqlCreateTables;
-                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                // A database already stamped with the current schema version needs none of the work
+                // below. Skipping it avoids re-running the CREATE script plus one PRAGMA
+                // table_info round-trip per migrated column on every single launch.
+                if (await ReadSchemaVersionAsync(connection).ConfigureAwait(false) != DatabaseConstants.SchemaVersion)
+                {
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.CommandText = DatabaseConstants.SqlCreateTables;
+                        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
 
-                // Run safe incremental migrations for existing tables
-                await MigrateSchemaAsync(connection).ConfigureAwait(false);
+                    // Run safe incremental migrations for existing tables
+                    await MigrateSchemaAsync(connection).ConfigureAwait(false);
+                    await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
+                }
 
                 _initialized = true;
                 _logger?.LogInformation("Database initialized successfully at: {Path}", DatabaseConstants.DatabaseFilePath);
@@ -62,6 +71,23 @@ namespace Procure.Data
             {
                 _initLock.Release();
             }
+        }
+
+        private static async Task<int> ReadSchemaVersionAsync(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA user_version;";
+            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+            return result is null or DBNull ? 0 : Convert.ToInt32(result);
+        }
+
+        private static async Task WriteSchemaVersionAsync(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            // PRAGMA user_version does not accept a parameter, and the value is a compile-time
+            // constant rather than anything user supplied.
+            cmd.CommandText = $"PRAGMA user_version = {DatabaseConstants.SchemaVersion};";
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
         private static async Task MigrateSchemaAsync(SqliteConnection connection)
