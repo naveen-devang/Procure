@@ -722,7 +722,50 @@
 
                                     <!-- EXPANDED DETAIL VIEW (3-COLUMN NATIVE FLUENT PANEL) -->
                                     <converters:LazyExpander IsExpanded="{Binding IsExpanded}">
-                                        <converters:LazyExpander.ContentTemplate>
+                                        <converters:LazyExpander.PlaceholderTemplate>
+                                        <DataTemplate>
+                                            <!-- Shown for one frame while the real panel builds, so a
+                                                 data-heavy PR reads as loading rather than hung. Mirrors
+                                                 the 3-column shape below so the swap is not jarring. -->
+                                            <Border StrokeThickness="0" Padding="18"
+                                                    Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkBackground}}">
+                                                <Grid ColumnDefinitions="*, *, *" ColumnSpacing="14">
+                                                    <Border Grid.Column="0" Padding="16" StrokeThickness="1"
+                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                                        <VerticalStackLayout Spacing="12">
+                                                            <BoxView HeightRequest="12" WidthRequest="140" CornerRadius="3" HorizontalOptions="Start" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                        </VerticalStackLayout>
+                                                    </Border>
+                                                    <Border Grid.Column="1" Padding="16" StrokeThickness="1"
+                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                                        <VerticalStackLayout Spacing="12">
+                                                            <BoxView HeightRequest="12" WidthRequest="120" CornerRadius="3" HorizontalOptions="Start" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                        </VerticalStackLayout>
+                                                    </Border>
+                                                    <Border Grid.Column="2" Padding="16" StrokeThickness="1"
+                                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                            Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                                                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                                        <VerticalStackLayout Spacing="12">
+                                                            <BoxView HeightRequest="12" WidthRequest="130" CornerRadius="3" HorizontalOptions="Start" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                            <BoxView HeightRequest="58" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                        </VerticalStackLayout>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </converters:LazyExpander.PlaceholderTemplate>
+
+                                    <converters:LazyExpander.ContentTemplate>
                                             <DataTemplate x:DataType="models:PurchaseRequisition">
                                     <Border StrokeThickness="0"
                                             Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkBackground}}"
