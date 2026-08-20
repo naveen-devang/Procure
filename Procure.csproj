@@ -34,6 +34,7 @@
 		       <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+		<MauiStrictXamlCompilation>true</MauiStrictXamlCompilation>
 
 		<!-- Display name -->
 		<ApplicationTitle>Procure</ApplicationTitle>
@@ -70,7 +71,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.100" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11" />
 	</ItemGroup>
 
@@ -79,6 +80,9 @@
 		<PackageReference Include="CommunityToolkit.Maui" Version="15.0.0" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.11" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
+		<!-- bundle_green 2.1.11 ships lib.e_sqlite3 2.1.11, which NU1903-flags as a high severity
+		     vulnerability (GHSA-2m69-gcr7-jv3q). These pins lift only the native binaries (desktop and
+		     android) to patched builds; drop them once bundle_green ships >= 2.1.13. -->
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.12" />
 	</ItemGroup>
