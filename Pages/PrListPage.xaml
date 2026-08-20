@@ -7,6 +7,7 @@
              xmlns:converters="clr-namespace:Procure.Utilities"
              xmlns:f="clr-namespace:Fonts"
              x:Class="Procure.Pages.PrListPage"
+             x:Name="ThisPage"
              x:DataType="pageModels:PrListPageModel"
              Shell.NavBarIsVisible="False"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
@@ -461,7 +462,7 @@
                                           ColumnSpacing="10"
                                           BackgroundColor="Transparent">
                                         <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=ToggleExpandCommand}"
+                                            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleExpandCommand}"
                                                                   CommandParameter="{Binding .}" />
                                         </Grid.GestureRecognizers>
 
@@ -475,7 +476,7 @@
                                         <!-- Priority Badge (Clickable: toggles Urgent / Normal) -->
                                         <Button Grid.Column="1"
                                                 Text="{Binding Priority}"
-                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=TogglePriorityCommand}"
+                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.TogglePriorityCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11"
                                                 FontFamily="SegoeSemibold"
@@ -686,7 +687,7 @@
                                         <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
                                             <Button Text="&#xE70F;"
                                                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenEditPrModalCommand}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
                                                     CommandParameter="{Binding .}"
                                                     FontSize="12"
                                                     HeightRequest="30"
@@ -699,7 +700,7 @@
 
                                             <Button Text="&#xE74D;"
                                                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=DeletePrCommand}"
+                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePrCommand}"
                                                     CommandParameter="{Binding .}"
                                                     FontSize="12"
                                                     HeightRequest="30"
@@ -794,7 +795,7 @@
                                                     </VerticalStackLayout>
                                                     <Button Grid.Column="2" Text="&#xE748; Split PR"
                                                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SplitMasterPrCommand}"
+                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitMasterPrCommand}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="11" HeightRequest="28" Padding="10,0"
                                                             Style="{StaticResource SecondaryButton}"
@@ -822,7 +823,7 @@
                                                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                                                    VerticalOptions="Center" />
                                                             <Button Grid.Column="1" Text="+ Add RFQ"
-                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenAddRfqModalCommand}"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenAddRfqModalCommand}"
                                                                     CommandParameter="{Binding .}"
                                                                     FontSize="11" HeightRequest="28" Padding="10,0"
                                                                     BorderWidth="1"
@@ -862,7 +863,7 @@
                                                                                     <!-- Split / Unlink Shared RFQ Button -->
                                                                                     <Button Text="&#xE748;"
                                                                                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SplitSharedRfqCommand}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitSharedRfqCommand}"
                                                                                             CommandParameter="{Binding .}"
                                                                                             IsVisible="{Binding IsSharedRfq}"
                                                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -874,7 +875,7 @@
                                                                                     <!-- Edit Icon Button -->
                                                                                     <Button Text="&#xE70F;"
                                                                                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenEditRfqModalCommand}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditRfqModalCommand}"
                                                                                             CommandParameter="{Binding .}"
                                                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                                                             BackgroundColor="Transparent"
@@ -885,7 +886,7 @@
                                                                                     <!-- Delete Icon Button -->
                                                                                     <Button Text="&#xE74D;"
                                                                                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=DeleteRfqCommand}"
+                                                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeleteRfqCommand}"
                                                                                             CommandParameter="{Binding .}"
                                                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                                                             BackgroundColor="Transparent"
@@ -1140,7 +1141,7 @@
                                                                     Text="&#xEDE1;"
                                                                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
                                                                     IsVisible="{Binding HasPcr}"
-                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenExportPcrModalCommand}"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenExportPcrModalCommand}"
                                                                     CommandParameter="{Binding .}"
                                                                     FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0"
                                                                     BackgroundColor="Transparent"
@@ -1153,7 +1154,7 @@
                                                             <Button Grid.Column="3"
                                                                     Text="&#xE713;"
                                                                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenApprovalConfigModalCommand}"
+                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenApprovalConfigModalCommand}"
                                                                     CommandParameter="{Binding .}"
                                                                     FontSize="14" WidthRequest="28" HeightRequest="28" Padding="0"
                                                                     BackgroundColor="Transparent"
@@ -1201,7 +1202,7 @@
                                                                                         <!-- Unset: Clean Button Filling 142px -->
                                                                                         <Button Grid.Column="1" Text="+ Sent Date"
                                                                                                 IsVisible="{Binding HasSentDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SetApprovalSentTodayCommand}"
+                                                                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SetApprovalSentTodayCommand}"
                                                                                                 CommandParameter="{Binding .}"
                                                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                                                 HorizontalOptions="Fill"
@@ -1220,7 +1221,7 @@
                                                                                                         DateSelected="OnApprovalDateSelected"
                                                                                                         VerticalOptions="Center" />
                                                                                             <Button Grid.Column="1" Text="✕"
-                                                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=ClearSentDateCommand}"
+                                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ClearSentDateCommand}"
                                                                                                     CommandParameter="{Binding .}"
                                                                                                     FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
                                                                                                     BackgroundColor="Transparent"
@@ -1239,7 +1240,7 @@
                                                                                         <!-- Unset: Clean Button Filling 142px -->
                                                                                         <Button Grid.Column="1" Text="+ Received Date"
                                                                                                 IsVisible="{Binding HasReceivedDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SetApprovalReceivedTodayCommand}"
+                                                                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SetApprovalReceivedTodayCommand}"
                                                                                                 CommandParameter="{Binding .}"
                                                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                                                 HorizontalOptions="Fill"
@@ -1258,7 +1259,7 @@
                                                                                                         DateSelected="OnApprovalDateSelected"
                                                                                                         VerticalOptions="Center" />
                                                                                             <Button Grid.Column="1" Text="✕"
-                                                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=ClearReceivedDateCommand}"
+                                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ClearReceivedDateCommand}"
                                                                                                     CommandParameter="{Binding .}"
                                                                                                     FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
                                                                                                     BackgroundColor="Transparent"
@@ -1289,7 +1290,7 @@
                                                                        TextColor="{StaticResource Gray400}"
                                                                        HorizontalOptions="Center" />
                                                                 <Button Text="+ Create &amp; Submit PCR"
-                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=CreatePcrForPrCommand}"
+                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.CreatePcrForPrCommand}"
                                                                         CommandParameter="{Binding .}"
                                                                         Style="{StaticResource PrimaryButton}"
                                                                         FontSize="12" HeightRequest="32" Padding="14,0" />
@@ -1318,7 +1319,7 @@
                                                                        VerticalOptions="Center" />
                                                                 
                                                                 <Button Grid.Column="1" Text="+ Add PO"
-                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenAddPoModalCommand}"
+                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenAddPoModalCommand}"
                                                                         CommandParameter="{Binding .}"
                                                                         FontSize="11" HeightRequest="28" Padding="10,0"
                                                                         BorderWidth="1"
@@ -1390,7 +1391,7 @@
                                                                             <Button Grid.Row="0" Grid.Column="2"
                                                                                     Text="&#xE70F;"
                                                                                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenEditPoModalCommand}"
+                                                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPoModalCommand}"
                                                                                     CommandParameter="{Binding .}"
                                                                                     FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                                                     BackgroundColor="Transparent"
@@ -1419,7 +1420,7 @@
                                                                                 <!-- Split Combined PO Button -->
                                                                                 <Button Text="&#xE748;"
                                                                                         FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SplitCombinedPoCommand}"
+                                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SplitCombinedPoCommand}"
                                                                                         CommandParameter="{Binding .}"
                                                                                         IsVisible="{Binding IsCombinedPo}"
                                                                                         FontSize="10" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -1431,7 +1432,7 @@
                                                                                 <!-- Delete PO Button -->
                                                                                 <Button Text="&#xE74D;"
                                                                                         FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=DeletePoCommand}"
+                                                                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePoCommand}"
                                                                                         CommandParameter="{Binding .}"
                                                                                         FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                                                         BackgroundColor="Transparent"
@@ -1583,7 +1584,7 @@
 
                                                     <Button Grid.Column="1"
                                                             Text="Edit Requisition &amp; Fields"
-                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=OpenEditPrModalCommand}"
+                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="12" HeightRequest="32" Padding="14,0"
                                                             Style="{StaticResource SecondaryButton}"
