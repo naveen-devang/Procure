@@ -4,6 +4,7 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.Modals.AddPoModal"
+             x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsAddPoModalVisible}">
 
@@ -393,13 +394,13 @@
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                                         
                                                         <Button Grid.Column="1" Text="Select All Items"
-                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=SelectAllPoRfqItemsCommand}"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.SelectAllPoRfqItemsCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />
 
                                                         <Button Grid.Column="2" Text="Deselect All Items"
-                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=DeselectAllPoRfqItemsCommand}"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DeselectAllPoRfqItemsCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />
@@ -549,7 +550,7 @@
                                                             <!-- VAT Type Picker -->
                                                             <VerticalStackLayout Grid.Column="4" Spacing="2">
                                                                 <Label Text="VAT Type" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=AvailableVatTypes}"
+                                                                <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AvailableVatTypes}"
                                                                         SelectedItem="{Binding VatType, Mode=TwoWay}"
                                                                         SelectedIndexChanged="OnPoVatTypeSelectedIndexChanged"
                                                                         HeightRequest="30" FontSize="11.5" />

@@ -4,6 +4,7 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.Modals.ApprovalConfigModal"
+             x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsApprovalConfigModalVisible}">
 
@@ -90,7 +91,7 @@
                                                 <RoundRectangle CornerRadius="4" />
                                             </Border.StrokeShape>
                                             <Border.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=ToggleApprovalInclusionCommand}"
+                                                <TapGestureRecognizer Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.ToggleApprovalInclusionCommand}"
                                                                       CommandParameter="{Binding .}" />
                                             </Border.GestureRecognizers>
                                             <Label Text="&#xE73E;"
@@ -112,7 +113,7 @@
                                         <!-- Delete Button in Right Corner -->
                                         <Button Grid.Column="3" Text="&#xE74D;"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=RemoveStageFromConfigCommand}"
+                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveStageFromConfigCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12" WidthRequest="32" HeightRequest="32" Padding="0"
                                                 BackgroundColor="Transparent"

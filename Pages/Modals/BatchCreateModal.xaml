@@ -4,6 +4,7 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.Modals.BatchCreateModal"
+             x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsBatchCreateModalVisible}">
 
@@ -209,7 +210,7 @@
                                                     <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="End" Margin="0,0,0,2">
                                                         <Button Text="&#xE8C8;"
                                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=DuplicateBatchPrRowCommand}"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DuplicateBatchPrRowCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 BackgroundColor="Transparent"
                                                                 TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
@@ -218,7 +219,7 @@
 
                                                         <Button Text="&#xE74D;"
                                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=RemoveBatchPrRowCommand}"
+                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchPrRowCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 BackgroundColor="Transparent"
                                                                 TextColor="{StaticResource FluentCritical}"
@@ -232,21 +233,21 @@
                                                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                                                         <Label Text="PR Type *" FontSize="11" FontFamily="SegoeSemibold"
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=AllPrTypes}"
+                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPrTypes}"
                                                                 SelectedItem="{Binding PrType, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
                                                     </VerticalStackLayout>
 
                                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
                                                         <Label Text="Plant" FontSize="11" FontFamily="SegoeSemibold"
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=AllPlants}"
+                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPlants}"
                                                                 SelectedItem="{Binding Plant, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
                                                     </VerticalStackLayout>
 
                                                     <VerticalStackLayout Grid.Column="2" Spacing="2">
                                                         <Label Text="Priority" FontSize="11" FontFamily="SegoeSemibold"
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=AllPriorities}"
+                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPriorities}"
                                                                 SelectedItem="{Binding Priority, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
                                                     </VerticalStackLayout>
 
@@ -281,14 +282,14 @@
 
                                                             <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
                                                                 <Button Text="Paste Items"
-                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=PasteBatchPrItemsFromClipboardCommand}"
+                                                                        Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.PasteBatchPrItemsFromClipboardCommand}"
                                                                         CommandParameter="{Binding .}"
                                                                         ToolTipProperties.Text="Paste items from Excel into this requisition"
                                                                         FontSize="10.5" HeightRequest="24" Padding="8,0"
                                                                         Style="{StaticResource SecondaryButton}"
                                                                         VerticalOptions="Center" />
                                                                 <Button Text="+ Add Item"
-                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=AddBatchItemToPrCommand}"
+                                                                        Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AddBatchItemToPrCommand}"
                                                                         CommandParameter="{Binding .}"
                                                                         FontSize="10.5" HeightRequest="24" Padding="8,0"
                                                                         Style="{StaticResource SecondaryButton}"
@@ -316,7 +317,7 @@
                                                                                Placeholder="Price" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
                                                                         <Button Grid.Column="4" Text="&#xE74D;"
                                                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}, Path=RemoveBatchItemFromPrCommand}"
+                                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchItemFromPrCommand}"
                                                                                 CommandParameter="{Binding .}"
                                                                                 BackgroundColor="Transparent"
                                                                                 TextColor="{StaticResource FluentCritical}"
