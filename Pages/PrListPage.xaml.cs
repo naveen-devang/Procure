@@ -25,24 +25,35 @@ namespace Procure.Pages
         }
 
         /// <summary>
-        /// Loads the board's data ahead of first navigation. OnAppearing then finds it already
-        /// loaded and skips straight to rendering.
+        /// Warms the board's data ahead of first navigation, but not its cards: Shell has not realised
+        /// this page's native controls yet, so cards filled now would all be created in one block on
+        /// the first tab switch. OnAppearing releases the fill once the board can actually paint.
         /// </summary>
         internal void PreloadAsync()
         {
             if (_hasLoadedOnce) return;
             _hasLoadedOnce = true;
-            Dispatcher.Dispatch(async () => await _viewModel.LoadPrsAsync());
+            Dispatcher.Dispatch(async () => await _viewModel.PreloadDataAsync());
         }
 
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+            var probe = Procure.Utilities.TimingProbe.Start("PrListPage.OnAppearing"); // ponytail-temp
+
             if (!_hasLoadedOnce)
             {
                 _hasLoadedOnce = true;
                 await _viewModel.LoadPrsAsync();
             }
+            else
+            {
+                _viewModel.ApplyPendingFill();
+            }
+
+            probe.Mark("fill released"); // ponytail-temp
+            // Marks the tick after this one, so the gap shows what the native realisation actually cost.
+            Dispatcher.Dispatch(() => { probe.Mark("first tick after fill"); probe.Flush(); }); // ponytail-temp
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -87,6 +98,22 @@ namespace Procure.Pages
                     SkeletonContainer.Opacity = 1.0;
                 }
             });
+        }
+
+        // One card's worth of runway, so the next batch is built before the user reaches the end.
+        private const double RevealThreshold = 400;
+        private bool _revealQueued;
+
+        private void OnBoardScrolled(object? sender, ScrolledEventArgs e)
+        {
+            // Scrolled fires many times per gesture and the list grows only after the next layout
+            // pass, so without this latch one flick near the bottom reveals the whole list at once.
+            if (_revealQueued) return;
+            if (e.ScrollY + BoardScroll.Height < BoardScroll.ContentSize.Height - RevealThreshold) return;
+
+            _revealQueued = true;
+            _viewModel.RevealMore();
+            Dispatcher.Dispatch(() => _revealQueued = false);
         }
 
         private void OnPrSelectionCheckedChanged(object? sender, CheckedChangedEventArgs e)

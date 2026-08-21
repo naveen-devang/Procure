@@ -24,11 +24,15 @@ namespace Procure.Data.Repositories
 
         public async Task<List<PurchaseRequisition>> GetAllAsync()
         {
+            // ponytail-temp
+            var probe = TimingProbe.Start();
             await _db.InitializeAsync();
+            probe.Mark("InitializeAsync"); // ponytail-temp
             var prs = new List<PurchaseRequisition>();
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync();
+            probe.Mark("CreateConnection+Open"); // ponytail-temp
 
             // 1. Load PRs
             using (var cmd = connection.CreateCommand())
@@ -59,6 +63,7 @@ ORDER BY CreatedAt DESC;";
                     });
                 }
             }
+            probe.Mark("PRs"); // ponytail-temp
 
             // 2. Load RFQs
             var rfqDict = new Dictionary<Guid, List<RequestForQuotation>>();
@@ -106,6 +111,7 @@ FROM RequestForQuotation;";
                     rfqById[rfq.Id] = rfq;
                 }
             }
+            probe.Mark("RFQs"); // ponytail-temp
 
             // 2b. Load RfqItems
             using (var cmd = connection.CreateCommand())
@@ -139,6 +145,7 @@ ORDER BY SortOrder ASC;";
                     }
                 }
             }
+            probe.Mark("RfqItems"); // ponytail-temp
 
             // 3. Load PCRs and Approvals
             var pcrDict = new Dictionary<Guid, PriceComparisonRequest>();
@@ -161,6 +168,7 @@ ORDER BY SortOrder ASC;";
                     pcrById[pcr.Id] = pcr;
                 }
             }
+            probe.Mark("PCRs"); // ponytail-temp
 
             using (var cmd = connection.CreateCommand())
             {
@@ -187,6 +195,7 @@ ORDER BY SortOrder ASC;";
                     }
                 }
             }
+            probe.Mark("Approvals"); // ponytail-temp
 
             // 4. Load POs
             var poDict = new Dictionary<Guid, List<PurchaseOrder>>();
@@ -226,6 +235,7 @@ FROM PurchaseOrder;";
                     });
                 }
             }
+            probe.Mark("POs"); // ponytail-temp
 
             // 4b. Load PO Items
             var poItemDict = new Dictionary<Guid, List<PurchaseOrderItem>>();
@@ -260,6 +270,7 @@ ORDER BY SortOrder ASC;";
                     });
                 }
             }
+            probe.Mark("POItems"); // ponytail-temp
 
             // Attach items to POs
             foreach (var poList in poDict.Values)
@@ -272,6 +283,7 @@ ORDER BY SortOrder ASC;";
                     }
                 }
             }
+            probe.Mark("AttachItemsToPOs"); // ponytail-temp
 
             // 5. Load Custom Values in a single bulk query with Column Definitions joined
             var customDict = new Dictionary<Guid, List<CustomFieldValue>>();
@@ -304,6 +316,7 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
                     });
                 }
             }
+            probe.Mark("CustomFieldValues"); // ponytail-temp
 
             // 6. Load PrItems
             var itemDict = new Dictionary<Guid, List<PrItem>>();
@@ -336,6 +349,7 @@ ORDER BY SortOrder ASC;";
                     });
                 }
             }
+            probe.Mark("PrItems"); // ponytail-temp
 
             // 7. Populate navigation properties in-memory
             //    Note: NotifyHierarchyChanged is intentionally NOT called here.
@@ -363,6 +377,8 @@ ORDER BY SortOrder ASC;";
 
                 pr.CalculateItemFulfillments();
             }
+            probe.Mark("NavProps+Fulfillments"); // ponytail-temp
+            probe.Flush(); // ponytail-temp
 
             return prs;
         }
@@ -622,5 +638,50 @@ WHERE PrId IN ({prIdStrings});";
 
             return prs;
         }
+
+        // ponytail: TEMPORARY diagnostic scaffolding. Measures where the ~1.1s cold cost of
+        // GetAllAsync actually lands. DELETE this whole region plus every `probe.` line in
+        // GetAllAsync (grep for "ponytail-temp") once the numbers are captured.
+        #region ponytail-temp timing probe
+        private static int _getAllCallCount;
+
+        private sealed class TimingProbe
+        {
+            private readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
+            private readonly List<(string Label, long Ticks)> _marks = new(16);
+            private readonly int _call = System.Threading.Interlocked.Increment(ref _getAllCallCount);
+
+            public static TimingProbe Start() => new();
+
+            // Record only — no formatting, no I/O — so the probe does not distort what it measures.
+            public void Mark(string label) => _marks.Add((label, _sw.ElapsedTicks));
+
+            public void Flush()
+            {
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    var stamp = _call == 1 ? "COLD" : "warm";
+                    sb.AppendLine($"=== GetAllAsync call #{_call} ({stamp}) {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===");
+                    long prev = 0;
+                    foreach (var (label, ticks) in _marks)
+                    {
+                        var step = (ticks - prev) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                        var total = ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                        sb.AppendLine($"  {label,-24} step {step,9:F1} ms   total {total,9:F1} ms");
+                        prev = ticks;
+                    }
+
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(DatabaseConstants.DatabaseDirectory, "getall-timing.log"),
+                        sb.ToString());
+                }
+                catch
+                {
+                    // Diagnostics must never break the read path.
+                }
+            }
+        }
+        #endregion
     }
 }

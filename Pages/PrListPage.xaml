@@ -15,7 +15,7 @@
 
     <Grid>
         <!-- Main Scrollable Content -->
-        <ScrollView Padding="28,36,28,36">
+        <ScrollView x:Name="BoardScroll" Scrolled="OnBoardScrolled" Padding="28,36,28,36">
             <VerticalStackLayout Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
 
                 <!-- Page Header: Title + Primary Actions -->
@@ -341,69 +341,77 @@
                                         <!-- Description & Age & Consolidation Badges -->
                                         <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
                                             <!-- Badges Row (Consolidation, Merged, Shared RFQ, Combined PO) -->
-                                            <FlexLayout Wrap="Wrap" AlignItems="Center">
-                                                <!-- Consolidation Master Badge -->
-                                                <Border IsVisible="{Binding IsConsolidatedMaster}"
-                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
-                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPrBorderLight}, Dark={StaticResource BadgeCombinedPrBorderDark}}"
-                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrBgLight}, Dark={StaticResource BadgeCombinedPrBgDark}}"
-                                                        HorizontalOptions="Start">
-                                                    <Border.StrokeShape>
-                                                        <RoundRectangle CornerRadius="4" />
-                                                    </Border.StrokeShape>
-                                                    <Label Text="{Binding ConsolidatedFrom, StringFormat='Combined: {0}'}"
-                                                           FontSize="10" FontFamily="SegoeSemibold"
-                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrTextLight}, Dark={StaticResource BadgeCombinedPrTextDark}}"
-                                                           LineBreakMode="TailTruncation"
-                                                           MaximumWidthRequest="320" />
-                                                </Border>
+                                            <!-- All four badges are rare, so one LazyExpander defers the entire row - FlexLayout,
+                                                 borders and labels - instead of building 13 views to show nothing. -->
+                                            <converters:LazyExpander IsExpanded="{Binding HasAnyBadge}">
+                                                <converters:LazyExpander.ContentTemplate>
+                                                    <DataTemplate x:DataType="models:PurchaseRequisition">
+                                                        <FlexLayout Wrap="Wrap" AlignItems="Center">
+                                                            <!-- Consolidation Master Badge -->
+                                                            <Border IsVisible="{Binding IsConsolidatedMaster}"
+                                                                    Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPrBorderLight}, Dark={StaticResource BadgeCombinedPrBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrBgLight}, Dark={StaticResource BadgeCombinedPrBgDark}}"
+                                                                    HorizontalOptions="Start">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="4" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding ConsolidatedFrom, StringFormat='Combined: {0}'}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPrTextLight}, Dark={StaticResource BadgeCombinedPrTextDark}}"
+                                                                       LineBreakMode="TailTruncation"
+                                                                       MaximumWidthRequest="320" />
+                                                            </Border>
 
-                                                <!-- Merged Child Badge -->
-                                                <Border IsVisible="{Binding IsMergedChild}"
-                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
-                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeMergedBorderLight}, Dark={StaticResource BadgeMergedBorderDark}}"
-                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeMergedBgLight}, Dark={StaticResource BadgeMergedBgDark}}"
-                                                        HorizontalOptions="Start">
-                                                    <Border.StrokeShape>
-                                                        <RoundRectangle CornerRadius="4" />
-                                                    </Border.StrokeShape>
-                                                    <Label Text="Merged into Master PR"
-                                                           FontSize="10" FontFamily="SegoeSemibold"
-                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeMergedTextLight}, Dark={StaticResource BadgeMergedTextDark}}" />
-                                                </Border>
+                                                            <!-- Merged Child Badge -->
+                                                            <Border IsVisible="{Binding IsMergedChild}"
+                                                                    Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource BadgeMergedBorderLight}, Dark={StaticResource BadgeMergedBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource BadgeMergedBgLight}, Dark={StaticResource BadgeMergedBgDark}}"
+                                                                    HorizontalOptions="Start">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="4" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="Merged into Master PR"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource BadgeMergedTextLight}, Dark={StaticResource BadgeMergedTextDark}}" />
+                                                            </Border>
 
-                                                <!-- Shared RFQ Badge -->
-                                                <Border IsVisible="{Binding HasSharedRfqs}"
-                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
-                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
-                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBgLight}, Dark={StaticResource BadgeSharedRfqBgDark}}"
-                                                        HorizontalOptions="Start">
-                                                    <Border.StrokeShape>
-                                                        <RoundRectangle CornerRadius="4" />
-                                                    </Border.StrokeShape>
-                                                    <Label Text="{Binding SharedRfqsBadgeText, StringFormat='Shared RFQ ({0})'}"
-                                                           FontSize="10" FontFamily="SegoeSemibold"
-                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}"
-                                                           LineBreakMode="TailTruncation"
-                                                           MaximumWidthRequest="320" />
-                                                </Border>
+                                                            <!-- Shared RFQ Badge -->
+                                                            <Border IsVisible="{Binding HasSharedRfqs}"
+                                                                    Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource BadgeSharedRfqBorderLight}, Dark={StaticResource BadgeSharedRfqBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqBgLight}, Dark={StaticResource BadgeSharedRfqBgDark}}"
+                                                                    HorizontalOptions="Start">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="4" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding SharedRfqsBadgeText, StringFormat='Shared RFQ ({0})'}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}"
+                                                                       LineBreakMode="TailTruncation"
+                                                                       MaximumWidthRequest="320" />
+                                                            </Border>
 
-                                                <!-- Combined PO Badge -->
-                                                <Border IsVisible="{Binding HasCombinedPos}"
-                                                        Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
-                                                        Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPoBorderLight}, Dark={StaticResource BadgeCombinedPoBorderDark}}"
-                                                        BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoBgLight}, Dark={StaticResource BadgeCombinedPoBgDark}}"
-                                                        HorizontalOptions="Start">
-                                                    <Border.StrokeShape>
-                                                        <RoundRectangle CornerRadius="4" />
-                                                    </Border.StrokeShape>
-                                                    <Label Text="{Binding CombinedPosBadgeText, StringFormat='Combined PO ({0})'}"
-                                                           FontSize="10" FontFamily="SegoeSemibold"
-                                                           TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoTextLight}, Dark={StaticResource BadgeCombinedPoTextDark}}"
-                                                           LineBreakMode="TailTruncation"
-                                                           MaximumWidthRequest="320" />
-                                                </Border>
-                                            </FlexLayout>
+                                                            <!-- Combined PO Badge -->
+                                                            <Border IsVisible="{Binding HasCombinedPos}"
+                                                                    Margin="0,0,6,2" Padding="6,2" StrokeThickness="1"
+                                                                    Stroke="{AppThemeBinding Light={StaticResource BadgeCombinedPoBorderLight}, Dark={StaticResource BadgeCombinedPoBorderDark}}"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoBgLight}, Dark={StaticResource BadgeCombinedPoBgDark}}"
+                                                                    HorizontalOptions="Start">
+                                                                <Border.StrokeShape>
+                                                                    <RoundRectangle CornerRadius="4" />
+                                                                </Border.StrokeShape>
+                                                                <Label Text="{Binding CombinedPosBadgeText, StringFormat='Combined PO ({0})'}"
+                                                                       FontSize="10" FontFamily="SegoeSemibold"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource BadgeCombinedPoTextLight}, Dark={StaticResource BadgeCombinedPoTextDark}}"
+                                                                       LineBreakMode="TailTruncation"
+                                                                       MaximumWidthRequest="320" />
+                                                            </Border>
+                                                        </FlexLayout>
+                                                    </DataTemplate>
+                                                </converters:LazyExpander.ContentTemplate>
+                                            </converters:LazyExpander>
 
                                             <!-- Description (Ellipsized at 2 lines max so cards stay compact & aligned) -->
                                             <Label Text="{Binding Description}"
@@ -431,7 +439,7 @@
                                                 <!-- Age -->
                                                 <Label Text="{Binding AgeDisplay, StringFormat='Raised {0}'}"
                                                        FontSize="11"
-                                                       TextColor="{AppThemeBinding Light={StaticResource TextTertiary}, Dark={StaticResource TextTertiary}}"
+                                                       TextColor="{StaticResource TextTertiary}"
                                                        VerticalOptions="Center" />
                                             </HorizontalStackLayout>
                                         </VerticalStackLayout>
@@ -526,7 +534,7 @@
                                                 Text="{Binding IsExpanded, Converter={StaticResource BoolToChevronConverter}}"
                                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
                                                 FontSize="11"
-                                                TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray400}}"
+                                                TextColor="{StaticResource Gray400}"
                                                 VerticalOptions="Center" />
                                     </Grid>
 
@@ -588,75 +596,14 @@
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
 
-                <!-- Fluent Pagination Bar (Fast 0ms Navigation) -->
-                <Grid IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                      ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,8,0,16">
-                    <!-- Left: Summary ("Showing 1–10 of 48 requisitions") -->
-                    <Label Grid.Column="0"
-                           Text="{Binding PaginationSummary}"
-                           FontSize="12"
-                           FontFamily="SegoeSemibold"
-                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                           VerticalOptions="Center" />
-
-                    <!-- Right: Page Size Selector & Navigation Buttons -->
-                    <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
-                        <Label Text="Rows per page:"
-                               FontSize="12"
-                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                               VerticalOptions="Center" />
-
-                        <Picker ItemsSource="{Binding PageSizeOptions}"
-                                SelectedItem="{Binding PageSize, Mode=TwoWay}"
-                                FontSize="12"
-                                HeightRequest="32"
-                                WidthRequest="80"
-                                VerticalOptions="Center" />
-
-                        <Label Text="{Binding CurrentPage, StringFormat='Page {0} of '}"
-                               FontSize="12"
-                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                               VerticalOptions="Center" />
-                        <Label Text="{Binding TotalPages}"
-                               FontSize="12"
-                               FontFamily="SegoeSemibold"
-                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
-                               VerticalOptions="Center" />
-
-                        <!-- Navigation Buttons -->
-                        <Button Text="&#xE892;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                FontSize="12"
-                                Command="{Binding FirstPageCommand}"
-                                IsEnabled="{Binding CanGoPrevious}"
-                                Style="{StaticResource SecondaryButton}"
-                                HeightRequest="32" WidthRequest="36" Padding="0" />
-
-                        <Button Text="&#xE76B;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                FontSize="12"
-                                Command="{Binding PreviousPageCommand}"
-                                IsEnabled="{Binding CanGoPrevious}"
-                                Style="{StaticResource SecondaryButton}"
-                                HeightRequest="32" WidthRequest="36" Padding="0" />
-
-                        <Button Text="&#xE76C;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                FontSize="12"
-                                Command="{Binding NextPageCommand}"
-                                IsEnabled="{Binding CanGoNext}"
-                                Style="{StaticResource SecondaryButton}"
-                                HeightRequest="32" WidthRequest="36" Padding="0" />
-
-                        <Button Text="&#xE893;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                FontSize="12"
-                                Command="{Binding LastPageCommand}"
-                                IsEnabled="{Binding CanGoNext}"
-                                Style="{StaticResource SecondaryButton}"
-                                HeightRequest="32" WidthRequest="36" Padding="0" />
-                    </HorizontalStackLayout>
-                </Grid>
+                <!-- List footer. Pagination was replaced by infinite scroll (PrListPage.OnBoardScrolled ->
+                     RevealMore), so this is now a count rather than a pager. -->
+                <Label IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                       Text="{Binding ListSummary}"
+                       FontSize="12"
+                       FontFamily="SegoeSemibold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                       VerticalOptions="Center" Margin="0,8,0,16" />
 
             </VerticalStackLayout>
         </ScrollView>

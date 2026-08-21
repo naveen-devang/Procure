@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -65,29 +66,19 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool IsStatusMessageVisible { get; set; }
 
-        // Pagination
-        [ObservableProperty]
-        public partial int CurrentPage { get; set; } = 1;
-
-        [ObservableProperty]
-        public partial int PageSize { get; set; } = 10;
-
-        [ObservableProperty]
-        public partial int TotalPages { get; set; } = 1;
+        // Infinite scroll. Only RevealBatchSize cards exist up front and the board grows as the user
+        // scrolls, so a tab switch realises 5 cards instead of a whole page of them.
+        // ponytail: revealed rows are never dropped again, so scrolling to the bottom of a long list
+        // leaves every card realised and makes the next tab switch proportionally slower. Ceiling is
+        // the list length; reset _revealedCount on navigate-away if that ever bites.
+        private const int RevealBatchSize = 5;
+        private int _revealedCount = RevealBatchSize;
 
         [ObservableProperty]
         public partial int TotalFilteredCount { get; set; }
 
         [ObservableProperty]
-        public partial string PaginationSummary { get; set; } = "Showing 0 requisitions";
-
-        [ObservableProperty]
-        public partial bool CanGoPrevious { get; set; }
-
-        [ObservableProperty]
-        public partial bool CanGoNext { get; set; }
-
-        public List<int> PageSizeOptions { get; } = new() { 5, 10, 20, 50 };
+        public partial string ListSummary { get; set; } = "Showing 0 requisitions";
 
 
         public List<string> StatusFilterOptions { get; } = new()
@@ -208,33 +199,68 @@ namespace Procure.PageModels
             });
         }
 
+        // Set when a load finished while the board was still off-screen. Shell does not realise a
+        // page's native controls until you navigate to it, so filling FilteredPrs during the preload
+        // just parks ~430 views to be created in one synchronous block on the first tab switch -
+        // which is the freeze. Hold the fill until the board is actually appearing.
+        private bool _fillPending;
+
         [RelayCommand]
-        public async Task LoadPrsAsync()
+        public Task LoadPrsAsync() => LoadCoreAsync(fillUi: true);
+
+        /// <summary>Warms the data only. The card fill waits for <see cref="ApplyPendingFill"/>.</summary>
+        public Task PreloadDataAsync() => LoadCoreAsync(fillUi: false);
+
+        /// <summary>Runs the fill a preload deferred. Cheap no-op when there is nothing pending.</summary>
+        public void ApplyPendingFill()
+        {
+            if (!_fillPending) return;
+            _fillPending = false;
+            ApplyFilters();
+            UpdateStatusBanner();
+        }
+
+        private async Task LoadCoreAsync(bool fillUi)
         {
             if (IsBusy) return;
 
             try
             {
                 IsBusy = true;
+                var probe = Procure.Utilities.TimingProbe.Start("LoadPrsAsync"); // ponytail-temp
 
-                // Run the DB work on the thread pool to avoid blocking the UI
-                var defs = await Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync()).ConfigureAwait(true);
-                CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defs);
+                // Two independent queries, each on its own pooled SqliteConnection — overlap them
+                // instead of paying for the column definitions before the PRs even start.
+                var defsTask = Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync());
+                var prsTask = Task.Run(() => _prRepo.GetAllAsync());
+                probe.Mark("queue both queries"); // ponytail-temp
+                await Task.WhenAll(defsTask, prsTask).ConfigureAwait(true);
+                probe.Mark("await + resume on UI"); // ponytail-temp
 
-                // Load PRs on the thread pool. No NotifyHierarchyChanged pass here: nothing is bound
-                // to these objects yet (FilteredPrs is populated below), so the ~861 PropertyChanged
-                // events it raised had no subscribers. GetAllAsync already computed fulfilments.
-                var loadedPrs = await Task.Run(() => _prRepo.GetAllAsync()).ConfigureAwait(true);
+                // Back on the UI thread from here.
+                CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defsTask.Result);
+                _allPrs = MergeLoadedPrs(prsTask.Result);
+                probe.Mark("MergeLoadedPrs"); // ponytail-temp
 
-                // Back on UI thread: assign _allPrs and update bound collections
-                _allPrs = loadedPrs;
-                foreach (var pr in _allPrs)
+                // Hide the skeleton before the cards start arriving: its shimmer animates at rate:33 on
+                // this same thread and otherwise fights card inflation for the whole fill. This does let
+                // a second LoadPrs slip past the IsBusy guard mid-fill — harmless, the merge is
+                // idempotent and _fillGeneration retires the superseded fill.
+                IsBusy = false;
+
+                if (fillUi)
                 {
-                    pr.PropertyChanged -= OnPrItemPropertyChanged;
-                    pr.PropertyChanged += OnPrItemPropertyChanged;
+                    ApplyFilters();
+                    probe.Mark("ApplyFilters"); // ponytail-temp
+                    UpdateStatusBanner();
+                    probe.Mark("UpdateStatusBanner"); // ponytail-temp
                 }
-                ApplyFilters();
-                UpdateStatusBanner();
+                else
+                {
+                    _fillPending = true;
+                    probe.Mark("fill deferred (off-screen)"); // ponytail-temp
+                }
+                probe.Flush(); // ponytail-temp
             }
             catch (Exception ex)
             {
@@ -244,6 +270,43 @@ namespace Procure.PageModels
             {
                 IsBusy = false;
             }
+        }
+
+        /// <summary>Folds a fresh load into the instances the board is already bound to: same Id merges
+        /// in place, so an unchanged reload leaves FilteredPrs reference-identical and ApplyFilters exits
+        /// on its SequenceEqual check without destroying and rebuilding a single card.</summary>
+        private List<PurchaseRequisition> MergeLoadedPrs(List<PurchaseRequisition> loaded)
+        {
+            var live = _allPrs.ToDictionary(p => p.Id);
+            var merged = new List<PurchaseRequisition>(loaded.Count);
+
+            foreach (var fresh in loaded)
+            {
+                var pr = fresh;
+                if (live.TryGetValue(fresh.Id, out var kept))
+                {
+                    kept.MergeFrom(fresh);
+                    pr = kept;
+                }
+
+                // Unconditional -= then +=: idempotent for a reused instance, and it still picks up the
+                // PRs that batch create and merge-master push straight into _allPrs without subscribing.
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+                pr.PropertyChanged += OnPrItemPropertyChanged;
+                merged.Add(pr);
+            }
+
+            // Anything the DB no longer returns is dropped here — unsubscribe or the handler keeps it alive.
+            var loadedIds = loaded.Select(p => p.Id).ToHashSet();
+            foreach (var gone in _allPrs)
+            {
+                if (!loadedIds.Contains(gone.Id)) gone.PropertyChanged -= OnPrItemPropertyChanged;
+            }
+
+            Debug.Assert(merged.All(p => !live.TryGetValue(p.Id, out var before) || ReferenceEquals(p, before)),
+                "A reload replaced a live PurchaseRequisition instead of merging into it - every bound card will be rebuilt.");
+
+            return merged;
         }
 
         partial void OnSearchTextChanged(string value)
@@ -267,50 +330,13 @@ namespace Procure.PageModels
         partial void OnFilterPcrPendingOnlyChanged(bool value) => ApplyFilters(true);
         partial void OnFilterUrgentOnlyChanged(bool value) => ApplyFilters(true);
 
-        partial void OnPageSizeChanged(int value)
+        /// <summary>Grows the visible list by one batch. The scroll handler calls this as the user
+        /// nears the bottom; a no-op once everything that passes the filter is already on screen.</summary>
+        public void RevealMore()
         {
-            CurrentPage = 1;
+            if (_revealedCount >= TotalFilteredCount) return;
+            _revealedCount += RevealBatchSize;
             ApplyFilters();
-        }
-
-        [RelayCommand]
-        public void NextPage()
-        {
-            if (CurrentPage < TotalPages)
-            {
-                CurrentPage++;
-                ApplyFilters();
-            }
-        }
-
-        [RelayCommand]
-        public void PreviousPage()
-        {
-            if (CurrentPage > 1)
-            {
-                CurrentPage--;
-                ApplyFilters();
-            }
-        }
-
-        [RelayCommand]
-        public void FirstPage()
-        {
-            if (CurrentPage != 1)
-            {
-                CurrentPage = 1;
-                ApplyFilters();
-            }
-        }
-
-        [RelayCommand]
-        public void LastPage()
-        {
-            if (CurrentPage != TotalPages)
-            {
-                CurrentPage = TotalPages;
-                ApplyFilters();
-            }
         }
 
         [RelayCommand]
@@ -325,11 +351,11 @@ namespace Procure.PageModels
         [RelayCommand]
         public void DismissStatusMessage() => IsStatusMessageVisible = false;
 
-        private void ApplyFilters(bool resetPage = false)
+        private void ApplyFilters(bool resetReveal = false)
         {
-            if (resetPage)
+            if (resetReveal)
             {
-                CurrentPage = 1;
+                _revealedCount = RevealBatchSize;
             }
 
             var query = _allPrs.AsEnumerable();
@@ -381,32 +407,20 @@ namespace Procure.PageModels
 
             var allFiltered = query.ToList();
             TotalFilteredCount = allFiltered.Count;
-            TotalPages = Math.Max(1, (int)Math.Ceiling(TotalFilteredCount / (double)PageSize));
 
-            if (CurrentPage > TotalPages)
-            {
-                CurrentPage = TotalPages;
-            }
-            if (CurrentPage < 1)
-            {
-                CurrentPage = 1;
-            }
+            // A filter that shrank the list must not leave the window stranded past the end.
+            _revealedCount = Math.Max(RevealBatchSize, Math.Min(_revealedCount, TotalFilteredCount));
+            var pagedList = allFiltered.Take(_revealedCount).ToList();
 
-            CanGoPrevious = CurrentPage > 1;
-            CanGoNext = CurrentPage < TotalPages;
+            // The window must never strand: it shows something whenever anything matched, never more
+            // than matched, and clamping to the total is what lets RevealMore terminate.
+            Debug.Assert(pagedList.Count == Math.Min(_revealedCount, TotalFilteredCount)
+                         && (pagedList.Count > 0 || TotalFilteredCount == 0),
+                "Infinite-scroll window stranded - the board would render empty with matches available.");
 
-            var startIndex = (CurrentPage - 1) * PageSize;
-            var pagedList = allFiltered.Skip(startIndex).Take(PageSize).ToList();
-
-            if (TotalFilteredCount == 0)
-            {
-                PaginationSummary = "No requisitions found";
-            }
-            else
-            {
-                var endIndex = Math.Min(startIndex + PageSize, TotalFilteredCount);
-                PaginationSummary = $"Showing {startIndex + 1}–{endIndex} of {TotalFilteredCount} requisitions";
-            }
+            ListSummary = TotalFilteredCount == 0
+                ? "No requisitions found"
+                : $"Showing {pagedList.Count} of {TotalFilteredCount} requisitions";
 
             // Reconcile the existing collection instead of replacing the instance: replacing it makes the
             // bound BindableLayout tear down and rebuild every card, which also wipes each card's expanded

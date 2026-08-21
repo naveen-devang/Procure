@@ -481,17 +481,10 @@ namespace Procure.PageModels
                     await _prRepo.PartialSplitMergedPrAsync(SplitTargetMasterPr.Id, split, kept);
                 }
 
-                // Reload fresh PRs
-                var freshPrs = await _prRepo.GetAllAsync();
-                foreach (var p in _allPrs)
-                    p.PropertyChanged -= OnPrItemPropertyChanged;
-
-                _allPrs.Clear();
-                foreach (var pr in freshPrs)
-                {
-                    pr.PropertyChanged += OnPrItemPropertyChanged;
-                    _allPrs.Add(pr);
-                }
+                // Reload fresh PRs. Route through the same merge LoadPrsAsync uses: rebuilding
+                // _allPrs from fresh instances hands ApplyFilters a page it has to tear down and
+                // re-inflate card by card, and wipes every card's expanded and selected state.
+                _allPrs = MergeLoadedPrs(await _prRepo.GetAllAsync());
 
                 CloseSplitPrModal();
                 UpdateSelectionState();

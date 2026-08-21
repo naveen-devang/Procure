@@ -1,6 +1,9 @@
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
@@ -182,6 +185,10 @@ namespace Procure.Models
         public string SharedRfqsBadgeText => string.Join(", ", Rfqs.Where(r => r.IsSharedRfq).Select(r => r.SharedPrs).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
 
         public bool HasCombinedPos => Pos != null && Pos.Any(p => p.IsCombinedPo);
+
+        /// <summary>Gate for the whole badge row. All four badges are rare, so the card defers building
+        /// the row - and the FlexLayout holding it - until a PR actually has one.</summary>
+        public bool HasAnyBadge => IsConsolidatedMaster || IsMergedChild || HasSharedRfqs || HasCombinedPos;
         public string CombinedPosBadgeText => string.Join(", ", Pos.Where(p => p.IsCombinedPo).Select(p => p.CombinedPrs).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
 
         public void CalculateItemFulfillments()
@@ -253,7 +260,11 @@ namespace Procure.Models
         /// <summary>Raises only what a Status or Priority edit can change. Status and Priority notify
         /// themselves via [ObservableProperty]; IsMergedChild is derived from Status and does not.
         /// Use this instead of NotifyHierarchyChanged when no child collection was touched.</summary>
-        public void NotifyStatusChanged() => OnPropertyChanged(nameof(IsMergedChild));
+        public void NotifyStatusChanged()
+        {
+            OnPropertyChanged(nameof(IsMergedChild));
+            OnPropertyChanged(nameof(HasAnyBadge));
+        }
 
         public void NotifyHierarchyChanged()
         {
@@ -288,8 +299,121 @@ namespace Procure.Models
             OnPropertyChanged(nameof(SharedRfqsBadgeText));
             OnPropertyChanged(nameof(HasCombinedPos));
             OnPropertyChanged(nameof(CombinedPosBadgeText));
+            OnPropertyChanged(nameof(HasAnyBadge));
             // PoFulfillmentBadgeText, IsPoFullyOrdered, IsPoPartiallyOrdered, TotalOrderedItemQuantity
             // and TotalPendingItemQuantity are already raised by CalculateItemFulfillments() above.
+        }
+
+        /// <summary>Copies a freshly loaded row and its children onto this live instance, so a reload can
+        /// reuse the object every card is already bound to instead of handing the board new instances it
+        /// has to tear down and rebuild. Unchanged values are never re-assigned, so a reload that found no
+        /// DB change raises no PropertyChanged at all. UI-only state (IsExpanded, IsSelected) is left alone.</summary>
+        public void MergeFrom(PurchaseRequisition fresh)
+        {
+            if (fresh == null || ReferenceEquals(fresh, this)) return;
+
+            // Only when something actually moved: the computed card labels (ItemsCount, TotalPoValue,
+            // PcrStatusDisplay...) read the child collections and nothing notifies them on their own.
+            // This is the pass the repository deliberately leaves to the UI thread.
+            if (MergeInto(this, fresh)) NotifyHierarchyChanged();
+        }
+
+        // ponytail: reflection rather than a hand-written copy for each of the seven model types. The
+        // column list already lives in the repository's readers; duplicating it here is what goes stale
+        // and silently shows old data. ~500 objects a load against a cached PropertyInfo[] is sub-ms.
+        private static readonly ConcurrentDictionary<Type, PropertyInfo[]> MergeableProps = new();
+        private static readonly ConcurrentDictionary<Type, PropertyInfo> IdProps = new();
+
+        private static Guid IdOf(object o) => (Guid)IdProps.GetOrAdd(o.GetType(), static t => t.GetProperty("Id")!).GetValue(o)!;
+
+        /// <summary>Copies every persisted property of <paramref name="fresh"/> onto
+        /// <paramref name="target"/> (same runtime type). Returns true if anything actually changed.</summary>
+        private static bool MergeInto(object target, object fresh)
+        {
+            var changed = false;
+
+            foreach (var p in MergeableProps.GetOrAdd(target.GetType(), static t => t
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0
+                            && p.Name != nameof(IsExpanded) && p.Name != nameof(IsSelected))
+                .ToArray()))
+            {
+                var current = p.GetValue(target);
+                var incoming = p.GetValue(fresh);
+
+                // Child collection (Items, Rfqs, Pos, CustomValues, Approvals, PO/RFQ line items):
+                // merge the contents so the bound child layout is not reset.
+                if (current is IList currentList && incoming is IList incomingList)
+                {
+                    changed |= MergeList(currentList, incomingList);
+                }
+                // Single nav property (Pcr): same row merges in place, a different row is assigned so
+                // the setter can re-hook its PropertyChanged.
+                else if (current is ObservableObject liveChild && incoming is ObservableObject freshChild
+                         && IdOf(liveChild) == IdOf(freshChild))
+                {
+                    changed |= MergeInto(liveChild, freshChild);
+                }
+                else if (!Equals(current, incoming))
+                {
+                    p.SetValue(target, incoming);
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        /// <summary>Reconciles a bound child collection by Id: a row that is still there merges into the
+        /// live element and raises no collection event at all, new rows are inserted, dropped rows removed.
+        /// ponytail: O(n^2) scan and remove+insert instead of Move — child lists are a handful of rows and
+        /// the DB returns them in SortOrder, so a reorder is rare. Index the ids if that stops holding.</summary>
+        private static bool MergeList(IList target, IList fresh)
+        {
+            var changed = false;
+
+            for (var i = target.Count - 1; i >= 0; i--)
+            {
+                var id = IdOf(target[i]!);
+                var stillLoaded = false;
+                foreach (var f in fresh)
+                {
+                    if (IdOf(f!) == id) { stillLoaded = true; break; }
+                }
+                if (!stillLoaded)
+                {
+                    target.RemoveAt(i);
+                    changed = true;
+                }
+            }
+
+            for (var i = 0; i < fresh.Count; i++)
+            {
+                var id = IdOf(fresh[i]!);
+                var existing = -1;
+                for (var j = i; j < target.Count; j++)
+                {
+                    if (IdOf(target[j]!) == id) { existing = j; break; }
+                }
+
+                if (existing < 0)
+                {
+                    target.Insert(i, fresh[i]);
+                    changed = true;
+                    continue;
+                }
+
+                changed |= MergeInto(target[existing]!, fresh[i]!);
+                if (existing != i)
+                {
+                    var moved = target[existing];
+                    target.RemoveAt(existing);
+                    target.Insert(i, moved);
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
     }
 }

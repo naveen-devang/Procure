@@ -26,6 +26,12 @@
 		<TieredCompilation>true</TieredCompilation>
 		<TieredPGO>true</TieredPGO>
 
+		<!-- Kept for cold app start, NOT for the read path: measurement showed GetAllAsync itself is
+		     21ms cold, so the ~1.1s the PR Board waited was startup contention, not JIT of the query
+		     code. R2R may still help the startup work that contention is queued behind, but that is
+		     unmeasured - benchmark it before relying on it. Only takes effect on `dotnet publish`. -->
+		<PublishReadyToRun Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND '$(Configuration)' == 'Release'">true</PublishReadyToRun>
+
 		<!-- Enable XAML source generation for faster build times and improved performance.
 		     This generates C# code from XAML at compile time instead of runtime inflation.
 		     To disable, remove this line.
