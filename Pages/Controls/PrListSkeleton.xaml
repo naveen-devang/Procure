@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Procure.Pages.Controls.PrListSkeleton">
+
+    <!-- Six placeholder rows mirroring the real PR card, shown while the board loads.
+         PrListPage.xaml.cs pulses Opacity on this control to shimmer it. -->
+    <VerticalStackLayout Spacing="14">
+
+        <!-- Skeleton Card (template, repeated 6×) -->
+        <!-- Card 1 -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="70" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="140" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Card 2 (wider description to vary rhythm) -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="55" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="200" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Card 3 -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="110" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="80" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="120" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Card 4 -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="105" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="65" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="170" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Card 5 -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="95" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Card 6 (shorter description, fades the list naturally) -->
+        <Border StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="14,14,18,14">
+            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                <BoxView Grid.Column="0" WidthRequest="24" HeightRequest="24" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" VerticalOptions="Center" />
+                <BoxView Grid.Column="1" WidthRequest="60" HeightRequest="26" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center" WidthRequest="120">
+                    <BoxView HeightRequest="13" WidthRequest="100" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" HorizontalOptions="Start" />
+                    <BoxView HeightRequest="11" WidthRequest="75" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                    <BoxView HeightRequest="13" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" />
+                    <BoxView HeightRequest="11" WidthRequest="90" CornerRadius="3" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" HorizontalOptions="Start" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
+                    <BoxView WidthRequest="62" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="78" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="70" HeightRequest="22" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="5" HeightRequest="28" WidthRequest="90" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="46" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                    <BoxView WidthRequest="56" HeightRequest="30" CornerRadius="4" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                </HorizontalStackLayout>
+                <BoxView Grid.Column="7" WidthRequest="14" HeightRequest="14" CornerRadius="2" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+    </VerticalStackLayout>
+</ContentView>

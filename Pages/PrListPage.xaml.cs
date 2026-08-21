@@ -89,13 +89,6 @@ namespace Procure.Pages
             });
         }
 
-        private async void OnApprovalDateSelected(object? sender, DateChangedEventArgs e)
-        {
-            if (sender is DatePicker picker && picker.BindingContext is Approval approval)
-            {
-                await _viewModel.HandleApprovalDateChangedAsync(approval);
-            }
-        }
         private void OnPrSelectionCheckedChanged(object? sender, CheckedChangedEventArgs e)
         {
             if (sender is CheckBox checkBox && checkBox.BindingContext is PurchaseRequisition pr)
@@ -131,64 +124,6 @@ namespace Procure.Pages
                 }
 #endif
                 await _viewModel.ChangePrStatusAsync(pr);
-            }
-        }
-
-        private async void OnPoStatusButtonClicked(object? sender, EventArgs e)
-        {
-            if (sender is Button button && button.BindingContext is PurchaseOrder po)
-            {
-#if WINDOWS
-                if (button.Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement frameworkElement)
-                {
-                    var flyout = new Microsoft.UI.Xaml.Controls.MenuFlyout();
-                    foreach (var status in PoStatus.AllStatuses)
-                    {
-                        var item = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = status };
-                        if (status == po.Status)
-                        {
-                            item.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
-                        }
-                        item.Click += async (s, args) =>
-                        {
-                            await _viewModel.UpdatePoStatusDirectAsync(po, status);
-                        };
-                        flyout.Items.Add(item);
-                    }
-                    flyout.ShowAt(frameworkElement);
-                    return;
-                }
-#endif
-                await _viewModel.UpdatePoStatusAsync(po);
-            }
-        }
-
-        private async void OnRfqStatusButtonClicked(object? sender, EventArgs e)
-        {
-            if (sender is Button button && button.BindingContext is RequestForQuotation rfq)
-            {
-#if WINDOWS
-                if (button.Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement frameworkElement)
-                {
-                    var flyout = new Microsoft.UI.Xaml.Controls.MenuFlyout();
-                    foreach (var status in RfqStatus.AllStatuses)
-                    {
-                        var item = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = status };
-                        if (status == rfq.Status)
-                        {
-                            item.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
-                        }
-                        item.Click += async (s, args) =>
-                        {
-                            await _viewModel.UpdateRfqStatusDirectAsync(rfq, status);
-                        };
-                        flyout.Items.Add(item);
-                    }
-                    flyout.ShowAt(frameworkElement);
-                    return;
-                }
-#endif
-                await _viewModel.MarkQuoteReceivedCommand.ExecuteAsync(rfq);
             }
         }
 
