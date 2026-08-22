@@ -36,7 +36,7 @@ namespace Procure.Pages
                 _benchStarted = true;
                 Dispatcher.Dispatch(async () => await Procure.Utilities.BoardBench.RunAsync(
                     () => _viewModel.FilteredPrs.Count,
-                    _viewModel.RevealMore,
+                    () => _viewModel.LoadMoreCommand.Execute(null),
                     () => Procure.Utilities.BoardBench.SettleAsync(Dispatcher)));
             }
 #endif
@@ -94,22 +94,6 @@ namespace Procure.Pages
                     SkeletonContainer.Opacity = 1.0;
                 }
             });
-        }
-
-        // One card's worth of runway, so the next batch is built before the user reaches the end.
-        private const double RevealThreshold = 400;
-        private bool _revealQueued;
-
-        private void OnBoardScrolled(object? sender, ScrolledEventArgs e)
-        {
-            // Scrolled fires many times per gesture and the list grows only after the next layout
-            // pass, so without this latch one flick near the bottom reveals the whole list at once.
-            if (_revealQueued) return;
-            if (e.ScrollY + BoardScroll.Height < BoardScroll.ContentSize.Height - RevealThreshold) return;
-
-            _revealQueued = true;
-            _viewModel.RevealMore();
-            Dispatcher.Dispatch(() => _revealQueued = false);
         }
 
         private void OnPrSelectionCheckedChanged(object? sender, CheckedChangedEventArgs e)

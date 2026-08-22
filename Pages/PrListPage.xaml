@@ -14,32 +14,23 @@
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
 
     <Grid>
-        <!-- Main Scrollable Content -->
-        <ScrollView x:Name="BoardScroll" Scrolled="OnBoardScrolled" Padding="28,36,28,36">
-            <VerticalStackLayout Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
+        <!-- The CollectionView must own the scrolling. Nested in a ScrollView it is handed infinite
+             height, measures every item and silently stops virtualizing - which is the freeze this
+             page was built around before. So: chrome pinned in rows 0 and 2, cards scroll in row 1. -->
+        <Grid RowDefinitions="Auto, *, Auto"
+              Padding="28,36,28,36"
+              RowSpacing="20">
+
+            <VerticalStackLayout Grid.Row="0" Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
 
                 <!-- Page Header: Title + Primary Actions -->
                 <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto" Margin="0,6,0,0">
                     <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
-                        <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
-                            <Label Text="Purchase Requisitions"
-                                   FontFamily="SegoeSemibold"
-                                   FontSize="26"
-                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            
-                            <Border Padding="10,3" StrokeThickness="0"
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
-                                    VerticalOptions="Center">
-                                <Border.StrokeShape>
-                                    <RoundRectangle CornerRadius="12" />
-                                </Border.StrokeShape>
-                                <Label Text="{Binding FilteredPrs.Count, StringFormat='{0} requisitions'}"
-                                       FontSize="12"
-                                       FontFamily="SegoeSemibold"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
-                            </Border>
-                        </HorizontalStackLayout>
-                        
+                        <Label Text="Purchase Requisitions"
+                               FontFamily="SegoeSemibold"
+                               FontSize="26"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
                         <Label Text="Manage procurement lifecycle across vendor RFQs, multi-role PCR approvals, and purchase orders."
                                FontSize="13"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
@@ -229,39 +220,55 @@
                     </Grid>
                 </Border>
 
-                <!-- ===== SKELETON LOADING (built on first IsBusy = true) =====
-                     121 elements. Bound with a plain IsVisible it was constructed with the page and then
-                     sat in the tree, invisible, for the rest of the session. With the data preloaded
-                     before this page is ever built, IsBusy is already false on first open and it never
-                     inflates at all; a manual Refresh builds it once and reuses it after that.
-                     The name is on the LazyExpander so the shimmer animates the whole subtree. -->
-                <converters:LazyExpander x:Name="SkeletonContainer" IsExpanded="{Binding IsBusy}">
-                    <converters:LazyExpander.ContentTemplate>
-                        <DataTemplate>
-                            <controls:PrListSkeleton />
-                        </DataTemplate>
-                    </converters:LazyExpander.ContentTemplate>
-                </converters:LazyExpander>
+            </VerticalStackLayout>
 
-                <!-- PR Cards List (Lightweight BindableLayout - Eliminates CollectionView layout measurement freeze) -->
-                <VerticalStackLayout IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                     BindableLayout.ItemsSource="{Binding FilteredPrs}">
-                    <BindableLayout.EmptyView>
-                        <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
-                            <Label Text="No purchase requisitions match your criteria."
-                                   FontSize="15"
-                                   FontFamily="SegoeSemibold"
-                                   TextColor="{StaticResource Gray400}"
-                                   HorizontalOptions="Center" />
-                            <Button Text="Reset Filters"
-                                    Command="{Binding LoadPrsCommand}"
-                                    Style="{StaticResource SecondaryButton}"
-                                    HeightRequest="36"
-                                    HorizontalOptions="Center" />
-                        </VerticalStackLayout>
-                    </BindableLayout.EmptyView>
+            <!-- ===== SKELETON LOADING (built on first IsBusy = true) =====
+                 121 elements. Bound with a plain IsVisible it was constructed with the page and then
+                 sat in the tree, invisible, for the rest of the session. With the data preloaded
+                 before this page is ever built, IsBusy is already false on first open and it never
+                 inflates at all; a manual Refresh builds it once and reuses it after that.
+                 The name is on the LazyExpander so the shimmer animates the whole subtree.
+                 Overlays the list in row 1 rather than displacing it. -->
+            <converters:LazyExpander x:Name="SkeletonContainer" Grid.Row="1" VerticalOptions="Start"
+                                     IsExpanded="{Binding IsBusy}">
+                <converters:LazyExpander.ContentTemplate>
+                    <DataTemplate>
+                        <controls:PrListSkeleton />
+                    </DataTemplate>
+                </converters:LazyExpander.ContentTemplate>
+            </converters:LazyExpander>
 
-                    <BindableLayout.ItemTemplate>
+            <!-- PR Cards List. A CollectionView recycles containers, so the number of live native
+                 controls is bounded by what fits on screen rather than by how far you have scrolled -
+                 which is what keeps memory flat and scrolling smooth at 20,000 rows.
+                 RemainingItemsThreshold replaces the hand-rolled scroll handler and reveal counter. -->
+            <CollectionView Grid.Row="1"
+                            x:Name="BoardList"
+                            IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                            ItemsSource="{Binding FilteredPrs}"
+                            MaximumWidthRequest="1600"
+                            HorizontalOptions="Fill"
+                            SelectionMode="None"
+                            VerticalScrollBarVisibility="Always"
+                            ItemsUpdatingScrollMode="KeepScrollOffset"
+                            RemainingItemsThreshold="10"
+                            RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
+                        <Label Text="No purchase requisitions match your criteria."
+                               FontSize="15"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{StaticResource Gray400}"
+                               HorizontalOptions="Center" />
+                        <Button Text="Reset Filters"
+                                Command="{Binding LoadPrsCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="36"
+                                HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+
+                <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="models:PurchaseRequisition">
                             <Border Margin="0,0,0,14"
                                     StrokeThickness="1"
@@ -613,20 +620,18 @@
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
 
-                <!-- List footer. Pagination was replaced by infinite scroll (PrListPage.OnBoardScrolled ->
-                     RevealMore), so this is now a count rather than a pager. -->
-                <Label IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                       Text="{Binding ListSummary}"
-                       FontSize="12"
-                       FontFamily="SegoeSemibold"
-                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                       VerticalOptions="Center" Margin="0,8,0,16" />
-
-            </VerticalStackLayout>
-        </ScrollView>
+            <!-- List footer. Pinned, so "Showing N of M" stays readable however far you have scrolled. -->
+            <Label Grid.Row="2"
+                   IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                   Text="{Binding ListSummary}"
+                   FontSize="12"
+                   FontFamily="SegoeSemibold"
+                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                   VerticalOptions="Center" />
+        </Grid>
 
         <!-- ================= MODALS LAYER (Modular ContentView Components) ================= -->
         <converters:LazyExpander IsExpanded="{Binding IsEditModalVisible}">

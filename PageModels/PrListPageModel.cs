@@ -75,13 +75,6 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool IsStatusMessageVisible { get; set; }
 
-        // Infinite scroll. Only RevealBatchSize cards exist up front and the board grows as the user
-        // scrolls, so a tab switch realises 5 cards instead of a whole page of them. BoardDisappearing
-        // drops the window back to one batch, so a session that scrolled deep does not leave every card
-        // it ever revealed for the next tab switch to rebuild.
-        private const int RevealBatchSize = 5;
-        private int _revealedCount = RevealBatchSize;
-
         [ObservableProperty]
         public partial int TotalFilteredCount { get; set; }
 
@@ -242,14 +235,12 @@ namespace Procure.PageModels
             }
         }
 
-        /// <summary>Called from PrListPage.OnDisappearing. Drops the infinite-scroll window back to one
-        /// batch, so a session that scrolled to the bottom does not leave every card it ever revealed
-        /// alive for every later tab switch to pay for. Guarded: a user who never scrolled pays nothing.</summary>
-        public void BoardDisappearing()
-        {
-            _isBoardVisible = false;
-            if (_revealedCount > RevealBatchSize) ApplyFilters(resetReveal: true);
-        }
+        /// <summary>Called from PrListPage.OnDisappearing. Nothing to tear down: the CollectionView
+        /// recycles containers, so what is realised is bounded by the viewport however far the user
+        /// scrolled. This used to drop the window back to one batch, which meant removing hundreds of
+        /// rows one at a time - each destroying a card and relaying out the rest - and that quadratic
+        /// teardown, run inside OnDisappearing, was the tab-switch freeze. The board keeps its place.</summary>
+        public void BoardDisappearing() => _isBoardVisible = false;
 
         private bool _loadInFlight;
 
@@ -295,10 +286,14 @@ namespace Procure.PageModels
         /// the caller's SequenceEqual check exits without rebuilding a single card. Also reapplies the
         /// checkbox state from <see cref="_selectedIds"/>, which is what lets a selection survive being
         /// scrolled or filtered out of the loaded window.</summary>
-        private List<PurchaseRequisition> MergeLoadedPrs(List<PurchaseRequisition> loaded)
+        /// <param name="retain">Rows the board still shows beyond the re-read window. They are already
+        /// live instances with no fresh counterpart, so they are kept subscribed and kept in
+        /// <see cref="_loadedPrs"/> rather than being treated as gone.</param>
+        private List<PurchaseRequisition> MergeLoadedPrs(List<PurchaseRequisition> loaded,
+                                                         IReadOnlyList<PurchaseRequisition>? retain = null)
         {
             var live = _loadedPrs.ToDictionary(p => p.Id);
-            var merged = new List<PurchaseRequisition>(loaded.Count);
+            var merged = new List<PurchaseRequisition>(loaded.Count + (retain?.Count ?? 0));
 
             foreach (var fresh in loaded)
             {
@@ -317,11 +312,21 @@ namespace Procure.PageModels
                 merged.Add(pr);
             }
 
-            // Anything outside the new window is dropped here — unsubscribe or the handler keeps it alive.
-            var loadedIds = loaded.Select(p => p.Id).ToHashSet();
+            var keptIds = merged.Select(p => p.Id).ToHashSet();
+
+            if (retain != null)
+            {
+                foreach (var pr in retain)
+                {
+                    if (keptIds.Add(pr.Id)) merged.Add(pr);
+                }
+            }
+
+            // Anything the board no longer shows is dropped here — unsubscribe or the handler keeps it
+            // alive, and a long scroll would leak every row it ever loaded.
             foreach (var gone in _loadedPrs)
             {
-                if (!loadedIds.Contains(gone.Id)) gone.PropertyChanged -= OnPrItemPropertyChanged;
+                if (!keptIds.Contains(gone.Id)) gone.PropertyChanged -= OnPrItemPropertyChanged;
             }
 
             Debug.Assert(merged.All(p => !live.TryGetValue(p.Id, out var before) || ReferenceEquals(p, before)),
@@ -351,15 +356,6 @@ namespace Procure.PageModels
         partial void OnFilterPcrPendingOnlyChanged(bool value) => ApplyFilters(true);
         partial void OnFilterUrgentOnlyChanged(bool value) => ApplyFilters(true);
 
-        /// <summary>Grows the visible list by one batch. The scroll handler calls this as the user
-        /// nears the bottom; a no-op once everything that passes the filter is already on screen.</summary>
-        public void RevealMore()
-        {
-            if (_revealedCount >= TotalFilteredCount) return;
-            _revealedCount += RevealBatchSize;
-            ApplyFilters();
-        }
-
         [RelayCommand]
         public void ToggleFilterOverdue() => FilterOverdueOnly = !FilterOverdueOnly;
 
@@ -372,26 +368,102 @@ namespace Procure.PageModels
         [RelayCommand]
         public void DismissStatusMessage() => IsStatusMessageVisible = false;
 
-        private void ApplyFilters(bool resetReveal = false)
+        /// <summary>The board is out of date - re-read what is currently shown. Keeps its ~23 call sites
+        /// and their meaning; <paramref name="resetToTop"/> is for the cases where the match set itself
+        /// changed (search, status, filter chips) and the old window no longer means anything.</summary>
+        private void ApplyFilters(bool resetToTop = false)
         {
-            if (resetReveal)
-            {
-                _revealedCount = RevealBatchSize;
-            }
-
             // Fire and forget: the query runs off the UI thread and the generation retires any pass a
-            // later filter change supersedes. Kept synchronous so the ~15 places that call this after a
-            // save still read as "the board is now out of date, refresh it".
-            _ = ReloadPageAsync(++_pageGeneration);
+            // later change supersedes.
+            _ = ReloadWindowAsync(++_pageGeneration, resetToTop);
         }
 
-        // Bumped on every ApplyFilters so a page that arrives after a newer filter is discarded.
+        // Bumped on every load so a page that arrives after a newer one is discarded.
         private int _pageGeneration;
+        private bool _loadingMore;
 
-        /// <summary>Reads the current window from SQLite and reconciles it into the bound collection.
-        /// Every filter the board offers is applied in the WHERE clause, so this costs the same whether
-        /// the table holds 50 rows or 20,000.</summary>
-        private async Task ReloadPageAsync(int generation)
+        // Rows per fetch. Larger than the old reveal batch because the CollectionView recycles
+        // containers - fetching 50 rows no longer means building 50 cards.
+        private const int PageSize = 50;
+
+        // Bounds the re-read after an edit. Only a database cost now - the CollectionView realises a
+        // screenful whatever the number is - so it is set high enough that normal use never trims the
+        // board. Roughly 250ms of background materialisation at this size.
+        private const int MaxWindowReread = 2000;
+
+        /// <summary>Grows the board by one page. Bound to the CollectionView's
+        /// RemainingItemsThresholdReached, which fires as the user nears the end of what is loaded. This
+        /// is the whole of infinite scroll now, and it appends instead of re-reading the window.</summary>
+        [RelayCommand]
+        private async Task LoadMoreAsync()
+        {
+            // The threshold event fires repeatedly while the tail is on screen.
+            if (_loadingMore || FilteredPrs.Count >= TotalFilteredCount) return;
+
+            try
+            {
+                _loadingMore = true;
+                var generation = _pageGeneration;
+                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(FilteredPrs.Count, PageSize)))
+                                     .ConfigureAwait(true);
+                if (generation != _pageGeneration) return;   // a filter change superseded this
+
+                foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
+                TotalFilteredCount = page.TotalCount;
+                UpdateListSummary();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                _loadingMore = false;
+            }
+        }
+
+        private PrQuery BuildQuery(int skip, int take) => new(
+            Search: SearchText,
+            Status: SelectedStatusFilter,
+            OverdueOnly: FilterOverdueOnly,
+            PcrPendingOnly: FilterPcrPendingOnly,
+            UrgentOnly: FilterUrgentOnly,
+            NormalOverdueDays: _settingsService.NormalOverdueDays,
+            UrgentOverdueDays: _settingsService.UrgentOverdueDays,
+            Skip: skip,
+            Take: take);
+
+        private void UpdateListSummary() =>
+            ListSummary = TotalFilteredCount == 0
+                ? "No requisitions found"
+                : $"Showing {FilteredPrs.Count} of {TotalFilteredCount} requisitions";
+
+        /// <summary>Merge for appended rows: reuses any instance already loaded, subscribes the rest, and
+        /// drops nothing - appending never removes anything from the board.</summary>
+        private List<PurchaseRequisition> MergeAppend(List<PurchaseRequisition> loaded)
+        {
+            var live = _loadedPrs.ToDictionary(p => p.Id);
+            var merged = new List<PurchaseRequisition>(loaded.Count);
+
+            foreach (var fresh in loaded)
+            {
+                var pr = fresh;
+                if (live.TryGetValue(fresh.Id, out var kept)) { kept.MergeFrom(fresh); pr = kept; }
+                else _loadedPrs.Add(pr);
+
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+                pr.PropertyChanged += OnPrItemPropertyChanged;
+                pr.IsSelected = _selectedIds.Contains(pr.Id);
+                merged.Add(pr);
+            }
+
+            return merged;
+        }
+
+        /// <summary>Re-reads the loaded window and reconciles it in place, so an edit does not throw the
+        /// user back to the top. Only edits and filter changes reach this - scrolling appends through
+        /// LoadMoreAsync, which never re-reads what it already has.</summary>
+        private async Task ReloadWindowAsync(int generation, bool resetToTop)
         {
             // The skeleton covers the window where the board has nothing to show and a query is still
             // running. Without it the empty view - "No requisitions found" - flashes before the first
@@ -401,18 +473,13 @@ namespace Procure.PageModels
 
             try
             {
-                var query = new PrQuery(
-                    Search: SearchText,
-                    Status: SelectedStatusFilter,
-                    OverdueOnly: FilterOverdueOnly,
-                    PcrPendingOnly: FilterPcrPendingOnly,
-                    UrgentOnly: FilterUrgentOnly,
-                    NormalOverdueDays: _settingsService.NormalOverdueDays,
-                    UrgentOverdueDays: _settingsService.UrgentOverdueDays,
-                    Skip: 0,
-                    Take: _revealedCount);
+                // Re-read exactly what is on the board, so an edit leaves the user where they were.
+                // Bounded, because someone who scrolled to row 500 should not pay for that on every save.
+                var take = resetToTop || FilteredPrs.Count == 0
+                    ? PageSize
+                    : Math.Min(FilteredPrs.Count, MaxWindowReread);
 
-                var page = await Task.Run(() => _prRepo.GetPageAsync(query)).ConfigureAwait(true);
+                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(0, take))).ConfigureAwait(true);
 
                 // A selected PR outside the window still has to be loaded, or the action bar and the
                 // batch commands would silently act on only the part of the selection still on screen.
@@ -425,47 +492,27 @@ namespace Procure.PageModels
                 // Back on the UI thread. A newer filter has already queued its own pass.
                 if (generation != _pageGeneration) return;
 
+                // Anything the user had scrolled past the re-read window keeps its place. Re-reading all
+                // of it would cost seconds at 12,000 rows, and dropping it - which is what the clamp used
+                // to do - yanks the board back to the end of the window mid-edit.
+                var tail = resetToTop
+                    ? new List<PurchaseRequisition>()
+                    : FilteredPrs.Skip(page.Rows.Count).ToList();
+
                 // Page rows first, so the visible window is the head of the merged list.
-                _loadedPrs = MergeLoadedPrs(page.Rows.Concat(extra).ToList());
-                var pagedList = _loadedPrs.Take(page.Rows.Count).ToList();
+                _loadedPrs = MergeLoadedPrs(page.Rows.Concat(extra).ToList(), retain: tail);
+
+                var rows = _loadedPrs.Take(page.Rows.Count).ToList();
+                var reread = rows.Select(r => r.Id).ToHashSet();
+                rows.AddRange(tail.Where(p => !reread.Contains(p.Id)));
+
                 TotalFilteredCount = page.TotalCount;
-
-                // A filter that shrank the list must not leave the window stranded past the end - and
-                // without this, clearing a narrow filter after a long scroll would ask for the whole
-                // list in one query.
-                _revealedCount = Math.Max(RevealBatchSize, Math.Min(_revealedCount, TotalFilteredCount));
-
-                // The window must never strand: it shows something whenever anything matched, and never
-                // more than matched - that clamp is what lets RevealMore terminate.
-                Debug.Assert(pagedList.Count == Math.Min(_revealedCount, TotalFilteredCount),
-                    "Infinite-scroll window stranded - the board would render empty with matches available.");
 
                 // Selection state travels with the ids, so the action bar has to be recomputed once the
                 // page it describes has actually landed.
                 UpdateSelectionState();
-
-                ListSummary = TotalFilteredCount == 0
-                    ? "No requisitions found"
-                    : $"Showing {pagedList.Count} of {TotalFilteredCount} requisitions";
-
-                // Reconcile the existing collection instead of replacing the instance: replacing it makes
-                // the bound BindableLayout tear down and rebuild every card, which also wipes each card's
-                // expanded state.
-                // ponytail: O(n^2) diff via IndexOf - fine while the window is a page; swap in an index
-                // map if the reveal window ever runs into the hundreds.
-                if (!FilteredPrs.SequenceEqual(pagedList))
-                {
-                    for (var i = FilteredPrs.Count - 1; i >= 0; i--)
-                    {
-                        if (!pagedList.Contains(FilteredPrs[i]))
-                            FilteredPrs.RemoveAt(i);
-                    }
-
-                    // Each insert makes the bound layout build a whole card synchronously, so filling a
-                    // window in one pass freezes the UI. Place the first rows now and let the rest arrive
-                    // over following ticks: the board paints almost immediately and completes behind you.
-                    FillPage(pagedList, 0, ++_fillGeneration);
-                }
+                ReplaceRows(rows, resetToTop);
+                UpdateListSummary();
             }
             catch (Exception ex)
             {
@@ -480,33 +527,37 @@ namespace Procure.PageModels
         }
 
 
-        // Rows placed before yielding to the UI thread. Enough to fill the top of the viewport so
-        // the board looks populated immediately; the rest stream in behind it.
-        private const int FirstFillBatch = 3;
-        private const int FillBatchSize = 2;
-
-        // Bumped on every ApplyFilters so an in-flight fill from a superseded filter stops quietly.
-        private int _fillGeneration;
-
-        private void FillPage(List<PurchaseRequisition> pagedList, int start, int generation)
+        /// <summary>Reconciles the bound collection to <paramref name="rows"/>. Rows that are already
+        /// there keep their position, so an edit does not disturb the cards around it.
+        ///
+        /// This used to have to trickle inserts across dispatcher ticks, because every insert built a
+        /// whole card synchronously and every removal tore one down - which is what froze the app when
+        /// a few hundred rows changed at once. The CollectionView only realises what is on screen, so a
+        /// wholesale swap now costs a screenful of containers however many rows moved.</summary>
+        private void ReplaceRows(List<PurchaseRequisition> rows, bool reset)
         {
-            if (generation != _fillGeneration) return;
+            if (FilteredPrs.SequenceEqual(rows)) return;
 
-            var take = start == 0 ? FirstFillBatch : FillBatchSize;
-            var end = Math.Min(start + take, pagedList.Count);
-
-            for (var i = start; i < end; i++)
+            // Only a genuinely new match set is expressed as a reset. Deciding this on size instead
+            // would send the board back to the top every time a single row dropped out of a long
+            // window - a status edit at row 400 would look like the list had been rebuilt.
+            if (reset)
             {
-                var existing = FilteredPrs.IndexOf(pagedList[i]);
-                if (existing < 0)
-                    FilteredPrs.Insert(i, pagedList[i]);
-                else if (existing != i)
-                    FilteredPrs.Move(existing, i);
+                FilteredPrs.Clear();
+                foreach (var pr in rows) FilteredPrs.Add(pr);
+                return;
             }
 
-            if (end < pagedList.Count)
+            for (var i = FilteredPrs.Count - 1; i >= 0; i--)
             {
-                MainThread.BeginInvokeOnMainThread(() => FillPage(pagedList, end, generation));
+                if (!rows.Contains(FilteredPrs[i])) FilteredPrs.RemoveAt(i);
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var existing = FilteredPrs.IndexOf(rows[i]);
+                if (existing < 0) FilteredPrs.Insert(i, rows[i]);
+                else if (existing != i) FilteredPrs.Move(existing, i);
             }
         }
 

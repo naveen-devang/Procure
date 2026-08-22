@@ -32,9 +32,9 @@ namespace Procure.Utilities
         /// <param name="revealMore">Grows the board by one batch.</param>
         /// <param name="settle">Completes once the dispatcher has drained the work that queued.</param>
         public static async Task RunAsync(Func<int> cardCount, Action revealMore, Func<Task> settle,
-                                          int maxCards = 300, int budgetSeconds = 90)
+                                          int maxCards = 2000, int budgetSeconds = 180)
         {
-            var log = new StringBuilder("cards_after,batch_ms" + Environment.NewLine);
+            var log = new StringBuilder("cards_after,batch_ms,working_set_mb" + Environment.NewLine);
             var sw = new Stopwatch();
             var budget = Stopwatch.StartNew();
 
@@ -53,7 +53,10 @@ namespace Procure.Utilities
                 if (cardCount() == before) break;   // nothing left to reveal
 
                 await settle();
-                log.Append($"{cardCount()},{sw.Elapsed.TotalMilliseconds:F0}").Append(Environment.NewLine);
+                // Memory is the crash question: unvirtualized this climbed ~2.2 MB per card until
+                // the process died. It has to stay flat here however far the run goes.
+                var mb = Process.GetCurrentProcess().WorkingSet64 / 1048576;
+                log.Append($"{cardCount()},{sw.Elapsed.TotalMilliseconds:F0},{mb}").Append(Environment.NewLine);
 
                 // Written every batch, not at the end: a run that is cut short still leaves its curve.
                 Write(log);

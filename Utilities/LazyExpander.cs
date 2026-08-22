@@ -15,8 +15,16 @@ namespace Procure.Utilities
     /// UI thread, so nothing can paint while it runs - giving the placeholder its own frame first is
     /// the only way the click reads as "working" instead of "hung".
     ///
-    /// ponytail: content is never torn down again once built - collapsing only hides it. Ceiling is
-    /// peak memory for cards the user actually opened; add a release-on-collapse if that ever bites.
+    /// Hosted inside a virtualizing CollectionView, so containers are recycled: one of these may show
+    /// PR 5 and later PR 205. That is fine, and is why the ceiling below stopped mattering. Everything
+    /// in <see cref="ContentTemplate"/> binds to BindingContext, so recycling rebinds it; IsExpanded
+    /// re-evaluates against the new row, hiding or showing accordingly; and a placeholder still in
+    /// flight when a container is recycled checks IsExpanded again before building, so it either builds
+    /// for the new row or drops itself.
+    ///
+    /// ponytail: content is never torn down again once built - collapsing only hides it. Under
+    /// recycling that bounds peak memory at roughly (containers on screen x panel size) rather than at
+    /// every card ever opened, so a release-on-collapse is no longer worth its complexity.
     /// </summary>
     public sealed class LazyExpander : ContentView
     {
