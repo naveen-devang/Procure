@@ -250,7 +250,7 @@ namespace Procure.PageModels
             {
                 await _prRepo.DeleteAsync(pr.Id);
                 pr.PropertyChanged -= OnPrItemPropertyChanged;
-                _allPrs.Remove(pr);
+                _selectedIds.Remove(pr.Id);
                 ApplyFilters();
                 UpdateStatusBanner();
             }

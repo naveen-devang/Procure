@@ -130,7 +130,6 @@ namespace Procure.PageModels
             if (pr.Rfqs != null && pr.Rfqs.Count > 0)
             {
                 HasPoRfqs = true;
-                int poSequence = pr.Pos.Count + 101;
 
                 for (int i = 0; i < pr.Rfqs.Count; i++)
                 {
@@ -149,7 +148,7 @@ namespace Procure.PageModels
                     {
                         selection = new PoRfqSelection(rfq, pr, isSelected: true)
                         {
-                            PoNo = $"PO-{DateTime.Now.Year}-{poSequence + i}",
+                            PoNo = string.Empty,
                             OnTotalsRecalculated = RecalculatePoModalTotals
                         };
                     }
@@ -176,7 +175,7 @@ namespace Procure.PageModels
             if (po == null) return;
 
             // Find parent PR
-            var pr = _allPrs.FirstOrDefault(p => p.Id == po.PrId) ?? FilteredPrs.FirstOrDefault(p => p.Id == po.PrId);
+            var pr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId) ?? FilteredPrs.FirstOrDefault(p => p.Id == po.PrId);
             if (pr == null) return;
 
             TargetPrForPo = pr;
@@ -676,7 +675,7 @@ namespace Procure.PageModels
                 po.Status = action;
                 await _prRepo.SavePoAsync(po);
 
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == po.PrId);
+                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId);
                 if (parentPr != null)
                 {
                     if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
@@ -704,7 +703,7 @@ namespace Procure.PageModels
             try
             {
                 await _prRepo.DeletePoAsync(po.Id);
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == po.PrId);
+                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId);
                 if (parentPr != null)
                 {
                     parentPr.Pos.Remove(po);

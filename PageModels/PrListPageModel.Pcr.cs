@@ -287,7 +287,7 @@ namespace Procure.PageModels
         {
             try
             {
-                var parentPr = _allPrs.FirstOrDefault(p => p.Pcr != null && p.Pcr.Approvals.Any(a => a.Id == approval.Id))
+                var parentPr = _loadedPrs.FirstOrDefault(p => p.Pcr != null && p.Pcr.Approvals.Any(a => a.Id == approval.Id))
                                ?? FilteredPrs.FirstOrDefault(p => p.Pcr != null && p.Pcr.Approvals.Any(a => a.Id == approval.Id));
                 if (parentPr?.Pcr != null)
                 {
@@ -316,12 +316,19 @@ namespace Procure.PageModels
 
         // ================= CSV EXPORT =================
 
-        [RelayCommand]
+        // The export is the one command that still reads the whole table, so it is the one command that
+        // can take seconds on a large database - roughly 3s at 20,000 PRs, where it used to be instant
+        // off the in-memory list. Disallowing concurrent runs makes the button disable itself while it
+        // works, so the wait reads as "working" rather than "nothing happened, click it again".
+        [RelayCommand(AllowConcurrentExecutions = false)]
         public async Task ExportCsvAsync()
         {
             try
             {
-                var csv = await _csvExportService.ExportPrsToCsvAsync(_allPrs, CustomColumnDefinitions);
+                // The one place that still wants every PR. Read on a background thread and let the rows
+                // go as soon as the CSV is built rather than holding the whole table in memory.
+                var all = await Task.Run(() => _prRepo.GetAllAsync());
+                var csv = await _csvExportService.ExportPrsToCsvAsync(all, CustomColumnDefinitions);
                 var filePath = await _csvExportService.SaveExportToFileAsync(csv);
 
                 if (Shell.Current != null)

@@ -249,7 +249,7 @@ namespace Procure.PageModels
             IsEditingRfq = false;
             ModalRfqTitle = "Add Request for Quotation (RFQ)";
             TargetPrForRfq = pr;
-            NewRfqNo = $"RFQ-{pr.PrNo.Replace("PR-", "")}-{(char)('A' + pr.Rfqs.Count)}";
+            NewRfqNo = string.Empty;
             NewRfqVendor = string.Empty;
             NewRfqCurrency = string.IsNullOrWhiteSpace(_settingsService.DefaultCurrency) ? "AED" : _settingsService.DefaultCurrency;
             NewRfqQuoteAmount = null;
@@ -303,7 +303,7 @@ namespace Procure.PageModels
             EditingRfq = rfq;
             IsEditingRfq = true;
             ModalRfqTitle = $"Edit Commercial Terms - {rfq.Vendor}";
-            TargetPrForRfq = AllPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+            TargetPrForRfq = LoadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
             NewRfqNo = rfq.RfqNo;
             NewRfqVendor = rfq.Vendor;
             NewRfqCurrency = string.IsNullOrWhiteSpace(rfq.Currency) ? _settingsService.DefaultCurrency : rfq.Currency;
@@ -380,10 +380,17 @@ namespace Procure.PageModels
         {
             if (TargetPrForRfq == null && EditingRfq != null)
             {
-                TargetPrForRfq = AllPrs.FirstOrDefault(p => p.Id == EditingRfq.PrId);
+                TargetPrForRfq = LoadedPrs.FirstOrDefault(p => p.Id == EditingRfq.PrId);
             }
 
             if (TargetPrForRfq == null) return;
+
+            if (string.IsNullOrWhiteSpace(NewRfqNo))
+            {
+                if (Shell.Current != null)
+                    await Shell.Current.DisplayAlertAsync("Validation", "Please enter an RFQ Number.", "OK");
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(NewRfqVendor))
             {
@@ -531,7 +538,7 @@ namespace Procure.PageModels
                 await _prRepo.SaveRfqAsync(rfq);
 
                 // Update parent PR status if all quotes received
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
                 if (parentPr != null)
                 {
                     if (parentPr.Rfqs.All(r => r.Status == RfqStatus.QuoteReceived))
@@ -555,7 +562,7 @@ namespace Procure.PageModels
             try
             {
                 await _prRepo.DeleteRfqAsync(rfq.Id);
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
                 if (parentPr != null)
                 {
                     parentPr.Rfqs.Remove(rfq);

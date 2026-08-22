@@ -17,17 +17,17 @@ namespace Procure.Data.Repositories
 
         public async Task<List<CustomColumnDefinition>> GetAllDefinitionsAsync()
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             var list = new List<CustomColumnDefinition>();
 
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "SELECT Id, Name, DataType, SelectOptions, SortOrder FROM CustomColumnDefinition ORDER BY SortOrder ASC, Name ASC;";
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
             {
                 list.Add(new CustomColumnDefinition
                 {
@@ -44,9 +44,9 @@ namespace Procure.Data.Repositories
 
         public async Task SaveDefinitionAsync(CustomColumnDefinition definition)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
@@ -64,29 +64,29 @@ ON CONFLICT(Id) DO UPDATE SET
             cmd.Parameters.AddWithValue("@SelectOptions", (object?)definition.SelectOptions ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@SortOrder", definition.SortOrder);
 
-            await cmd.ExecuteNonQueryAsync();
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
         public async Task DeleteDefinitionAsync(Guid id)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "DELETE FROM CustomColumnDefinition WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
 
-            await cmd.ExecuteNonQueryAsync();
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
         public async Task<List<CustomFieldValue>> GetValuesForPrAsync(Guid prId)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             var list = new List<CustomFieldValue>();
 
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
@@ -97,8 +97,8 @@ WHERE v.PrId = @PrId
 ORDER BY d.SortOrder ASC, d.Name ASC;";
             cmd.Parameters.AddWithValue("@PrId", prId.ToString());
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
             {
                 list.Add(new CustomFieldValue
                 {
@@ -117,16 +117,16 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
 
         public async Task SaveValuesForPrAsync(Guid prId, IEnumerable<CustomFieldValue> values)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             using var delCmd = connection.CreateCommand();
             delCmd.Transaction = tx;
             delCmd.CommandText = "DELETE FROM CustomFieldValue WHERE PrId = @PrId;";
             delCmd.Parameters.AddWithValue("@PrId", prId.ToString());
-            await delCmd.ExecuteNonQueryAsync();
+            await delCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
             foreach (var val in values)
             {
@@ -142,10 +142,10 @@ VALUES (@Id, @PrId, @ColumnId, @Value);";
                 insCmd.Parameters.AddWithValue("@ColumnId", val.ColumnId.ToString());
                 insCmd.Parameters.AddWithValue("@Value", val.Value);
 
-                await insCmd.ExecuteNonQueryAsync();
+                await insCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
         }
     }
 }

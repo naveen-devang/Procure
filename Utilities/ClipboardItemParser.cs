@@ -164,7 +164,6 @@ namespace Procure.Utilities
         /// </summary>
         public static List<BatchPrEntry> ParseBatchPrEntries(
             string? clipboardText,
-            int startingSequenceNumber,
             string defaultRequestor,
             string defaultPriority,
             string defaultNotes,
@@ -190,8 +189,6 @@ namespace Procure.Utilities
                 startIndex = 1;
             }
 
-            int currentYear = DateTime.Now.Year;
-            int seq = startingSequenceNumber;
             var seenPrNos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int i = startIndex; i < rawLines.Count; i++)
@@ -216,7 +213,7 @@ namespace Procure.Utilities
                 }
                 else
                 {
-                    prNo = $"PR-{currentYear}-{seq++:D3}";
+                    prNo = string.Empty;
                     description = columns[0].Trim();
                     requestor = columns.Length > 1 && !string.IsNullOrWhiteSpace(columns[1]) ? columns[1].Trim() : defaultRequestor;
                     priority = columns.Length > 2 && !string.IsNullOrWhiteSpace(columns[2]) ? columns[2].Trim() : defaultPriority;

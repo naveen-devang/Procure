@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 1;
+        public const int SchemaVersion = 2;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -45,6 +45,34 @@ namespace Procure.Data
         /// synchronous=NORMAL is the documented pairing for WAL; the default FULL fsyncs every commit.</summary>
         public const string SqlConnectionPragmas = "PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY;";
 
+        /// <summary>
+        /// Recomputes the denormalised search text for one PR. Search has to match item names, vendor
+        /// names and RFQ/PO numbers as well as the PR's own fields; doing that with correlated EXISTS
+        /// subqueries measured 241-330ms at 20,000 PRs, while a LIKE scan of this single column
+        /// measures 4.7ms - faster than the in-memory scan it replaces, with identical substring
+        /// semantics and no FTS5 tokenizer to reason about.
+        ///
+        /// Written as SQL rather than assembled in C# so the list of searched fields exists once - and
+        /// the staleness check below is built from the same expression, so it can never drift from the
+        /// rebuild it is checking.
+        /// Custom field values are deliberately absent - search does not cover them today either.
+        /// </summary>
+        private const string SqlSearchBlobExpression = @"lower(
+    COALESCE(PrNo,'') || ' ' || COALESCE(Description,'') || ' ' || COALESCE(Requestor,'') || ' ' || COALESCE(ConsolidatedFrom,'') || ' ' ||
+    COALESCE((SELECT group_concat(COALESCE(ItemName,'') || ' ' || COALESCE(Notes,''), ' ') FROM PrItem WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
+    COALESCE((SELECT group_concat(COALESCE(Vendor,'') || ' ' || COALESCE(RfqNo,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
+    COALESCE((SELECT group_concat(COALESCE(Vendor,'') || ' ' || COALESCE(PoNo,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')
+)";
+
+        /// <summary>Append "WHERE Id = @Id" for a single PR; run it bare to rebuild the whole table.</summary>
+        public const string SqlRebuildSearchBlob =
+            "UPDATE PurchaseRequisition SET SearchBlob = " + SqlSearchBlobExpression;
+
+        /// <summary>Counts PRs whose stored search text no longer matches what it should be - i.e. rows
+        /// some write path changed without refreshing the blob. Must always be 0; see DatabaseSelfCheck.</summary>
+        public const string SqlStaleSearchBlobCount =
+            "SELECT COUNT(*) FROM PurchaseRequisition WHERE COALESCE(SearchBlob,'') <> " + SqlSearchBlobExpression;
+
         // journal_mode is the one PRAGMA that persists in the database file, so setting it once at
         // creation is correct. The others that used to live here (synchronous, temp_store, foreign_keys)
         // moved above; cache_size and wal_autocheckpoint were set to their own defaults and are gone.
@@ -64,11 +92,14 @@ CREATE TABLE IF NOT EXISTS PurchaseRequisition (
     CreatedAt TEXT NOT NULL,
     UpdatedAt TEXT NOT NULL,
     ParentPrId TEXT,
-    ConsolidatedFrom TEXT
+    ConsolidatedFrom TEXT,
+    SearchBlob TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_PR_PrNo ON PurchaseRequisition(PrNo);
 CREATE INDEX IF NOT EXISTS IX_PR_Status ON PurchaseRequisition(Status);
 CREATE INDEX IF NOT EXISTS IX_PR_ParentPrId ON PurchaseRequisition(ParentPrId);
+-- The board's only sort order. Without it every page pays a full scan plus a temp B-tree.
+CREATE INDEX IF NOT EXISTS IX_PR_CreatedAt ON PurchaseRequisition(CreatedAt DESC);
 
 CREATE TABLE IF NOT EXISTS PrItem (
     Id TEXT PRIMARY KEY,

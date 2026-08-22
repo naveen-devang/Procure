@@ -30,8 +30,19 @@ namespace Procure.PageModels
         private readonly ISettingsService _settingsService;
         private readonly IErrorHandler _errorHandler;
 
-        private List<PurchaseRequisition> _allPrs = new();
-        public IReadOnlyList<PurchaseRequisition> AllPrs => _allPrs;
+        // The PRs currently loaded - one page, not the table. Everything else lives in SQLite and is
+        // reached through _prRepo. Loading the lot cost 3.1s and 231MB at 20,000 PRs; a page costs ~10ms.
+        private List<PurchaseRequisition> _loadedPrs = new();
+
+        /// <summary>The PRs the board has in memory right now. Only ever the current page - use
+        /// <see cref="GetSelectedPrsAsync"/> or a repository query for anything wider.</summary>
+        public IReadOnlyList<PurchaseRequisition> LoadedPrs => _loadedPrs;
+
+        /// <summary>Selection has to outlive the page it was made on: a checked PR that scrolls out of
+        /// the window is evicted from memory, so the ids are the record and PurchaseRequisition.IsSelected
+        /// is just the checkbox binding, restored from here whenever a page loads.</summary>
+        private readonly HashSet<Guid> _selectedIds = new();
+
         private CancellationTokenSource? _searchDebounce;
 
         [ObservableProperty]
@@ -240,30 +251,21 @@ namespace Procure.PageModels
             if (_revealedCount > RevealBatchSize) ApplyFilters(resetReveal: true);
         }
 
+        private bool _loadInFlight;
+
         private async Task LoadCoreAsync(bool fillUi)
         {
-            if (IsBusy) return;
+            if (_loadInFlight) return;
 
             try
             {
-                IsBusy = true;
+                _loadInFlight = true;
 
-                // Two independent queries, each on its own pooled SqliteConnection — overlap them
-                // instead of paying for the column definitions before the PRs even start.
-                var defsTask = Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync());
-                var prsTask = Task.Run(() => _prRepo.GetAllAsync());
-                await Task.WhenAll(defsTask, prsTask).ConfigureAwait(true);
-
-                // Back on the UI thread from here.
-                CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defsTask.Result);
-                _allPrs = MergeLoadedPrs(prsTask.Result);
+                // The column definitions are the only thing a load still needs up front; the PR rows
+                // themselves arrive through ReloadPageAsync, which reads one page rather than the table.
+                CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(
+                    await Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync()).ConfigureAwait(true));
                 _hasLoadedOnce = true;
-
-                // Hide the skeleton before the cards start arriving: its shimmer animates at rate:33 on
-                // this same thread and otherwise fights card inflation for the whole fill. This does let
-                // a second LoadPrs slip past the IsBusy guard mid-fill — harmless, the merge is
-                // idempotent and _fillGeneration retires the superseded fill.
-                IsBusy = false;
 
                 // _isBoardVisible covers the race where the user opens the board while a preload is
                 // still running: without it the load would defer a fill nobody is left to release.
@@ -284,16 +286,18 @@ namespace Procure.PageModels
             }
             finally
             {
-                IsBusy = false;
+                _loadInFlight = false;
             }
         }
 
-        /// <summary>Folds a fresh load into the instances the board is already bound to: same Id merges
-        /// in place, so an unchanged reload leaves FilteredPrs reference-identical and ApplyFilters exits
-        /// on its SequenceEqual check without destroying and rebuilding a single card.</summary>
+        /// <summary>Folds a freshly read page into the instances the board is already bound to: same Id
+        /// merges in place, so a reload that changed nothing leaves FilteredPrs reference-identical and
+        /// the caller's SequenceEqual check exits without rebuilding a single card. Also reapplies the
+        /// checkbox state from <see cref="_selectedIds"/>, which is what lets a selection survive being
+        /// scrolled or filtered out of the loaded window.</summary>
         private List<PurchaseRequisition> MergeLoadedPrs(List<PurchaseRequisition> loaded)
         {
-            var live = _allPrs.ToDictionary(p => p.Id);
+            var live = _loadedPrs.ToDictionary(p => p.Id);
             var merged = new List<PurchaseRequisition>(loaded.Count);
 
             foreach (var fresh in loaded)
@@ -305,16 +309,17 @@ namespace Procure.PageModels
                     pr = kept;
                 }
 
-                // Unconditional -= then +=: idempotent for a reused instance, and it still picks up the
-                // PRs that batch create and merge-master push straight into _allPrs without subscribing.
+                // Unconditional -= then +=: idempotent for a reused instance, and it still picks up PRs
+                // that arrive by any path other than a merge.
                 pr.PropertyChanged -= OnPrItemPropertyChanged;
                 pr.PropertyChanged += OnPrItemPropertyChanged;
+                pr.IsSelected = _selectedIds.Contains(pr.Id);
                 merged.Add(pr);
             }
 
-            // Anything the DB no longer returns is dropped here — unsubscribe or the handler keeps it alive.
+            // Anything outside the new window is dropped here — unsubscribe or the handler keeps it alive.
             var loadedIds = loaded.Select(p => p.Id).ToHashSet();
-            foreach (var gone in _allPrs)
+            foreach (var gone in _loadedPrs)
             {
                 if (!loadedIds.Contains(gone.Id)) gone.PropertyChanged -= OnPrItemPropertyChanged;
             }
@@ -374,96 +379,104 @@ namespace Procure.PageModels
                 _revealedCount = RevealBatchSize;
             }
 
-            var query = _allPrs.AsEnumerable();
+            // Fire and forget: the query runs off the UI thread and the generation retires any pass a
+            // later filter change supersedes. Kept synchronous so the ~15 places that call this after a
+            // save still read as "the board is now out of date, refresh it".
+            _ = ReloadPageAsync(++_pageGeneration);
+        }
 
-            // Search text. Ordinal case-insensitive Contains rather than ToLowerInvariant() on both
-            // sides: same matches, but it allocates no lowered copy per field per PR per keystroke.
-            if (!string.IsNullOrWhiteSpace(SearchText))
+        // Bumped on every ApplyFilters so a page that arrives after a newer filter is discarded.
+        private int _pageGeneration;
+
+        /// <summary>Reads the current window from SQLite and reconciles it into the bound collection.
+        /// Every filter the board offers is applied in the WHERE clause, so this costs the same whether
+        /// the table holds 50 rows or 20,000.</summary>
+        private async Task ReloadPageAsync(int generation)
+        {
+            // The skeleton covers the window where the board has nothing to show and a query is still
+            // running. Without it the empty view - "No requisitions found" - flashes before the first
+            // page lands, which now happens on every open because the read is asynchronous.
+            var showSkeleton = FilteredPrs.Count == 0;
+            if (showSkeleton) IsBusy = true;
+
+            try
             {
-                var term = SearchText.Trim();
-                const StringComparison ci = StringComparison.OrdinalIgnoreCase;
-                query = query.Where(p =>
-                    p.PrNo.Contains(term, ci) ||
-                    p.ConsolidatedFrom.Contains(term, ci) ||
-                    p.Description.Contains(term, ci) ||
-                    p.Requestor.Contains(term, ci) ||
-                    p.Items.Any(i => i.ItemName.Contains(term, ci) || i.Notes.Contains(term, ci)) ||
-                    p.Rfqs.Any(r => r.Vendor.Contains(term, ci) || r.RfqNo.Contains(term, ci)) ||
-                    p.Pos.Any(po => po.Vendor.Contains(term, ci) || po.PoNo.Contains(term, ci)));
-            }
+                var query = new PrQuery(
+                    Search: SearchText,
+                    Status: SelectedStatusFilter,
+                    OverdueOnly: FilterOverdueOnly,
+                    PcrPendingOnly: FilterPcrPendingOnly,
+                    UrgentOnly: FilterUrgentOnly,
+                    NormalOverdueDays: _settingsService.NormalOverdueDays,
+                    UrgentOverdueDays: _settingsService.UrgentOverdueDays,
+                    Skip: 0,
+                    Take: _revealedCount);
 
-            // Status filter
-            if (!string.IsNullOrWhiteSpace(SelectedStatusFilter) && SelectedStatusFilter != "All")
-            {
-                query = query.Where(p => p.Status.Equals(SelectedStatusFilter, StringComparison.OrdinalIgnoreCase));
-            }
-            else if (string.IsNullOrWhiteSpace(SearchText))
-            {
-                // By default hide merged PRs unless explicitly searching or filtered
-                query = query.Where(p => p.Status != ProcurementStatus.Merged);
-            }
+                var page = await Task.Run(() => _prRepo.GetPageAsync(query)).ConfigureAwait(true);
 
-            // Overdue filter
-            if (FilterOverdueOnly)
-            {
-                var normalDays = _settingsService.NormalOverdueDays;
-                var urgentDays = _settingsService.UrgentOverdueDays;
-                query = query.Where(p => p.IsOverdue(normalDays, urgentDays));
-            }
+                // A selected PR outside the window still has to be loaded, or the action bar and the
+                // batch commands would silently act on only the part of the selection still on screen.
+                // Selections are a handful of rows, so this is bounded and usually skipped entirely.
+                var offWindow = _selectedIds.Except(page.Rows.Select(r => r.Id)).ToList();
+                var extra = offWindow.Count == 0
+                    ? new List<PurchaseRequisition>()
+                    : await Task.Run(() => _prRepo.GetByIdsAsync(offWindow)).ConfigureAwait(true);
 
-            // PCR Pending filter
-            if (FilterPcrPendingOnly)
-            {
-                query = query.Where(p => p.Pcr != null && !p.Pcr.IsFullyApproved);
-            }
+                // Back on the UI thread. A newer filter has already queued its own pass.
+                if (generation != _pageGeneration) return;
 
-            // Urgent filter
-            if (FilterUrgentOnly)
-            {
-                query = query.Where(p => p.IsUrgent);
-            }
+                // Page rows first, so the visible window is the head of the merged list.
+                _loadedPrs = MergeLoadedPrs(page.Rows.Concat(extra).ToList());
+                var pagedList = _loadedPrs.Take(page.Rows.Count).ToList();
+                TotalFilteredCount = page.TotalCount;
 
-            var allFiltered = query.ToList();
-            TotalFilteredCount = allFiltered.Count;
+                // A filter that shrank the list must not leave the window stranded past the end - and
+                // without this, clearing a narrow filter after a long scroll would ask for the whole
+                // list in one query.
+                _revealedCount = Math.Max(RevealBatchSize, Math.Min(_revealedCount, TotalFilteredCount));
 
-            // A filter that shrank the list must not leave the window stranded past the end.
-            _revealedCount = Math.Max(RevealBatchSize, Math.Min(_revealedCount, TotalFilteredCount));
-            var pagedList = allFiltered.Take(_revealedCount).ToList();
+                // The window must never strand: it shows something whenever anything matched, and never
+                // more than matched - that clamp is what lets RevealMore terminate.
+                Debug.Assert(pagedList.Count == Math.Min(_revealedCount, TotalFilteredCount),
+                    "Infinite-scroll window stranded - the board would render empty with matches available.");
 
-            // The window must never strand: it shows something whenever anything matched, never more
-            // than matched, and clamping to the total is what lets RevealMore terminate.
-            Debug.Assert(pagedList.Count == Math.Min(_revealedCount, TotalFilteredCount)
-                         && (pagedList.Count > 0 || TotalFilteredCount == 0),
-                "Infinite-scroll window stranded - the board would render empty with matches available.");
+                // Selection state travels with the ids, so the action bar has to be recomputed once the
+                // page it describes has actually landed.
+                UpdateSelectionState();
 
-            ListSummary = TotalFilteredCount == 0
-                ? "No requisitions found"
-                : $"Showing {pagedList.Count} of {TotalFilteredCount} requisitions";
+                ListSummary = TotalFilteredCount == 0
+                    ? "No requisitions found"
+                    : $"Showing {pagedList.Count} of {TotalFilteredCount} requisitions";
 
-            // Reconcile the existing collection instead of replacing the instance: replacing it makes the
-            // bound BindableLayout tear down and rebuild every card, which also wipes each card's expanded
-            // and selected state. Removals first, then insert/move into position.
-            // ponytail: O(n^2) diff via IndexOf — fine while a page is PageSizeOptions-sized (max 50);
-            // swap in an index map if paging ever goes into the hundreds.
-            if (!FilteredPrs.SequenceEqual(pagedList))
-            {
-                for (var i = FilteredPrs.Count - 1; i >= 0; i--)
+                // Reconcile the existing collection instead of replacing the instance: replacing it makes
+                // the bound BindableLayout tear down and rebuild every card, which also wipes each card's
+                // expanded state.
+                // ponytail: O(n^2) diff via IndexOf - fine while the window is a page; swap in an index
+                // map if the reveal window ever runs into the hundreds.
+                if (!FilteredPrs.SequenceEqual(pagedList))
                 {
-                    if (!pagedList.Contains(FilteredPrs[i]))
-                        FilteredPrs.RemoveAt(i);
+                    for (var i = FilteredPrs.Count - 1; i >= 0; i--)
+                    {
+                        if (!pagedList.Contains(FilteredPrs[i]))
+                            FilteredPrs.RemoveAt(i);
+                    }
+
+                    // Each insert makes the bound layout build a whole card synchronously, so filling a
+                    // window in one pass freezes the UI. Place the first rows now and let the rest arrive
+                    // over following ticks: the board paints almost immediately and completes behind you.
+                    FillPage(pagedList, 0, ++_fillGeneration);
                 }
-
-                // Each insert makes the bound layout build a whole card synchronously (~75ms on a
-                // Debug build), so filling a full page in one pass freezes the UI for most of a
-                // second. Place the first rows now and let the rest arrive over following ticks:
-                // the board paints almost immediately and completes while the user is reading it.
-                var generation = ++_fillGeneration;
-                FillPage(pagedList, 0, generation);
             }
-
-            // No UpdateSelectionState() here: filtering never touches pr.IsSelected, and the method
-            // scans _allPrs rather than the page, so its result cannot change. The checkbox handler
-            // and the batch commands call it directly when selection actually moves.
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                // Only the pass that raised it clears it, or a superseded query would uncover an empty
+                // board while the current one is still running.
+                if (showSkeleton && generation == _pageGeneration) IsBusy = false;
+            }
         }
 
 
@@ -497,28 +510,34 @@ namespace Procure.PageModels
             }
         }
 
-        private void UpdateStatusBanner()
+        /// <summary>The banner counts every PR, not just the loaded page, so they come from SQL. Fire and
+        /// forget for the same reason ApplyFilters is: callers treat it as "the board changed".</summary>
+        private void UpdateStatusBanner() => _ = UpdateStatusBannerAsync();
+
+        private async Task UpdateStatusBannerAsync()
         {
-            var normalDays = _settingsService.NormalOverdueDays;
-            var urgentDays = _settingsService.UrgentOverdueDays;
+            try
+            {
+                var normalDays = _settingsService.NormalOverdueDays;
+                var urgentDays = _settingsService.UrgentOverdueDays;
 
-            // One walk, two counters — this used to run Count() twice over the same list.
-            var overdue = 0;
-            var pcrPending = 0;
-            foreach (var p in _allPrs)
-            {
-                if (p.IsOverdue(normalDays, urgentDays)) overdue++;
-                if (p.Pcr != null && !p.Pcr.IsFullyApproved) pcrPending++;
-            }
+                var (overdue, pcrPending) = await Task
+                    .Run(() => _prRepo.GetBannerCountsAsync(normalDays, urgentDays))
+                    .ConfigureAwait(true);
 
-            if (overdue > 0 || pcrPending > 0)
-            {
-                StatusMessage = $"Attention: {overdue} PR(s) are overdue past SLA threshold and {pcrPending} PCR(s) are awaiting signature.";
-                IsStatusMessageVisible = true;
+                if (overdue > 0 || pcrPending > 0)
+                {
+                    StatusMessage = $"Attention: {overdue} PR(s) are overdue past SLA threshold and {pcrPending} PCR(s) are awaiting signature.";
+                    IsStatusMessageVisible = true;
+                }
+                else
+                {
+                    IsStatusMessageVisible = false;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                IsStatusMessageVisible = false;
+                _errorHandler.HandleError(ex);
             }
         }
 
@@ -564,7 +583,7 @@ namespace Procure.PageModels
                 po.Status = newStatus;
                 await _prRepo.SavePoAsync(po);
 
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == po.PrId);
+                var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == po.PrId);
                 if (parentPr != null)
                 {
                     if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
@@ -603,7 +622,7 @@ namespace Procure.PageModels
 
                 await _prRepo.SaveRfqAsync(rfq);
 
-                var parentPr = _allPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+                var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == rfq.PrId);
                 if (parentPr != null)
                 {
                     if (parentPr.Rfqs.All(r => r.IsQuoteReceived) && parentPr.Status == ProcurementStatus.RfqSent)

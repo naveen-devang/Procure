@@ -27,6 +27,16 @@ namespace Procure
             {
                 _ = CheckForUpdatesInBackgroundAsync();
             }
+
+#if DEBUG
+            // Opt-in only: PROCURE_SELFCHECK=1. One environment read on a Debug launch, nothing in Release.
+            if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
+            {
+                _ = Data.DatabaseSelfCheck.RunAsync(
+                    _services.GetRequiredService<Data.SqliteDatabase>(),
+                    _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>());
+            }
+#endif
         }
 
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)

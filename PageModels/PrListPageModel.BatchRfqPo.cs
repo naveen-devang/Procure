@@ -261,7 +261,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task OpenBatchRfqModalAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
                 if (Shell.Current != null)
@@ -345,6 +345,13 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task SaveBatchRfqModalAsync()
         {
+            if (string.IsNullOrWhiteSpace(BatchRfqNo))
+            {
+                if (Shell.Current != null)
+                    await Shell.Current.DisplayAlertAsync("Validation", "RFQ Number is required.", "OK");
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(BatchRfqVendor))
             {
                 if (Shell.Current != null)
@@ -352,7 +359,7 @@ namespace Procure.PageModels
                 return;
             }
 
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count == 0) return;
 
             try
@@ -360,7 +367,7 @@ namespace Procure.PageModels
                 IsBusy = true;
                 var rfqTemplate = new RequestForQuotation
                 {
-                    RfqNo = string.IsNullOrWhiteSpace(BatchRfqNo) ? $"RFQ-{DateTime.Now:yyyyMMdd}" : BatchRfqNo.Trim(),
+                    RfqNo = BatchRfqNo.Trim(),
                     Vendor = BatchRfqVendor.Trim(),
                     Currency = string.IsNullOrWhiteSpace(BatchRfqCurrency) ? "AED" : BatchRfqCurrency.Trim(),
                     QuoteAmount = CalculatedBatchRfqBaseTotal > 0 ? CalculatedBatchRfqBaseTotal : BatchRfqQuoteAmount,
@@ -391,6 +398,7 @@ namespace Procure.PageModels
                 foreach (var pr in selected)
                 {
                     pr.IsSelected = false;
+                    _selectedIds.Remove(pr.Id);
                     pr.NotifyHierarchyChanged();
                 }
 
@@ -426,7 +434,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task OpenBatchPoModalAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
                 if (Shell.Current != null)
@@ -434,8 +442,7 @@ namespace Procure.PageModels
                 return;
             }
 
-            var totalPos = _allPrs.SelectMany(p => p.Pos).Count();
-            BatchPoNo = $"PO-{DateTime.Now.Year}-{totalPos + 101}";
+            BatchPoNo = string.Empty;
 
             // Look for common vendor in quotes
             var vendors = selected.SelectMany(p => p.Rfqs).Select(r => r.Vendor).Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
@@ -465,7 +472,7 @@ namespace Procure.PageModels
                 return;
             }
 
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count == 0) return;
 
             try
@@ -485,6 +492,7 @@ namespace Procure.PageModels
                 foreach (var pr in selected)
                 {
                     pr.IsSelected = false;
+                    _selectedIds.Remove(pr.Id);
                     pr.NotifyHierarchyChanged();
                 }
 

@@ -5,8 +5,40 @@ using Procure.Models;
 
 namespace Procure.Data.Repositories
 {
+    /// <summary>Everything the board filters by, in the shape the SQL needs it. The overdue thresholds
+    /// travel with the query because they are user settings, not constants.</summary>
+    public sealed record PrQuery(
+        string? Search,
+        string? Status,
+        bool OverdueOnly,
+        bool PcrPendingOnly,
+        bool UrgentOnly,
+        int NormalOverdueDays,
+        int UrgentOverdueDays,
+        int Skip,
+        int Take);
+
+    /// <summary><paramref name="TotalCount"/> is the unpaged match count, for the board's footer and
+    /// for knowing when the infinite scroll has reached the end.</summary>
+    public sealed record PrPage(List<PurchaseRequisition> Rows, int TotalCount);
+
     public interface IPurchaseRequisitionRepository
     {
+        /// <summary>One page of the board with its full child graph. This is the board's read path;
+        /// GetAllAsync remains only for the CSV export, which genuinely wants every row.</summary>
+        Task<PrPage> GetPageAsync(PrQuery query);
+
+        /// <summary>The attention banner's two counts, over every PR rather than the current page.</summary>
+        Task<(int Overdue, int PcrPending)> GetBannerCountsAsync(int normalOverdueDays, int urgentOverdueDays);
+
+        /// <summary>Specific PRs with their child graph - how the board keeps a selection loaded once it
+        /// scrolls outside the visible window.</summary>
+        Task<List<PurchaseRequisition>> GetByIdsAsync(IReadOnlyCollection<Guid> ids);
+
+        /// <summary>The source PRs behind a merged master. Merged children are hidden from the board's
+        /// default view, so this cannot be answered from the loaded window.</summary>
+        Task<List<PurchaseRequisition>> GetChildPrsAsync(Guid masterPrId, IReadOnlyCollection<string> fallbackPrNos);
+
         Task<List<PurchaseRequisition>> GetAllAsync();
         Task<int> GetCountAsync();
         Task SaveAsync(PurchaseRequisition pr);

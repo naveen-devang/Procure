@@ -110,16 +110,33 @@ namespace Procure.PageModels
         [RelayCommand]
         public void ClearSelection()
         {
-            foreach (var pr in _allPrs)
+            foreach (var pr in _loadedPrs)
             {
                 pr.IsSelected = false;
             }
+            _selectedIds.Clear();
+            UpdateSelectionState();
+        }
+
+        /// <summary>Records a checkbox change. The id set is the record that outlives the loaded window;
+        /// PurchaseRequisition.IsSelected is the binding, reapplied by MergeLoadedPrs on every page.</summary>
+        public void SetSelected(PurchaseRequisition pr, bool isSelected)
+        {
+            // A card being removed from the board tears its bindings down, and a CheckBox can raise
+            // CheckedChanged(false) on the way out. That is not the user unticking anything, and acting
+            // on it would silently drop the selection every time the window scrolled or refiltered - so
+            // only the cards actually on the board are allowed to speak for the selection.
+            if (!FilteredPrs.Contains(pr)) return;
+
+            pr.IsSelected = isSelected;
+            if (isSelected) _selectedIds.Add(pr.Id);
+            else _selectedIds.Remove(pr.Id);
             UpdateSelectionState();
         }
 
         public void UpdateSelectionState()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             SelectedPrsCount = selected.Count;
             IsBatchSelectionActive = selected.Count > 0;
             SelectedPrsSummary = selected.Count == 1 ? "1 requisition selected" : $"{selected.Count} requisitions selected";
@@ -189,7 +206,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task OpenMergePrModalAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 2)
             {
                 if (Shell.Current != null)
@@ -209,7 +226,8 @@ namespace Procure.PageModels
                 return no;
             }).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
 
-            MergeMasterPrNo = cleanNumbers.Count > 0 ? string.Join("/", cleanNumbers) : $"PR-{DateTime.Now.Year}-{_allPrs.Count + 1:D3}";
+            // Joined from the source numbers when there are any; otherwise blank for you to fill in.
+            MergeMasterPrNo = cleanNumbers.Count > 0 ? string.Join("/", cleanNumbers) : string.Empty;
             MergeDescription = string.Join("\n", selected.Select(p => $"• {p.PrNo}: {p.Description} ({p.Requestor})"));
 
             var requestors = selected.Select(p => p.Requestor).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().ToList();
@@ -246,7 +264,7 @@ namespace Procure.PageModels
                 return;
             }
 
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 2) return;
 
             try
@@ -268,12 +286,11 @@ namespace Procure.PageModels
 
                 await _prRepo.MergePrsAsync(selected, masterPr, MergeCopyChildRfqs);
 
-                _allPrs.Insert(0, masterPr);
-                masterPr.NotifyHierarchyChanged();
+                // The master is in SQLite now; ApplyFilters below brings it into the window.
                 foreach (var src in selected)
                 {
                     src.IsSelected = false;
-                    src.NotifyHierarchyChanged();
+                    _selectedIds.Remove(src.Id);
                 }
 
                 IsMergePrModalVisible = false;
@@ -305,7 +322,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task MergeOrSplitPrAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count == 1 && selected[0].IsConsolidatedMaster)
             {
                 await SplitMasterPrAsync(selected[0]);
@@ -319,7 +336,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task CreateOrSplitSharedRfqAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count >= 1 && selected.All(p => p.Rfqs.Any(r => r.IsSharedRfq)))
             {
                 await SplitSelectedSharedRfqAsync();
@@ -333,7 +350,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task CreateOrSplitCombinedPoAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count >= 1 && selected.All(p => p.Pos.Any(po => po.IsCombinedPo)))
             {
                 await SplitSelectedCombinedPoAsync();
@@ -355,18 +372,17 @@ namespace Procure.PageModels
         {
             SplitTargetMasterPr = masterPr;
 
-            // Find all child PRs linked to this master PR
-            var childPrs = _allPrs.Where(p => p.ParentPrId == masterPr.Id).ToList();
+            // Linked by ParentPrId, or matched by the numbers listed in ConsolidatedFrom. Both are
+            // asked at once now, in SQL: merged children carry status 'Merged', which the board hides,
+            // so they are not in the loaded window to search.
+            var prNos = string.IsNullOrWhiteSpace(masterPr.ConsolidatedFrom)
+                ? new List<string>()
+                : masterPr.ConsolidatedFrom.Split(new[] { ',', '/' }, StringSplitOptions.RemoveEmptyEntries)
+                                           .Select(s => s.Trim().ToLowerInvariant())
+                                           .Where(s => !string.IsNullOrWhiteSpace(s))
+                                           .ToList();
 
-            // Fallback matching by ConsolidatedFrom PR numbers if needed
-            if (childPrs.Count == 0 && !string.IsNullOrWhiteSpace(masterPr.ConsolidatedFrom))
-            {
-                var prNos = masterPr.ConsolidatedFrom.Split(new[] { ',', '/' }, StringSplitOptions.RemoveEmptyEntries)
-                                                     .Select(s => s.Trim().ToLowerInvariant())
-                                                     .Where(s => !string.IsNullOrWhiteSpace(s))
-                                                     .ToList();
-                childPrs = _allPrs.Where(p => prNos.Contains(p.PrNo.ToLowerInvariant()) || prNos.Contains(p.PrNo.Replace("PR-", "").ToLowerInvariant())).ToList();
-            }
+            var childPrs = await Task.Run(() => _prRepo.GetChildPrsAsync(masterPr.Id, prNos));
 
             if (childPrs.Count == 0)
             {
@@ -481,11 +497,6 @@ namespace Procure.PageModels
                     await _prRepo.PartialSplitMergedPrAsync(SplitTargetMasterPr.Id, split, kept);
                 }
 
-                // Reload fresh PRs. Route through the same merge LoadPrsAsync uses: rebuilding
-                // _allPrs from fresh instances hands ApplyFilters a page it has to tear down and
-                // re-inflate card by card, and wipes every card's expanded and selected state.
-                _allPrs = MergeLoadedPrs(await _prRepo.GetAllAsync());
-
                 CloseSplitPrModal();
                 UpdateSelectionState();
                 ApplyFilters();
@@ -522,7 +533,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task SplitSelectedSharedRfqAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             var sharedRfqs = selected.SelectMany(p => p.Rfqs.Where(r => r.IsSharedRfq)).ToList();
             if (sharedRfqs.Count == 0) return;
 
@@ -550,7 +561,7 @@ namespace Procure.PageModels
 
                 // Clear in-memory SharedPrs across matching RFQs
                 var targetRfqNo = rfq.RfqNo;
-                foreach (var pr in _allPrs)
+                foreach (var pr in _loadedPrs)
                 {
                     foreach (var r in pr.Rfqs)
                     {
@@ -581,7 +592,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task SplitSelectedCombinedPoAsync()
         {
-            var selected = _allPrs.Where(p => p.IsSelected).ToList();
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             var combinedPos = selected.SelectMany(p => p.Pos.Where(po => po.IsCombinedPo)).ToList();
             if (combinedPos.Count == 0) return;
 
@@ -608,7 +619,7 @@ namespace Procure.PageModels
                 await _prRepo.SplitCombinedPoAsync(po.Id);
 
                 var targetPoNo = po.PoNo;
-                foreach (var pr in _allPrs)
+                foreach (var pr in _loadedPrs)
                 {
                     foreach (var p in pr.Pos)
                     {

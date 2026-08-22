@@ -101,8 +101,7 @@ namespace Procure.Pages
         {
             if (sender is CheckBox checkBox && checkBox.BindingContext is PurchaseRequisition pr)
             {
-                pr.IsSelected = e.Value;
-                _viewModel.UpdateSelectionState();
+                _viewModel.SetSelected(pr, e.Value);
             }
         }
 

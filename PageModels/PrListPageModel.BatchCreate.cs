@@ -61,7 +61,7 @@ namespace Procure.PageModels
             var defs = await _customColumnRepo.GetAllDefinitionsAsync();
             CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defs);
 
-            var mostRecentRequestor = _allPrs.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Requestor))?.Requestor ?? string.Empty;
+            var mostRecentRequestor = _loadedPrs.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Requestor))?.Requestor ?? string.Empty;
             BatchSharedRequestor = mostRecentRequestor;
             BatchSharedPlant = ProcurementPlant.RW01;
             BatchSharedPrType = ProcurementPrType.StoresAndSpares;
@@ -87,11 +87,9 @@ namespace Procure.PageModels
 
             // Populate 3 initial PR rows
             var entries = new ObservableCollection<BatchPrEntry>();
-            var startNum = _allPrs.Count + 1;
             for (int i = 0; i < 3; i++)
             {
-                var entry = CreateNewBatchPrEntry(startNum + i, BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType);
-                entries.Add(entry);
+                entries.Add(CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType));
             }
 
             BatchPrEntries = entries;
@@ -99,7 +97,7 @@ namespace Procure.PageModels
             IsBatchCreateModalVisible = true;
         }
 
-        private BatchPrEntry CreateNewBatchPrEntry(int sequenceNumber, string requestor, string priority, string plant = ProcurementPlant.RW01, string prType = ProcurementPrType.StoresAndSpares)
+        private BatchPrEntry CreateNewBatchPrEntry(string requestor, string priority, string plant = ProcurementPlant.RW01, string prType = ProcurementPrType.StoresAndSpares)
         {
             var entryId = Guid.NewGuid();
             var rowVals = new ObservableCollection<CustomFieldValue>();
@@ -120,7 +118,7 @@ namespace Procure.PageModels
             var entry = new BatchPrEntry
             {
                 Id = entryId,
-                PrNo = $"PR-{DateTime.Now.Year}-{sequenceNumber:D3}",
+                PrNo = string.Empty,
                 Requestor = requestor,
                 Plant = plant,
                 PrType = prType,
@@ -147,8 +145,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public void AddBatchPrRow()
         {
-            var nextNum = _allPrs.Count + BatchPrEntries.Count + 1;
-            var entry = CreateNewBatchPrEntry(nextNum, BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType);
+            var entry = CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType);
             BatchPrEntries.Add(entry);
             UpdateBatchEntriesSummary();
         }
@@ -167,7 +164,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public void DuplicateBatchPrRow(BatchPrEntry source)
         {
-            var nextNum = _allPrs.Count + BatchPrEntries.Count + 1;
             var newEntryId = Guid.NewGuid();
 
             var dupCustomVals = new ObservableCollection<CustomFieldValue>();
@@ -205,7 +201,9 @@ namespace Procure.PageModels
             var duplicate = new BatchPrEntry
             {
                 Id = newEntryId,
-                PrNo = $"PR-{DateTime.Now.Year}-{nextNum:D3}",
+                // Blank, not the source's number: duplicating a row copies its content, and two PRs
+                // must never share a number.
+                PrNo = string.Empty,
                 Description = source.Description,
                 Requestor = source.Requestor,
                 Plant = source.Plant,
@@ -362,14 +360,8 @@ namespace Procure.PageModels
                 IsBusy = true;
                 await _prRepo.SaveBatchPrsAsync(validEntries);
 
-                // Insert into in-memory list
-                for (int i = validEntries.Count - 1; i >= 0; i--)
-                {
-                    var pr = validEntries[i];
-                    pr.NotifyHierarchyChanged();
-                    _allPrs.Insert(0, pr);
-                }
-
+                // Nothing to insert in memory: ApplyFilters re-reads the window from SQLite, where the
+                // rows now are, and the merge hands the board the instances it is already bound to.
                 IsBatchCreateModalVisible = false;
                 BatchPrEntries.Clear();
                 ApplyFilters();
@@ -458,10 +450,8 @@ namespace Procure.PageModels
                 var text = await Clipboard.Default.GetTextAsync();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
-                var startSeq = _allPrs.Count + BatchPrEntries.Count + 1;
                 var parsedEntries = ClipboardItemParser.ParseBatchPrEntries(
                     text,
-                    startSeq,
                     BatchSharedRequestor,
                     BatchSharedPriority,
                     BatchSharedNotes,
@@ -633,10 +623,8 @@ namespace Procure.PageModels
             if (string.IsNullOrWhiteSpace(rawPastedText))
                 return;
 
-            var startSeq = _allPrs.Count + BatchPrEntries.Count + 1;
             var parsed = ClipboardItemParser.ParseBatchPrEntries(
                 rawPastedText,
-                startSeq,
                 BatchSharedRequestor,
                 BatchSharedPriority,
                 BatchSharedNotes,

@@ -12,11 +12,11 @@ namespace Procure.Data.Repositories
     {
         public async Task MergePrsAsync(List<PurchaseRequisition> sourcePrs, PurchaseRequisition masterPr, bool copyRfqs)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             masterPr.UpdatedAt = DateTime.Now;
 
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             // 1. Save master PR
@@ -39,7 +39,7 @@ VALUES (@Id, @PrNo, @Description, @Requestor, @Priority, @Status, @Notes, @Creat
                 cmd.Parameters.AddWithValue("@ParentPrId", DBNull.Value);
                 cmd.Parameters.AddWithValue("@ConsolidatedFrom", masterPr.ConsolidatedFrom ?? string.Empty);
 
-                await cmd.ExecuteNonQueryAsync();
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             // 1b. Consolidate line items from source PRs into master PR
@@ -78,7 +78,7 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                         itemCmd.Parameters.AddWithValue("@Notes", masterItem.Notes ?? string.Empty);
                         itemCmd.Parameters.AddWithValue("@SortOrder", masterItem.SortOrder);
 
-                        await itemCmd.ExecuteNonQueryAsync();
+                        await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
                 }
             }
@@ -140,7 +140,7 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                         rfqCmd.Parameters.AddWithValue("@TechnicalApproval", newRfq.TechnicalApproval ?? string.Empty);
                         rfqCmd.Parameters.AddWithValue("@Currency", newRfq.Currency ?? "AED");
 
-                        await rfqCmd.ExecuteNonQueryAsync();
+                        await rfqCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
                         if (rfq.Items != null)
                         {
@@ -181,7 +181,7 @@ VALUES (@Id, @RfqId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @
                                 rfqItemCmd.Parameters.AddWithValue("@Notes", newRfqItem.Notes ?? string.Empty);
                                 rfqItemCmd.Parameters.AddWithValue("@SortOrder", newRfqItem.SortOrder);
 
-                                await rfqItemCmd.ExecuteNonQueryAsync();
+                                await rfqItemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                             }
                         }
                     }
@@ -214,17 +214,21 @@ WHERE Id = @Id;";
                 srcCmd.Parameters.AddWithValue("@Notes", src.Notes);
                 srcCmd.Parameters.AddWithValue("@UpdatedAt", src.UpdatedAt.ToString("o"));
 
-                await srcCmd.ExecuteNonQueryAsync();
+                await srcCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
         public async Task CreateBatchPoAsync(List<PurchaseRequisition> targetPrs, PurchaseOrder poTemplate)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             var allocatedValue = targetPrs.Count > 0 && poTemplate.Value > 0 ? (poTemplate.Value / targetPrs.Count) : 0m;
@@ -272,10 +276,14 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                 cmd.Parameters.AddWithValue("@PrStatus", pr.Status);
                 cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
 
-                await cmd.ExecuteNonQueryAsync();
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
 
             foreach (var pr in targetPrs)
             {
@@ -285,9 +293,9 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
 
         public async Task CreateBatchRfqAsync(List<PurchaseRequisition> targetPrs, RequestForQuotation rfqTemplate, IEnumerable<RfqItem>? batchItems = null)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             var sharedPrNumbers = string.Join(", ", targetPrs.Select(p => p.PrNo));
@@ -360,7 +368,7 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                 cmd.Parameters.AddWithValue("@PrStatus", pr.Status);
                 cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
 
-                await cmd.ExecuteNonQueryAsync();
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
                 // Save RfqItems for this specific PR
                 int sort = 0;
@@ -402,11 +410,15 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                     itemCmd.Parameters.AddWithValue("@Notes", rfqItem.Notes ?? string.Empty);
                     itemCmd.Parameters.AddWithValue("@SortOrder", rfqItem.SortOrder);
 
-                    await itemCmd.ExecuteNonQueryAsync();
+                    await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
 
             foreach (var pr in targetPrs)
             {
@@ -416,9 +428,9 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
 
         public async Task SplitMergedPrAsync(Guid masterPrId)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             // 1. Get the master PR details
@@ -428,7 +440,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                 getMasterCmd.Transaction = tx;
                 getMasterCmd.CommandText = "SELECT ConsolidatedFrom FROM PurchaseRequisition WHERE Id = @Id;";
                 getMasterCmd.Parameters.AddWithValue("@Id", masterPrId.ToString());
-                var obj = await getMasterCmd.ExecuteScalarAsync();
+                var obj = await getMasterCmd.ExecuteScalarAsync().ConfigureAwait(false);
                 consolidatedFrom = obj?.ToString();
             }
 
@@ -439,8 +451,8 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                 findCmd.Transaction = tx;
                 findCmd.CommandText = "SELECT Id FROM PurchaseRequisition WHERE ParentPrId = @ParentId;";
                 findCmd.Parameters.AddWithValue("@ParentId", masterPrId.ToString());
-                using var reader = await findCmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                using var reader = await findCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     childIds.Add(reader.GetString(0));
                 }
@@ -460,8 +472,8 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                     findByNoCmd.CommandText = "SELECT Id FROM PurchaseRequisition WHERE PrNo = @PrNo OR PrNo = @PrNoWithPrefix;";
                     findByNoCmd.Parameters.AddWithValue("@PrNo", prNo);
                     findByNoCmd.Parameters.AddWithValue("@PrNoWithPrefix", prNo.StartsWith("PR-", StringComparison.OrdinalIgnoreCase) ? prNo : $"PR-{prNo}");
-                    using var rdr = await findByNoCmd.ExecuteReaderAsync();
-                    while (await rdr.ReadAsync())
+                    using var rdr = await findByNoCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await rdr.ReadAsync().ConfigureAwait(false))
                     {
                         var id = rdr.GetString(0);
                         if (!childIds.Contains(id)) childIds.Add(id);
@@ -478,7 +490,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                     checkPoCmd.Transaction = tx;
                     checkPoCmd.CommandText = "SELECT COUNT(*) FROM PurchaseOrder WHERE PrId = @PrId;";
                     checkPoCmd.Parameters.AddWithValue("@PrId", childId);
-                    var poCount = Convert.ToInt32(await checkPoCmd.ExecuteScalarAsync());
+                    var poCount = Convert.ToInt32(await checkPoCmd.ExecuteScalarAsync().ConfigureAwait(false));
                     if (poCount > 0)
                     {
                         restoredStatus = ProcurementStatus.PoRaised;
@@ -489,7 +501,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                         checkRfqCmd.Transaction = tx;
                         checkRfqCmd.CommandText = "SELECT COUNT(*) FROM RequestForQuotation WHERE PrId = @PrId;";
                         checkRfqCmd.Parameters.AddWithValue("@PrId", childId);
-                        var rfqCount = Convert.ToInt32(await checkRfqCmd.ExecuteScalarAsync());
+                        var rfqCount = Convert.ToInt32(await checkRfqCmd.ExecuteScalarAsync().ConfigureAwait(false));
                         if (rfqCount > 0)
                         {
                             restoredStatus = ProcurementStatus.RfqSent;
@@ -506,7 +518,7 @@ WHERE Id = @Id;";
                 restoreCmd.Parameters.AddWithValue("@Status", restoredStatus);
                 restoreCmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
                 restoreCmd.Parameters.AddWithValue("@Id", childId);
-                await restoreCmd.ExecuteNonQueryAsync();
+                await restoreCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             // 4. Delete the master PR and its cascaded data
@@ -515,7 +527,7 @@ WHERE Id = @Id;";
                 delRfqItemsCmd.Transaction = tx;
                 delRfqItemsCmd.CommandText = "DELETE FROM RfqItem WHERE RfqId IN (SELECT Id FROM RequestForQuotation WHERE PrId = @PrId);";
                 delRfqItemsCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                await delRfqItemsCmd.ExecuteNonQueryAsync();
+                await delRfqItemsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             using (var delRfqsCmd = connection.CreateCommand())
@@ -523,7 +535,7 @@ WHERE Id = @Id;";
                 delRfqsCmd.Transaction = tx;
                 delRfqsCmd.CommandText = "DELETE FROM RequestForQuotation WHERE PrId = @PrId;";
                 delRfqsCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                await delRfqsCmd.ExecuteNonQueryAsync();
+                await delRfqsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             using (var delPosCmd = connection.CreateCommand())
@@ -531,7 +543,7 @@ WHERE Id = @Id;";
                 delPosCmd.Transaction = tx;
                 delPosCmd.CommandText = "DELETE FROM PurchaseOrder WHERE PrId = @PrId;";
                 delPosCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                await delPosCmd.ExecuteNonQueryAsync();
+                await delPosCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             using (var delPcrCmd = connection.CreateCommand())
@@ -541,7 +553,7 @@ WHERE Id = @Id;";
 DELETE FROM Approval WHERE PcrId IN (SELECT Id FROM PriceComparisonRequest WHERE PrId = @PrId);
 DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
                 delPcrCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                await delPcrCmd.ExecuteNonQueryAsync();
+                await delPcrCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             using (var delItemsCmd = connection.CreateCommand())
@@ -549,7 +561,7 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
                 delItemsCmd.Transaction = tx;
                 delItemsCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @PrId;";
                 delItemsCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                await delItemsCmd.ExecuteNonQueryAsync();
+                await delItemsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             using (var delPrCmd = connection.CreateCommand())
@@ -557,17 +569,21 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
                 delPrCmd.Transaction = tx;
                 delPrCmd.CommandText = "DELETE FROM PurchaseRequisition WHERE Id = @Id;";
                 delPrCmd.Parameters.AddWithValue("@Id", masterPrId.ToString());
-                await delPrCmd.ExecuteNonQueryAsync();
+                await delPrCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
         public async Task PartialSplitMergedPrAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             // 1. Restore each split PR
@@ -579,7 +595,7 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
                     checkPoCmd.Transaction = tx;
                     checkPoCmd.CommandText = "SELECT COUNT(*) FROM PurchaseOrder WHERE PrId = @PrId;";
                     checkPoCmd.Parameters.AddWithValue("@PrId", child.Id.ToString());
-                    var poCount = Convert.ToInt32(await checkPoCmd.ExecuteScalarAsync());
+                    var poCount = Convert.ToInt32(await checkPoCmd.ExecuteScalarAsync().ConfigureAwait(false));
                     if (poCount > 0)
                     {
                         restoredStatus = ProcurementStatus.PoRaised;
@@ -590,7 +606,7 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
                         checkRfqCmd.Transaction = tx;
                         checkRfqCmd.CommandText = "SELECT COUNT(*) FROM RequestForQuotation WHERE PrId = @PrId;";
                         checkRfqCmd.Parameters.AddWithValue("@PrId", child.Id.ToString());
-                        var rfqCount = Convert.ToInt32(await checkRfqCmd.ExecuteScalarAsync());
+                        var rfqCount = Convert.ToInt32(await checkRfqCmd.ExecuteScalarAsync().ConfigureAwait(false));
                         if (rfqCount > 0)
                         {
                             restoredStatus = ProcurementStatus.RfqSent;
@@ -615,7 +631,7 @@ WHERE Id = @Id;";
                 restoreCmd.Parameters.AddWithValue("@Notes", cleanedNotes);
                 restoreCmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
                 restoreCmd.Parameters.AddWithValue("@Id", child.Id.ToString());
-                await restoreCmd.ExecuteNonQueryAsync();
+                await restoreCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             // 2. Update master PR metadata for remaining kept PRs
@@ -647,7 +663,7 @@ WHERE Id = @Id;";
                 updateMasterCmd.Parameters.AddWithValue("@Notes", newNotes);
                 updateMasterCmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
                 updateMasterCmd.Parameters.AddWithValue("@Id", masterPrId.ToString());
-                await updateMasterCmd.ExecuteNonQueryAsync();
+                await updateMasterCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             // 3. Rebuild line items on master PR: wipe current and re-insert from kept PRs
@@ -656,7 +672,7 @@ WHERE Id = @Id;";
                 delItemsCmd.Transaction = tx;
                 delItemsCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @MasterId;";
                 delItemsCmd.Parameters.AddWithValue("@MasterId", masterPrId.ToString());
-                await delItemsCmd.ExecuteNonQueryAsync();
+                await delItemsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             int itemSort = 0;
@@ -681,19 +697,23 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                         itemCmd.Parameters.AddWithValue("@Notes", string.IsNullOrWhiteSpace(srcItem.Notes) ? $"From {keptPr.PrNo}" : $"{srcItem.Notes} (From {keptPr.PrNo})");
                         itemCmd.Parameters.AddWithValue("@SortOrder", itemSort++);
 
-                        await itemCmd.ExecuteNonQueryAsync();
+                        await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
                 }
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
         public async Task SplitSharedRfqAsync(Guid rfqId)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             string? rfqNo = null;
@@ -702,7 +722,7 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                 getCmd.Transaction = tx;
                 getCmd.CommandText = "SELECT RfqNo FROM RequestForQuotation WHERE Id = @Id;";
                 getCmd.Parameters.AddWithValue("@Id", rfqId.ToString());
-                var obj = await getCmd.ExecuteScalarAsync();
+                var obj = await getCmd.ExecuteScalarAsync().ConfigureAwait(false);
                 rfqNo = obj?.ToString();
             }
 
@@ -715,17 +735,21 @@ SET SharedPrs = ''
 WHERE Id = @Id OR (@RfqNo IS NOT NULL AND RfqNo = @RfqNo);";
                 updateCmd.Parameters.AddWithValue("@Id", rfqId.ToString());
                 updateCmd.Parameters.AddWithValue("@RfqNo", (object?)rfqNo ?? DBNull.Value);
-                await updateCmd.ExecuteNonQueryAsync();
+                await updateCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
         public async Task SplitCombinedPoAsync(Guid poId)
         {
-            await _db.InitializeAsync();
+            await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
-            await connection.OpenAsync();
+            await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
             string? poNo = null;
@@ -734,7 +758,7 @@ WHERE Id = @Id OR (@RfqNo IS NOT NULL AND RfqNo = @RfqNo);";
                 getCmd.Transaction = tx;
                 getCmd.CommandText = "SELECT PoNo FROM PurchaseOrder WHERE Id = @Id;";
                 getCmd.Parameters.AddWithValue("@Id", poId.ToString());
-                var obj = await getCmd.ExecuteScalarAsync();
+                var obj = await getCmd.ExecuteScalarAsync().ConfigureAwait(false);
                 poNo = obj?.ToString();
             }
 
@@ -747,10 +771,14 @@ SET CombinedPrs = ''
 WHERE Id = @Id OR (@PoNo IS NOT NULL AND PoNo = @PoNo);";
                 updateCmd.Parameters.AddWithValue("@Id", poId.ToString());
                 updateCmd.Parameters.AddWithValue("@PoNo", (object?)poNo ?? DBNull.Value);
-                await updateCmd.ExecuteNonQueryAsync();
+                await updateCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await tx.CommitAsync();
+            await tx.CommitAsync().ConfigureAwait(false);
+
+            // These move rows between several PRs at once, so rebuild every PR's search text rather
+            // than each operation maintaining its own list of which ones it touched.
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
     }
 }
