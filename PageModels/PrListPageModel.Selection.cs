@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -300,7 +299,7 @@ namespace Procure.PageModels
                 ApplyFilters();
                 UpdateStatusBanner();
 
-                await Toast.Make($"Combined {selected.Count} requisitions into {masterPr.PrNo}").Show();
+                ShowToast($"Combined {selected.Count} requisitions into {masterPr.PrNo}");
             }
             catch (Exception ex)
             {

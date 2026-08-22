@@ -104,6 +104,13 @@ namespace Procure.Pages
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(PrListPageModel.IsToastVisible) && _viewModel.IsToastVisible)
+            {
+                ToastPill.Opacity = 0;
+                _ = ToastPill.FadeToAsync(1.0, 150, Easing.CubicOut);
+                return;
+            }
+
             if (e.PropertyName != nameof(PrListPageModel.IsBusy)) return;
 
             if (_viewModel.IsBusy)
@@ -168,7 +175,62 @@ namespace Procure.Pages
 
             _boardScrollViewer.ViewChanged -= OnBoardViewChanged;
             _boardScrollViewer.ViewChanged += OnBoardViewChanged;
+
+            TuneNativeList();
+            MaybeStartAutoFling();
             return true;
+        }
+
+        /// <summary>Fling-smoothness knobs on the native list. PROCURE_NO_TUNE=1 skips them so the
+        /// fling rig can A/B one binary.</summary>
+        private void TuneNativeList()
+        {
+            if (Environment.GetEnvironmentVariable("PROCURE_NO_TUNE") == "1")
+            {
+                Procure.Utilities.BoardTrace.Mark("native-tune skipped");
+                return;
+            }
+            if (BoardList.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.ListViewBase lv) return;
+
+            // Show placeholder containers during fast pans instead of blocking the UI thread to
+            // realize full cards mid-fling; content fills in as the velocity drops.
+            lv.ShowsScrollingPlaceholders = true;
+
+            // Bound the off-screen realization buffer: the WinUI default realizes multiple extra
+            // viewports of cache in the same pass that is already behind the fling.
+            if (lv.ItemsPanelRoot is Microsoft.UI.Xaml.Controls.ItemsStackPanel panel)
+            {
+                panel.CacheLength = 1.0;
+            }
+            Procure.Utilities.BoardTrace.Mark("native-tune applied");
+        }
+
+        // Deterministic fling driver for A/B measurement: PROCURE_TRACE_FLING=<steps> sweeps the
+        // board in fixed animated jumps on a fixed cadence; the trace heartbeat records every
+        // UI-thread block it provokes. Diagnostics-only, inert without the env var.
+        private bool _flingStarted;
+
+        private void MaybeStartAutoFling()
+        {
+            if (_flingStarted) return;
+            if (!int.TryParse(Environment.GetEnvironmentVariable("PROCURE_TRACE_FLING"), out var steps) || steps <= 0) return;
+            _flingStarted = true;
+
+            var step = 0;
+            void Fling()
+            {
+                if (_boardScrollViewer is null || step >= steps)
+                {
+                    Procure.Utilities.BoardTrace.Mark("fling-done");
+                    return;
+                }
+                step++;
+                var target = _boardScrollViewer.VerticalOffset + 2600;
+                Procure.Utilities.BoardTrace.Mark($"fling step={step} to={target:F0}");
+                _boardScrollViewer.ChangeView(null, target, null);
+                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(900), Fling);
+            }
+            Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(2), Fling);
         }
 
         private static Microsoft.UI.Xaml.Controls.ScrollViewer? FindScrollViewer(Microsoft.UI.Xaml.DependencyObject node)

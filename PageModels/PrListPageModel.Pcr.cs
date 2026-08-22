@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -352,7 +351,7 @@ namespace Procure.PageModels
                     // Non-fatal if no viewer is available; the toast still names the file.
                 }
 
-                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
+                ShowToast($"Exported {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
@@ -497,7 +496,7 @@ namespace Procure.PageModels
                 CloseExportPcrModal();
 
                 // The exporter already opened the file; the result is visible, so no blocking dialog.
-                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
+                ShowToast($"Exported {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
@@ -539,7 +538,7 @@ namespace Procure.PageModels
                 var filePath = await _pcrExportService.ExportPcrToPdfAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
                 CloseExportPcrModal();
 
-                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
+                ShowToast($"Exported {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {

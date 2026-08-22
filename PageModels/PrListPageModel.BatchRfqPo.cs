@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -198,7 +197,7 @@ namespace Procure.PageModels
             try
             {
                 await RfqClipboardFormatter.CopyToClipboardAsync(selectedItems);
-                await Toast.Make($"Copied {selectedItems.Count} item(s) for email").Show();
+                ShowToast($"Copied {selectedItems.Count} item(s) for email");
             }
             catch (Exception ex)
             {

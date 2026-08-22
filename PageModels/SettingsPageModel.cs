@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -90,6 +89,12 @@ namespace Procure.PageModels
         // Default Approval Stages
         [ObservableProperty]
         public partial ObservableCollection<string> DefaultApprovalStages { get; set; } = new();
+
+        // Transient inline confirmation beside the Save button; OS toasts throw on unpackaged apps.
+        [ObservableProperty]
+        public partial string SavedMessage { get; set; } = string.Empty;
+
+        private int _savedMessageGeneration;
 
         [ObservableProperty]
         public partial string NewDefaultStageName { get; set; } = string.Empty;
@@ -337,7 +342,13 @@ namespace Procure.PageModels
                 _settingsService.DatabaseDirectory = DatabaseDirectory;
                 _settingsService.AutoCheckUpdatesOnStartup = AutoCheckUpdates;
 
-                await Toast.Make("Settings saved").Show();
+                SavedMessage = "Settings saved";
+                var gen = ++_savedMessageGeneration;
+                Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                    ?.DispatchDelayed(TimeSpan.FromMilliseconds(2500), () =>
+                    {
+                        if (gen == _savedMessageGeneration) SavedMessage = string.Empty;
+                    });
             }
             catch (Exception ex)
             {

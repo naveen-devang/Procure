@@ -18,13 +18,13 @@
              height, measures every item and silently stops virtualizing - which is the freeze this
              page was built around before. So: chrome pinned in rows 0 and 2, cards scroll in row 1. -->
         <Grid RowDefinitions="Auto, *, Auto"
-              Padding="28,36,28,36"
+              Padding="28,24,28,36"
               RowSpacing="20">
 
             <VerticalStackLayout Grid.Row="0" Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
 
                 <!-- Page Header: Title + Primary Actions -->
-                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto" Margin="0,6,0,0">
+                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto">
                     <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
                         <Label Text="Purchase Requisitions"
                                FontFamily="SegoeSemibold"
@@ -685,6 +685,31 @@
                 <DataTemplate><modals:BatchCreateModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
+
+        <!-- In-app toast pill: success feedback without the packaged-app notification pipeline,
+             which throws on unpackaged WinUI. Auto-hides from the page model; fade-in in code-behind. -->
+        <Border x:Name="ToastPill"
+                IsVisible="{Binding IsToastVisible}"
+                InputTransparent="True"
+                HorizontalOptions="Center"
+                VerticalOptions="End"
+                Margin="0,0,0,52"
+                Padding="16,10"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                ZIndex="9998">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="6" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#000000" Offset="0,4" Radius="16" Opacity="0.3" />
+            </Border.Shadow>
+            <Label Text="{Binding ToastText}"
+                   FontSize="12.5"
+                   FontFamily="SegoeSemibold"
+                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+        </Border>
 
         <!-- Hardware-Accelerated Smooth Theme Transition Curtain -->
         <BoxView x:Name="ThemeCurtain"

@@ -412,12 +412,19 @@
                         </VerticalStackLayout>
                     </Grid>
 
-                    <Button Text="Save Settings"
-                            Command="{Binding SaveSettingsCommand}"
-                            Style="{StaticResource PrimaryButton}"
-                            HorizontalOptions="End"
-                            HeightRequest="36"
-                            Padding="20,0" />
+                    <HorizontalStackLayout Spacing="12" HorizontalOptions="End" VerticalOptions="Center">
+                        <Label Text="{Binding SavedMessage}"
+                               IsVisible="{Binding SavedMessage, Converter={StaticResource NullToBoolConverter}}"
+                               FontSize="12"
+                               FontFamily="SegoeSemibold"
+                               VerticalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource FluentSuccess}, Dark={StaticResource FluentSuccessTextDark}}" />
+                        <Button Text="Save Settings"
+                                Command="{Binding SaveSettingsCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                HeightRequest="36"
+                                Padding="20,0" />
+                    </HorizontalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

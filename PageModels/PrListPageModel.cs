@@ -76,6 +76,28 @@ namespace Procure.PageModels
         public partial bool IsStatusMessageVisible { get; set; }
 
         [ObservableProperty]
+        public partial string ToastText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial bool IsToastVisible { get; set; }
+
+        private int _toastGeneration;
+
+        /// <summary>In-app success pill. OS toasts (CommunityToolkit Toast) go through the packaged
+        /// notification pipeline and throw 0x80070490 "Element not found" on this unpackaged app.</summary>
+        public void ShowToast(string message)
+        {
+            ToastText = message;
+            IsToastVisible = true;
+            var gen = ++_toastGeneration;
+            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                ?.DispatchDelayed(TimeSpan.FromMilliseconds(2500), () =>
+                {
+                    if (gen == _toastGeneration) IsToastVisible = false;
+                });
+        }
+
+        [ObservableProperty]
         public partial int TotalFilteredCount { get; set; }
 
         [ObservableProperty]
