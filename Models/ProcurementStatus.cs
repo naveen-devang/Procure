@@ -30,6 +30,25 @@ namespace Procure.Models
             OnHold,
             Cancelled
         ];
+
+        /// <summary>What the manual status pickers offer. Merged is excluded: it is a system state
+        /// owned by the merge/split operations, and the board hides Merged rows by default - so
+        /// hand-picking it makes the PR silently vanish from the All view, which reads as a delete.
+        /// The status *filter* still lists Merged so hidden rows stay findable.</summary>
+        public static readonly string[] SelectableStatuses =
+        [
+            PrRaised,
+            RfqSent,
+            QuotesReceived,
+            PcrSubmitted,
+            PcrApproved,
+            PoRaised,
+            PartiallyDelivered,
+            Delivered,
+            Closed,
+            OnHold,
+            Cancelled
+        ];
     }
 
     public static class ProcurementPriority

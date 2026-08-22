@@ -109,6 +109,9 @@ namespace Procure.Services
             get => _urgentOverdueDays ??= Preferences.Default.Get(KeyUrgentDays, 5);
             set
             {
+                // Unchanged-value guard (every setter here): a no-op "Save Settings" used to fire
+                // events that refiltered the whole PR board.
+                if (UrgentOverdueDays == value) return;
                 Preferences.Default.Set(KeyUrgentDays, value);
                 _urgentOverdueDays = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(UrgentOverdueDays)));
@@ -120,6 +123,7 @@ namespace Procure.Services
             get => _normalOverdueDays ??= Preferences.Default.Get(KeyNormalDays, 10);
             set
             {
+                if (NormalOverdueDays == value) return;
                 Preferences.Default.Set(KeyNormalDays, value);
                 _normalOverdueDays = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(NormalOverdueDays)));
@@ -131,6 +135,7 @@ namespace Procure.Services
             get => DatabaseConstants.DatabaseDirectory;
             set
             {
+                if (DatabaseConstants.DatabaseDirectory == value) return;
                 DatabaseConstants.DatabaseDirectory = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(DatabaseDirectory)));
             }
@@ -141,6 +146,7 @@ namespace Procure.Services
             get => _appTheme ??= Preferences.Default.Get(KeyAppTheme, "Dark");
             set
             {
+                if (AppTheme == value) return;
                 Preferences.Default.Set(KeyAppTheme, value);
                 _appTheme = value;
                 ApplyThemeMode(value);
@@ -153,6 +159,7 @@ namespace Procure.Services
             get => _accentTheme ??= Preferences.Default.Get(KeyAccentTheme, "Blue");
             set
             {
+                if (AccentTheme == value) return;
                 Preferences.Default.Set(KeyAccentTheme, value);
                 _accentTheme = value;
                 ApplyAccentColor(value);
@@ -165,6 +172,7 @@ namespace Procure.Services
             get => _autoCheckUpdatesOnStartup ??= Preferences.Default.Get(KeyAutoCheckUpdates, true);
             set
             {
+                if (AutoCheckUpdatesOnStartup == value) return;
                 Preferences.Default.Set(KeyAutoCheckUpdates, value);
                 _autoCheckUpdatesOnStartup = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AutoCheckUpdatesOnStartup)));
@@ -176,6 +184,7 @@ namespace Procure.Services
             get => _isSidebarCompact ??= Preferences.Default.Get(KeySidebarCompact, false);
             set
             {
+                if (IsSidebarCompact == value) return;
                 Preferences.Default.Set(KeySidebarCompact, value);
                 _isSidebarCompact = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(IsSidebarCompact)));
@@ -187,6 +196,7 @@ namespace Procure.Services
             get => _autoCollapseSidebarOnNarrow ??= Preferences.Default.Get(KeyAutoCollapseOnNarrow, true);
             set
             {
+                if (AutoCollapseSidebarOnNarrow == value) return;
                 Preferences.Default.Set(KeyAutoCollapseOnNarrow, value);
                 _autoCollapseSidebarOnNarrow = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AutoCollapseSidebarOnNarrow)));
@@ -198,6 +208,7 @@ namespace Procure.Services
             get => _defaultCurrency ??= Preferences.Default.Get(KeyDefaultCurrency, "AED");
             set
             {
+                if (DefaultCurrency == value) return;
                 Preferences.Default.Set(KeyDefaultCurrency, value);
                 _defaultCurrency = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(DefaultCurrency)));
@@ -209,6 +220,7 @@ namespace Procure.Services
         public void SetDefaultApprovalRoles(IEnumerable<string> roles)
         {
             var list = roles.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).ToList();
+            if (list.SequenceEqual(_defaultApprovalRoles ??= LoadDefaultApprovalRoles())) return;
             Preferences.Default.Set(KeyDefaultApprovalRoles, string.Join("|||", list));
             _defaultApprovalRoles = list;
             SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(GetDefaultApprovalRoles)));

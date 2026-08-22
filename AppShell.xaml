@@ -11,7 +11,7 @@
     Shell.BackgroundColor="Transparent"
     Shell.ForegroundColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
     FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}"
-    Title="RWC  MM Tracker">
+    Title="RWC MM Tracker">
 
     <!-- Flyout App Header with Responsive Collapse/Expand Toggle -->
     <Shell.FlyoutHeader>

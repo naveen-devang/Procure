@@ -37,6 +37,15 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial ObservableCollection<PrItem> EditingPrItems { get; set; } = new();
 
+        // The edit modal binds TwoWay to the live PR the card shows, so cancelling must put back
+        // what was there on open or abandoned edits stay on the card and ride along with the next
+        // unrelated save. Items/CustomValues references included: a failed validation replaces them
+        // before the user can still cancel.
+        private sealed record PrEditSnapshot(string PrNo, string Requestor, string Plant, string PrType,
+            string Description, string Priority, string Status, string Notes,
+            ObservableCollection<PrItem> Items, ObservableCollection<CustomFieldValue> CustomValues);
+        private PrEditSnapshot? _editSnapshot;
+
 
         // ================= PR CRUD =================
 
@@ -123,6 +132,8 @@ namespace Procure.PageModels
 
             EditModalTitle = $"Edit Requisition {pr.PrNo}";
             CurrentEditingPr = pr;
+            _editSnapshot = new PrEditSnapshot(pr.PrNo, pr.Requestor, pr.Plant, pr.PrType,
+                pr.Description, pr.Priority, pr.Status, pr.Notes, pr.Items, pr.CustomValues);
 
             // Prepare custom fields with existing values
             var vals = new List<CustomFieldValue>();
@@ -219,6 +230,7 @@ namespace Procure.PageModels
                 ApplyFilters();
                 UpdateStatusBanner();
 
+                _editSnapshot = null;
                 IsEditModalVisible = false;
             }
             catch (Exception ex)
@@ -230,6 +242,20 @@ namespace Procure.PageModels
         [RelayCommand]
         public void CloseEditModal()
         {
+            if (CurrentEditingPr is { } pr && _editSnapshot is { } s)
+            {
+                pr.PrNo = s.PrNo;
+                pr.Requestor = s.Requestor;
+                pr.Plant = s.Plant;
+                pr.PrType = s.PrType;
+                pr.Description = s.Description;
+                pr.Priority = s.Priority;
+                pr.Status = s.Status;
+                pr.Notes = s.Notes;
+                pr.Items = s.Items;
+                pr.CustomValues = s.CustomValues;
+            }
+            _editSnapshot = null;
             IsEditModalVisible = false;
         }
 

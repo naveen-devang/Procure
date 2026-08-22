@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -325,19 +327,32 @@ namespace Procure.PageModels
         {
             try
             {
-                // The one place that still wants every PR. Read on a background thread and let the rows
-                // go as soon as the CSV is built rather than holding the whole table in memory.
-                var all = await Task.Run(() => _prRepo.GetAllAsync());
-                var csv = await _csvExportService.ExportPrsToCsvAsync(all, CustomColumnDefinitions);
-                var filePath = await _csvExportService.SaveExportToFileAsync(csv);
-
-                if (Shell.Current != null)
+                // The one place that still wants every PR. Read, build and write on a background
+                // thread - the string build alone is most of the ~3s at 20,000 PRs and used to run
+                // on the dispatcher.
+                var filePath = await Task.Run(async () =>
                 {
-                    await Shell.Current.DisplayAlertAsync(
-                        "Export Successful",
-                        $"Procurement report successfully exported to:\n{filePath}",
-                        "OK");
+                    var all = await _prRepo.GetAllAsync();
+                    var csv = await _csvExportService.ExportPrsToCsvAsync(all, CustomColumnDefinitions);
+                    return await _csvExportService.SaveExportToFileAsync(csv);
+                });
+
+                // Same behavior as the PCR exports: hand the file to the OS viewer instead of
+                // dead-ending at a path in a dialog.
+                try
+                {
+                    await Launcher.Default.OpenAsync(new OpenFileRequest
+                    {
+                        Title = Path.GetFileName(filePath),
+                        File = new ReadOnlyFile(filePath)
+                    });
                 }
+                catch
+                {
+                    // Non-fatal if no viewer is available; the toast still names the file.
+                }
+
+                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
             }
             catch (Exception ex)
             {
@@ -481,13 +496,8 @@ namespace Procure.PageModels
                 var filePath = await _pcrExportService.ExportPcrToExcelAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
                 CloseExportPcrModal();
 
-                if (Shell.Current != null)
-                {
-                    await Shell.Current.DisplayAlertAsync(
-                        "Export Successful",
-                        $"Price comparison spreadsheet exported to:\n{filePath}",
-                        "OK");
-                }
+                // The exporter already opened the file; the result is visible, so no blocking dialog.
+                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
             }
             catch (Exception ex)
             {
@@ -529,13 +539,7 @@ namespace Procure.PageModels
                 var filePath = await _pcrExportService.ExportPcrToPdfAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
                 CloseExportPcrModal();
 
-                if (Shell.Current != null)
-                {
-                    await Shell.Current.DisplayAlertAsync(
-                        "Export Successful",
-                        $"Price comparison PDF document exported to:\n{filePath}",
-                        "OK");
-                }
+                await Toast.Make($"Exported {Path.GetFileName(filePath)}").Show();
             }
             catch (Exception ex)
             {

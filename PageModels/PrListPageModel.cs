@@ -99,7 +99,7 @@ namespace Procure.PageModels
             ProcurementStatus.Cancelled
         };
 
-        public string[] AllStatuses => ProcurementStatus.AllStatuses;
+        public string[] SelectableStatuses => ProcurementStatus.SelectableStatuses;
         public string[] AllPriorities => ProcurementPriority.AllPriorities;
         public string[] AllPlants => ProcurementPlant.AllPlants;
         public string[] AllPrTypes => ProcurementPrType.AllPrTypes;
@@ -365,6 +365,18 @@ namespace Procure.PageModels
         [RelayCommand]
         public void ToggleFilterUrgent() => FilterUrgentOnly = !FilterUrgentOnly;
 
+        /// <summary>Bound to the empty state's "Reset Filters" button. Each setter triggers its own
+        /// ApplyFilters pass; the generation counter retires the superseded ones.</summary>
+        [RelayCommand]
+        public void ResetFilters()
+        {
+            SearchText = string.Empty;
+            SelectedStatusFilter = "All";
+            FilterOverdueOnly = false;
+            FilterPcrPendingOnly = false;
+            FilterUrgentOnly = false;
+        }
+
         [RelayCommand]
         public void DismissStatusMessage() => IsStatusMessageVisible = false;
 
@@ -381,10 +393,42 @@ namespace Procure.PageModels
         // Bumped on every load so a page that arrives after a newer one is discarded.
         private int _pageGeneration;
         private bool _loadingMore;
+        private bool _loadMorePending;
+        private int _lastVisibleIndex;
+
+        // Matches the XAML RemainingItemsThreshold; used by the Scrolled-driven trigger below.
+        private const int LoadMoreThreshold = 10;
+
+        /// <summary>The authoritative infinite-scroll trigger. RemainingItemsThresholdReached is
+        /// unreliable on Windows - a traced session showed it never firing across 30s of scrolling -
+        /// so pagination keys off the Scrolled event's LastVisibleItemIndex instead. The XAML
+        /// threshold stays wired as harmless redundancy behind the same re-entry guard.</summary>
+        public void OnBoardScrolled(int lastVisibleItemIndex)
+        {
+            _lastVisibleIndex = lastVisibleItemIndex;
+            if (lastVisibleItemIndex >= FilteredPrs.Count - LoadMoreThreshold) _ = LoadMoreAsync();
+        }
+
+        private bool _nearTail;
+
+        /// <summary>Fed by the page's native ScrollViewer.ViewChanged hook - the one scroll signal
+        /// that provably fires on a prewarmed page's first visit, where both MAUI scroll events stay
+        /// dead until the page is left and revisited. Also fires on extent changes, so a user parked
+        /// at the bottom keeps triggering as appended pages grow the list.</summary>
+        public void OnBoardNearTail(bool nearTail)
+        {
+            _nearTail = nearTail;
+            if (nearTail) _ = LoadMoreAsync();
+        }
 
         // Rows per fetch. Larger than the old reveal batch because the CollectionView recycles
         // containers - fetching 50 rows no longer means building 50 cards.
         private const int PageSize = 50;
+
+        // First fill only: roughly one viewport. Hydrating 50 PRs with 5 RFQs + 2 POs each costs
+        // ~350ms off-thread before anything can show; 16 gets first cards on screen sooner and
+        // RemainingItemsThresholdReached immediately tops the window up to PageSize and beyond.
+        private const int FirstPaintPageSize = 16;
 
         // Bounds the re-read after an edit. Only a database cost now - the CollectionView realises a
         // screenful whatever the number is - so it is set high enough that normal use never trims the
@@ -397,9 +441,17 @@ namespace Procure.PageModels
         [RelayCommand]
         private async Task LoadMoreAsync()
         {
-            // The threshold event fires repeatedly while the tail is on screen.
-            if (_loadingMore || FilteredPrs.Count >= TotalFilteredCount) return;
+            Procure.Utilities.BoardTrace.Mark($"load-more-event shown={FilteredPrs.Count} total={TotalFilteredCount} inflight={_loadingMore}");
+            // Triggers fire repeatedly while the tail is on screen; one that lands mid-load is
+            // remembered and serviced below instead of being dropped.
+            if (_loadingMore)
+            {
+                _loadMorePending = true;
+                return;
+            }
+            if (FilteredPrs.Count >= TotalFilteredCount) return;
 
+            var countBefore = FilteredPrs.Count;
             try
             {
                 _loadingMore = true;
@@ -411,6 +463,7 @@ namespace Procure.PageModels
                 foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
                 TotalFilteredCount = page.TotalCount;
                 UpdateListSummary();
+                Procure.Utilities.BoardTrace.Mark($"more-loaded total={FilteredPrs.Count}");
             }
             catch (Exception ex)
             {
@@ -419,6 +472,18 @@ namespace Procure.PageModels
             finally
             {
                 _loadingMore = false;
+            }
+
+            // A user parked at the tail produces no scroll delta and therefore no further trigger,
+            // so keep filling until the window is ahead of the viewport. The grew-this-pass check
+            // keeps a non-appending pass from chaining forever.
+            var pending = _loadMorePending;
+            _loadMorePending = false;
+            if ((pending || _nearTail || _lastVisibleIndex >= FilteredPrs.Count - LoadMoreThreshold)
+                && FilteredPrs.Count > countBefore
+                && FilteredPrs.Count < TotalFilteredCount)
+            {
+                _ = LoadMoreAsync();
             }
         }
 
@@ -469,17 +534,34 @@ namespace Procure.PageModels
             // running. Without it the empty view - "No requisitions found" - flashes before the first
             // page lands, which now happens on every open because the read is asynchronous.
             var showSkeleton = FilteredPrs.Count == 0;
-            if (showSkeleton) IsBusy = true;
+            if (showSkeleton)
+            {
+                IsBusy = true;
+                Procure.Utilities.BoardTrace.Mark("skeleton-built");
+            }
 
             try
             {
                 // Re-read exactly what is on the board, so an edit leaves the user where they were.
                 // Bounded, because someone who scrolled to row 500 should not pay for that on every save.
-                var take = resetToTop || FilteredPrs.Count == 0
-                    ? PageSize
-                    : Math.Min(FilteredPrs.Count, MaxWindowReread);
+                var take = showSkeleton
+                    ? FirstPaintPageSize
+                    : resetToTop
+                        ? PageSize
+                        : Math.Min(FilteredPrs.Count, MaxWindowReread);
 
                 var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(0, take))).ConfigureAwait(true);
+                if (showSkeleton) Procure.Utilities.BoardTrace.Mark($"query-done rows={page.Rows.Count}");
+
+                if (showSkeleton)
+                {
+                    // Give the page shell and the shimmering skeleton a painted frame before card
+                    // realization takes the UI thread - without this yield the entire open, from
+                    // click to first card pixels, is one continuous freeze. Same calibration as
+                    // LazyExpander's placeholder delay.
+                    await Task.Delay(80).ConfigureAwait(true);
+                    if (generation != _pageGeneration) return;
+                }
 
                 // A selected PR outside the window still has to be loaded, or the action bar and the
                 // batch commands would silently act on only the part of the selection still on screen.
@@ -513,6 +595,15 @@ namespace Procure.PageModels
                 UpdateSelectionState();
                 ReplaceRows(rows, resetToTop);
                 UpdateListSummary();
+                if (showSkeleton)
+                {
+                    Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
+                    // The first fill is one viewport; grow the window to a full page shortly after,
+                    // off the critical path, so "Showing N of M" reaches PageSize without the user
+                    // having to scroll to trigger the first threshold fetch.
+                    Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                        ?.DispatchDelayed(TimeSpan.FromMilliseconds(250), () => _ = LoadMoreAsync());
+                }
             }
             catch (Exception ex)
             {
@@ -548,9 +639,12 @@ namespace Procure.PageModels
                 return;
             }
 
+            // Set lookup: rows can be up to MaxWindowReread deep, and List.Contains per element made
+            // this loop O(n^2) on the dispatcher thread.
+            var rowSet = new HashSet<PurchaseRequisition>(rows);
             for (var i = FilteredPrs.Count - 1; i >= 0; i--)
             {
-                if (!rows.Contains(FilteredPrs[i])) FilteredPrs.RemoveAt(i);
+                if (!rowSet.Contains(FilteredPrs[i])) FilteredPrs.RemoveAt(i);
             }
 
             for (var i = 0; i < rows.Count; i++)
@@ -601,7 +695,7 @@ namespace Procure.PageModels
                 $"Update Status for {pr.PrNo}",
                 "Cancel",
                 null,
-                ProcurementStatus.AllStatuses);
+                ProcurementStatus.SelectableStatuses);
 
             if (selected != null && selected != "Cancel" && selected != pr.Status)
             {
@@ -718,6 +812,24 @@ namespace Procure.PageModels
         public void ToggleExpand(PurchaseRequisition pr)
         {
             pr.IsExpanded = !pr.IsExpanded;
+        }
+
+        /// <summary>Esc support: closes the topmost open modal overlay through its Close command
+        /// (which may revert state, e.g. the edit modal's snapshot restore). False when none is open.</summary>
+        public bool CloseTopmostModal()
+        {
+            // Config/export modals first - they open on top of the board's other overlays.
+            if (IsApprovalConfigModalVisible) { CloseApprovalConfigModal(); return true; }
+            if (IsExportPcrModalVisible) { CloseExportPcrModal(); return true; }
+            if (IsEditModalVisible) { CloseEditModal(); return true; }
+            if (IsAddRfqModalVisible) { CloseAddRfqModal(); return true; }
+            if (IsAddPoModalVisible) { CloseAddPoModal(); return true; }
+            if (IsMergePrModalVisible) { CloseMergePrModal(); return true; }
+            if (IsSplitPrModalVisible) { CloseSplitPrModal(); return true; }
+            if (IsBatchRfqModalVisible) { CloseBatchRfqModal(); return true; }
+            if (IsBatchPoModalVisible) { CloseBatchPoModal(); return true; }
+            if (IsBatchCreateModalVisible) { CloseBatchCreateModal(); return true; }
+            return false;
         }
 
     }

@@ -579,11 +579,21 @@ namespace Procure.Models
             }
         }
 
+        private bool _bulkSelecting;
+
         public void OnItemSelectionOrPriceChanged()
         {
+            if (_bulkSelecting) return;
             if (HasItems)
             {
-                CustomBaseAmount = Items.Where(i => i.IsSelected).Sum(i => i.LineTotal);
+                var total = Items.Where(i => i.IsSelected).Sum(i => i.LineTotal);
+                if (CustomBaseAmount != total)
+                {
+                    // The setter's OnCustomBaseAmountChanged hook runs NotifyCalculationsChanged;
+                    // calling it again here doubled every recalc.
+                    CustomBaseAmount = total;
+                    return;
+                }
             }
             NotifyCalculationsChanged();
         }
@@ -611,19 +621,25 @@ namespace Procure.Models
 
         public void SelectAllItems()
         {
+            // Each IsSelected flip invokes OnItemSelectionOrPriceChanged; suppressed during the
+            // loop so N items cost one recalc, not N full sum-and-notify passes.
+            _bulkSelecting = true;
             foreach (var item in Items)
             {
                 item.IsSelected = true;
             }
+            _bulkSelecting = false;
             OnItemSelectionOrPriceChanged();
         }
 
         public void DeselectAllItems()
         {
+            _bulkSelecting = true;
             foreach (var item in Items)
             {
                 item.IsSelected = false;
             }
+            _bulkSelecting = false;
             OnItemSelectionOrPriceChanged();
         }
     }

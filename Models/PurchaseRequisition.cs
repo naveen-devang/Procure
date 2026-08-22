@@ -71,7 +71,9 @@ namespace Procure.Models
 
         private void OnPcrPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            OnPropertyChanged(nameof(Pcr));
+            // Only the PR-level rollup: re-raising Pcr here would force every Pcr.* binding path in
+            // the expanded panel to re-resolve on each PCR change; those paths already listen to the
+            // PCR instance's own PropertyChanged.
             OnPropertyChanged(nameof(PcrStatusDisplay));
         }
 
@@ -211,6 +213,8 @@ namespace Procure.Models
             OnPropertyChanged(nameof(IsPoPartiallyOrdered));
             OnPropertyChanged(nameof(TotalOrderedItemQuantity));
             OnPropertyChanged(nameof(TotalPendingItemQuantity));
+            OnPropertyChanged(nameof(PendingItemsSummaryText));
+            OnPropertyChanged(nameof(HasPendingItemsSummary));
         }
 
         public decimal TotalOrderedItemQuantity => Items?.Sum(i => i.OrderedQuantity) ?? 0m;
@@ -232,7 +236,7 @@ namespace Procure.Models
             }
         }
 
-        public bool HasPendingItemsSummary => !string.IsNullOrWhiteSpace(PendingItemsSummaryText);
+        public bool HasPendingItemsSummary => HasItems && !IsPoFullyOrdered;
 
         public string PoFulfillmentBadgeText
         {
@@ -335,7 +339,13 @@ namespace Procure.Models
             foreach (var p in MergeableProps.GetOrAdd(target.GetType(), static t => t
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0
-                            && p.Name != nameof(IsExpanded) && p.Name != nameof(IsSelected))
+                            && p.Name != nameof(IsExpanded) && p.Name != nameof(IsSelected)
+                            // UI-helper setters with side effects (they rewrite the persisted
+                            // properties they wrap); merging them would depend on reflection
+                            // returning the raw properties first, which is not guaranteed.
+                            && p.Name != nameof(Approval.SentDatePickerValue)
+                            && p.Name != nameof(Approval.ReceivedDatePickerValue)
+                            && p.Name != nameof(CustomFieldValue.DateValue))
                 .ToArray()))
             {
                 var current = p.GetValue(target);

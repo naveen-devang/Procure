@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:converters="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Modals.AddPoModal"
              x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
@@ -279,7 +280,13 @@
 
 
                         <!-- ================= PAGE 2: CONFIGURE PO DETAILS & PRICING ================= -->
-                        <VerticalStackLayout IsVisible="{Binding IsPoModalStep2}" Spacing="14">
+                        <!-- The heavy half of the modal: a full PO-configuration card per selected RFQ.
+                             Deferred so the first open inflates only Step 1; this builds when the user
+                             clicks Next, behind the Step-2 loading skeleton that already covers it. -->
+                        <converters:LazyExpander IsExpanded="{Binding IsPoModalStep2}">
+                            <converters:LazyExpander.ContentTemplate>
+                                <DataTemplate x:DataType="pageModels:PrListPageModel">
+                        <VerticalStackLayout Spacing="14">
 
 
                             <!-- Allocation Status Summary Pill -->
@@ -394,13 +401,13 @@
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                                         
                                                         <Button Grid.Column="1" Text="Select All Items"
-                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.SelectAllPoRfqItemsCommand}"
+                                                                Command="{Binding SelectAllPoRfqItemsCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />
 
                                                         <Button Grid.Column="2" Text="Deselect All Items"
-                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DeselectAllPoRfqItemsCommand}"
+                                                                Command="{Binding DeselectAllPoRfqItemsCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />
@@ -550,7 +557,7 @@
                                                             <!-- VAT Type Picker -->
                                                             <VerticalStackLayout Grid.Column="4" Spacing="2">
                                                                 <Label Text="VAT Type" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                                                <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AvailableVatTypes}"
+                                                                <Picker ItemsSource="{Binding AvailableVatTypes, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                         SelectedItem="{Binding VatType, Mode=TwoWay}"
                                                                         SelectedIndexChanged="OnPoVatTypeSelectedIndexChanged"
                                                                         HeightRequest="30" FontSize="11.5" />
@@ -576,6 +583,9 @@
                                 </BindableLayout.ItemTemplate>
                             </VerticalStackLayout>
                         </VerticalStackLayout>
+                                </DataTemplate>
+                            </converters:LazyExpander.ContentTemplate>
+                        </converters:LazyExpander>
                     </Grid>
                 </ScrollView>
 

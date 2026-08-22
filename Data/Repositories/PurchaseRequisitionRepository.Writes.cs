@@ -51,7 +51,12 @@ ON CONFLICT(Id) DO UPDATE SET
 
         // Scalar-field-only save: writes the PurchaseRequisition row and nothing else.
         // Use instead of SaveAsync when Items and CustomValues are untouched.
-        public async Task SavePrFieldsAsync(PurchaseRequisition pr)
+        // Microsoft.Data.Sqlite's *Async methods run synchronously, so every public write method here
+        // and in the Restructure partial hops to the thread pool once via Task.Run; page models can
+        // await them straight from the UI thread without blocking the dispatcher.
+        public Task SavePrFieldsAsync(PurchaseRequisition pr) => Task.Run(() => SavePrFieldsCoreAsync(pr));
+
+        private async Task SavePrFieldsCoreAsync(PurchaseRequisition pr)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             pr.UpdatedAt = DateTime.Now;
@@ -92,32 +97,42 @@ ON CONFLICT(Id) DO UPDATE SET
         }
 
 
-        /// <summary>Replaces a PR's item rows to match <paramref name="pr"/>.Items. Callers that only
-        /// change scalar PR fields must use SavePrFieldsAsync instead — this rewrites every row.</summary>
-        private static async Task SyncPrItemsAsync(SqliteConnection connection, SqliteTransaction? tx, PurchaseRequisition pr)
+        /// <summary>Syncs a PR's item rows to match <paramref name="pr"/>.Items: departed rows are
+        /// deleted, survivors UPSERTed under their existing Ids. Deleting and reinserting instead would
+        /// fire the ON DELETE SET NULL on RfqItem.PrItemId / PurchaseOrderItem.PrItemId and sever those
+        /// links permanently — FK actions run at delete time, so reinserting the same Guid does not
+        /// restore them. Callers that only change scalar PR fields must use SavePrFieldsAsync.</summary>
+        private static async Task SyncPrItemsAsync(SqliteConnection connection, SqliteTransaction tx, PurchaseRequisition pr)
         {
-            using (var deleteItemCmd = connection.CreateCommand())
+            var kept = new List<PrItem>();
+            if (pr.Items != null)
             {
-                deleteItemCmd.Transaction = tx;
-                deleteItemCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @PrId;";
-                deleteItemCmd.Parameters.AddWithValue("@PrId", pr.Id.ToString());
-                await deleteItemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                foreach (var item in pr.Items)
+                {
+                    if (string.IsNullOrWhiteSpace(item.ItemName)) continue;
+                    item.PrId = pr.Id;
+                    item.SortOrder = kept.Count;
+                    kept.Add(item);
+                }
             }
 
-            if (pr.Items == null || pr.Items.Count == 0) return;
+            await DeleteDepartedChildrenAsync(connection, tx, "PrItem", "PrId", pr.Id, kept.Select(i => i.Id).ToList()).ConfigureAwait(false);
 
-            int sortOrder = 0;
-            foreach (var item in pr.Items)
+            foreach (var item in kept)
             {
-                if (string.IsNullOrWhiteSpace(item.ItemName)) continue;
-                item.PrId = pr.Id;
-                item.SortOrder = sortOrder++;
-
                 using var insItemCmd = connection.CreateCommand();
                 insItemCmd.Transaction = tx;
                 insItemCmd.CommandText = @"
 INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder)
+ON CONFLICT(Id) DO UPDATE SET
+    PrId = excluded.PrId,
+    ItemName = excluded.ItemName,
+    Quantity = excluded.Quantity,
+    Unit = excluded.Unit,
+    EstimatedUnitPrice = excluded.EstimatedUnitPrice,
+    Notes = excluded.Notes,
+    SortOrder = excluded.SortOrder;";
 
                 insItemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
                 insItemCmd.Parameters.AddWithValue("@PrId", item.PrId.ToString());
@@ -132,7 +147,9 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             }
         }
 
-        public async Task SaveAsync(PurchaseRequisition pr)
+        public Task SaveAsync(PurchaseRequisition pr) => Task.Run(() => SaveCoreAsync(pr));
+
+        private async Task SaveCoreAsync(PurchaseRequisition pr)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             pr.UpdatedAt = DateTime.Now;
@@ -144,17 +161,18 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             await UpsertPrRowAsync(connection, tx, pr).ConfigureAwait(false);
 
             await SyncPrItemsAsync(connection, tx, pr).ConfigureAwait(false);
+            if (pr.CustomValues.Count > 0)
+            {
+                await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
+            }
             await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
 
             await tx.CommitAsync().ConfigureAwait(false);
-
-            if (pr.CustomValues.Count > 0)
-            {
-                await _customColumnRepo.SaveValuesForPrAsync(pr.Id, pr.CustomValues).ConfigureAwait(false);
-            }
         }
 
-        public async Task SaveBatchPrsAsync(List<PurchaseRequisition> prs)
+        public Task SaveBatchPrsAsync(List<PurchaseRequisition> prs) => Task.Run(() => SaveBatchPrsCoreAsync(prs));
+
+        private async Task SaveBatchPrsCoreAsync(List<PurchaseRequisition> prs)
         {
             if (prs == null || prs.Count == 0) return;
 
@@ -168,22 +186,19 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                 pr.UpdatedAt = DateTime.Now;
                 await UpsertPrRowAsync(connection, tx, pr).ConfigureAwait(false);
                 await SyncPrItemsAsync(connection, tx, pr).ConfigureAwait(false);
+                if (pr.CustomValues.Count > 0)
+                {
+                    await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
+                }
                 await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
             }
 
             await tx.CommitAsync().ConfigureAwait(false);
-
-            // Save custom field values
-            foreach (var pr in prs)
-            {
-                if (pr.CustomValues.Count > 0)
-                {
-                    await _customColumnRepo.SaveValuesForPrAsync(pr.Id, pr.CustomValues).ConfigureAwait(false);
-                }
-            }
         }
 
-        public async Task DeleteAsync(Guid id)
+        public Task DeleteAsync(Guid id) => Task.Run(() => DeleteCoreAsync(id));
+
+        private async Task DeleteCoreAsync(Guid id)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -213,7 +228,9 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        public async Task SaveRfqAsync(RequestForQuotation rfq)
+        public Task SaveRfqAsync(RequestForQuotation rfq) => Task.Run(() => SaveRfqCoreAsync(rfq));
+
+        private async Task SaveRfqCoreAsync(RequestForQuotation rfq)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -313,7 +330,9 @@ ON CONFLICT(Id) DO UPDATE SET
             await tx.CommitAsync().ConfigureAwait(false);
         }
 
-        public async Task DeleteRfqAsync(Guid rfqId)
+        public Task DeleteRfqAsync(Guid rfqId) => Task.Run(() => DeleteRfqCoreAsync(rfqId));
+
+        private async Task DeleteRfqCoreAsync(Guid rfqId)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -330,17 +349,22 @@ ON CONFLICT(Id) DO UPDATE SET
                 prId = Guid.Parse((string)found);
             }
 
+            using var tx = connection.BeginTransaction();
             using (var cmd = connection.CreateCommand())
             {
+                cmd.Transaction = tx;
                 cmd.CommandText = "DELETE FROM RequestForQuotation WHERE Id = @Id;";
                 cmd.Parameters.AddWithValue("@Id", rfqId.ToString());
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await RefreshSearchBlobAsync(connection, null, prId).ConfigureAwait(false);
+            await RefreshSearchBlobAsync(connection, tx, prId).ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
         }
 
-        public async Task SavePcrAsync(PriceComparisonRequest pcr)
+        public Task SavePcrAsync(PriceComparisonRequest pcr) => Task.Run(() => SavePcrCoreAsync(pcr));
+
+        private async Task SavePcrCoreAsync(PriceComparisonRequest pcr)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -408,7 +432,9 @@ ON CONFLICT(Id) DO UPDATE SET
             await tx.CommitAsync().ConfigureAwait(false);
         }
 
-        public async Task UpdateApprovalAsync(Approval approval)
+        public Task UpdateApprovalAsync(Approval approval) => Task.Run(() => UpdateApprovalCoreAsync(approval));
+
+        private async Task UpdateApprovalCoreAsync(Approval approval)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -442,7 +468,9 @@ ON CONFLICT(Id) DO UPDATE SET
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        public async Task SavePoAsync(PurchaseOrder po)
+        public Task SavePoAsync(PurchaseOrder po) => Task.Run(() => SavePoCoreAsync(po));
+
+        private async Task SavePoCoreAsync(PurchaseOrder po)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -544,7 +572,9 @@ ON CONFLICT(Id) DO UPDATE SET
             }
         }
 
-        public async Task DeletePoAsync(Guid poId)
+        public Task DeletePoAsync(Guid poId) => Task.Run(() => DeletePoCoreAsync(poId));
+
+        private async Task DeletePoCoreAsync(Guid poId)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -560,14 +590,17 @@ ON CONFLICT(Id) DO UPDATE SET
                 prId = Guid.Parse((string)found);
             }
 
+            using var tx = connection.BeginTransaction();
             using (var cmd = connection.CreateCommand())
             {
+                cmd.Transaction = tx;
                 cmd.CommandText = "DELETE FROM PurchaseOrder WHERE Id = @Id;";
                 cmd.Parameters.AddWithValue("@Id", poId.ToString());
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await RefreshSearchBlobAsync(connection, null, prId).ConfigureAwait(false);
+            await RefreshSearchBlobAsync(connection, tx, prId).ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
         }
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Data;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -21,12 +20,7 @@ namespace Procure.Data
 
         public SqliteConnection CreateConnection()
         {
-            var dir = DatabaseConstants.DatabaseDirectory;
-            if (!Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
+            // Directory existence is ensured once, when DatabaseConstants resolves its cached path.
             var connection = new SqliteConnection(DatabaseConstants.ConnectionString);
 
             // Every caller creates a connection and opens it itself, so hooking the open is the one

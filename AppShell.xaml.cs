@@ -18,6 +18,7 @@ namespace Procure
         {
             _services = services;
             _settingsService = settingsService;
+            Procure.Utilities.BoardTrace.Mark("shell-ctor-start");
             InitializeComponent();
 
             // Only the landing page is built here. Taking all four by constructor injection meant DI
@@ -33,6 +34,32 @@ namespace Procure
             // otherwise pays SQLite provider start-up plus the full load on the click itself.
             // Fire and forget: PrListPageModel handles its own errors and guards re-entry.
             _ = services.GetRequiredService<PrListPageModel>().PreloadDataAsync();
+
+            // Warm the board's visual tree too. 1.2s clears the startup busy stretch (~1.1s measured
+            // on the trace heartbeat) so the prewarm never delays first paint, while still beating any
+            // humanly-plausible click; OnNavigating's null check makes it race-free if one lands first.
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(1200), () =>
+            {
+                if (PrBoardContent.Content is null)
+                {
+                    Procure.Utilities.BoardTrace.Mark("prewarm-inflate-start");
+                    PrBoardContent.Content = _services.GetRequiredService<PrListPage>();
+                    Procure.Utilities.BoardTrace.Mark("prewarm-inflate-done");
+                }
+            });
+
+            Procure.Utilities.BoardTrace.Mark("shell-ctor-done");
+            Procure.Utilities.BoardTrace.StartPulse(Dispatcher);
+            if (Procure.Utilities.BoardTrace.IsEnabled
+                && int.TryParse(Environment.GetEnvironmentVariable("PROCURE_TRACE_NAV"), out var navMs))
+            {
+                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(navMs), async () =>
+                {
+                    Procure.Utilities.BoardTrace.Mark("nav-click");
+                    await GoToAsync("//prboard");
+                    Procure.Utilities.BoardTrace.Mark("nav-completed");
+                });
+            }
         }
 
         // Pages are DI singletons assigned to their ShellContent once, so this is purely about *when*
@@ -45,7 +72,11 @@ namespace Procure
             if (string.IsNullOrEmpty(target)) return;
 
             if (PrBoardContent.Content is null && target.Contains("prboard", StringComparison.Ordinal))
+            {
+                Procure.Utilities.BoardTrace.Mark("click-inflate-start");
                 PrBoardContent.Content = _services.GetRequiredService<PrListPage>();
+                Procure.Utilities.BoardTrace.Mark("click-inflate-done");
+            }
             else if (ColumnsContent.Content is null && target.Contains("columns", StringComparison.Ordinal))
                 ColumnsContent.Content = _services.GetRequiredService<ManageColumnsPage>();
             else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
@@ -157,7 +188,9 @@ namespace Procure
             await TransitionThemeAsync(isDark ? "Light" : "Dark", CompactThemeBtn);
         }
 
-        private async Task TransitionThemeAsync(string targetTheme, Button? clickedBtn = null)
+        // Internal so the Settings page's theme picker goes through the same curtain/fade instead of
+        // hard-flipping the whole app.
+        internal async Task TransitionThemeAsync(string targetTheme, Button? clickedBtn = null)
         {
             if (_isThemeTransitioning) return;
             _isThemeTransitioning = true;

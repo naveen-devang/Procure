@@ -122,6 +122,15 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
             await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
+            await WriteValuesForPrAsync(connection, tx, prId, values).ConfigureAwait(false);
+
+            await tx.CommitAsync().ConfigureAwait(false);
+        }
+
+        // Shared write body, so PurchaseRequisitionRepository can persist custom values inside the
+        // same transaction as the PR row instead of paying a second connection and commit per save.
+        internal static async Task WriteValuesForPrAsync(SqliteConnection connection, SqliteTransaction tx, Guid prId, IEnumerable<CustomFieldValue> values)
+        {
             using var delCmd = connection.CreateCommand();
             delCmd.Transaction = tx;
             delCmd.CommandText = "DELETE FROM CustomFieldValue WHERE PrId = @PrId;";
@@ -144,8 +153,6 @@ VALUES (@Id, @PrId, @ColumnId, @Value);";
 
                 await insCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
-
-            await tx.CommitAsync().ConfigureAwait(false);
         }
     }
 }

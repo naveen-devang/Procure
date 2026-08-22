@@ -28,8 +28,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATUSES = ["PR Raised", "RFQ Sent", "Quotes Received", "PCR Submitted", "PCR Approved",
             "PO Raised", "Partially Delivered", "Delivered", "Closed", "On Hold"]
 PRIORITIES = ["Normal"] * 8 + ["Urgent"] * 2
-PLANTS = ["RW01", "RW02", "RW03"]
-PR_TYPES = ["Stores&Spares", "Capex", "Services"]
+PLANTS = ["RW01", "NO01", "MF01"]
+PR_TYPES = ["Stores&Spares", "Raw Material", "Packing Material", "Service", "Capex"]
 VENDORS = [f"Vendor {chr(65 + i % 26)}{i} Trading LLC" for i in range(400)]
 ITEMS = [f"{a} {b}"
          for a in ("Bearing", "Gasket", "Valve", "Pump", "Motor", "Filter", "Seal", "Coupling",

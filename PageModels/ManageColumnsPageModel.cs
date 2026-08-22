@@ -97,9 +97,7 @@ namespace Procure.PageModels
                 NewColumnDataType = CustomFieldDataType.Text;
                 NewColumnOptions = string.Empty;
                 ShowOptionsField = false;
-
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Success", $"Column '{col.Name}' added successfully.", "OK");
+                // No success dialog: the new row appearing in the list is the confirmation.
             }
             catch (Exception ex)
             {

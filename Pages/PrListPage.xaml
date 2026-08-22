@@ -252,7 +252,8 @@
                             VerticalScrollBarVisibility="Always"
                             ItemsUpdatingScrollMode="KeepScrollOffset"
                             RemainingItemsThreshold="10"
-                            RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
+                            RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}"
+                            Scrolled="OnBoardScrolled">
                 <CollectionView.EmptyView>
                     <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
                         <Label Text="No purchase requisitions match your criteria."
@@ -261,7 +262,7 @@
                                TextColor="{StaticResource Gray400}"
                                HorizontalOptions="Center" />
                         <Button Text="Reset Filters"
-                                Command="{Binding LoadPrsCommand}"
+                                Command="{Binding ResetFiltersCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 HeightRequest="36"
                                 HorizontalOptions="Center" />
@@ -293,7 +294,7 @@
                                           ColumnSpacing="10"
                                           BackgroundColor="Transparent">
                                         <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleExpandCommand}"
+                                            <TapGestureRecognizer Command="{Binding ToggleExpandCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                   CommandParameter="{Binding .}" />
                                         </Grid.GestureRecognizers>
 
@@ -307,7 +308,7 @@
                                         <!-- Priority Badge (Clickable: toggles Urgent / Normal) -->
                                         <Button Grid.Column="1"
                                                 Text="{Binding Priority}"
-                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.TogglePriorityCommand}"
+                                                Command="{Binding TogglePriorityCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11"
                                                 FontFamily="SegoeSemibold"
@@ -531,7 +532,7 @@
                                         <Button Grid.Column="8" VerticalOptions="Center"
                                                 Text="&#xE70F;"
                                                 FontFamily="Segoe Fluent Icons"
-                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
+                                                Command="{Binding OpenEditPrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12"
                                                 HeightRequest="30"
@@ -545,7 +546,7 @@
                                         <Button Grid.Column="9" VerticalOptions="Center"
                                                 Text="&#xE74D;"
                                                 FontFamily="Segoe Fluent Icons"
-                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePrCommand}"
+                                                Command="{Binding DeletePrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12"
                                                 HeightRequest="30"
@@ -612,7 +613,7 @@
 
                                     <converters:LazyExpander.ContentTemplate>
                                         <DataTemplate x:DataType="models:PurchaseRequisition">
-                                            <controls:PrDetailPanel PageModel="{Binding Source={x:Reference ThisPage}, Path=BindingContext}" />
+                                            <controls:PrDetailPanel PageModel="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}" />
                                         </DataTemplate>
                                     </converters:LazyExpander.ContentTemplate>
                                     </converters:LazyExpander>

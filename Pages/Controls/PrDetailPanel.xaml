@@ -2,6 +2,8 @@
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:converters="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Controls.PrDetailPanel"
              x:Name="ThisPanel"
              x:DataType="models:PurchaseRequisition">
@@ -37,7 +39,7 @@
                     </VerticalStackLayout>
                     <Button Grid.Column="2" Text="&#xE748; Split PR"
                             FontFamily="Segoe Fluent Icons"
-                            Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.SplitMasterPrCommand}"
+                            Command="{Binding SplitMasterPrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                             CommandParameter="{Binding .}"
                             FontSize="11" HeightRequest="28" Padding="10,0"
                             Style="{StaticResource SecondaryButton}"
@@ -65,7 +67,7 @@
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                    VerticalOptions="Center" />
                             <Button Grid.Column="1" Text="+ Add RFQ"
-                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenAddRfqModalCommand}"
+                                    Command="{Binding OpenAddRfqModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="11" HeightRequest="28" Padding="10,0"
                                     BorderWidth="1"
@@ -105,7 +107,7 @@
                                                     <!-- Split / Unlink Shared RFQ Button -->
                                                     <Button Text="&#xE748;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.SplitSharedRfqCommand}"
+                                                            Command="{Binding SplitSharedRfqCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                             CommandParameter="{Binding .}"
                                                             IsVisible="{Binding IsSharedRfq}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -117,7 +119,7 @@
                                                     <!-- Edit Icon Button -->
                                                     <Button Text="&#xE70F;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenEditRfqModalCommand}"
+                                                            Command="{Binding OpenEditRfqModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                             BackgroundColor="Transparent"
@@ -128,7 +130,7 @@
                                                     <!-- Delete Icon Button -->
                                                     <Button Text="&#xE74D;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.DeleteRfqCommand}"
+                                                            Command="{Binding DeleteRfqCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                             BackgroundColor="Transparent"
@@ -383,7 +385,7 @@
                                     Text="&#xEDE1;"
                                     FontFamily="Segoe Fluent Icons"
                                     IsVisible="{Binding HasPcr}"
-                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenExportPcrModalCommand}"
+                                    Command="{Binding OpenExportPcrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0"
                                     BackgroundColor="Transparent"
@@ -396,7 +398,7 @@
                             <Button Grid.Column="3"
                                     Text="&#xE713;"
                                     FontFamily="Segoe Fluent Icons"
-                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenApprovalConfigModalCommand}"
+                                    Command="{Binding OpenApprovalConfigModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="14" WidthRequest="28" HeightRequest="28" Padding="0"
                                     BackgroundColor="Transparent"
@@ -444,7 +446,7 @@
                                                         <!-- Unset: Clean Button Filling 142px -->
                                                         <Button Grid.Column="1" Text="+ Sent Date"
                                                                 IsVisible="{Binding HasSentDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.SetApprovalSentTodayCommand}"
+                                                                Command="{Binding SetApprovalSentTodayCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                 CommandParameter="{Binding .}"
                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                 HorizontalOptions="Fill"
@@ -452,25 +454,34 @@
                                                                 TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                                                 CornerRadius="4" />
 
-                                                        <!-- Set: Direct DatePicker + Clear button (No gap) -->
-                                                        <Grid Grid.Column="1" IsVisible="{Binding HasSentDate}" ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
-                                                            <DatePicker Grid.Column="0"
-                                                                        Date="{Binding SentDatePickerValue, Mode=TwoWay}"
-                                                                        Format="MMM dd, yyyy"
-                                                                        FontSize="10"
-                                                                        WidthRequest="120"
-                                                                        HeightRequest="26"
-                                                                        DateSelected="OnApprovalDateSelected"
-                                                                        VerticalOptions="Center" />
-                                                            <Button Grid.Column="1" Text="✕"
-                                                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.ClearSentDateCommand}"
-                                                                    CommandParameter="{Binding .}"
-                                                                    FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
-                                                                    BackgroundColor="Transparent"
-                                                                    TextColor="{StaticResource Gray400}"
-                                                                    ToolTipProperties.Text="Clear Sent Date"
-                                                                    VerticalOptions="Center" />
-                                                        </Grid>
+                                                        <!-- Set: DatePicker + Clear, deferred. IsVisible=false still builds the
+                                                             native CalendarDatePicker - the heaviest control in this panel - so an
+                                                             unset stage builds only the "+" button; the picker inflates the first
+                                                             time a date is actually set. -->
+                                                        <converters:LazyExpander Grid.Column="1" IsExpanded="{Binding HasSentDate}">
+                                                            <converters:LazyExpander.ContentTemplate>
+                                                                <DataTemplate x:DataType="models:Approval">
+                                                                    <Grid ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
+                                                                        <DatePicker Grid.Column="0"
+                                                                                    Date="{Binding SentDatePickerValue, Mode=TwoWay}"
+                                                                                    Format="MMM dd, yyyy"
+                                                                                    FontSize="10"
+                                                                                    WidthRequest="120"
+                                                                                    HeightRequest="26"
+                                                                                    DateSelected="OnApprovalDateSelected"
+                                                                                    VerticalOptions="Center" />
+                                                                        <Button Grid.Column="1" Text="✕"
+                                                                                Command="{Binding ClearSentDateCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                                CommandParameter="{Binding .}"
+                                                                                FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
+                                                                                BackgroundColor="Transparent"
+                                                                                TextColor="{StaticResource Gray400}"
+                                                                                ToolTipProperties.Text="Clear Sent Date"
+                                                                                VerticalOptions="Center" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </converters:LazyExpander.ContentTemplate>
+                                                        </converters:LazyExpander>
                                                     </Grid>
 
                                                     <!-- 2. DATE RECEIVED ROW -->
@@ -482,7 +493,7 @@
                                                         <!-- Unset: Clean Button Filling 142px -->
                                                         <Button Grid.Column="1" Text="+ Received Date"
                                                                 IsVisible="{Binding HasReceivedDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.SetApprovalReceivedTodayCommand}"
+                                                                Command="{Binding SetApprovalReceivedTodayCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                                 CommandParameter="{Binding .}"
                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                 HorizontalOptions="Fill"
@@ -490,25 +501,31 @@
                                                                 TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                                                 CornerRadius="4" />
 
-                                                        <!-- Set: Direct DatePicker + Clear button (No gap) -->
-                                                        <Grid Grid.Column="1" IsVisible="{Binding HasReceivedDate}" ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
-                                                            <DatePicker Grid.Column="0"
-                                                                        Date="{Binding ReceivedDatePickerValue, Mode=TwoWay}"
-                                                                        Format="MMM dd, yyyy"
-                                                                        FontSize="10"
-                                                                        WidthRequest="120"
-                                                                        HeightRequest="26"
-                                                                        DateSelected="OnApprovalDateSelected"
-                                                                        VerticalOptions="Center" />
-                                                            <Button Grid.Column="1" Text="✕"
-                                                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.ClearReceivedDateCommand}"
-                                                                    CommandParameter="{Binding .}"
-                                                                    FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
-                                                                    BackgroundColor="Transparent"
-                                                                    TextColor="{StaticResource Gray400}"
-                                                                    ToolTipProperties.Text="Clear Received Date"
-                                                                    VerticalOptions="Center" />
-                                                        </Grid>
+                                                        <!-- Set: DatePicker + Clear, deferred - same reasoning as the Sent row. -->
+                                                        <converters:LazyExpander Grid.Column="1" IsExpanded="{Binding HasReceivedDate}">
+                                                            <converters:LazyExpander.ContentTemplate>
+                                                                <DataTemplate x:DataType="models:Approval">
+                                                                    <Grid ColumnDefinitions="120, Auto" ColumnSpacing="3" VerticalOptions="Center">
+                                                                        <DatePicker Grid.Column="0"
+                                                                                    Date="{Binding ReceivedDatePickerValue, Mode=TwoWay}"
+                                                                                    Format="MMM dd, yyyy"
+                                                                                    FontSize="10"
+                                                                                    WidthRequest="120"
+                                                                                    HeightRequest="26"
+                                                                                    DateSelected="OnApprovalDateSelected"
+                                                                                    VerticalOptions="Center" />
+                                                                        <Button Grid.Column="1" Text="✕"
+                                                                                Command="{Binding ClearReceivedDateCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                                CommandParameter="{Binding .}"
+                                                                                FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
+                                                                                BackgroundColor="Transparent"
+                                                                                TextColor="{StaticResource Gray400}"
+                                                                                ToolTipProperties.Text="Clear Received Date"
+                                                                                VerticalOptions="Center" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </converters:LazyExpander.ContentTemplate>
+                                                        </converters:LazyExpander>
                                                     </Grid>
                                                 </VerticalStackLayout>
                                             </Grid>
@@ -532,7 +549,7 @@
                                        TextColor="{StaticResource Gray400}"
                                        HorizontalOptions="Center" />
                                 <Button Text="+ Create &amp; Submit PCR"
-                                        Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.CreatePcrForPrCommand}"
+                                        Command="{Binding CreatePcrForPrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                         CommandParameter="{Binding .}"
                                         Style="{StaticResource PrimaryButton}"
                                         FontSize="12" HeightRequest="32" Padding="14,0" />
@@ -561,7 +578,7 @@
                                        VerticalOptions="Center" />
 
                                 <Button Grid.Column="1" Text="+ Add PO"
-                                        Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenAddPoModalCommand}"
+                                        Command="{Binding OpenAddPoModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                         CommandParameter="{Binding .}"
                                         FontSize="11" HeightRequest="28" Padding="10,0"
                                         BorderWidth="1"
@@ -633,7 +650,7 @@
                                             <Button Grid.Row="0" Grid.Column="2"
                                                     Text="&#xE70F;"
                                                     FontFamily="Segoe Fluent Icons"
-                                                    Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenEditPoModalCommand}"
+                                                    Command="{Binding OpenEditPoModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                     CommandParameter="{Binding .}"
                                                     FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                     BackgroundColor="Transparent"
@@ -662,7 +679,7 @@
                                                 <!-- Split Combined PO Button -->
                                                 <Button Text="&#xE748;"
                                                         FontFamily="Segoe Fluent Icons"
-                                                        Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.SplitCombinedPoCommand}"
+                                                        Command="{Binding SplitCombinedPoCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                         CommandParameter="{Binding .}"
                                                         IsVisible="{Binding IsCombinedPo}"
                                                         FontSize="10" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -674,7 +691,7 @@
                                                 <!-- Delete PO Button -->
                                                 <Button Text="&#xE74D;"
                                                         FontFamily="Segoe Fluent Icons"
-                                                        Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.DeletePoCommand}"
+                                                        Command="{Binding DeletePoCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                                                         CommandParameter="{Binding .}"
                                                         FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                         BackgroundColor="Transparent"
@@ -826,7 +843,7 @@
 
                     <Button Grid.Column="1"
                             Text="Edit Requisition &amp; Fields"
-                            Command="{Binding Source={x:Reference ThisPanel}, Path=PageModel.OpenEditPrModalCommand}"
+                            Command="{Binding OpenEditPrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
                             CommandParameter="{Binding .}"
                             FontSize="12" HeightRequest="32" Padding="14,0"
                             Style="{StaticResource SecondaryButton}"

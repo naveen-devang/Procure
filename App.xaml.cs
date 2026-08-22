@@ -79,11 +79,11 @@ namespace Procure
         protected override Window CreateWindow(IActivationState? activationState)
         {
             var shell = _services.GetRequiredService<AppShell>();
+            // No explicit Width/Height: OnWindowCreated maximizes the window, and an explicit size
+            // applied after that only fights the maximized state.
             var window = new Window(shell)
             {
-                Title = "RWC  MM Tracker",
-                Width = 1400,
-                Height = 900,
+                Title = "RWC MM Tracker",
                 MinimumWidth = 800,
                 MinimumHeight = 550
             };

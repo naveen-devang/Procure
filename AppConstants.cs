@@ -4,9 +4,8 @@ namespace Procure
     {
         /// <summary>
         /// The GitHub repository used for checking releases and automatic updates.
-        /// Update this with your GitHub username/repository name when ready (e.g. "your-username/Procure").
         /// </summary>
-        public const string GitHubRepository = "Procure/Procure";
+        public const string GitHubRepository = "naveen-devang/Procure";
 
         /// <summary>
         /// Sidebar layout dimensions and responsive breakpoints (in DIPs).

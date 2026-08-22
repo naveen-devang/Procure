@@ -40,7 +40,8 @@
                         <VerticalStackLayout Grid.Column="0" Spacing="4">
                             <Label Text="PR Number *" FontSize="12" FontFamily="SegoeSemibold"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            <Entry Text="{Binding CurrentEditingPr.PrNo, Mode=TwoWay}"
+                            <Entry x:Name="PrNoEntry"
+                                   Text="{Binding CurrentEditingPr.PrNo, Mode=TwoWay}"
                                    Placeholder="e.g. PR-2026-001" HeightRequest="36" />
                         </VerticalStackLayout>
 
@@ -138,7 +139,7 @@
                         <VerticalStackLayout Grid.Column="1" Spacing="4">
                             <Label Text="Status" FontSize="12" FontFamily="SegoeSemibold"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            <Picker ItemsSource="{Binding AllStatuses}"
+                            <Picker ItemsSource="{Binding SelectableStatuses}"
                                     SelectedItem="{Binding CurrentEditingPr.Status, Mode=TwoWay}"
                                     HeightRequest="36" />
                         </VerticalStackLayout>

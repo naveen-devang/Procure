@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -26,11 +26,29 @@ namespace Procure.Data
         /// against a 20,000-PR database while your real one stays where it is. Unset, this is exactly
         /// the saved preference as before.
         /// </summary>
+        // Resolved once per process: every DB call routes through these, and the uncached form cost
+        // two Preferences reads (a registry hit when unpackaged) plus a directory stat per connection.
+        private static string? _cachedDirectory;
+        private static string? _cachedConnectionString;
+
         public static string DatabaseDirectory
         {
-            get => Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
-                   ?? Preferences.Default.Get(CustomDbPathKey, DefaultDatabaseDirectory);
-            set => Preferences.Default.Set(CustomDbPathKey, value);
+            get
+            {
+                if (_cachedDirectory is null)
+                {
+                    _cachedDirectory = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
+                                       ?? Preferences.Default.Get(CustomDbPathKey, DefaultDatabaseDirectory);
+                    Directory.CreateDirectory(_cachedDirectory); // no-op when it already exists
+                }
+                return _cachedDirectory;
+            }
+            set
+            {
+                Preferences.Default.Set(CustomDbPathKey, value);
+                _cachedDirectory = null;
+                _cachedConnectionString = null;
+            }
         }
 
         public static string DatabaseFilePath => Path.Combine(DatabaseDirectory, DatabaseFilename);
@@ -41,7 +59,7 @@ namespace Procure.Data
         /// schema version changes, so every launch after the first left ON DELETE CASCADE unenforced.
         /// Microsoft.Data.Sqlite re-applies this on every open, pooled or not.
         /// </summary>
-        public static string ConnectionString => new SqliteConnectionStringBuilder
+        public static string ConnectionString => _cachedConnectionString ??= new SqliteConnectionStringBuilder
         {
             DataSource = DatabaseFilePath,
             ForeignKeys = true
@@ -158,6 +176,9 @@ CREATE TABLE IF NOT EXISTS RfqItem (
     SortOrder INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS IX_RfqItem_RfqId ON RfqItem(RfqId);
+-- With foreign_keys=ON, every PrItem delete scans child tables for referencing rows unless the
+-- FK column is indexed. Same for the other child-side FK indexes below.
+CREATE INDEX IF NOT EXISTS IX_RfqItem_PrItemId ON RfqItem(PrItemId);
 
 CREATE TABLE IF NOT EXISTS PriceComparisonRequest (
     Id TEXT PRIMARY KEY,
@@ -199,6 +220,7 @@ CREATE TABLE IF NOT EXISTS PurchaseOrder (
     VatType TEXT DEFAULT '5%'
 );
 CREATE INDEX IF NOT EXISTS IX_PO_PrId ON PurchaseOrder(PrId);
+CREATE INDEX IF NOT EXISTS IX_PO_LinkedRfqId ON PurchaseOrder(LinkedRfqId);
 
 CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
     Id TEXT PRIMARY KEY,
@@ -214,6 +236,8 @@ CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
     SortOrder INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
+CREATE INDEX IF NOT EXISTS IX_PoItem_PrItemId ON PurchaseOrderItem(PrItemId);
+CREATE INDEX IF NOT EXISTS IX_PoItem_RfqItemId ON PurchaseOrderItem(RfqItemId);
 
 CREATE TABLE IF NOT EXISTS CustomColumnDefinition (
     Id TEXT PRIMARY KEY,
@@ -230,6 +254,7 @@ CREATE TABLE IF NOT EXISTS CustomFieldValue (
     Value TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_CFV_PrId ON CustomFieldValue(PrId);
+CREATE INDEX IF NOT EXISTS IX_CFV_ColumnId ON CustomFieldValue(ColumnId);
 ";
     }
 }

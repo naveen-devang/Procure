@@ -12,14 +12,10 @@ namespace Procure.Data.Repositories
     public partial class PurchaseRequisitionRepository : IPurchaseRequisitionRepository
     {
         private readonly SqliteDatabase _db;
-        private readonly ICustomColumnRepository _customColumnRepo;
 
-        public PurchaseRequisitionRepository(
-            SqliteDatabase db,
-            ICustomColumnRepository customColumnRepo)
+        public PurchaseRequisitionRepository(SqliteDatabase db)
         {
             _db = db;
-            _customColumnRepo = customColumnRepo;
         }
 
         public async Task<List<PurchaseRequisition>> GetAllAsync()
@@ -714,142 +710,8 @@ LIMIT @Limit;";
                 }
             }
 
-            if (prs.Count == 0) return prs;
-
-            var prById = prs.ToDictionary(p => p.Id);
-
-            // Load RFQs for these few PRs
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Incoterms, DeliveryLeadTime, Currency, SharedPrs
-FROM RequestForQuotation
-WHERE PrId IN ({BindIdList(cmd, "@Pr", prById.Keys)});";
-
-                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    var prId = Guid.Parse(reader.GetString(1));
-                    if (prById.TryGetValue(prId, out var pr))
-                    {
-                        pr.Rfqs.Add(new RequestForQuotation
-                        {
-                            Id = Guid.Parse(reader.GetString(0)),
-                            PrId = prId,
-                            RfqNo = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                            Vendor = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                            Status = reader.IsDBNull(4) ? RfqStatus.Sent : reader.GetString(4),
-                            SentDate = reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5)),
-                            QuoteReceivedDate = reader.IsDBNull(6) ? null : DateTime.Parse(reader.GetString(6)),
-                            QuoteAmount = reader.IsDBNull(7) ? null : Convert.ToDecimal(reader.GetValue(7)),
-                            PaymentTerms = reader.IsDBNull(8) ? "30 Days Net" : reader.GetString(8),
-                            VatType = reader.IsDBNull(9) ? "5%" : reader.GetString(9),
-                            Freight = reader.IsDBNull(10) ? null : Convert.ToDecimal(reader.GetValue(10)),
-                            OtherCharges = reader.IsDBNull(11) ? null : Convert.ToDecimal(reader.GetValue(11)),
-                            Incoterms = reader.IsDBNull(12) ? "DDP" : reader.GetString(12),
-                            DeliveryLeadTime = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
-                            Currency = reader.IsDBNull(14) ? "AED" : reader.GetString(14),
-                            SharedPrs = reader.IsDBNull(15) ? string.Empty : reader.GetString(15)
-                        });
-                    }
-                }
-            }
-
-            // Load PCRs and Approvals for these PRs
-            var pcrDict = new Dictionary<Guid, PriceComparisonRequest>();
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT Id, PrId, PcrNo, CreatedAt
-FROM PriceComparisonRequest
-WHERE PrId IN ({BindIdList(cmd, "@Pr", prById.Keys)});";
-
-                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    var prId = Guid.Parse(reader.GetString(1));
-                    var pcr = new PriceComparisonRequest
-                    {
-                        Id = Guid.Parse(reader.GetString(0)),
-                        PrId = prId,
-                        PcrNo = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                        CreatedAt = DateTime.Parse(reader.GetString(3))
-                    };
-                    pcrDict[pcr.Id] = pcr;
-                    if (prById.TryGetValue(prId, out var pr)) pr.Pcr = pcr;
-                }
-            }
-
-            if (pcrDict.Count > 0)
-            {
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = $@"
-SELECT Id, PcrId, Role, SignedByName, Signed, SignedDate, SentDate, ReceivedDate, SortOrder, RequiresMultipleDates
-FROM Approval
-WHERE PcrId IN ({BindIdList(cmd, "@Pcr", pcrDict.Keys)})
-ORDER BY SortOrder ASC;";
-
-                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        var pcrId = Guid.Parse(reader.GetString(1));
-                        if (pcrDict.TryGetValue(pcrId, out var pcr))
-                        {
-                            pcr.Approvals.Add(new Approval
-                            {
-                                Id = Guid.Parse(reader.GetString(0)),
-                                PcrId = pcrId,
-                                Role = reader.GetString(2),
-                                SignedByName = reader.IsDBNull(3) ? null : reader.GetString(3),
-                                Signed = reader.GetInt32(4) != 0,
-                                SignedDate = reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5)),
-                                SentDate = reader.IsDBNull(6) ? null : DateTime.Parse(reader.GetString(6)),
-                                ReceivedDate = reader.IsDBNull(7) ? null : DateTime.Parse(reader.GetString(7)),
-                                SortOrder = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
-                                RequiresMultipleDates = reader.IsDBNull(9) || reader.GetInt32(9) != 0,
-                                IsIncluded = true
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Load POs for these PRs
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-SELECT Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs
-FROM PurchaseOrder
-WHERE PrId IN ({BindIdList(cmd, "@Pr", prById.Keys)});";
-
-                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    var prId = Guid.Parse(reader.GetString(1));
-                    if (prById.TryGetValue(prId, out var pr))
-                    {
-                        pr.Pos.Add(new PurchaseOrder
-                        {
-                            Id = Guid.Parse(reader.GetString(0)),
-                            PrId = prId,
-                            PoNo = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                            Vendor = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                            LinkedRfqId = reader.IsDBNull(4) ? null : Guid.Parse(reader.GetString(4)),
-                            Value = reader.IsDBNull(5) ? 0 : Convert.ToDecimal(reader.GetValue(5)),
-                            Status = reader.IsDBNull(6) ? PoStatus.Raised : reader.GetString(6),
-                            Date = reader.IsDBNull(7) ? null : DateTime.Parse(reader.GetString(7)),
-                            CombinedPrs = reader.IsDBNull(8) ? string.Empty : reader.GetString(8)
-                        });
-                    }
-                }
-            }
-
-            foreach (var pr in prs)
-            {
-                pr.NotifyHierarchyChanged();
-            }
-
+            // No child hydration: the only caller is the Dashboard's Needs Attention widget, whose
+            // template binds scalar PR fields exclusively.
             return prs;
         }
     }

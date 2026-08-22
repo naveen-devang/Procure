@@ -82,7 +82,7 @@
                                     <VerticalStackLayout Grid.Column="0" Spacing="4">
                                         <Label Text="Default Requestor" FontSize="11" FontFamily="SegoeSemibold"
                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Entry Text="{Binding BatchSharedRequestor, Mode=TwoWay}" Placeholder="e.g. Operations Team" HeightRequest="34" FontSize="12" />
+                                        <Entry x:Name="SharedRequestorEntry" Text="{Binding BatchSharedRequestor, Mode=TwoWay}" Placeholder="e.g. Operations Team" HeightRequest="34" FontSize="12" />
                                     </VerticalStackLayout>
 
                                     <VerticalStackLayout Grid.Column="1" Spacing="4">

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -123,13 +125,36 @@ namespace Procure.PageModels
 
             _settingsService.SettingsChanged += (s, e) =>
             {
-                SelectedThemeMode = _settingsService.AppTheme;
-                SelectedAccentTheme = _settingsService.AccentTheme;
-                AutoCheckUpdates = _settingsService.AutoCheckUpdatesOnStartup;
-                IsSidebarCompact = _settingsService.IsSidebarCompact;
-                AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
-                DefaultCurrency = _settingsService.DefaultCurrency;
-                LoadDefaultApprovalStages();
+                // Keyed like AppShell's handler: a theme click or a sidebar auto-collapse during a
+                // window resize must not touch unrelated properties or rebuild the stages list.
+                switch (e.Key)
+                {
+                    case nameof(ISettingsService.AppTheme):
+                        SelectedThemeMode = _settingsService.AppTheme;
+                        break;
+                    case nameof(ISettingsService.AccentTheme):
+                        SelectedAccentTheme = _settingsService.AccentTheme;
+                        break;
+                    case nameof(ISettingsService.AutoCheckUpdatesOnStartup):
+                        AutoCheckUpdates = _settingsService.AutoCheckUpdatesOnStartup;
+                        break;
+                    case nameof(ISettingsService.IsSidebarCompact):
+                        IsSidebarCompact = _settingsService.IsSidebarCompact;
+                        break;
+                    case nameof(ISettingsService.AutoCollapseSidebarOnNarrow):
+                        AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
+                        break;
+                    case nameof(ISettingsService.DefaultCurrency):
+                        DefaultCurrency = _settingsService.DefaultCurrency;
+                        break;
+                    case nameof(ISettingsService.GetDefaultApprovalRoles):
+                        // This model's own stage commands mutate DefaultApprovalStages in place and
+                        // then persist, which raises this key - only a genuinely different list
+                        // (another writer) warrants the Clear-and-refill rebuild.
+                        if (!DefaultApprovalStages.SequenceEqual(_settingsService.GetDefaultApprovalRoles()))
+                            LoadDefaultApprovalStages();
+                        break;
+                }
             };
         }
 
@@ -168,10 +193,16 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public void SelectThemeMode(string mode)
+        public async Task SelectThemeModeAsync(string mode)
         {
             SelectedThemeMode = mode;
-            _settingsService.AppTheme = mode;
+            if (_settingsService.AppTheme == mode) return;
+
+            // Same curtain/fade the sidebar buttons get; the fallback covers a missing shell.
+            if (Shell.Current is AppShell shell)
+                await shell.TransitionThemeAsync(mode);
+            else
+                _settingsService.AppTheme = mode;
         }
 
         [RelayCommand]
@@ -306,10 +337,7 @@ namespace Procure.PageModels
                 _settingsService.DatabaseDirectory = DatabaseDirectory;
                 _settingsService.AutoCheckUpdatesOnStartup = AutoCheckUpdates;
 
-                if (Shell.Current != null)
-                {
-                    await Shell.Current.DisplayAlertAsync("Settings Saved", "Preferences updated successfully.", "OK");
-                }
+                await Toast.Make("Settings saved").Show();
             }
             catch (Exception ex)
             {

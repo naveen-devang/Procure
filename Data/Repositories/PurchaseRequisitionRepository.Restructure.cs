@@ -10,7 +10,11 @@ namespace Procure.Data.Repositories
     // Multi-PR restructuring: merge, bulk RFQ/PO creation, and the split/unmerge family.
     public partial class PurchaseRequisitionRepository
     {
-        public async Task MergePrsAsync(List<PurchaseRequisition> sourcePrs, PurchaseRequisition masterPr, bool copyRfqs)
+        // Like the Writes partial: SQLite work is synchronous under the async surface, so every
+        // public restructure op hops to the thread pool once via Task.Run.
+        public Task MergePrsAsync(List<PurchaseRequisition> sourcePrs, PurchaseRequisition masterPr, bool copyRfqs) => Task.Run(() => MergePrsCoreAsync(sourcePrs, masterPr, copyRfqs));
+
+        private async Task MergePrsCoreAsync(List<PurchaseRequisition> sourcePrs, PurchaseRequisition masterPr, bool copyRfqs)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             masterPr.UpdatedAt = DateTime.Now;
@@ -224,7 +228,9 @@ WHERE Id = @Id;";
             await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
-        public async Task CreateBatchPoAsync(List<PurchaseRequisition> targetPrs, PurchaseOrder poTemplate)
+        public Task CreateBatchPoAsync(List<PurchaseRequisition> targetPrs, PurchaseOrder poTemplate) => Task.Run(() => CreateBatchPoCoreAsync(targetPrs, poTemplate));
+
+        private async Task CreateBatchPoCoreAsync(List<PurchaseRequisition> targetPrs, PurchaseOrder poTemplate)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -291,7 +297,9 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
             }
         }
 
-        public async Task CreateBatchRfqAsync(List<PurchaseRequisition> targetPrs, RequestForQuotation rfqTemplate, IEnumerable<RfqItem>? batchItems = null)
+        public Task CreateBatchRfqAsync(List<PurchaseRequisition> targetPrs, RequestForQuotation rfqTemplate, IEnumerable<RfqItem>? batchItems = null) => Task.Run(() => CreateBatchRfqCoreAsync(targetPrs, rfqTemplate, batchItems));
+
+        private async Task CreateBatchRfqCoreAsync(List<PurchaseRequisition> targetPrs, RequestForQuotation rfqTemplate, IEnumerable<RfqItem>? batchItems)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -426,7 +434,9 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
             }
         }
 
-        public async Task SplitMergedPrAsync(Guid masterPrId)
+        public Task SplitMergedPrAsync(Guid masterPrId) => Task.Run(() => SplitMergedPrCoreAsync(masterPrId));
+
+        private async Task SplitMergedPrCoreAsync(Guid masterPrId)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -579,7 +589,9 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
             await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
-        public async Task PartialSplitMergedPrAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs)
+        public Task PartialSplitMergedPrAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs) => Task.Run(() => PartialSplitMergedPrCoreAsync(masterPrId, splitPrs, keptPrs));
+
+        private async Task PartialSplitMergedPrCoreAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -709,7 +721,9 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
             await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
         }
 
-        public async Task SplitSharedRfqAsync(Guid rfqId)
+        public Task SplitSharedRfqAsync(Guid rfqId) => Task.Run(() => SplitSharedRfqCoreAsync(rfqId));
+
+        private async Task SplitSharedRfqCoreAsync(Guid rfqId)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -739,13 +753,12 @@ WHERE Id = @Id OR (@RfqNo IS NOT NULL AND RfqNo = @RfqNo);";
             }
 
             await tx.CommitAsync().ConfigureAwait(false);
-
-            // These move rows between several PRs at once, so rebuild every PR's search text rather
-            // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            // No search-blob rebuild: SharedPrs is not part of the blob and nothing else changed.
         }
 
-        public async Task SplitCombinedPoAsync(Guid poId)
+        public Task SplitCombinedPoAsync(Guid poId) => Task.Run(() => SplitCombinedPoCoreAsync(poId));
+
+        private async Task SplitCombinedPoCoreAsync(Guid poId)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -775,10 +788,7 @@ WHERE Id = @Id OR (@PoNo IS NOT NULL AND PoNo = @PoNo);";
             }
 
             await tx.CommitAsync().ConfigureAwait(false);
-
-            // These move rows between several PRs at once, so rebuild every PR's search text rather
-            // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            // No search-blob rebuild: CombinedPrs is not part of the blob and nothing else changed.
         }
     }
 }

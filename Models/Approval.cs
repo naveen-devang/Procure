@@ -22,6 +22,8 @@ namespace Procure.Models
         public partial bool Signed { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasReceivedDate))]
+        [NotifyPropertyChangedFor(nameof(IsReceived))]
         [NotifyPropertyChangedFor(nameof(StatusText))]
         public partial DateTime? SignedDate { get; set; }
 
@@ -53,6 +55,8 @@ namespace Procure.Models
         public bool IsReceived => ReceivedDate.HasValue || (Signed && SignedDate.HasValue);
         public bool IsSent => SentDate.HasValue;
 
+        // The generated setters' NotifyPropertyChangedFor fan-out already raises every dependent
+        // property; no blanket NotifyPropertiesChanged here or one date pick storms the PCR/PR chain.
         public DateTime SentDatePickerValue
         {
             get => SentDate ?? DateTime.Today;
@@ -61,7 +65,6 @@ namespace Procure.Models
                 if (SentDate != value)
                 {
                     SentDate = value;
-                    NotifyPropertiesChanged();
                 }
             }
         }
@@ -76,7 +79,6 @@ namespace Procure.Models
                     ReceivedDate = value;
                     Signed = true;
                     SignedDate = value;
-                    NotifyPropertiesChanged();
                 }
             }
         }

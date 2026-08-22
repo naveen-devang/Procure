@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -197,13 +198,7 @@ namespace Procure.PageModels
             try
             {
                 await RfqClipboardFormatter.CopyToClipboardAsync(selectedItems);
-                if (Shell.Current != null)
-                {
-                    await Shell.Current.DisplayAlertAsync(
-                        "Copied to Clipboard",
-                        $"Successfully copied {selectedItems.Count} item(s) across selected PRs formatted for your email.\n\nYou can now paste directly into Outlook, Gmail, or Word.",
-                        "OK");
-                }
+                await Toast.Make($"Copied {selectedItems.Count} item(s) for email").Show();
             }
             catch (Exception ex)
             {

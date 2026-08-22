@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -295,17 +296,19 @@ namespace Procure.PageModels
         {
             if (BatchPrEntries.Count == 0) return;
 
-            // Validate PR entries
+            // Validate PR entries. Failures accumulate so one submit reports every bad row at once
+            // instead of one round trip through a dialog per row.
             var validEntries = new List<PurchaseRequisition>();
+            var errors = new List<string>();
             int index = 1;
 
             foreach (var entry in BatchPrEntries)
             {
                 if (string.IsNullOrWhiteSpace(entry.PrNo))
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Validation", $"Row {index}: PR Number is required.", "OK");
-                    return;
+                    errors.Add($"Row {index}: PR Number is required.");
+                    index++;
+                    continue;
                 }
 
                 // Filter valid line items
@@ -320,18 +323,18 @@ namespace Procure.PageModels
                     }
                     else
                     {
-                        if (Shell.Current != null)
-                            await Shell.Current.DisplayAlertAsync("Validation", $"Row {index} ({entry.PrNo}): Description or at least one Line Item is required.", "OK");
-                        return;
+                        errors.Add($"Row {index} ({entry.PrNo}): Description or at least one Line Item is required.");
+                        index++;
+                        continue;
                     }
                 }
 
                 var prType = string.IsNullOrWhiteSpace(entry.PrType) ? BatchSharedPrType : entry.PrType;
                 if (string.IsNullOrWhiteSpace(prType))
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Validation", $"Row {index} ({entry.PrNo}): PR Type is required. Please select a PR Type.", "OK");
-                    return;
+                    errors.Add($"Row {index} ({entry.PrNo}): PR Type is required. Please select a PR Type.");
+                    index++;
+                    continue;
                 }
 
                 var pr = new PurchaseRequisition
@@ -355,6 +358,13 @@ namespace Procure.PageModels
                 index++;
             }
 
+            if (errors.Count > 0)
+            {
+                if (Shell.Current != null)
+                    await Shell.Current.DisplayAlertAsync("Validation", string.Join("\n", errors), "OK");
+                return;
+            }
+
             try
             {
                 IsBusy = true;
@@ -367,13 +377,7 @@ namespace Procure.PageModels
                 ApplyFilters();
                 UpdateStatusBanner();
 
-                if (Shell.Current != null)
-                {
-                    await Shell.Current.DisplayAlertAsync(
-                        "Batch Creation Complete",
-                        $"Successfully created {validEntries.Count} purchase requisitions.",
-                        "OK");
-                }
+                await Toast.Make($"Created {validEntries.Count} purchase requisitions").Show();
             }
             catch (Exception ex)
             {

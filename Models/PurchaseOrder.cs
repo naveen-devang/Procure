@@ -19,6 +19,7 @@ namespace Procure.Models
         public partial Guid? LinkedRfqId { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedValue))]
         public partial decimal Value { get; set; }
 
         [ObservableProperty]
@@ -28,6 +29,7 @@ namespace Procure.Models
         public partial DateTime? Date { get; set; } = DateTime.Today;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedValue))]
         public partial string Currency { get; set; } = "AED";
 
         [ObservableProperty]

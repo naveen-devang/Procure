@@ -289,6 +289,16 @@ namespace Procure.Utilities
         {
             var columns = SplitColumns(line);
 
+            // A comma-split line whose second column is not a quantity ("Bearing, deep-groove, 5 pcs")
+            // is an item name that contains commas, not columns - treat it as one column and let the
+            // single-column heuristics find the quantity. Tab-separated Excel paste never hits this.
+            if (columns.Length >= 2 && !line.Contains('\t')
+                && columns[1].Trim().Length > 0
+                && !Regex.IsMatch(columns[1].Trim(), @"^\d+(?:\.\d+)?\s*[a-zA-Z]*$"))
+            {
+                columns = new[] { line };
+            }
+
             if (columns.Length >= 2)
             {
                 // Multi-column row (Tab or Comma separated from Excel)

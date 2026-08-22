@@ -355,6 +355,14 @@ namespace Procure.Models
             OnPropertyChanged(nameof(HasTechnicalApproval));
             OnPropertyChanged(nameof(IsTechnicallyApproved));
             OnPropertyChanged(nameof(IsTechnicallyNotApproved));
+            // Chip visibility/text in the expanded panel; without these an RFQ edit leaves the
+            // shared/payment-terms/lead-time chips showing pre-edit values until a full rebuild.
+            OnPropertyChanged(nameof(IsSharedRfq));
+            OnPropertyChanged(nameof(HasPaymentTerms));
+            OnPropertyChanged(nameof(FormattedPaymentTermsBadge));
+            OnPropertyChanged(nameof(HasDeliveryLeadTime));
+            OnPropertyChanged(nameof(FormattedLeadTimeBadge));
+            OnPropertyChanged(nameof(HasCommercialDetails));
         }
     }
 }

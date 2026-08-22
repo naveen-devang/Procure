@@ -55,7 +55,7 @@
                                 <VerticalStackLayout Grid.Column="0" Spacing="4">
                                     <Label Text="RFQ Number" FontSize="12"
                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                    <Entry Text="{Binding NewRfqNo, Mode=TwoWay}" Placeholder="e.g. RFQ-001-A" HeightRequest="36" />
+                                    <Entry x:Name="RfqNoEntry" Text="{Binding NewRfqNo, Mode=TwoWay}" Placeholder="e.g. RFQ-001-A" HeightRequest="36" />
                                 </VerticalStackLayout>
 
                                 <VerticalStackLayout Grid.Column="1" Spacing="4">

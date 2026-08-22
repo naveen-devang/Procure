@@ -16,7 +16,9 @@ namespace Procure.Pages
 
         public PrListPage(PrListPageModel viewModel)
         {
+            Procure.Utilities.BoardTrace.Mark("page-inflate-start");
             InitializeComponent();
+            Procure.Utilities.BoardTrace.Mark("page-inflate-done");
             BindingContext = _viewModel = viewModel;
 
             // Watch for IsBusy changes to start/stop the shimmer animation
@@ -28,7 +30,18 @@ namespace Procure.Pages
         protected override void OnAppearing()
         {
             base.OnAppearing();
+            Procure.Utilities.BoardTrace.Mark("page-appearing");
             _viewModel.BoardAppearing();
+
+#if WINDOWS
+            // Post-layout, so the ListView's template (and its ScrollViewer) exists by the time we
+            // look for it. One delayed retry covers a slow first layout.
+            Dispatcher.Dispatch(() =>
+            {
+                if (!HookBoardScrollViewer())
+                    Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(400), () => HookBoardScrollViewer());
+            });
+#endif
 
 #if DEBUG
             if (Procure.Utilities.BoardBench.IsEnabled && !_benchStarted)
@@ -51,6 +64,43 @@ namespace Procure.Pages
             base.OnDisappearing();
             _viewModel.BoardDisappearing();
         }
+
+#if WINDOWS
+        // One page-level Esc hook for all ten modal overlays. Subscribe/unsubscribe tied to the
+        // handler lifetime, same as AppShell's event pairs.
+        protected override void OnHandlerChanged()
+        {
+            base.OnHandlerChanged();
+            if (Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement root)
+            {
+                root.PreviewKeyDown -= OnPagePreviewKeyDown;
+                root.PreviewKeyDown += OnPagePreviewKeyDown;
+            }
+        }
+
+        protected override void OnHandlerChanging(HandlerChangingEventArgs args)
+        {
+            base.OnHandlerChanging(args);
+            if (args.NewHandler is null)
+            {
+                if (args.OldHandler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement root)
+                {
+                    root.PreviewKeyDown -= OnPagePreviewKeyDown;
+                }
+                if (_boardScrollViewer != null)
+                {
+                    _boardScrollViewer.ViewChanged -= OnBoardViewChanged;
+                    _boardScrollViewer = null;
+                }
+            }
+        }
+
+        private void OnPagePreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (e.Key != Windows.System.VirtualKey.Escape) return;
+            if (_viewModel.CloseTopmostModal()) e.Handled = true;
+        }
+#endif
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -96,6 +146,52 @@ namespace Procure.Pages
             });
         }
 
+        // MAUI-level scroll trigger; kept, but on a prewarmed page it can stay dead until the page
+        // is left and revisited - the native ViewChanged hook below is the authoritative signal.
+        private void OnBoardScrolled(object? sender, ItemsViewScrolledEventArgs e) =>
+            _viewModel.OnBoardScrolled(e.LastVisibleItemIndex);
+
+#if WINDOWS
+        private Microsoft.UI.Xaml.Controls.ScrollViewer? _boardScrollViewer;
+
+        // Hooks the board ListView's ScrollViewer directly: on a page inflated by the prewarm, both
+        // MAUI scroll events (Scrolled, RemainingItemsThresholdReached) never fire on the first
+        // visit - traced live - because their wiring predates the native ScrollViewer. ViewChanged
+        // also fires when appended pages grow the extent, which keeps a user parked at the bottom fed.
+        private bool HookBoardScrollViewer()
+        {
+            if (_boardScrollViewer != null) return true;
+            if (BoardList.Handler?.PlatformView is not Microsoft.UI.Xaml.DependencyObject root) return false;
+
+            _boardScrollViewer = FindScrollViewer(root);
+            if (_boardScrollViewer is null) return false;
+
+            _boardScrollViewer.ViewChanged -= OnBoardViewChanged;
+            _boardScrollViewer.ViewChanged += OnBoardViewChanged;
+            return true;
+        }
+
+        private static Microsoft.UI.Xaml.Controls.ScrollViewer? FindScrollViewer(Microsoft.UI.Xaml.DependencyObject node)
+        {
+            if (node is Microsoft.UI.Xaml.Controls.ScrollViewer sv) return sv;
+            var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node);
+            for (var i = 0; i < count; i++)
+            {
+                var found = FindScrollViewer(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i));
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private void OnBoardViewChanged(object? sender, Microsoft.UI.Xaml.Controls.ScrollViewerViewChangedEventArgs e)
+        {
+            if (sender is not Microsoft.UI.Xaml.Controls.ScrollViewer sv) return;
+            // Within two viewports of the end counts as "near the tail".
+            var nearTail = sv.VerticalOffset + sv.ViewportHeight >= sv.ExtentHeight - 2 * sv.ViewportHeight;
+            _viewModel.OnBoardNearTail(nearTail);
+        }
+#endif
+
         private void OnPrSelectionCheckedChanged(object? sender, CheckedChangedEventArgs e)
         {
             if (sender is CheckBox checkBox && checkBox.BindingContext is PurchaseRequisition pr)
@@ -112,7 +208,7 @@ namespace Procure.Pages
                 if (button.Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement frameworkElement)
                 {
                     var flyout = new Microsoft.UI.Xaml.Controls.MenuFlyout();
-                    foreach (var status in ProcurementStatus.AllStatuses)
+                    foreach (var status in ProcurementStatus.SelectableStatuses)
                     {
                         var item = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = status };
                         if (status == pr.Status)

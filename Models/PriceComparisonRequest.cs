@@ -63,12 +63,10 @@ namespace Procure.Models
 
         private void OnApprovalItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(Approval.IsReceived) ||
-                e.PropertyName == nameof(Approval.ReceivedDate) ||
-                e.PropertyName == nameof(Approval.Signed) ||
-                e.PropertyName == nameof(Approval.SignedDate) ||
-                e.PropertyName == nameof(Approval.SentDate) ||
-                e.PropertyName == nameof(Approval.StatusText))
+            // The rollups below depend only on each approval's IsReceived, and Approval raises
+            // IsReceived on every path that can change it - matching more names here just multiplies
+            // identical refreshes per edit.
+            if (e.PropertyName == nameof(Approval.IsReceived))
             {
                 NotifyApprovalsChanged();
             }
@@ -121,7 +119,9 @@ namespace Procure.Models
 
         public void NotifyApprovalsChanged()
         {
-            OnPropertyChanged(nameof(Approvals));
+            // No Approvals raise: the collection instance is unchanged on these paths (the property
+            // setter's SetProperty raises it on actual replacement), and re-raising it forces every
+            // Approvals.* binding to re-resolve.
             OnPropertyChanged(nameof(IsFullyApproved));
             OnPropertyChanged(nameof(SignedCount));
             OnPropertyChanged(nameof(TotalApprovalsCount));
