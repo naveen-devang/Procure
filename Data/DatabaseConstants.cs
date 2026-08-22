@@ -20,9 +20,16 @@ namespace Procure.Data
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
 
+        /// <summary>
+        /// PROCURE_DB_DIR points the whole app at another database for the length of one run, without
+        /// touching the saved path. That is how the capacity tests in Tools/generate-test-db.py are run
+        /// against a 20,000-PR database while your real one stays where it is. Unset, this is exactly
+        /// the saved preference as before.
+        /// </summary>
         public static string DatabaseDirectory
         {
-            get => Preferences.Default.Get(CustomDbPathKey, DefaultDatabaseDirectory);
+            get => Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
+                   ?? Preferences.Default.Get(CustomDbPathKey, DefaultDatabaseDirectory);
             set => Preferences.Default.Set(CustomDbPathKey, value);
         }
 

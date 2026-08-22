@@ -29,7 +29,22 @@ namespace Procure.Pages
         {
             base.OnAppearing();
             _viewModel.BoardAppearing();
+
+#if DEBUG
+            if (Procure.Utilities.BoardBench.IsEnabled && !_benchStarted)
+            {
+                _benchStarted = true;
+                Dispatcher.Dispatch(async () => await Procure.Utilities.BoardBench.RunAsync(
+                    () => _viewModel.FilteredPrs.Count,
+                    _viewModel.RevealMore,
+                    () => Procure.Utilities.BoardBench.SettleAsync(Dispatcher)));
+            }
+#endif
         }
+
+#if DEBUG
+        private bool _benchStarted;
+#endif
 
         protected override void OnDisappearing()
         {
