@@ -24,7 +24,7 @@
             <Button x:Name="SidebarToggleBtn"
                     Grid.Column="0"
                     Text="&#xE700;"
-                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                    FontFamily="Segoe Fluent Icons"
                     FontSize="15"
                     WidthRequest="38"
                     HeightRequest="36"
@@ -92,7 +92,7 @@
                     <HorizontalStackLayout Spacing="4" VerticalOptions="Center">
                         <Button x:Name="LightModeBtn"
                                 Text="&#xE706;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontFamily="Segoe Fluent Icons"
                                 FontSize="13"
                                 WidthRequest="32" HeightRequest="28"
                                 Padding="0"
@@ -104,7 +104,7 @@
 
                         <Button x:Name="DarkModeBtn"
                                 Text="&#xE708;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontFamily="Segoe Fluent Icons"
                                 FontSize="13"
                                 WidthRequest="32" HeightRequest="28"
                                 Padding="0"
@@ -125,7 +125,7 @@
                   BackgroundColor="Transparent">
                 <Button x:Name="CompactThemeBtn"
                         Text="&#xE708;"
-                        FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                        FontFamily="Segoe Fluent Icons"
                         FontSize="14"
                         WidthRequest="36"
                         HeightRequest="36"

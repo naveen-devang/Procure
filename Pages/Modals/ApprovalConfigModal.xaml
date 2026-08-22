@@ -37,7 +37,7 @@
                     </VerticalStackLayout>
 
                     <Button Grid.Column="1" Text="&#xE711;"
-                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                            FontFamily="Segoe Fluent Icons"
                             Command="{Binding CloseApprovalConfigModalCommand}"
                             FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
                             BackgroundColor="Transparent"
@@ -95,7 +95,7 @@
                                                                       CommandParameter="{Binding .}" />
                                             </Border.GestureRecognizers>
                                             <Label Text="&#xE73E;"
-                                                   FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                   FontFamily="Segoe Fluent Icons"
                                                    FontSize="10"
                                                    FontAttributes="Bold"
                                                    IsVisible="{Binding IsIncluded}"
@@ -112,7 +112,7 @@
 
                                         <!-- Delete Button in Right Corner -->
                                         <Button Grid.Column="3" Text="&#xE74D;"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveStageFromConfigCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12" WidthRequest="32" HeightRequest="32" Padding="0"

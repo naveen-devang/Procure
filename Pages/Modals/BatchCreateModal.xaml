@@ -58,7 +58,7 @@
                                 <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
                                     <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
                                         <Label Text="&#xE71E;"
-                                               FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                               FontFamily="Segoe Fluent Icons"
                                                FontSize="14"
                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
                                                VerticalOptions="Center" />
@@ -209,7 +209,7 @@
                                                     <!-- Row Actions -->
                                                     <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="End" Margin="0,0,0,2">
                                                         <Button Text="&#xE8C8;"
-                                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                FontFamily="Segoe Fluent Icons"
                                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DuplicateBatchPrRowCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 BackgroundColor="Transparent"
@@ -218,7 +218,7 @@
                                                                 HeightRequest="30" WidthRequest="30" Padding="0" FontSize="13" />
 
                                                         <Button Text="&#xE74D;"
-                                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                FontFamily="Segoe Fluent Icons"
                                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchPrRowCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 BackgroundColor="Transparent"
@@ -271,7 +271,7 @@
                                                         <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
                                                             <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
                                                                 <Label Text="&#xE74C;"
-                                                                       FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                       FontFamily="Segoe Fluent Icons"
                                                                        FontSize="12"
                                                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                                                        VerticalOptions="Center" />
@@ -316,7 +316,7 @@
                                                                         <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
                                                                                Placeholder="Price" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
                                                                         <Button Grid.Column="4" Text="&#xE74D;"
-                                                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                                                FontFamily="Segoe Fluent Icons"
                                                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchItemFromPrCommand}"
                                                                                 CommandParameter="{Binding .}"
                                                                                 BackgroundColor="Transparent"

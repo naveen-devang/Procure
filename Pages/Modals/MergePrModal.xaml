@@ -37,7 +37,7 @@
                         </VerticalStackLayout>
 
                         <Button Grid.Column="1" Text="&#xE711;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontFamily="Segoe Fluent Icons"
                                 Command="{Binding CloseMergePrModalCommand}"
                                 FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
                                 BackgroundColor="Transparent"

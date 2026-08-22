@@ -25,7 +25,7 @@
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="TextColor" Value="{StaticResource White}" />
         <Setter Property="BackgroundColor" Value="{DynamicResource Primary}" />
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI=SegoeSemibold, Default=''}" />
+        <Setter Property="FontFamily" Value="SegoeSemibold" />
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="BorderWidth" Value="0"/>
         <Setter Property="CornerRadius" Value="6"/>
@@ -57,7 +57,7 @@
     <Style x:Key="SecondaryButton" TargetType="Button">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI=SegoeSemibold, Default=''}" />
+        <Setter Property="FontFamily" Value="SegoeSemibold" />
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="BorderWidth" Value="1"/>
         <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray500}}" />
@@ -90,7 +90,7 @@
     <Style x:Key="CancelButton" TargetType="Button">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource FluentCriticalBg}, Dark={StaticResource FluentCriticalBgDark}}" />
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI=SegoeSemibold, Default=''}" />
+        <Setter Property="FontFamily" Value="SegoeSemibold" />
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="BorderWidth" Value="1"/>
         <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}" />

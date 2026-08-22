@@ -141,7 +141,7 @@
                     </Border.StrokeShape>
                     <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
                         <Label Grid.Column="0" Text="&#xE7BA;"
-                               FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                               FontFamily="Segoe Fluent Icons"
                                FontSize="14"
                                TextColor="{AppThemeBinding Light={StaticResource AlertWarningIconLight}, Dark={StaticResource AlertWarningIconDark}}"
                                VerticalOptions="Center" />
@@ -229,9 +229,19 @@
                     </Grid>
                 </Border>
 
-                <!-- ===== SKELETON LOADING (visible while IsBusy = true) ===== -->
-                <controls:PrListSkeleton x:Name="SkeletonContainer"
-                                         IsVisible="{Binding IsBusy}" />
+                <!-- ===== SKELETON LOADING (built on first IsBusy = true) =====
+                     121 elements. Bound with a plain IsVisible it was constructed with the page and then
+                     sat in the tree, invisible, for the rest of the session. With the data preloaded
+                     before this page is ever built, IsBusy is already false on first open and it never
+                     inflates at all; a manual Refresh builds it once and reuses it after that.
+                     The name is on the LazyExpander so the shimmer animates the whole subtree. -->
+                <converters:LazyExpander x:Name="SkeletonContainer" IsExpanded="{Binding IsBusy}">
+                    <converters:LazyExpander.ContentTemplate>
+                        <DataTemplate>
+                            <controls:PrListSkeleton />
+                        </DataTemplate>
+                    </converters:LazyExpander.ContentTemplate>
+                </converters:LazyExpander>
 
                 <!-- PR Cards List (Lightweight BindableLayout - Eliminates CollectionView layout measurement freeze) -->
                 <VerticalStackLayout IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
@@ -264,8 +274,13 @@
 
                                 <VerticalStackLayout Spacing="0">
 
-                                    <!-- CARD HEADER ROW (Clickable to expand/collapse) -->
-                                    <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto"
+                                    <!-- CARD HEADER ROW (Clickable to expand/collapse).
+                                         Columns: 0 select, 1 priority, 2 PR text block, 3 description,
+                                         4-6 pipeline pills, 7 status, 8-9 actions, 10 chevron. The pills
+                                         and the action buttons used to sit in their own stack layouts;
+                                         they are direct children now, which is two fewer containers and
+                                         two fewer measure passes per card. -->
+                                    <Grid ColumnDefinitions="Auto, Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto"
                                           RowDefinitions="Auto"
                                           Padding="14,14,18,14"
                                           ColumnSpacing="10"
@@ -444,50 +459,54 @@
                                             </HorizontalStackLayout>
                                         </VerticalStackLayout>
 
-                                        <!-- Pipeline Count Pills (Unified Metric Strip) -->
-                                        <HorizontalStackLayout Grid.Column="4" Spacing="8" VerticalOptions="Center">
-                                            <!-- RFQ Pill -->
-                                            <Border Padding="8,3" StrokeThickness="1"
-                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="4" />
-                                                </Border.StrokeShape>
-                                                <Label Text="{Binding RfqCount, StringFormat='{0} RFQs'}"
-                                                       FontSize="11"
-                                                       FontFamily="SegoeSemibold"
-                                                       TextColor="{AppThemeBinding Light={StaticResource PillTextNeutralLight}, Dark={StaticResource PillTextNeutralDark}}" />
-                                            </Border>
+                                        <!-- Pipeline Count Pills (Unified Metric Strip). Direct Grid children
+                                             rather than a HorizontalStackLayout: the stack existed only to
+                                             space them, and the Grid's ColumnSpacing does that without a
+                                             container and its measure pass. Gap 8 -> 10px. -->
+                                        <!-- RFQ Pill -->
+                                        <Border Grid.Column="4" VerticalOptions="Center"
+                                                Padding="8,3" StrokeThickness="1"
+                                                Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding RfqCount, StringFormat='{0} RFQs'}"
+                                                   FontSize="11"
+                                                   FontFamily="SegoeSemibold"
+                                                   TextColor="{AppThemeBinding Light={StaticResource PillTextNeutralLight}, Dark={StaticResource PillTextNeutralDark}}" />
+                                        </Border>
 
-                                            <!-- PCR Pill -->
-                                            <Border Padding="8,3" StrokeThickness="1"
-                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="4" />
-                                                </Border.StrokeShape>
-                                                <Label Text="{Binding PcrStatusDisplay}"
-                                                       FontSize="11"
-                                                       FontFamily="SegoeSemibold"
-                                                       TextColor="{Binding PcrStatusDisplay, Converter={StaticResource PcrPillTextColorConverter}}" />
-                                            </Border>
+                                        <!-- PCR Pill -->
+                                        <Border Grid.Column="5" VerticalOptions="Center"
+                                                Padding="8,3" StrokeThickness="1"
+                                                Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding PcrStatusDisplay}"
+                                                   FontSize="11"
+                                                   FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding PcrStatusDisplay, Converter={StaticResource PcrPillTextColorConverter}}" />
+                                        </Border>
 
-                                            <!-- PO Pill -->
-                                            <Border Padding="8,3" StrokeThickness="1"
-                                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
-                                                <Border.StrokeShape>
-                                                    <RoundRectangle CornerRadius="4" />
-                                                </Border.StrokeShape>
-                                                <Label Text="{Binding FormattedTotalPoValue, StringFormat='PO: {0}'}"
-                                                       FontSize="11"
-                                                       FontFamily="SegoeSemibold"
-                                                       TextColor="{Binding TotalPoValue, Converter={StaticResource PoPillTextColorConverter}}" />
-                                            </Border>
-                                        </HorizontalStackLayout>
+                                        <!-- PO Pill -->
+                                        <Border Grid.Column="6" VerticalOptions="Center"
+                                                Padding="8,3" StrokeThickness="1"
+                                                Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="4" />
+                                            </Border.StrokeShape>
+                                            <Label Text="{Binding FormattedTotalPoValue, StringFormat='PO: {0}'}"
+                                                   FontSize="11"
+                                                   FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding TotalPoValue, Converter={StaticResource PoPillTextColorConverter}}" />
+                                        </Border>
 
                                         <!-- Status InfoBadge (Clickable: opens native button-anchored flyout) -->
-                                        <Button Grid.Column="5"
+                                        <Button Grid.Column="7"
                                                 Text="{Binding Status}"
                                                 Clicked="OnPrStatusButtonClicked"
                                                 FontSize="12"
@@ -500,39 +519,40 @@
                                                 TextColor="{Binding Status, Converter={StaticResource StatusColorConverter}}"
                                                 VerticalOptions="Center" />
 
-                                        <!-- Edit & Delete Action Icon Buttons -->
-                                        <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
-                                            <Button Text="&#xE70F;"
-                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                    FontSize="12"
-                                                    HeightRequest="30"
-                                                    WidthRequest="30"
-                                                    Padding="0"
-                                                    CornerRadius="4"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                                    TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                                                    ToolTipProperties.Text="Edit PR" />
+                                        <!-- Edit & Delete Action Icon Buttons. Same reasoning as the pills:
+                                             the stack only spaced them. Gap 6 -> 10px. -->
+                                        <Button Grid.Column="8" VerticalOptions="Center"
+                                                Text="&#xE70F;"
+                                                FontFamily="Segoe Fluent Icons"
+                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenEditPrModalCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12"
+                                                HeightRequest="30"
+                                                WidthRequest="30"
+                                                Padding="0"
+                                                CornerRadius="4"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                ToolTipProperties.Text="Edit PR" />
 
-                                            <Button Text="&#xE74D;"
-                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
-                                                    Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePrCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                    FontSize="12"
-                                                    HeightRequest="30"
-                                                    WidthRequest="30"
-                                                    Padding="0"
-                                                    CornerRadius="4"
-                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                                    TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
-                                                    ToolTipProperties.Text="Delete PR" />
-                                        </HorizontalStackLayout>
+                                        <Button Grid.Column="9" VerticalOptions="Center"
+                                                Text="&#xE74D;"
+                                                FontFamily="Segoe Fluent Icons"
+                                                Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeletePrCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12"
+                                                HeightRequest="30"
+                                                WidthRequest="30"
+                                                Padding="0"
+                                                CornerRadius="4"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource FluentCritical}, Dark={StaticResource FluentCriticalTextDark}}"
+                                                ToolTipProperties.Text="Delete PR" />
 
                                         <!-- Expand / Collapse Indicator Chevron -->
-                                        <Label Grid.Column="7"
+                                        <Label Grid.Column="10"
                                                 Text="{Binding IsExpanded, Converter={StaticResource BoolToChevronConverter}}"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 FontSize="11"
                                                 TextColor="{StaticResource Gray400}"
                                                 VerticalOptions="Center" />

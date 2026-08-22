@@ -38,7 +38,7 @@
                         </VerticalStackLayout>
 
                         <Button Grid.Column="1" Text="&#xE711;"
-                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                FontFamily="Segoe Fluent Icons"
                                 Command="{Binding CloseBatchRfqModalCommand}"
                                 FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
                                 BackgroundColor="Transparent"
@@ -149,7 +149,7 @@
                                             Style="{StaticResource SecondaryButton}"
                                             FontSize="11" HeightRequest="28" Padding="8,0" />
                                     <Button Text="&#xE8C8; Copy for Email"
-                                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                            FontFamily="Segoe Fluent Icons"
                                             Command="{Binding CopySelectedBatchRfqItemsForEmailCommand}"
                                             Style="{StaticResource SecondaryButton}"
                                             FontSize="11" HeightRequest="28" Padding="10,0"

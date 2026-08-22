@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,7 +27,22 @@ namespace Procure.Data
                 Directory.CreateDirectory(dir);
             }
 
-            return new SqliteConnection(DatabaseConstants.ConnectionString);
+            var connection = new SqliteConnection(DatabaseConstants.ConnectionString);
+
+            // Every caller creates a connection and opens it itself, so hooking the open is the one
+            // place that reaches all of them - including any added later. The handler is static and
+            // captures nothing, and it dies with the connection the caller disposes.
+            connection.StateChange += ApplyConnectionPragmas;
+            return connection;
+        }
+
+        private static void ApplyConnectionPragmas(object? sender, StateChangeEventArgs e)
+        {
+            if (e.CurrentState != ConnectionState.Open || sender is not SqliteConnection connection) return;
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = DatabaseConstants.SqlConnectionPragmas;
+            cmd.ExecuteNonQuery();
         }
 
         public async Task InitializeAsync()

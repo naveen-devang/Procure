@@ -51,7 +51,7 @@
                             <!-- Dark Mode -->
                             <Button Grid.Column="0"
                                     Text="&#xE708;  Dark Mode"
-                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    FontFamily="Segoe Fluent Icons"
                                     Command="{Binding SelectThemeModeCommand}"
                                     CommandParameter="Dark"
                                     HeightRequest="40"
@@ -62,7 +62,7 @@
                             <!-- Light Mode -->
                             <Button Grid.Column="1"
                                     Text="&#xE706;  Light Mode"
-                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    FontFamily="Segoe Fluent Icons"
                                     Command="{Binding SelectThemeModeCommand}"
                                     CommandParameter="Light"
                                     HeightRequest="40"
@@ -73,7 +73,7 @@
                             <!-- System Default -->
                             <Button Grid.Column="2"
                                     Text="&#xE7F8;  System Default"
-                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                    FontFamily="Segoe Fluent Icons"
                                     Command="{Binding SelectThemeModeCommand}"
                                     CommandParameter="System"
                                     HeightRequest="40"
@@ -471,7 +471,7 @@
                                                VerticalOptions="Center" />
 
                                         <Button Grid.Column="1" Text="&#xE70E;"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageUpCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
@@ -481,7 +481,7 @@
                                                 ToolTipProperties.Text="Move Up" />
 
                                         <Button Grid.Column="2" Text="&#xE70D;"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.MoveDefaultStageDownCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"
@@ -491,7 +491,7 @@
                                                 ToolTipProperties.Text="Move Down" />
 
                                         <Button Grid.Column="3" Text="&#xE74D;"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 Command="{Binding Source={x:Reference ThisSettingsPage}, Path=BindingContext.RemoveDefaultStageCommand}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11" WidthRequest="28" HeightRequest="28" Padding="0"

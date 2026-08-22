@@ -13,7 +13,6 @@ namespace Procure.Pages
     public partial class PrListPage : ContentPage, IThemeTransitionable
     {
         private readonly PrListPageModel _viewModel;
-        private bool _hasLoadedOnce;
 
         public PrListPage(PrListPageModel viewModel)
         {
@@ -24,36 +23,18 @@ namespace Procure.Pages
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
 
-        /// <summary>
-        /// Warms the board's data ahead of first navigation, but not its cards: Shell has not realised
-        /// this page's native controls yet, so cards filled now would all be created in one block on
-        /// the first tab switch. OnAppearing releases the fill once the board can actually paint.
-        /// </summary>
-        internal void PreloadAsync()
-        {
-            if (_hasLoadedOnce) return;
-            _hasLoadedOnce = true;
-            Dispatcher.Dispatch(async () => await _viewModel.PreloadDataAsync());
-        }
-
-        protected override async void OnAppearing()
+        // Whether the data is already warm, still loading, or untouched is the page model's business -
+        // it owns the rows. This page only reports when the board can actually paint.
+        protected override void OnAppearing()
         {
             base.OnAppearing();
-            var probe = Procure.Utilities.TimingProbe.Start("PrListPage.OnAppearing"); // ponytail-temp
+            _viewModel.BoardAppearing();
+        }
 
-            if (!_hasLoadedOnce)
-            {
-                _hasLoadedOnce = true;
-                await _viewModel.LoadPrsAsync();
-            }
-            else
-            {
-                _viewModel.ApplyPendingFill();
-            }
-
-            probe.Mark("fill released"); // ponytail-temp
-            // Marks the tick after this one, so the gap shows what the native realisation actually cost.
-            Dispatcher.Dispatch(() => { probe.Mark("first tick after fill"); probe.Flush(); }); // ponytail-temp
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            _viewModel.BoardDisappearing();
         }
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

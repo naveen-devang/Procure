@@ -1,6 +1,8 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Controls;
+using Procure.PageModels;
 using Procure.Pages;
 using Procure.Services;
 
@@ -9,30 +11,45 @@ namespace Procure
     public partial class AppShell : Shell
     {
         private readonly ISettingsService _settingsService;
+        private readonly IServiceProvider _services;
         private bool _isManuallyToggled;
 
-        public AppShell(
-            DashboardPage dashboardPage,
-            PrListPage prListPage,
-            ManageColumnsPage manageColumnsPage,
-            SettingsPage settingsPage,
-            ISettingsService settingsService)
+        public AppShell(IServiceProvider services, ISettingsService settingsService)
         {
+            _services = services;
             _settingsService = settingsService;
             InitializeComponent();
 
-            DashboardContent.Content = dashboardPage;
-            PrBoardContent.Content = prListPage;
-            ColumnsContent.Content = manageColumnsPage;
-            SettingsContent.Content = settingsPage;
+            // Only the landing page is built here. Taking all four by constructor injection meant DI
+            // ran every page's InitializeComponent before the first frame - Settings alone is 139
+            // elements, and a session may never open it. The rest inflate in OnNavigating.
+            DashboardContent.Content = services.GetRequiredService<DashboardPage>();
 
             UpdateThemeButtonHighlights();
             UpdateSidebarLayout(_settingsService.IsSidebarCompact);
 
-            // Warm the PR Board's data while the user is still on the Dashboard. Opening the board
+            // Warm the PR Board's data while the user is still on the Dashboard - the page model holds
+            // the rows and has no visual tree, so this costs a query and nothing else. Opening the board
             // otherwise pays SQLite provider start-up plus the full load on the click itself.
             // Fire and forget: PrListPageModel handles its own errors and guards re-entry.
-            prListPage.PreloadAsync();
+            _ = services.GetRequiredService<PrListPageModel>().PreloadDataAsync();
+        }
+
+        // Pages are DI singletons assigned to their ShellContent once, so this is purely about *when*
+        // the assignment happens - nothing is ever re-inflated on a later tab switch.
+        protected override void OnNavigating(ShellNavigatingEventArgs args)
+        {
+            base.OnNavigating(args);
+
+            var target = args.Target?.Location?.OriginalString;
+            if (string.IsNullOrEmpty(target)) return;
+
+            if (PrBoardContent.Content is null && target.Contains("prboard", StringComparison.Ordinal))
+                PrBoardContent.Content = _services.GetRequiredService<PrListPage>();
+            else if (ColumnsContent.Content is null && target.Contains("columns", StringComparison.Ordinal))
+                ColumnsContent.Content = _services.GetRequiredService<ManageColumnsPage>();
+            else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
+                SettingsContent.Content = _services.GetRequiredService<SettingsPage>();
         }
 
         // Subscribe/unsubscribe in matching pairs, tied to the handler lifetime. Subscribing in the

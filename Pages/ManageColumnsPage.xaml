@@ -144,7 +144,7 @@
                                             <!-- Responsive Delete Button -->
                                             <Button Grid.Column="2"
                                                     Text="&#xE74D;"
-                                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                    FontFamily="Segoe Fluent Icons"
                                                     Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.DeleteColumnCommand}"
                                                     CommandParameter="{Binding .}"
                                                     FontSize="11"

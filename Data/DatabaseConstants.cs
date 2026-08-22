@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Microsoft.Data.Sqlite;
 using Microsoft.Maui.Storage;
 
 namespace Procure.Data
@@ -9,9 +10,10 @@ namespace Procure.Data
         public const string DatabaseFilename = "procure_tracker.db3";
 
         /// <summary>
-        /// Stamped into PRAGMA user_version once the schema is current. Bump this whenever
-        /// SqlCreateTables or MigrateSchemaAsync changes, or existing databases will not be
-        /// re-checked and the new column will be missing at runtime.
+        /// Stamped into PRAGMA user_version once the schema is current. Bump this whenever a table or
+        /// column is added to SqlCreateTables or MigrateSchemaAsync, or existing databases will not be
+        /// re-checked and the new column will be missing at runtime. Editing the script without
+        /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
         public const int SchemaVersion = 1;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
@@ -26,15 +28,28 @@ namespace Procure.Data
 
         public static string DatabaseFilePath => Path.Combine(DatabaseDirectory, DatabaseFilename);
 
-        public static string ConnectionString => $"Data Source={DatabaseFilePath};";
+        /// <summary>
+        /// ForeignKeys is set here rather than as a PRAGMA in <see cref="SqlCreateTables"/> because
+        /// foreign_keys is per-connection and defaults to OFF: the create script runs only when the
+        /// schema version changes, so every launch after the first left ON DELETE CASCADE unenforced.
+        /// Microsoft.Data.Sqlite re-applies this on every open, pooled or not.
+        /// </summary>
+        public static string ConnectionString => new SqliteConnectionStringBuilder
+        {
+            DataSource = DatabaseFilePath,
+            ForeignKeys = true
+        }.ToString();
 
+        /// <summary>Per-connection settings with no connection-string equivalent, applied on every open
+        /// by <see cref="SqliteDatabase.CreateConnection"/>. Both are pure configuration writes - no I/O.
+        /// synchronous=NORMAL is the documented pairing for WAL; the default FULL fsyncs every commit.</summary>
+        public const string SqlConnectionPragmas = "PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY;";
+
+        // journal_mode is the one PRAGMA that persists in the database file, so setting it once at
+        // creation is correct. The others that used to live here (synchronous, temp_store, foreign_keys)
+        // moved above; cache_size and wal_autocheckpoint were set to their own defaults and are gone.
         public const string SqlCreateTables = @"
 PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
-PRAGMA temp_store = FILE;
-PRAGMA cache_size = -2000;
-PRAGMA wal_autocheckpoint = 1000;
-PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS PurchaseRequisition (
     Id TEXT PRIMARY KEY,

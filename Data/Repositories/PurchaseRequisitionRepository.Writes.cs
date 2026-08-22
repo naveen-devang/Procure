@@ -166,29 +166,18 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
         }
 
         // Deletes only the child rows that are gone from memory, so an unchanged child set writes nothing.
-        // Table and column names are compile-time constants; every value is parameterised.
-        // ponytail: one @Keep parameter per surviving child - SQLite's 32766-parameter cap is the ceiling.
-        // If a parent ever holds more children than that, switch to a temp table of ids.
+        // Table and column names are compile-time constants; every value is parameterised via BindIdList.
         private static async Task DeleteDepartedChildrenAsync(SqliteConnection connection, SqliteTransaction tx, string table, string parentColumn, Guid parentId, IReadOnlyList<Guid> keepIds)
         {
             using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             cmd.Parameters.AddWithValue("@ParentId", parentId.ToString());
 
-            if (keepIds.Count == 0)
-            {
-                cmd.CommandText = $"DELETE FROM {table} WHERE {parentColumn} = @ParentId;";
-            }
-            else
-            {
-                var names = new string[keepIds.Count];
-                for (int i = 0; i < keepIds.Count; i++)
-                {
-                    names[i] = "@Keep" + i;
-                    cmd.Parameters.AddWithValue(names[i], keepIds[i].ToString());
-                }
-                cmd.CommandText = $"DELETE FROM {table} WHERE {parentColumn} = @ParentId AND Id NOT IN ({string.Join(",", names)});";
-            }
+            // NOT IN () is not valid SQL, so an empty keep set is its own statement rather than an
+            // empty placeholder list.
+            cmd.CommandText = keepIds.Count == 0
+                ? $"DELETE FROM {table} WHERE {parentColumn} = @ParentId;"
+                : $"DELETE FROM {table} WHERE {parentColumn} = @ParentId AND Id NOT IN ({BindIdList(cmd, "@Keep", keepIds)});";
 
             await cmd.ExecuteNonQueryAsync();
         }

@@ -113,7 +113,7 @@
                                         <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
                                                Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
                                         <Button Grid.Column="4" Text="&#xE74D;"
-                                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Default='Segoe MDL2 Assets'}"
+                                                FontFamily="Segoe Fluent Icons"
                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveEditingPrItemCommand}"
                                                 CommandParameter="{Binding .}"
                                                 BackgroundColor="Transparent"

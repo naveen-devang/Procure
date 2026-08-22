@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +14,6 @@ using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
 using Procure.Services.Export;
-using Procure.Utilities;
 
 namespace Procure.PageModels
 {
@@ -67,10 +65,9 @@ namespace Procure.PageModels
         public partial bool IsStatusMessageVisible { get; set; }
 
         // Infinite scroll. Only RevealBatchSize cards exist up front and the board grows as the user
-        // scrolls, so a tab switch realises 5 cards instead of a whole page of them.
-        // ponytail: revealed rows are never dropped again, so scrolling to the bottom of a long list
-        // leaves every card realised and makes the next tab switch proportionally slower. Ceiling is
-        // the list length; reset _revealedCount on navigate-away if that ever bites.
+        // scrolls, so a tab switch realises 5 cards instead of a whole page of them. BoardDisappearing
+        // drops the window back to one batch, so a session that scrolled deep does not leave every card
+        // it ever revealed for the next tab switch to rebuild.
         private const int RevealBatchSize = 5;
         private int _revealedCount = RevealBatchSize;
 
@@ -201,23 +198,46 @@ namespace Procure.PageModels
 
         // Set when a load finished while the board was still off-screen. Shell does not realise a
         // page's native controls until you navigate to it, so filling FilteredPrs during the preload
-        // just parks ~430 views to be created in one synchronous block on the first tab switch -
+        // just parks the cards to be created in one synchronous block on the first tab switch -
         // which is the freeze. Hold the fill until the board is actually appearing.
         private bool _fillPending;
+        private bool _isBoardVisible;
+        private bool _hasLoadedOnce;
 
         [RelayCommand]
         public Task LoadPrsAsync() => LoadCoreAsync(fillUi: true);
 
-        /// <summary>Warms the data only. The card fill waits for <see cref="ApplyPendingFill"/>.</summary>
+        /// <summary>Warms the data before the board's XAML has ever been built. The card fill waits for
+        /// <see cref="BoardAppearing"/>, unless the user reaches the board first - see LoadCoreAsync.</summary>
         public Task PreloadDataAsync() => LoadCoreAsync(fillUi: false);
 
-        /// <summary>Runs the fill a preload deferred. Cheap no-op when there is nothing pending.</summary>
-        public void ApplyPendingFill()
+        /// <summary>Called from PrListPage.OnAppearing: releases a fill the preload deferred, or starts
+        /// the load outright if no preload ever ran.</summary>
+        public void BoardAppearing()
         {
-            if (!_fillPending) return;
-            _fillPending = false;
-            ApplyFilters();
-            UpdateStatusBanner();
+            _isBoardVisible = true;
+
+            if (_fillPending)
+            {
+                _fillPending = false;
+                ApplyFilters();
+                UpdateStatusBanner();
+            }
+            else if (!_hasLoadedOnce)
+            {
+                // Also the path when a preload is still in flight: LoadCoreAsync returns early on
+                // IsBusy, and the in-flight load now sees _isBoardVisible and fills itself.
+                _ = LoadPrsAsync();
+            }
+        }
+
+        /// <summary>Called from PrListPage.OnDisappearing. Drops the infinite-scroll window back to one
+        /// batch, so a session that scrolled to the bottom does not leave every card it ever revealed
+        /// alive for every later tab switch to pay for. Guarded: a user who never scrolled pays nothing.</summary>
+        public void BoardDisappearing()
+        {
+            _isBoardVisible = false;
+            if (_revealedCount > RevealBatchSize) ApplyFilters(resetReveal: true);
         }
 
         private async Task LoadCoreAsync(bool fillUi)
@@ -227,20 +247,17 @@ namespace Procure.PageModels
             try
             {
                 IsBusy = true;
-                var probe = Procure.Utilities.TimingProbe.Start("LoadPrsAsync"); // ponytail-temp
 
                 // Two independent queries, each on its own pooled SqliteConnection — overlap them
                 // instead of paying for the column definitions before the PRs even start.
                 var defsTask = Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync());
                 var prsTask = Task.Run(() => _prRepo.GetAllAsync());
-                probe.Mark("queue both queries"); // ponytail-temp
                 await Task.WhenAll(defsTask, prsTask).ConfigureAwait(true);
-                probe.Mark("await + resume on UI"); // ponytail-temp
 
                 // Back on the UI thread from here.
                 CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defsTask.Result);
                 _allPrs = MergeLoadedPrs(prsTask.Result);
-                probe.Mark("MergeLoadedPrs"); // ponytail-temp
+                _hasLoadedOnce = true;
 
                 // Hide the skeleton before the cards start arriving: its shimmer animates at rate:33 on
                 // this same thread and otherwise fights card inflation for the whole fill. This does let
@@ -248,19 +265,18 @@ namespace Procure.PageModels
                 // idempotent and _fillGeneration retires the superseded fill.
                 IsBusy = false;
 
-                if (fillUi)
+                // _isBoardVisible covers the race where the user opens the board while a preload is
+                // still running: without it the load would defer a fill nobody is left to release.
+                if (fillUi || _isBoardVisible)
                 {
+                    _fillPending = false;
                     ApplyFilters();
-                    probe.Mark("ApplyFilters"); // ponytail-temp
                     UpdateStatusBanner();
-                    probe.Mark("UpdateStatusBanner"); // ponytail-temp
                 }
                 else
                 {
                     _fillPending = true;
-                    probe.Mark("fill deferred (off-screen)"); // ponytail-temp
                 }
-                probe.Flush(); // ponytail-temp
             }
             catch (Exception ex)
             {
@@ -360,18 +376,20 @@ namespace Procure.PageModels
 
             var query = _allPrs.AsEnumerable();
 
-            // Search text
+            // Search text. Ordinal case-insensitive Contains rather than ToLowerInvariant() on both
+            // sides: same matches, but it allocates no lowered copy per field per PR per keystroke.
             if (!string.IsNullOrWhiteSpace(SearchText))
             {
-                var term = SearchText.Trim().ToLowerInvariant();
+                var term = SearchText.Trim();
+                const StringComparison ci = StringComparison.OrdinalIgnoreCase;
                 query = query.Where(p =>
-                    p.PrNo.ToLowerInvariant().Contains(term) ||
-                    (!string.IsNullOrEmpty(p.ConsolidatedFrom) && p.ConsolidatedFrom.ToLowerInvariant().Contains(term)) ||
-                    p.Description.ToLowerInvariant().Contains(term) ||
-                    p.Requestor.ToLowerInvariant().Contains(term) ||
-                    p.Items.Any(i => i.ItemName.ToLowerInvariant().Contains(term) || i.Notes.ToLowerInvariant().Contains(term)) ||
-                    p.Rfqs.Any(r => r.Vendor.ToLowerInvariant().Contains(term) || (!string.IsNullOrEmpty(r.RfqNo) && r.RfqNo.ToLowerInvariant().Contains(term))) ||
-                    p.Pos.Any(po => po.Vendor.ToLowerInvariant().Contains(term) || po.PoNo.ToLowerInvariant().Contains(term)));
+                    p.PrNo.Contains(term, ci) ||
+                    p.ConsolidatedFrom.Contains(term, ci) ||
+                    p.Description.Contains(term, ci) ||
+                    p.Requestor.Contains(term, ci) ||
+                    p.Items.Any(i => i.ItemName.Contains(term, ci) || i.Notes.Contains(term, ci)) ||
+                    p.Rfqs.Any(r => r.Vendor.Contains(term, ci) || r.RfqNo.Contains(term, ci)) ||
+                    p.Pos.Any(po => po.Vendor.Contains(term, ci) || po.PoNo.Contains(term, ci)));
             }
 
             // Status filter
