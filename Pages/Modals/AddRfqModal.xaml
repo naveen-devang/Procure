@@ -80,7 +80,7 @@
                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                     <Picker ItemsSource="{Binding AvailableCurrencies}"
                                             SelectedItem="{Binding NewRfqCurrency, Mode=TwoWay}"
-                                            SelectedIndexChanged="OnRfqCurrencySelectionChanged"
+
                                             HeightRequest="36" />
                                 </VerticalStackLayout>
 
@@ -173,9 +173,18 @@
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </Grid>
 
-                            <!-- Table Rows -->
-                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding EditingRfqItems}" Spacing="6">
-                                <BindableLayout.ItemTemplate>
+                            <!-- Table Rows. A virtualizing CollectionView with a bounded height:
+                                 the old non-virtualized stack realized every row at open and
+                                 re-measured all of them on every keystroke — with 60+ items that
+                                 was the typing lag. Height tracks the item count up to ~8 rows,
+                                 then the table scrolls internally. -->
+                            <CollectionView ItemsSource="{Binding EditingRfqItems}"
+                                            HeightRequest="{Binding RfqItemsListHeight}"
+                                            SelectionMode="None">
+                                <CollectionView.ItemsLayout>
+                                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="6" />
+                                </CollectionView.ItemsLayout>
+                                <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="models:RfqItem">
                                         <Grid ColumnDefinitions="36, *, 80, 90, 85, 95, 90"
                                               ColumnSpacing="8"
@@ -254,8 +263,8 @@
                                                    TextChanged="OnRfqLastPriceTextChanged" />
                                         </Grid>
                                     </DataTemplate>
-                                </BindableLayout.ItemTemplate>
-                            </VerticalStackLayout>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
                         </VerticalStackLayout>
                     </Border>
 
@@ -321,7 +330,7 @@
                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                     <Picker ItemsSource="{Binding AvailableVatTypes}"
                                             SelectedItem="{Binding NewRfqVatType, Mode=TwoWay}"
-                                            SelectedIndexChanged="OnRfqVatTypeSelectionChanged"
+
                                             HeightRequest="36" />
                                 </VerticalStackLayout>
                             </Grid>

@@ -226,7 +226,8 @@ namespace Procure.Pages
                 }
                 step++;
                 var target = _boardScrollViewer.VerticalOffset + 2600;
-                Procure.Utilities.BoardTrace.Mark($"fling step={step} to={target:F0}");
+                if (Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"fling step={step} to={target:F0}");
                 _boardScrollViewer.ChangeView(null, target, null);
                 Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(900), Fling);
             }

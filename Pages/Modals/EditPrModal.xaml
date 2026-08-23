@@ -41,14 +41,14 @@
                             <Label Text="PR Number *" FontSize="12" FontFamily="SegoeSemibold"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                             <Entry x:Name="PrNoEntry"
-                                   Text="{Binding CurrentEditingPr.PrNo, Mode=TwoWay}"
+                                   Text="{Binding EditingPrNo, Mode=TwoWay}"
                                    Placeholder="e.g. PR-2026-001" HeightRequest="36" />
                         </VerticalStackLayout>
 
                         <VerticalStackLayout Grid.Column="1" Spacing="4">
                             <Label Text="Requestor Name *" FontSize="12" FontFamily="SegoeSemibold"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            <Entry Text="{Binding CurrentEditingPr.Requestor, Mode=TwoWay}"
+                            <Entry Text="{Binding EditingPrRequestor, Mode=TwoWay}"
                                    Placeholder="e.g. Sarah Lin" HeightRequest="36" />
                         </VerticalStackLayout>
 
@@ -70,7 +70,7 @@
                     <VerticalStackLayout Spacing="4">
                         <Label Text="Description *" FontSize="12" FontFamily="SegoeSemibold"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                        <Entry Text="{Binding CurrentEditingPr.Description, Mode=TwoWay}"
+                        <Entry Text="{Binding EditingPrDescription, Mode=TwoWay}"
                                Placeholder="Item or service requested..." HeightRequest="36" />
                     </VerticalStackLayout>
 
@@ -148,7 +148,7 @@
                     <VerticalStackLayout Spacing="4">
                         <Label Text="Notes &amp; Justification" FontSize="12" FontFamily="SegoeSemibold"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                        <Editor Text="{Binding CurrentEditingPr.Notes, Mode=TwoWay}"
+                        <Editor Text="{Binding EditingPrNotes, Mode=TwoWay}"
                                 Placeholder="Additional procurement details or notes..."
                                 HeightRequest="70" />
                     </VerticalStackLayout>

@@ -271,7 +271,22 @@ namespace Procure.Models
         partial void OnFreightChanged(decimal? value) => NotifyCalculationsChanged();
         partial void OnOtherChargesChanged(decimal? value) => NotifyCalculationsChanged();
         partial void OnOverallDiscountChanged(decimal? value) => NotifyCalculationsChanged();
-        partial void OnVatTypeChanged(string value) => NotifyCalculationsChanged();
+
+        private string _lastValidVatType = "5%";
+
+        partial void OnVatTypeChanged(string value)
+        {
+            // A Picker whose ItemsSource resolves after SelectedItem pushes null through the
+            // TwoWay binding; accepting it silently zeroes the VAT in every derived total.
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                VatType = _lastValidVatType;
+                return;
+            }
+            _lastValidVatType = value;
+            NotifyCalculationsChanged();
+        }
+
         partial void OnCustomBaseAmountChanged(decimal? value) => NotifyCalculationsChanged();
 
         public bool HasItems => Items != null && Items.Count > 0;
@@ -292,10 +307,10 @@ namespace Procure.Models
         {
             get
             {
-                var cur = string.IsNullOrWhiteSpace(Currency) ? "AED" : Currency;
+                var money = Procure.Utilities.MoneyFormat.Format(Currency, DisplayTotalAmount);
                 if (!string.IsNullOrWhiteSpace(RfqNumber))
-                    return $"{VendorName} • {cur} {DisplayTotalAmount:N0} ({RfqNumber})";
-                return $"{VendorName} • {cur} {DisplayTotalAmount:N0}";
+                    return $"{VendorName} • {money} ({RfqNumber})";
+                return $"{VendorName} • {money}";
             }
         }
 
@@ -394,11 +409,13 @@ namespace Procure.Models
                         RfqItemId = rfqItem.Id,
                         PrItemId = rfqItem.PrItemId ?? prItem?.Id,
                         ItemName = rfqItem.ItemName,
-                        Quantity = (remainingAvail > 0 && remainingAvail < rfqItem.Quantity) ? remainingAvail : rfqItem.Quantity,
+                        // An item already fully ordered by other POs defaults to 0/unselected;
+                        // defaulting to the full RFQ quantity opened the wizard over-allocated.
+                        Quantity = Math.Min(rfqItem.Quantity, remainingAvail),
                         PrTargetQuantity = prTarget,
                         OtherPosOrderedQuantity = otherPoOrdered,
                         Unit = rfqItem.Unit,
-                        IsSelected = rfqItem.IsQuoted && (rfqItem.QuotedUnitPrice.HasValue && rfqItem.QuotedUnitPrice.Value > 0 || rfqItem.LineTotal > 0),
+                        IsSelected = remainingAvail > 0 && rfqItem.IsQuoted && (rfqItem.QuotedUnitPrice.HasValue && rfqItem.QuotedUnitPrice.Value > 0 || rfqItem.LineTotal > 0),
                         QuotedUnitPrice = rfqItem.QuotedUnitPrice,
                         Discount = rfqItem.Discount,
                         LastPrice = rfqItem.LastPrice,
@@ -427,7 +444,7 @@ namespace Procure.Models
                             Id = Guid.NewGuid(),
                             PrItemId = prItem.Id,
                             ItemName = prItem.ItemName,
-                            Quantity = remainingAvail > 0 ? remainingAvail : prItem.Quantity,
+                            Quantity = remainingAvail,
                             PrTargetQuantity = prItem.Quantity,
                             OtherPosOrderedQuantity = otherPoOrdered,
                             Unit = prItem.Unit,
@@ -442,6 +459,14 @@ namespace Procure.Models
             if (Items.Any(i => i.IsSelected))
             {
                 CustomBaseAmount = Items.Where(i => i.IsSelected).Sum(i => i.LineTotal);
+            }
+            else if (rfq.Items != null && rfq.Items.Count > 0)
+            {
+                // Item-backed quote with nothing selectable (every line already fully ordered by
+                // other POs): falling back to the lump QuoteAmount re-offered the vendor's full
+                // quote on a card with zero items, bypassing the allocation check.
+                CustomBaseAmount = 0m;
+                IsSelected = false;
             }
             else
             {
@@ -519,7 +544,7 @@ namespace Procure.Models
                                 PrItemId = prItem.Id,
                                 RfqItemId = rfqItem?.Id,
                                 ItemName = prItem.ItemName,
-                                Quantity = remainingAvail > 0 ? remainingAvail : prItem.Quantity,
+                                Quantity = remainingAvail,
                                 PrTargetQuantity = prItem.Quantity,
                                 OtherPosOrderedQuantity = otherPoOrdered,
                                 Unit = prItem.Unit,
@@ -571,12 +596,28 @@ namespace Procure.Models
                     };
                     Items.Add(itemSelection);
                 }
-                CustomBaseAmount = existingPo.Value > 0 ? existingPo.Value : Items.Where(i => i.IsSelected).Sum(i => i.LineTotal);
+                // existingPo.Value is the VAT-inclusive landed total; using it as the net base
+                // re-applied VAT (and freight/charges) on every edit round-trip.
+                if (existingPo.BaseAmount is not > 0m)
+                {
+                    CustomBaseAmount = existingPo.Value > 0 ? DeriveNetBase(existingPo) : Items.Where(i => i.IsSelected).Sum(i => i.LineTotal);
+                }
             }
-            else
+            else if (existingPo.BaseAmount is not > 0m)
             {
-                CustomBaseAmount = existingPo.Value;
+                CustomBaseAmount = DeriveNetBase(existingPo);
             }
+        }
+
+        // Backs the net base out of a stored VAT-inclusive Value for rows saved before
+        // BaseAmount existed (or by paths that stored no breakdown). Uses the selection's own
+        // effective charges (which include the linked-RFQ fallbacks applied above) — netting out
+        // only the PO's stored charges left the RFQ-sourced copies counted twice.
+        private decimal DeriveNetBase(PurchaseOrder po)
+        {
+            var vat = VatType == "5%" ? 1.05m : 1.0m;
+            var net = po.Value / vat;
+            return Math.Max(0m, net - (Freight ?? 0m) - (OtherCharges ?? 0m) + (OverallDiscount ?? 0m));
         }
 
         private bool _bulkSelecting;

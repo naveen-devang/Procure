@@ -36,7 +36,14 @@ namespace Procure.Models
         public bool IsNumber => string.Equals(ColumnDataType, CustomFieldDataType.Number, StringComparison.OrdinalIgnoreCase);
         public bool IsText => !IsSelect && !IsDate && !IsNumber;
 
-        public string[] OptionsList => !string.IsNullOrWhiteSpace(SelectOptions)
+        private string[]? _optionsCache;
+
+        partial void OnSelectOptionsChanged(string? value) => _optionsCache = null;
+
+        // Cached: a fresh array per read gave the Select picker a new ItemsSource identity on every
+        // re-raise, which reset its SelectedIndex to -1 and pushed null back into Value — silently
+        // clearing the custom field.
+        public string[] OptionsList => _optionsCache ??= !string.IsNullOrWhiteSpace(SelectOptions)
             ? SelectOptions.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             : Array.Empty<string>();
 

@@ -191,11 +191,10 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (item.QuotedUnitPrice != null)
-                    {
-                        item.QuotedUnitPrice = null;
-                        ViewModel?.RecalculateRfqTotals();
-                    }
+                    // The item's PropertyChanged subscription already drives the recalc; an
+                    // explicit call here ran it a second (and with LineTotal's companion
+                    // notification, a third) time per keystroke.
+                    item.QuotedUnitPrice = null;
                     return;
                 }
 
@@ -209,11 +208,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out price))
                 {
-                    if (item.QuotedUnitPrice != price)
-                    {
-                        item.QuotedUnitPrice = price;
-                        ViewModel?.RecalculateRfqTotals();
-                    }
+                    item.QuotedUnitPrice = price;
                 }
             }
         }
@@ -224,11 +219,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (item.Discount != null)
-                    {
-                        item.Discount = null;
-                        ViewModel?.RecalculateRfqTotals();
-                    }
+                    item.Discount = null;
                     return;
                 }
 
@@ -242,11 +233,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var discount) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out discount))
                 {
-                    if (item.Discount != discount)
-                    {
-                        item.Discount = discount;
-                        ViewModel?.RecalculateRfqTotals();
-                    }
+                    item.Discount = discount;
                 }
             }
         }
@@ -286,8 +273,8 @@ namespace Procure.Pages.Modals
         {
             if (sender is CheckBox cb && cb.BindingContext is RfqItem item)
             {
+                // IsQuoted is in the item PropertyChanged match list; the setter drives the recalc.
                 item.IsQuoted = e.Value;
-                ViewModel?.RecalculateRfqTotals();
             }
         }
 
@@ -383,14 +370,8 @@ namespace Procure.Pages.Modals
             }
         }
 
-        private void OnRfqVatTypeSelectionChanged(object? sender, EventArgs e)
-        {
-            ViewModel?.RecalculateRfqTotals();
-        }
-
-        private void OnRfqCurrencySelectionChanged(object? sender, EventArgs e)
-        {
-            ViewModel?.RecalculateRfqTotals();
-        }
+        // The NewRfqVatType / NewRfqCurrency partial hooks on the page model already run the
+        // recalc when the TwoWay Picker bindings write; the SelectedIndexChanged handlers that
+        // used to live here ran it a second time per selection.
     }
 }

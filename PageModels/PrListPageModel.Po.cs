@@ -141,6 +141,9 @@ namespace Procure.PageModels
                     {
                         selection = new PoRfqSelection(existingPo, rfq, pr)
                         {
+                            // Pre-checked cards silently re-raised (duplicated) the existing PO on
+                            // save; the user opts back in to update it instead.
+                            IsSelected = false,
                             OnTotalsRecalculated = RecalculatePoModalTotals
                         };
                     }
@@ -234,13 +237,6 @@ namespace Procure.PageModels
                 HasPoQuantityValidationErrors = false;
                 PoQuantityValidationErrorMessage = string.Empty;
                 PoAllocationSummaryText = string.Empty;
-                OnPropertyChanged(nameof(SelectedPoRfqCount));
-                OnPropertyChanged(nameof(SelectedPoRfqCountMessage));
-                OnPropertyChanged(nameof(TotalPoAmountSummary));
-                OnPropertyChanged(nameof(CanGoToPoStep2));
-                OnPropertyChanged(nameof(HasPoQuantityValidationErrors));
-                OnPropertyChanged(nameof(PoQuantityValidationErrorMessage));
-                OnPropertyChanged(nameof(PoAllocationSummaryText));
                 return;
             }
 
@@ -257,7 +253,7 @@ namespace Procure.PageModels
             {
                 var curGroups = selected
                     .GroupBy(s => string.IsNullOrWhiteSpace(s.Currency) ? "AED" : s.Currency)
-                    .Select(g => $"{g.Key} {g.Sum(s => s.DisplayTotalAmount):N0}");
+                    .Select(g => MoneyFormat.Format(g.Key, g.Sum(s => s.DisplayTotalAmount)));
                 TotalPoAmountSummary = string.Join("  •  ", curGroups);
             }
 
@@ -273,10 +269,17 @@ namespace Procure.PageModels
                 int overAllocatedItemsCount = 0;
                 var pendingItemsList = new List<string>();
 
+                // A selected card that updates an existing PO replaces that PO's quantities, so
+                // they must not also be counted as "other PO" — counting both double-allocated
+                // every item and reported a false "Exceeds PR target" on reopen.
+                var updatingPoIds = IsEditPoMode && EditingPo != null
+                    ? new HashSet<Guid> { EditingPo.Id }
+                    : new HashSet<Guid>(selected.Where(s => s.EditingPoId.HasValue).Select(s => s.EditingPoId!.Value));
+
                 foreach (var prItem in TargetPrForPo.Items)
                 {
                     var otherPoOrdered = TargetPrForPo.Pos
-                        .Where(p => !IsEditPoMode || (EditingPo != null && p.Id != EditingPo.Id))
+                        .Where(p => !updatingPoIds.Contains(p.Id))
                         .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
                         .Where(pi => (pi.PrItemId.HasValue && pi.PrItemId.Value == prItem.Id) || string.Equals(pi.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase))
                         .Sum(pi => pi.Quantity);
@@ -328,14 +331,6 @@ namespace Procure.PageModels
             {
                 PoAllocationSummaryText = string.Empty;
             }
-
-            OnPropertyChanged(nameof(SelectedPoRfqCount));
-            OnPropertyChanged(nameof(SelectedPoRfqCountMessage));
-            OnPropertyChanged(nameof(TotalPoAmountSummary));
-            OnPropertyChanged(nameof(CanGoToPoStep2));
-            OnPropertyChanged(nameof(HasPoQuantityValidationErrors));
-            OnPropertyChanged(nameof(PoQuantityValidationErrorMessage));
-            OnPropertyChanged(nameof(PoAllocationSummaryText));
         }
 
         [RelayCommand]
@@ -447,168 +442,60 @@ namespace Procure.PageModels
 
             try
             {
+                // The PO save deliberately never writes back into the linked RFQ: the RFQ is the
+                // record of what the vendor quoted, and pushing PO allocations/deselections into
+                // it falsified every later PCR export and quote comparison.
                 if (IsEditPoMode && EditingPo != null)
                 {
                     // EDIT EXISTING PO MODE
-                    var rfqSel = selectedRfqs[0];
-                    EditingPo.PoNo = rfqSel.PoNo.Trim();
-                    EditingPo.Vendor = rfqSel.VendorName.Trim();
-                    EditingPo.Value = rfqSel.DisplayTotalAmount;
-                    EditingPo.Currency = string.IsNullOrWhiteSpace(rfqSel.Currency) ? "AED" : rfqSel.Currency;
-                    EditingPo.BaseAmount = rfqSel.BaseAmount;
-                    EditingPo.Freight = rfqSel.Freight;
-                    EditingPo.OtherCharges = rfqSel.OtherCharges;
-                    EditingPo.Discount = rfqSel.OverallDiscount;
-                    EditingPo.VatType = rfqSel.VatType;
-
-                    // Update PO items
-                    EditingPo.Items.Clear();
-                    if (rfqSel.HasItems)
-                    {
-                        foreach (var itemSel in rfqSel.Items.Where(i => i.IsSelected))
-                        {
-                            EditingPo.Items.Add(new PurchaseOrderItem
-                            {
-                                Id = itemSel.Id,
-                                PoId = EditingPo.Id,
-                                PrItemId = itemSel.PrItemId,
-                                RfqItemId = itemSel.RfqItemId,
-                                ItemName = itemSel.ItemName,
-                                Quantity = itemSel.Quantity,
-                                Unit = itemSel.Unit,
-                                UnitPrice = itemSel.QuotedUnitPrice,
-                                Discount = itemSel.Discount
-                            });
-                        }
-                    }
-
+                    ApplySelectionToPo(selectedRfqs[0], EditingPo, freshItemIds: false);
                     await _prRepo.SavePoAsync(EditingPo);
-
-                    // If linked RFQ exists and user modified items, persist to RFQ
-                    if (rfqSel.Rfq != null && rfqSel.HasItems)
-                    {
-                        foreach (var itemSel in rfqSel.Items)
-                        {
-                            var matchingRfqItem = rfqSel.Rfq.Items?.FirstOrDefault(i => (itemSel.RfqItemId.HasValue && i.Id == itemSel.RfqItemId.Value) || string.Equals(i.ItemName, itemSel.ItemName, StringComparison.OrdinalIgnoreCase));
-                            if (matchingRfqItem != null)
-                            {
-                                matchingRfqItem.Quantity = itemSel.Quantity;
-                                matchingRfqItem.QuotedUnitPrice = itemSel.QuotedUnitPrice;
-                                matchingRfqItem.Discount = itemSel.Discount;
-                                matchingRfqItem.IsQuoted = itemSel.IsSelected;
-                            }
-                            else if (itemSel.IsSelected && itemSel.QuotedUnitPrice.HasValue && itemSel.QuotedUnitPrice.Value > 0)
-                            {
-                                var newRfqItem = new RfqItem
-                                {
-                                    Id = itemSel.RfqItemId ?? Guid.NewGuid(),
-                                    RfqId = rfqSel.Rfq.Id,
-                                    PrItemId = itemSel.PrItemId,
-                                    ItemName = itemSel.ItemName,
-                                    Quantity = itemSel.Quantity,
-                                    Unit = itemSel.Unit,
-                                    IsQuoted = true,
-                                    QuotedUnitPrice = itemSel.QuotedUnitPrice,
-                                    Discount = itemSel.Discount
-                                };
-                                rfqSel.Rfq.Items?.Add(newRfqItem);
-                                itemSel.RfqItemId = newRfqItem.Id;
-                            }
-                        }
-                        rfqSel.Rfq.QuoteAmount = rfqSel.BaseAmount;
-                        if (rfqSel.Freight.HasValue) rfqSel.Rfq.Freight = rfqSel.Freight;
-                        if (rfqSel.OtherCharges.HasValue) rfqSel.Rfq.OtherCharges = rfqSel.OtherCharges;
-                        if (rfqSel.OverallDiscount.HasValue) rfqSel.Rfq.Discount = rfqSel.OverallDiscount;
-                        if (!string.IsNullOrWhiteSpace(rfqSel.VatType)) rfqSel.Rfq.VatType = rfqSel.VatType;
-
-                        rfqSel.Rfq.NotifyCalculationsChanged();
-                        await _prRepo.SaveRfqAsync(rfqSel.Rfq);
-                    }
                 }
                 else
                 {
+                    // Two same-vendor quote cards can resolve to the same existing PO; saving both
+                    // would silently overwrite the first card's data with the second's.
+                    var duplicateTarget = selectedRfqs
+                        .Where(s => s.EditingPoId.HasValue)
+                        .GroupBy(s => s.EditingPoId!.Value)
+                        .FirstOrDefault(g => g.Count() > 1);
+                    if (duplicateTarget != null)
+                    {
+                        if (Shell.Current != null)
+                            await Shell.Current.DisplayAlertAsync("Duplicate Target", $"Two selected quotes would update the same existing PO ({duplicateTarget.First().VendorName}). Please deselect one of them.", "OK");
+                        return;
+                    }
+
                     // CREATE NEW PO(S) MODE
                     foreach (var rfqSel in selectedRfqs)
                     {
-                        var po = new PurchaseOrder
-                        {
-                            Id = Guid.NewGuid(),
-                            PrId = TargetPrForPo.Id,
-                            PoNo = rfqSel.PoNo.Trim(),
-                            Vendor = rfqSel.VendorName.Trim(),
-                            LinkedRfqId = rfqSel.Rfq?.Id,
-                            Value = rfqSel.DisplayTotalAmount,
-                            Currency = string.IsNullOrWhiteSpace(rfqSel.Currency) ? "AED" : rfqSel.Currency,
-                            Status = PoStatus.Raised,
-                            Date = DateTime.Today,
-                            BaseAmount = rfqSel.BaseAmount,
-                            Freight = rfqSel.Freight,
-                            OtherCharges = rfqSel.OtherCharges,
-                            Discount = rfqSel.OverallDiscount,
-                            VatType = rfqSel.VatType
-                        };
+                        var existing = rfqSel.EditingPoId.HasValue
+                            ? TargetPrForPo.Pos.FirstOrDefault(p => p.Id == rfqSel.EditingPoId.Value)
+                            : null;
 
-                        if (rfqSel.HasItems)
+                        if (existing != null)
                         {
-                            foreach (var itemSel in rfqSel.Items.Where(i => i.IsSelected))
-                            {
-                                po.Items.Add(new PurchaseOrderItem
-                                {
-                                    Id = Guid.NewGuid(),
-                                    PoId = po.Id,
-                                    PrItemId = itemSel.PrItemId,
-                                    RfqItemId = itemSel.RfqItemId,
-                                    ItemName = itemSel.ItemName,
-                                    Quantity = itemSel.Quantity,
-                                    Unit = itemSel.Unit,
-                                    UnitPrice = itemSel.QuotedUnitPrice,
-                                    Discount = itemSel.Discount
-                                });
-                            }
+                            // Card was inflated from an already-raised PO; saving updates it
+                            // rather than inserting a second PO with the same number.
+                            ApplySelectionToPo(rfqSel, existing, freshItemIds: false);
+                            await _prRepo.SavePoAsync(existing);
                         }
-
-                        await _prRepo.SavePoAsync(po);
-                        TargetPrForPo.Pos.Add(po);
-
-                        // If user updated item quantities or unit prices, persist them to RFQ items
-                        if (rfqSel.HasItems && rfqSel.Rfq != null)
+                        else
                         {
-                            foreach (var itemSel in rfqSel.Items)
+                            var po = new PurchaseOrder
                             {
-                                var matchingRfqItem = rfqSel.Rfq.Items?.FirstOrDefault(i => (itemSel.RfqItemId.HasValue && i.Id == itemSel.RfqItemId.Value) || string.Equals(i.ItemName, itemSel.ItemName, StringComparison.OrdinalIgnoreCase));
-                                if (matchingRfqItem != null)
-                                {
-                                    matchingRfqItem.Quantity = itemSel.Quantity;
-                                    matchingRfqItem.QuotedUnitPrice = itemSel.QuotedUnitPrice;
-                                    matchingRfqItem.Discount = itemSel.Discount;
-                                    matchingRfqItem.IsQuoted = itemSel.IsSelected;
-                                }
-                                else if (itemSel.IsSelected && itemSel.QuotedUnitPrice.HasValue && itemSel.QuotedUnitPrice.Value > 0)
-                                {
-                                    var newRfqItem = new RfqItem
-                                    {
-                                        Id = itemSel.RfqItemId ?? Guid.NewGuid(),
-                                        RfqId = rfqSel.Rfq.Id,
-                                        PrItemId = itemSel.PrItemId,
-                                        ItemName = itemSel.ItemName,
-                                        Quantity = itemSel.Quantity,
-                                        Unit = itemSel.Unit,
-                                        IsQuoted = true,
-                                        QuotedUnitPrice = itemSel.QuotedUnitPrice,
-                                        Discount = itemSel.Discount
-                                    };
-                                    rfqSel.Rfq.Items?.Add(newRfqItem);
-                                    itemSel.RfqItemId = newRfqItem.Id;
-                                }
-                            }
-                            rfqSel.Rfq.QuoteAmount = rfqSel.BaseAmount;
-                            if (rfqSel.Freight.HasValue) rfqSel.Rfq.Freight = rfqSel.Freight;
-                            if (rfqSel.OtherCharges.HasValue) rfqSel.Rfq.OtherCharges = rfqSel.OtherCharges;
-                            if (rfqSel.OverallDiscount.HasValue) rfqSel.Rfq.Discount = rfqSel.OverallDiscount;
-                            if (!string.IsNullOrWhiteSpace(rfqSel.VatType)) rfqSel.Rfq.VatType = rfqSel.VatType;
-
-                            rfqSel.Rfq.NotifyCalculationsChanged();
-                            await _prRepo.SaveRfqAsync(rfqSel.Rfq);
+                                Id = Guid.NewGuid(),
+                                PrId = TargetPrForPo.Id,
+                                LinkedRfqId = rfqSel.Rfq?.Id,
+                                Status = PoStatus.Raised,
+                                Date = DateTime.Today
+                            };
+                            ApplySelectionToPo(rfqSel, po, freshItemIds: true);
+                            await _prRepo.SavePoAsync(po);
+                            TargetPrForPo.Pos.Add(po);
+                            // A retry after a later card fails must update this PO, not insert a
+                            // second one with the same number.
+                            rfqSel.EditingPoId = po.Id;
                         }
                     }
 
@@ -630,6 +517,44 @@ namespace Procure.PageModels
             catch (Exception ex)
             {
                 _errorHandler.HandleError(ex);
+            }
+        }
+
+        // Single mapping from a wizard card to a PurchaseOrder, shared by create, update-existing
+        // and edit-mode saves so the three paths cannot drift apart. freshItemIds must be true for
+        // a brand-new PO: the wizard row Ids are minted once per modal open, and reusing them on a
+        // retry after a partial failure would re-parent the first save's item rows onto the
+        // duplicate via the repository's ON CONFLICT(Id) upsert.
+        private static void ApplySelectionToPo(PoRfqSelection rfqSel, PurchaseOrder po, bool freshItemIds)
+        {
+            po.PoNo = rfqSel.PoNo.Trim();
+            po.Vendor = rfqSel.VendorName.Trim();
+            po.Value = rfqSel.DisplayTotalAmount;
+            po.Currency = string.IsNullOrWhiteSpace(rfqSel.Currency) ? "AED" : rfqSel.Currency;
+            po.BaseAmount = rfqSel.BaseAmount;
+            po.Freight = rfqSel.Freight;
+            po.OtherCharges = rfqSel.OtherCharges;
+            po.Discount = rfqSel.OverallDiscount;
+            po.VatType = rfqSel.VatType;
+
+            po.Items.Clear();
+            if (rfqSel.HasItems)
+            {
+                foreach (var itemSel in rfqSel.Items.Where(i => i.IsSelected))
+                {
+                    po.Items.Add(new PurchaseOrderItem
+                    {
+                        Id = freshItemIds ? Guid.NewGuid() : itemSel.Id,
+                        PoId = po.Id,
+                        PrItemId = itemSel.PrItemId,
+                        RfqItemId = itemSel.RfqItemId,
+                        ItemName = itemSel.ItemName,
+                        Quantity = itemSel.Quantity,
+                        Unit = itemSel.Unit,
+                        UnitPrice = itemSel.QuotedUnitPrice,
+                        Discount = itemSel.Discount
+                    });
+                }
             }
         }
 

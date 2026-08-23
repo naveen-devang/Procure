@@ -6,6 +6,10 @@ using Procure.PageModels;
 
 namespace Procure.Pages.Modals
 {
+    // Handlers only parse and assign. Each model setter already fans out through
+    // OnPriceOrSelectionChanged / NotifyCalculationsChanged / OnTotalsRecalculated, so the
+    // explicit re-invocations that used to follow every assignment ran the full wizard
+    // recalculation three times per keystroke.
     public partial class AddPoModal : ContentView
     {
         private PrListPageModel? ViewModel => BindingContext as PrListPageModel;
@@ -21,12 +25,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (item.Quantity != 0m)
-                    {
-                        item.Quantity = 0m;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.Quantity = 0m;
                     return;
                 }
 
@@ -34,12 +33,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var qty) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out qty))
                 {
-                    if (item.Quantity != qty)
-                    {
-                        item.Quantity = qty;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.Quantity = qty;
                 }
             }
         }
@@ -50,12 +44,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (item.QuotedUnitPrice != null)
-                    {
-                        item.QuotedUnitPrice = null;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.QuotedUnitPrice = null;
                     return;
                 }
 
@@ -63,12 +52,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out price))
                 {
-                    if (item.QuotedUnitPrice != price)
-                    {
-                        item.QuotedUnitPrice = price;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.QuotedUnitPrice = price;
                 }
             }
         }
@@ -79,12 +63,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (item.Discount != null)
-                    {
-                        item.Discount = null;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.Discount = null;
                     return;
                 }
 
@@ -92,22 +71,8 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var discount) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out discount))
                 {
-                    if (item.Discount != discount)
-                    {
-                        item.Discount = discount;
-                        item.OnPriceOrSelectionChanged?.Invoke();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    item.Discount = discount;
                 }
-            }
-        }
-
-        private void OnPoItemCheckedChanged(object? sender, CheckedChangedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.BindingContext is PoRfqItemSelection item)
-            {
-                item.OnPriceOrSelectionChanged?.Invoke();
-                ViewModel?.RecalculatePoModalTotals();
             }
         }
 
@@ -117,12 +82,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (selection.CustomBaseAmount != null)
-                    {
-                        selection.CustomBaseAmount = null;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.CustomBaseAmount = null;
                     return;
                 }
 
@@ -130,12 +90,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var baseAmt) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out baseAmt))
                 {
-                    if (selection.CustomBaseAmount != baseAmt)
-                    {
-                        selection.CustomBaseAmount = baseAmt;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.CustomBaseAmount = baseAmt;
                 }
             }
         }
@@ -146,12 +101,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (selection.Freight != null)
-                    {
-                        selection.Freight = null;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.Freight = null;
                     return;
                 }
 
@@ -159,12 +109,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var freight) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out freight))
                 {
-                    if (selection.Freight != freight)
-                    {
-                        selection.Freight = freight;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.Freight = freight;
                 }
             }
         }
@@ -175,12 +120,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (selection.OtherCharges != null)
-                    {
-                        selection.OtherCharges = null;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.OtherCharges = null;
                     return;
                 }
 
@@ -188,12 +128,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var charges) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out charges))
                 {
-                    if (selection.OtherCharges != charges)
-                    {
-                        selection.OtherCharges = charges;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.OtherCharges = charges;
                 }
             }
         }
@@ -204,12 +139,7 @@ namespace Procure.Pages.Modals
             {
                 if (string.IsNullOrWhiteSpace(e.NewTextValue))
                 {
-                    if (selection.OverallDiscount != null)
-                    {
-                        selection.OverallDiscount = null;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
+                    selection.OverallDiscount = null;
                     return;
                 }
 
@@ -217,25 +147,7 @@ namespace Procure.Pages.Modals
                 if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var discount) ||
                     decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out discount))
                 {
-                    if (selection.OverallDiscount != discount)
-                    {
-                        selection.OverallDiscount = discount;
-                        selection.NotifyCalculationsChanged();
-                        ViewModel?.RecalculatePoModalTotals();
-                    }
-                }
-            }
-        }
-
-        private void OnPoVatTypeSelectedIndexChanged(object? sender, EventArgs e)
-        {
-            if (sender is Picker picker && picker.BindingContext is PoRfqSelection selection)
-            {
-                if (picker.SelectedItem is string vatType && selection.VatType != vatType)
-                {
-                    selection.VatType = vatType;
-                    selection.NotifyCalculationsChanged();
-                    ViewModel?.RecalculatePoModalTotals();
+                    selection.OverallDiscount = discount;
                 }
             }
         }

@@ -38,7 +38,9 @@ namespace Procure.Utilities
                     .Replace("\n", "<br/>")
                     .Replace("\r", "<br/>");
 
-                var unit = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(item.Unit) ? "Each" : item.Unit.Trim());
+                // "pcs" matches ClipboardItemParser's blank-unit default so the emitted table
+                // round-trips without the unit silently changing.
+                var unit = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim());
                 var qtyStr = item.Quantity.ToString("G29", CultureInfo.InvariantCulture);
 
                 sb.AppendLine("    <tr>");
@@ -64,7 +66,7 @@ namespace Procure.Utilities
             foreach (var item in items)
             {
                 var desc = (item.ItemName ?? string.Empty).Replace("\t", " ").Replace("\r\n", " ").Replace("\n", " ");
-                var unit = string.IsNullOrWhiteSpace(item.Unit) ? "Each" : item.Unit.Trim();
+                var unit = string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim();
                 var qtyStr = item.Quantity.ToString("G29", CultureInfo.InvariantCulture);
 
                 sb.AppendLine($"{serialNumber++}\t{desc}\t{qtyStr}\t{unit}");

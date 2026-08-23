@@ -418,6 +418,10 @@ namespace Procure.PageModels
         private bool _loadMorePending;
         private int _lastVisibleIndex;
 
+        // The shimmer skeleton belongs to the FIRST load only. Keying it on "board is empty" made
+        // every filter selection after an empty result raise the full skeleton + an extra 80ms.
+        private bool _hasEverLoaded;
+
         // Matches the XAML RemainingItemsThreshold; used by the Scrolled-driven trigger below.
         private const int LoadMoreThreshold = 10;
 
@@ -463,7 +467,8 @@ namespace Procure.PageModels
         [RelayCommand]
         private async Task LoadMoreAsync()
         {
-            Procure.Utilities.BoardTrace.Mark($"load-more-event shown={FilteredPrs.Count} total={TotalFilteredCount} inflight={_loadingMore}");
+            if (Procure.Utilities.BoardTrace.IsEnabled)
+                Procure.Utilities.BoardTrace.Mark($"load-more-event shown={FilteredPrs.Count} total={TotalFilteredCount} inflight={_loadingMore}");
             // Triggers fire repeatedly while the tail is on screen; one that lands mid-load is
             // remembered and serviced below instead of being dropped.
             if (_loadingMore)
@@ -472,6 +477,11 @@ namespace Procure.PageModels
                 return;
             }
             if (FilteredPrs.Count >= TotalFilteredCount) return;
+
+            // Consume the near-tail signal: ViewChanged re-arms it while the user genuinely sits at
+            // the tail. Left sticky, a short list (extent < ~3 viewports) kept it true forever and
+            // the chain below paged the ENTIRE table into memory.
+            _nearTail = false;
 
             var countBefore = FilteredPrs.Count;
             try
@@ -485,7 +495,8 @@ namespace Procure.PageModels
                 foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
                 TotalFilteredCount = page.TotalCount;
                 UpdateListSummary();
-                Procure.Utilities.BoardTrace.Mark($"more-loaded total={FilteredPrs.Count}");
+                if (Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"more-loaded total={FilteredPrs.Count}");
             }
             catch (Exception ex)
             {
@@ -501,7 +512,7 @@ namespace Procure.PageModels
             // keeps a non-appending pass from chaining forever.
             var pending = _loadMorePending;
             _loadMorePending = false;
-            if ((pending || _nearTail || _lastVisibleIndex >= FilteredPrs.Count - LoadMoreThreshold)
+            if ((pending || _lastVisibleIndex >= FilteredPrs.Count - LoadMoreThreshold)
                 && FilteredPrs.Count > countBefore
                 && FilteredPrs.Count < TotalFilteredCount)
             {
@@ -555,7 +566,7 @@ namespace Procure.PageModels
             // The skeleton covers the window where the board has nothing to show and a query is still
             // running. Without it the empty view - "No requisitions found" - flashes before the first
             // page lands, which now happens on every open because the read is asynchronous.
-            var showSkeleton = FilteredPrs.Count == 0;
+            var showSkeleton = FilteredPrs.Count == 0 && !_hasEverLoaded;
             if (showSkeleton)
             {
                 IsBusy = true;
@@ -573,7 +584,8 @@ namespace Procure.PageModels
                         : Math.Min(FilteredPrs.Count, MaxWindowReread);
 
                 var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(0, take))).ConfigureAwait(true);
-                if (showSkeleton) Procure.Utilities.BoardTrace.Mark($"query-done rows={page.Rows.Count}");
+                if (showSkeleton && Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"query-done rows={page.Rows.Count}");
 
                 if (showSkeleton)
                 {
@@ -612,6 +624,8 @@ namespace Procure.PageModels
 
                 TotalFilteredCount = page.TotalCount;
 
+                _hasEverLoaded = true;
+
                 // Selection state travels with the ids, so the action bar has to be recomputed once the
                 // page it describes has actually landed.
                 UpdateSelectionState();
@@ -619,7 +633,8 @@ namespace Procure.PageModels
                 UpdateListSummary();
                 if (showSkeleton)
                 {
-                    Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
+                    if (Procure.Utilities.BoardTrace.IsEnabled)
+                        Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
                     // The first fill is one viewport; grow the window to a full page shortly after,
                     // off the critical path, so "Showing N of M" reaches PageSize without the user
                     // having to scroll to trigger the first threshold fetch.
@@ -656,6 +671,18 @@ namespace Procure.PageModels
             // window - a status edit at row 400 would look like the list had been rebuilt.
             if (reset)
             {
+                // A reset rebuilds every container; cards left expanded would each flash the
+                // LazyExpander placeholder and pay a synchronous detail-panel build. A new match
+                // set starting collapsed is the expected UX anyway.
+                foreach (var pr in FilteredPrs)
+                {
+                    if (pr.IsExpanded) pr.IsExpanded = false;
+                }
+                foreach (var pr in rows)
+                {
+                    if (pr.IsExpanded) pr.IsExpanded = false;
+                }
+
                 FilteredPrs.Clear();
                 foreach (var pr in rows) FilteredPrs.Add(pr);
                 return;
@@ -671,6 +698,11 @@ namespace Procure.PageModels
 
             for (var i = 0; i < rows.Count; i++)
             {
+                // Fast path first: after the removal pass the lists are aligned except around an
+                // actual insert/move, so the IndexOf scan (O(n) per row, O(n²) per pass at a
+                // 20k-grown board) only runs for the handful of genuinely displaced rows.
+                if (i < FilteredPrs.Count && ReferenceEquals(FilteredPrs[i], rows[i])) continue;
+
                 var existing = FilteredPrs.IndexOf(rows[i]);
                 if (existing < 0) FilteredPrs.Insert(i, rows[i]);
                 else if (existing != i) FilteredPrs.Move(existing, i);
@@ -725,6 +757,17 @@ namespace Procure.PageModels
             }
         }
 
+        // A one-field status/priority edit only changes the board's match set when a filter that
+        // inspects it is active. The card is already bound to the updated object, so reloading and
+        // reconciling the whole window (query + reflection merge + reconcile, the slowest single
+        // click in the app) is skipped when no filter can be affected.
+        private bool RowFilterActive =>
+            SelectedStatusFilter != "All" ||
+            FilterOverdueOnly ||
+            FilterPcrPendingOnly ||
+            FilterUrgentOnly ||
+            !string.IsNullOrWhiteSpace(SearchText);
+
         public async Task UpdatePrStatusDirectAsync(PurchaseRequisition pr, string newStatus)
         {
             if (string.IsNullOrWhiteSpace(newStatus) || pr.Status == newStatus) return;
@@ -733,7 +776,7 @@ namespace Procure.PageModels
                 pr.Status = newStatus;
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyStatusChanged();
-                ApplyFilters();
+                if (RowFilterActive) ApplyFilters();
                 UpdateStatusBanner();
             }
             catch (Exception ex)
@@ -768,7 +811,7 @@ namespace Procure.PageModels
                     UpdateStatusBanner();
                 }
 
-                ApplyFilters();
+                if (RowFilterActive) ApplyFilters();
             }
             catch (Exception ex)
             {
@@ -802,7 +845,7 @@ namespace Procure.PageModels
                     UpdateStatusBanner();
                 }
 
-                ApplyFilters();
+                if (RowFilterActive) ApplyFilters();
             }
             catch (Exception ex)
             {
@@ -821,7 +864,7 @@ namespace Procure.PageModels
 
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyStatusChanged();
-                ApplyFilters();
+                if (RowFilterActive) ApplyFilters();
                 UpdateStatusBanner();
             }
             catch (Exception ex)

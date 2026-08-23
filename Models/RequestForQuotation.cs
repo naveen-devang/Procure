@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -320,6 +321,21 @@ namespace Procure.Models
                                             !string.IsNullOrWhiteSpace(VatType) ||
                                             HasFreight ||
                                             HasOtherCharges;
+
+        // The vendor's most recent USABLE quote: RFQs that actually carry quote data outrank
+        // newer ones that were merely (re-)sent — otherwise a re-sent, still-unquoted RFQ would
+        // zero the vendor's numbers in every consumer that wants "the latest quote".
+        public static RequestForQuotation? LatestQuoteForVendor(IEnumerable<RequestForQuotation>? rfqs, string? vendor)
+        {
+            if (rfqs == null) return null;
+            var matches = rfqs
+                .Where(r => string.IsNullOrWhiteSpace(vendor)
+                    || string.Equals(r.Vendor?.Trim(), vendor.Trim(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var quoted = matches.Where(r => r.IsQuoteReceived || r.TotalLandedCost > 0).ToList();
+            var pool = quoted.Count > 0 ? quoted : matches;
+            return pool.OrderBy(r => r.QuoteReceivedDate ?? r.SentDate ?? DateTime.MinValue).LastOrDefault();
+        }
 
         public void NotifyCalculationsChanged()
         {

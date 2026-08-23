@@ -458,7 +458,9 @@ namespace Procure.PageModels
                     BatchSharedRequestor,
                     BatchSharedPriority,
                     BatchSharedNotes,
-                    BatchSharedCustomValues);
+                    BatchSharedCustomValues,
+                    defaultPlant: BatchSharedPlant,
+                    defaultPrType: BatchSharedPrType);
 
                 if (parsedEntries.Count == 0)
                 {
@@ -632,7 +634,9 @@ namespace Procure.PageModels
                 BatchSharedPriority,
                 BatchSharedNotes,
                 BatchSharedCustomValues,
-                isPrNoFirst: isPrNoColumn);
+                isPrNoFirst: isPrNoColumn,
+                defaultPlant: BatchSharedPlant,
+                defaultPrType: BatchSharedPrType);
 
             if (parsed.Count == 0) return;
 

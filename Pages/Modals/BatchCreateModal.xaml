@@ -25,7 +25,10 @@
                 <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
             </Border.Shadow>
 
-            <Grid RowDefinitions="Auto, *, Auto" RowSpacing="16">
+            <!-- Shared defaults stay pinned; the PR rows live in a virtualizing CollectionView in
+                 the star row. The old ScrollView realized every pasted row (50 PRs x ~30 controls)
+                 and re-measured all of them on every keystroke — that was the typing lag here. -->
+            <Grid RowDefinitions="Auto, Auto, Auto, *, Auto" RowSpacing="16">
                 <!-- Dialog Header -->
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" VerticalOptions="Center">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
@@ -42,12 +45,8 @@
                             HeightRequest="30" WidthRequest="30" Padding="0" />
                 </Grid>
 
-                <!-- Scrollable Content -->
-                <ScrollView Grid.Row="1">
-                    <VerticalStackLayout Spacing="16">
-
-                        <!-- Section A: Shared Defaults & Tags -->
-                        <Border StrokeThickness="1"
+                <!-- Section A: Shared Defaults & Tags -->
+                <Border Grid.Row="1" StrokeThickness="1"
                                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                                 Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
                                 Padding="16">
@@ -155,9 +154,8 @@
                             </VerticalStackLayout>
                         </Border>
 
-                        <!-- Section B: Requisitions List -->
-                        <VerticalStackLayout Spacing="12">
-                            <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                <!-- Section B header: Requisitions List toolbar -->
+                <Grid Grid.Row="2" ColumnDefinitions="*, Auto" VerticalOptions="Center">
                                 <Label Grid.Column="0" Text="Requisition Entries" FontFamily="SegoeSemibold" FontSize="14"
                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                 <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
@@ -171,10 +169,14 @@
                                             Style="{StaticResource SecondaryButton}"
                                             FontSize="11" HeightRequest="28" Padding="12,0" />
                                 </HorizontalStackLayout>
-                            </Grid>
+                </Grid>
 
-                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding BatchPrEntries}" Spacing="12">
-                                <BindableLayout.ItemTemplate>
+                <!-- PR rows: virtualized -->
+                <CollectionView Grid.Row="3" ItemsSource="{Binding BatchPrEntries}" SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="12" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="models:BatchPrEntry">
                                         <Border StrokeThickness="1"
                                                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
@@ -333,15 +335,11 @@
                                             </VerticalStackLayout>
                                         </Border>
                                     </DataTemplate>
-                                </BindableLayout.ItemTemplate>
-                            </VerticalStackLayout>
-                        </VerticalStackLayout>
-
-                    </VerticalStackLayout>
-                </ScrollView>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
 
                 <!-- Dialog Footer -->
-                <Grid Grid.Row="2" ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,4,0,0">
+                <Grid Grid.Row="4" ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,4,0,0">
                     <Button Grid.Column="0" Text="+ Add Another Requisition"
                             Command="{Binding AddBatchPrRowCommand}"
                             Style="{StaticResource SecondaryButton}"

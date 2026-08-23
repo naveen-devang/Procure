@@ -276,6 +276,10 @@ namespace Procure.PageModels
                     PrNo = MergeMasterPrNo.Trim(),
                     Description = MergeDescription.Trim(),
                     Requestor = MergeRequestor.Trim(),
+                    // Inherit from the sources (most common value): defaulting silently relabeled
+                    // e.g. an all-NO01/Capex merge as RW01/Stores&Spares.
+                    Plant = selected.GroupBy(p => p.Plant).OrderByDescending(g => g.Count()).First().Key,
+                    PrType = selected.GroupBy(p => p.PrType).OrderByDescending(g => g.Count()).First().Key,
                     Priority = MergePriority,
                     Status = ProcurementStatus.PrRaised,
                     Notes = MergeNotes.Trim(),
@@ -432,9 +436,29 @@ namespace Procure.PageModels
             }
             else
             {
-                SplitActionSummary = $"All {totalCount} requisitions will be separated back to standalone active PRs. Master PR {SplitTargetMasterPr?.PrNo} will be removed.";
+                SplitActionSummary = $"All {totalCount} requisitions will be separated back to standalone active PRs. Master PR {SplitTargetMasterPr?.PrNo} will be removed.{BuildSplitMasterDocWarning()}";
                 CanConfirmSplit = true;
             }
+        }
+
+        // A full split hard-deletes every document attached to the master; without naming them the
+        // confirmation read as harmless while a real raised PO was about to be destroyed.
+        private string BuildSplitMasterDocWarning()
+        {
+            var master = SplitTargetMasterPr;
+            if (master == null) return string.Empty;
+
+            var parts = new List<string>();
+            if (master.Pos != null && master.Pos.Count > 0)
+                parts.Add($"{master.Pos.Count} raised PO(s) ({string.Join(", ", master.Pos.Select(p => p.PoNo))})");
+            if (master.Rfqs != null && master.Rfqs.Count > 0)
+                parts.Add($"{master.Rfqs.Count} RFQ(s)");
+            if (master.Pcr != null)
+                parts.Add("the PCR record");
+
+            return parts.Count == 0
+                ? string.Empty
+                : $" WARNING: {string.Join(", ", parts)} recorded on the master will be permanently deleted.";
         }
 
         [RelayCommand]

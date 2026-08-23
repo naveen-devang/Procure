@@ -37,6 +37,22 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial ObservableCollection<PrItem> EditingPrItems { get; set; } = new();
 
+        // Typed header fields are edited through these buffers, not the live board PR: TwoWay
+        // bindings to the live object re-rendered the board card behind the modal on every
+        // keystroke. Committed to the PR in SavePrModalAsync; dropdown fields (Plant, PR Type,
+        // Priority, Status) still bind live — a Picker fires once per selection, not per key.
+        [ObservableProperty]
+        public partial string EditingPrNo { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string EditingPrRequestor { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string EditingPrDescription { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string EditingPrNotes { get; set; } = string.Empty;
+
         // The edit modal binds TwoWay to the live PR the card shows, so cancelling must put back
         // what was there on open or abandoned edits stay on the card and ride along with the next
         // unrelated save. Items/CustomValues references included: a failed validation replaces them
@@ -113,9 +129,9 @@ namespace Procure.PageModels
                     EditingPrItems.Add(item);
                 }
 
-                if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && EditingPrItems.Count > 0)
+                if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(EditingPrDescription) && EditingPrItems.Count > 0)
                 {
-                    CurrentEditingPr.Description = EditingPrItems[0].ItemName;
+                    EditingPrDescription = EditingPrItems[0].ItemName;
                 }
             }
             catch (Exception ex)
@@ -132,6 +148,10 @@ namespace Procure.PageModels
 
             EditModalTitle = $"Edit Requisition {pr.PrNo}";
             CurrentEditingPr = pr;
+            EditingPrNo = pr.PrNo;
+            EditingPrRequestor = pr.Requestor;
+            EditingPrDescription = pr.Description;
+            EditingPrNotes = pr.Notes;
             _editSnapshot = new PrEditSnapshot(pr.PrNo, pr.Requestor, pr.Plant, pr.PrType,
                 pr.Description, pr.Priority, pr.Status, pr.Notes, pr.Items, pr.CustomValues);
 
@@ -192,6 +212,13 @@ namespace Procure.PageModels
         public async Task SavePrModalAsync()
         {
             if (CurrentEditingPr == null) return;
+
+            // Commit the buffered header fields onto the live PR now — the modal edits buffers so
+            // typing does not repaint the board card behind it.
+            CurrentEditingPr.PrNo = EditingPrNo;
+            CurrentEditingPr.Requestor = EditingPrRequestor;
+            CurrentEditingPr.Description = EditingPrDescription;
+            CurrentEditingPr.Notes = EditingPrNotes;
 
             if (string.IsNullOrWhiteSpace(CurrentEditingPr.PrNo))
             {

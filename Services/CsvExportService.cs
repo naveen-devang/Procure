@@ -33,6 +33,8 @@ namespace Procure.Services
                 "PCR Status",
                 "PO Count",
                 "Total PO Value",
+                "PO Currency",
+                "PO Value Breakdown",
                 "Consolidated From",
                 "Notes"
             };
@@ -47,6 +49,19 @@ namespace Procure.Services
             // Rows
             foreach (var pr in prs)
             {
+                // "Total PO Value" was a bare cross-currency sum with no currency anywhere in the
+                // file; the currency column flags it, and the breakdown itemizes mixed-currency PRs.
+                var poCurrencies = pr.Pos?
+                    .Select(p => string.IsNullOrWhiteSpace(p.Currency) ? "AED" : p.Currency)
+                    .Distinct()
+                    .ToList() ?? new List<string>();
+                var poCurrencyDisplay = poCurrencies.Count == 0 ? "AED" : string.Join("/", poCurrencies);
+                var poBreakdown = poCurrencies.Count > 1
+                    ? string.Join(" | ", pr.Pos!
+                        .GroupBy(p => string.IsNullOrWhiteSpace(p.Currency) ? "AED" : p.Currency)
+                        .Select(g => $"{g.Key} {g.Sum(p => p.Value):F2}"))
+                    : string.Empty;
+
                 var row = new List<string>
                 {
                     EscapeCsv(pr.PrNo),
@@ -63,6 +78,8 @@ namespace Procure.Services
                     EscapeCsv(pr.PcrStatusDisplay),
                     pr.PoCount.ToString(),
                     pr.TotalPoValue.ToString("F2"),
+                    EscapeCsv(poCurrencyDisplay),
+                    EscapeCsv(poBreakdown),
                     EscapeCsv(pr.ConsolidatedFrom),
                     EscapeCsv(pr.Notes)
                 };

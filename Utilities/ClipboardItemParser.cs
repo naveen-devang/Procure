@@ -168,7 +168,9 @@ namespace Procure.Utilities
             string defaultPriority,
             string defaultNotes,
             IReadOnlyList<CustomFieldValue>? sharedCustomValues = null,
-            bool isPrNoFirst = false)
+            bool isPrNoFirst = false,
+            string? defaultPlant = null,
+            string? defaultPrType = null)
         {
             var result = new List<BatchPrEntry>();
             if (string.IsNullOrWhiteSpace(clipboardText))
@@ -279,6 +281,11 @@ namespace Procure.Utilities
                     Items = items
                 };
 
+                // Pasted rows previously ignored the Shared Plant / PR Type header selections and
+                // fell back to the model defaults, unlike rows added via the Add Row button.
+                if (!string.IsNullOrWhiteSpace(defaultPlant)) entry.Plant = defaultPlant;
+                if (!string.IsNullOrWhiteSpace(defaultPrType)) entry.PrType = defaultPrType;
+
                 result.Add(entry);
             }
 
@@ -297,6 +304,30 @@ namespace Procure.Utilities
                 && !Regex.IsMatch(columns[1].Trim(), @"^\d+(?:\.\d+)?\s*[a-zA-Z]*$"))
             {
                 columns = new[] { line };
+            }
+
+            // The app's own email-copy table is "serial⭾name⭾qty⭾unit"; a purely numeric first
+            // column followed by a non-numeric name and a quantity-like third column is a serial
+            // number, not the item name — without the shift the paste imported items named "1","2",…
+            bool serialShift = columns.Length >= 3
+                && Regex.IsMatch(columns[0].Trim(), @"^\d+$")
+                && !Regex.IsMatch(columns[1].Trim(), @"^\d+(?:[\.,]\d+)?\s*[a-zA-Z]*$")
+                && Regex.IsMatch(columns[2].Trim(), @"^\d+(?:[\.,]\d+)?\s*[a-zA-Z]*$");
+
+            // A purely numeric item name (part number "300012") defeats the check above, but the
+            // full 4-column shape serial⭾number-name⭾qty⭾unit-word is still unambiguous.
+            if (!serialShift && columns.Length >= 4
+                && Regex.IsMatch(columns[0].Trim(), @"^\d+$")
+                && columns[1].Trim().Length > 0
+                && Regex.IsMatch(columns[2].Trim(), @"^\d+(?:\.\d+)?$")
+                && Regex.IsMatch(columns[3].Trim(), @"^[A-Za-z]{1,12}$"))
+            {
+                serialShift = true;
+            }
+
+            if (serialShift)
+            {
+                columns = columns.Skip(1).ToArray();
             }
 
             if (columns.Length >= 2)
@@ -410,6 +441,13 @@ namespace Procure.Utilities
             }
         }
 
+        // A single thousands-formatted cell like "1,250", "AED 2,300" or "1,000 pcs" — an optional
+        // short currency/unit token either side of one comma-grouped number. Excel copies numbers
+        // as displayed, so these arrive with commas that are separators of digits, not of columns.
+        private static readonly Regex FormattedNumberLineRegex = new(
+            @"^\s*(?:[A-Za-z$€£¥]{1,4}\s*)?-?\d{1,3}(?:,\d{3})+(?:\.\d+)?\s*(?:[A-Za-z]{1,12})?\s*$",
+            RegexOptions.Compiled);
+
         private static string[] SplitColumns(string line)
         {
             if (line.Contains('\t'))
@@ -417,7 +455,9 @@ namespace Procure.Utilities
                 return line.Split('\t');
             }
 
-            if (line.Contains(',') && !line.StartsWith('"'))
+            // Splitting "1,250.00" into ["1","250.00"] turned pasted prices into price+discount
+            // pairs and pasted quantities of "1,000" into 1.
+            if (line.Contains(',') && !line.StartsWith('"') && !FormattedNumberLineRegex.IsMatch(line))
             {
                 return line.Split(',');
             }
@@ -448,6 +488,9 @@ namespace Procure.Utilities
                 return 1;
 
             var clean = raw.Trim();
+            // "1,000" is a thousands-formatted quantity, not 1 — strip digit-grouping commas
+            // before the unit split so Excel-displayed numbers parse at full magnitude.
+            clean = Regex.Replace(clean, @"(?<=\d),(?=\d{3}(?:\D|$))", "");
             // Separate numbers from units if formatted like "5pcs" or "10 units"
             var match = Regex.Match(clean, @"^(?<num>\d+(?:\.\d+)?)\s*(?<unit>[a-zA-Z]+)?$");
             if (match.Success)
@@ -483,26 +526,49 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(clipboardText))
                 return result;
 
+            // Blank lines are kept: a blank cell in a copied Excel column means "not quoted",
+            // and dropping it shifted every following price onto the wrong item.
             var rawLines = clipboardText
-                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None)
                 .Select(l => l.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
                 .ToList();
 
-            if (rawLines.Count == 0)
+            // The trailing newline Excel appends to a copy produces exactly ONE empty entry —
+            // remove only that one. Stripping every trailing blank also swallowed genuine blank
+            // cells at the END of a copied column, leaving stale prices on the last items.
+            if (rawLines.Count > 0 && string.IsNullOrWhiteSpace(rawLines[^1]))
+            {
+                rawLines.RemoveAt(rawLines.Count - 1);
+            }
+
+            if (rawLines.Count == 0 || rawLines.All(string.IsNullOrWhiteSpace))
                 return result;
 
+            // Header detection runs on the first non-blank line (a spacer row above the table
+            // otherwise hid the header, which then got parsed as a price of null).
             int startIndex = 0;
-            if (IsPricingHeaderRow(rawLines[0]))
+            int firstContent = rawLines.FindIndex(l => !string.IsNullOrWhiteSpace(l));
+            if (firstContent >= 0 && IsPricingHeaderRow(rawLines[firstContent]))
             {
-                startIndex = 1;
+                startIndex = firstContent + 1;
             }
 
             for (int i = startIndex; i < rawLines.Count; i++)
             {
                 var line = rawLines[i];
-                var cols = SplitColumns(line);
                 var row = new RfqPricingPasteRow();
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    // Emit a clearing row for the pasted column so alignment is preserved.
+                    if (startCol == RfqPricingColumn.UnitPrice) row.HasUnitPrice = true;
+                    else if (startCol == RfqPricingColumn.Discount) row.HasDiscount = true;
+                    else row.HasLastPrice = true;
+                    result.Add(row);
+                    continue;
+                }
+
+                var cols = SplitColumns(line);
 
                 if (startCol == RfqPricingColumn.UnitPrice)
                 {
@@ -514,6 +580,7 @@ namespace Procure.Utilities
                     if (cols.Length > 1)
                     {
                         row.Discount = ParsePrice(cols[1]);
+                        row.DiscountIsPercent = cols[1].Contains('%');
                         row.HasDiscount = true;
                     }
                     if (cols.Length > 2)
@@ -527,6 +594,7 @@ namespace Procure.Utilities
                     if (cols.Length > 0)
                     {
                         row.Discount = ParsePrice(cols[0]);
+                        row.DiscountIsPercent = cols[0].Contains('%');
                         row.HasDiscount = true;
                     }
                     if (cols.Length > 1)
@@ -576,10 +644,23 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(sanitized))
                 return null;
 
-            // Handle comma thousands separators
+            // Handle comma separators: "1,250" / "12,345,678" are thousands groups (Excel copies
+            // numbers as displayed) — rewriting them as decimal commas understated prices 1000x.
+            // Only a lone comma with 1-2 trailing digits reads as a European decimal comma.
             if (sanitized.Contains(',') && !sanitized.Contains('.'))
             {
-                sanitized = sanitized.Replace(",", ".");
+                if (Regex.IsMatch(sanitized, @"^-?\d{1,3}(?:,\d{3})+$"))
+                {
+                    sanitized = sanitized.Replace(",", "");
+                }
+                else if (Regex.IsMatch(sanitized, @"^-?\d+,\d{1,2}$"))
+                {
+                    sanitized = sanitized.Replace(",", ".");
+                }
+                else
+                {
+                    sanitized = sanitized.Replace(",", "");
+                }
             }
             else if (sanitized.Contains(',') && sanitized.Contains('.'))
             {
@@ -610,5 +691,9 @@ namespace Procure.Utilities
         public bool HasUnitPrice { get; set; }
         public bool HasDiscount { get; set; }
         public bool HasLastPrice { get; set; }
+
+        // "5%" in a discount cell carries the percentage, not 5 currency units; the consumer
+        // converts it against the row's unit price (the discount column is a per-unit amount).
+        public bool DiscountIsPercent { get; set; }
     }
 }

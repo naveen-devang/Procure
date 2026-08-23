@@ -85,7 +85,21 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string FormattedCalculatedBatchRfqGrandTotal { get; set; } = string.Empty;
 
-        partial void OnBatchRfqQuoteAmountChanged(decimal? value) => RecalculateBatchRfqTotals();
+        // Mirrors the single-RFQ modal: tracks whether the lump sum was machine-synced from the
+        // items so clearing every price zeroes the total instead of resurrecting the stale sum.
+        private bool _batchRfqQuoteAmountAutoSynced;
+        private bool _syncingBatchRfqQuoteAmount;
+
+        partial void OnBatchRfqQuoteAmountChanged(decimal? value)
+        {
+            if (_syncingBatchRfqQuoteAmount)
+            {
+                // The recalc itself is writing the synced sum; re-entering it doubled every pass.
+                return;
+            }
+            _batchRfqQuoteAmountAutoSynced = false;
+            RecalculateBatchRfqTotals();
+        }
         partial void OnBatchRfqFreightChanged(decimal? value) => RecalculateBatchRfqTotals();
         partial void OnBatchRfqOtherChargesChanged(decimal? value) => RecalculateBatchRfqTotals();
         partial void OnBatchRfqDiscountChanged(decimal? value) => RecalculateBatchRfqTotals();
@@ -108,6 +122,13 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string BatchPoStatus { get; set; } = PoStatus.Raised;
 
+        [ObservableProperty]
+        public partial string BatchPoCurrency { get; set; } = "AED";
+
+        // Bounds the shared-RFQ item table's virtualizing CollectionView (up to ~8 visible rows).
+        [ObservableProperty]
+        public partial double BatchRfqItemsListHeight { get; set; } = 42;
+
 
         // ================= BATCH SHARED RFQ OPERATIONS =================
 
@@ -119,7 +140,18 @@ namespace Procure.PageModels
                 if (quotedSum > 0)
                 {
                     CalculatedBatchRfqBaseTotal = quotedSum;
+                    _syncingBatchRfqQuoteAmount = true;
                     BatchRfqQuoteAmount = quotedSum;
+                    _syncingBatchRfqQuoteAmount = false;
+                    _batchRfqQuoteAmountAutoSynced = true;
+                }
+                else if (_batchRfqQuoteAmountAutoSynced)
+                {
+                    CalculatedBatchRfqBaseTotal = 0m;
+                    _syncingBatchRfqQuoteAmount = true;
+                    BatchRfqQuoteAmount = null;
+                    _syncingBatchRfqQuoteAmount = false;
+                    _batchRfqQuoteAmountAutoSynced = false;
                 }
                 else
                 {
@@ -142,15 +174,17 @@ namespace Procure.PageModels
             var cur = string.IsNullOrWhiteSpace(BatchRfqCurrency) ? "AED" : BatchRfqCurrency;
             FormattedCalculatedBatchRfqGrandTotal = $"{cur} {CalculatedBatchRfqGrandTotal:N2}";
             HasBatchEditingRfqItems = BatchEditingRfqItems != null && BatchEditingRfqItems.Count > 0;
+            BatchRfqItemsListHeight = Math.Clamp(BatchEditingRfqItems?.Count ?? 0, 1, 8) * 42;
         }
 
         private void OnBatchEditingRfqItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // LineTotal is only a companion notification of the four source properties below;
+            // matching it too ran the recalc twice for every edit.
             if (e.PropertyName == nameof(RfqItem.IsQuoted) ||
                 e.PropertyName == nameof(RfqItem.QuotedUnitPrice) ||
                 e.PropertyName == nameof(RfqItem.Discount) ||
-                e.PropertyName == nameof(RfqItem.Quantity) ||
-                e.PropertyName == nameof(RfqItem.LineTotal))
+                e.PropertyName == nameof(RfqItem.Quantity))
             {
                 RecalculateBatchRfqTotals();
             }
@@ -223,15 +257,13 @@ namespace Procure.PageModels
                 if (row.HasUnitPrice)
                 {
                     targetItem.QuotedUnitPrice = row.UnitPrice;
-                    if (row.UnitPrice.HasValue)
-                    {
-                        targetItem.IsQuoted = true;
-                    }
+                    // Blank pasted cell explicitly un-quotes the row (keeps column alignment).
+                    targetItem.IsQuoted = row.UnitPrice.HasValue;
                 }
 
                 if (row.HasDiscount)
                 {
-                    targetItem.Discount = row.Discount;
+                    targetItem.Discount = ResolvePastedDiscount(row, targetItem);
                 }
 
                 if (row.HasLastPrice)
@@ -279,6 +311,7 @@ namespace Procure.PageModels
             BatchRfqVendor = string.Empty;
             BatchRfqCurrency = string.IsNullOrWhiteSpace(_settingsService.DefaultCurrency) ? "AED" : _settingsService.DefaultCurrency;
             BatchRfqQuoteAmount = null;
+            _batchRfqQuoteAmountAutoSynced = false;
             BatchRfqFreight = null;
             BatchRfqOtherCharges = null;
             BatchRfqDiscount = null;
@@ -443,8 +476,25 @@ namespace Procure.PageModels
             var mostCommonVendor = vendors.GroupBy(v => v).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? string.Empty;
             BatchPoVendor = mostCommonVendor;
 
-            var sumQuotes = selected.SelectMany(p => p.Rfqs).Where(r => string.IsNullOrEmpty(mostCommonVendor) || r.Vendor == mostCommonVendor).Sum(r => r.QuoteAmount ?? 0m);
-            BatchPoTotalValue = sumQuotes;
+            // One quote per PR — the vendor's latest USABLE quote — summed at landed cost
+            // (VAT-inclusive, like the single PO wizard). Summing every RFQ's base amount
+            // double-counted revised quotes and understated the total by VAT and charges.
+            var perPrQuotes = selected
+                .Select(p => RequestForQuotation.LatestQuoteForVendor(p.Rfqs, mostCommonVendor))
+                .Where(r => r != null)
+                .Select(r => r!)
+                .ToList();
+            BatchPoCurrency = perPrQuotes
+                .Select(r => string.IsNullOrWhiteSpace(r.Currency) ? "AED" : r.Currency.Trim())
+                .GroupBy(c => c, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .FirstOrDefault() ?? "AED";
+            // Quotes in different currencies cannot be summed into one number: the prefill counts
+            // only the majority currency; other-currency PRs keep their own quote value at save.
+            BatchPoTotalValue = perPrQuotes
+                .Where(r => string.Equals(string.IsNullOrWhiteSpace(r.Currency) ? "AED" : r.Currency.Trim(), BatchPoCurrency, StringComparison.OrdinalIgnoreCase))
+                .Sum(r => r.TotalLandedCost);
             BatchPoStatus = PoStatus.Raised;
 
             IsBatchPoModalVisible = true;
@@ -478,7 +528,8 @@ namespace Procure.PageModels
                     Vendor = BatchPoVendor.Trim(),
                     Value = BatchPoTotalValue,
                     Status = BatchPoStatus,
-                    Date = DateTime.Today
+                    Date = DateTime.Today,
+                    Currency = string.IsNullOrWhiteSpace(BatchPoCurrency) ? "AED" : BatchPoCurrency
                 };
 
                 await _prRepo.CreateBatchPoAsync(selected, poTemplate);

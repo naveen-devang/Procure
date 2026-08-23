@@ -28,13 +28,15 @@ namespace Procure.Data.Repositories
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom)
-VALUES (@Id, @PrNo, @Description, @Requestor, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom);";
+INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType)
+VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType);";
 
                 cmd.Parameters.AddWithValue("@Id", masterPr.Id.ToString());
                 cmd.Parameters.AddWithValue("@PrNo", masterPr.PrNo);
                 cmd.Parameters.AddWithValue("@Description", masterPr.Description);
                 cmd.Parameters.AddWithValue("@Requestor", masterPr.Requestor);
+                cmd.Parameters.AddWithValue("@Plant", masterPr.Plant ?? "RW01");
+                cmd.Parameters.AddWithValue("@PrType", masterPr.PrType ?? "Stores&Spares");
                 cmd.Parameters.AddWithValue("@Priority", masterPr.Priority);
                 cmd.Parameters.AddWithValue("@Status", masterPr.Status);
                 cmd.Parameters.AddWithValue("@Notes", masterPr.Notes);
@@ -237,22 +239,89 @@ WHERE Id = @Id;";
             await connection.OpenAsync().ConfigureAwait(false);
             using var tx = connection.BeginTransaction();
 
-            var allocatedValue = targetPrs.Count > 0 && poTemplate.Value > 0 ? (poTemplate.Value / targetPrs.Count) : 0m;
             var combinedPrNumbers = string.Join(", ", targetPrs.Select(p => p.PrNo));
 
-            foreach (var pr in targetPrs)
+            // Each PR's slice of the combined PO follows its own vendor quote (the vendor's latest
+            // USABLE quote — a newer re-sent-but-unquoted RFQ must not zero the PR's share): value
+            // pro-rata by landed cost — an even split misallocated per-PR reporting — and the
+            // quote's currency/VAT/breakdown carried onto the row, which previously stored no
+            // breakdown at all and always claimed AED.
+            var prQuotes = targetPrs
+                .Select(pr => RequestForQuotation.LatestQuoteForVendor(pr.Rfqs, poTemplate.Vendor))
+                .ToList();
+
+            // The confirmed total is denominated in the template currency, so only quotes in that
+            // currency share it; a quote in another currency keeps its own landed value — scaling
+            // it against the template-currency total would move money between currencies.
+            var templateCur = string.IsNullOrWhiteSpace(poTemplate.Currency) ? "AED" : poTemplate.Currency.Trim();
+            bool InTemplateCurrency(RequestForQuotation? q) =>
+                q == null || string.Equals(string.IsNullOrWhiteSpace(q.Currency) ? "AED" : q.Currency.Trim(), templateCur, StringComparison.OrdinalIgnoreCase);
+
+            var totalLanded = prQuotes.Where(q => q != null && InTemplateCurrency(q)).Sum(q => q!.TotalLandedCost);
+            int templateSlotCount = prQuotes.Count(InTemplateCurrency);
+            int lastTemplateIndex = prQuotes.FindLastIndex(q => InTemplateCurrency(q));
+
+            decimal assignedValue = 0m;
+            for (int prIndex = 0; prIndex < targetPrs.Count; prIndex++)
             {
+                var pr = targetPrs[prIndex];
+                var quote = prQuotes[prIndex];
+
+                // Scale the quote's landed cost so the per-PR values sum exactly to the total the
+                // user confirmed in the modal (factor is 1 when the prefill was left untouched).
+                decimal allocatedValue;
+                if (!InTemplateCurrency(quote))
+                {
+                    allocatedValue = Math.Round(quote!.TotalLandedCost, 2);
+                }
+                else if (prIndex == lastTemplateIndex)
+                {
+                    allocatedValue = Math.Max(0m, poTemplate.Value - assignedValue);
+                }
+                else
+                {
+                    var weight = totalLanded > 0
+                        ? (quote?.TotalLandedCost ?? 0m) / totalLanded
+                        : 1m / Math.Max(1, templateSlotCount);
+                    allocatedValue = Math.Round(poTemplate.Value * weight, 2);
+                    assignedValue += allocatedValue;
+                }
+                var factor = quote != null && quote.TotalLandedCost > 0 ? allocatedValue / quote.TotalLandedCost : 0m;
+
+                var vatType = string.IsNullOrWhiteSpace(quote?.VatType) ? (string.IsNullOrWhiteSpace(poTemplate.VatType) ? "5%" : poTemplate.VatType) : quote!.VatType;
+                var freight = quote?.Freight.HasValue == true && factor > 0 ? Math.Round(quote.Freight!.Value * factor, 2) : (decimal?)null;
+                var otherCharges = quote?.OtherCharges.HasValue == true && factor > 0 ? Math.Round(quote.OtherCharges!.Value * factor, 2) : (decimal?)null;
+                var discount = quote?.Discount.HasValue == true && factor > 0 ? Math.Round(quote.Discount!.Value * factor, 2) : (decimal?)null;
+
+                // Derive the base from the allocated value so the stored breakdown reproduces
+                // Value exactly — rounding every component independently let them drift apart by
+                // up to ~2 cents, re-arming the startup Value repair on a future schema bump.
+                decimal? baseAmount = null;
+                if (quote != null && factor > 0)
+                {
+                    var vatFactor = vatType == "5%" ? 1.05m : 1.0m;
+                    var net = Math.Round(allocatedValue / vatFactor, 2);
+                    baseAmount = Math.Max(0m, net - (freight ?? 0m) - (otherCharges ?? 0m) + (discount ?? 0m));
+                }
+
                 var po = new PurchaseOrder
                 {
                     Id = Guid.NewGuid(),
                     PrId = pr.Id,
                     PoNo = poTemplate.PoNo,
                     Vendor = poTemplate.Vendor,
+                    LinkedRfqId = quote?.Id,
                     Value = allocatedValue,
                     Status = poTemplate.Status,
                     Date = poTemplate.Date ?? DateTime.Today,
                     CombinedPrs = combinedPrNumbers,
-                    Currency = string.IsNullOrWhiteSpace(poTemplate.Currency) ? "AED" : poTemplate.Currency
+                    Currency = !string.IsNullOrWhiteSpace(quote?.Currency) ? quote!.Currency
+                        : (string.IsNullOrWhiteSpace(poTemplate.Currency) ? "AED" : poTemplate.Currency),
+                    VatType = vatType,
+                    BaseAmount = baseAmount,
+                    Freight = freight,
+                    OtherCharges = otherCharges,
+                    Discount = discount
                 };
                 pr.Pos.Add(po);
 
@@ -264,8 +333,8 @@ WHERE Id = @Id;";
                 using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency)
-VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency);
+INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType)
+VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency, @BaseAmount, @Freight, @OtherCharges, @Discount, @VatType);
 
 UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE Id = @PrId;";
 
@@ -273,12 +342,17 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                 cmd.Parameters.AddWithValue("@PrId", pr.Id.ToString());
                 cmd.Parameters.AddWithValue("@PoNo", po.PoNo);
                 cmd.Parameters.AddWithValue("@Vendor", po.Vendor);
-                cmd.Parameters.AddWithValue("@LinkedRfqId", DBNull.Value);
+                cmd.Parameters.AddWithValue("@LinkedRfqId", po.LinkedRfqId.HasValue ? po.LinkedRfqId.Value.ToString() : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@Value", po.Value);
                 cmd.Parameters.AddWithValue("@Status", po.Status);
                 cmd.Parameters.AddWithValue("@Date", po.Date.HasValue ? po.Date.Value.ToString("o") : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@CombinedPrs", po.CombinedPrs);
                 cmd.Parameters.AddWithValue("@Currency", po.Currency);
+                cmd.Parameters.AddWithValue("@BaseAmount", po.BaseAmount.HasValue ? (object)po.BaseAmount.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Freight", po.Freight.HasValue ? (object)po.Freight.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@OtherCharges", po.OtherCharges.HasValue ? (object)po.OtherCharges.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Discount", po.Discount.HasValue ? (object)po.Discount.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@VatType", po.VatType);
                 cmd.Parameters.AddWithValue("@PrStatus", pr.Status);
                 cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
 
@@ -309,12 +383,77 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
             var sharedPrNumbers = string.Join(", ", targetPrs.Select(p => p.PrNo));
             var batchItemList = batchItems?.ToList() ?? new List<RfqItem>();
 
+            // The batch dialog collects ONE quote amount and ONE freight/other/discount for the
+            // whole lot. Copying them verbatim onto every per-PR RFQ multiplied the money N-fold
+            // (each PR's PCR then carried the full batch charges). Instead: a PR's own priced rows
+            // are its base; the typed lump sum, minus what priced rows already cover, is split
+            // equally across the PRs without priced rows; header charges are apportioned pro-rata
+            // by base share (equal split when nothing is priced).
+            var prShares = new List<(PurchaseRequisition Pr, List<RfqItem> Items, decimal Base)>();
+            decimal totalQuotedSum = 0m;
+            int unpricedCount = 0;
             foreach (var pr in targetPrs)
             {
-                var prSpecificItems = batchItemList.Where(bi => bi.Notes == pr.PrNo || (pr.Items != null && pr.Items.Any(pi => pi.Id == bi.PrItemId))).ToList();
+                var items = batchItemList.Where(bi => bi.Notes == pr.PrNo || (pr.Items != null && pr.Items.Any(pi => pi.Id == bi.PrItemId))).ToList();
+                var quotedSum = items.Where(i => i.IsQuoted).Sum(i => i.LineTotal);
+                prShares.Add((pr, items, quotedSum));
+                totalQuotedSum += quotedSum;
+                if (quotedSum <= 0) unpricedCount++;
+            }
 
-                var prQuotedSum = prSpecificItems.Where(i => i.IsQuoted).Sum(i => i.LineTotal);
-                var prQuoteAmount = prQuotedSum > 0 ? prQuotedSum : rfqTemplate.QuoteAmount;
+            var lumpRemainder = Math.Max(0m, (rfqTemplate.QuoteAmount ?? 0m) - totalQuotedSum);
+            if (unpricedCount > 0)
+            {
+                var unpricedShare = Math.Round(lumpRemainder / unpricedCount, 2);
+                int remainingUnpriced = unpricedCount;
+                for (int i = 0; i < prShares.Count; i++)
+                {
+                    if (prShares[i].Base <= 0)
+                    {
+                        remainingUnpriced--;
+                        // The last unpriced PR absorbs the rounding remainder so the per-PR
+                        // amounts sum exactly to the lump the user confirmed.
+                        var share = remainingUnpriced == 0
+                            ? Math.Max(0m, lumpRemainder - unpricedShare * (unpricedCount - 1))
+                            : unpricedShare;
+                        prShares[i] = (prShares[i].Pr, prShares[i].Items, share);
+                    }
+                }
+            }
+            var totalBase = prShares.Sum(s => s.Base);
+
+            decimal?[] ApportionAcrossPrs(decimal? whole)
+            {
+                var shares = new decimal?[prShares.Count];
+                if (!whole.HasValue || whole.Value == 0m) return shares;
+                decimal assigned = 0m;
+                for (int i = 0; i < prShares.Count; i++)
+                {
+                    decimal share;
+                    if (i == prShares.Count - 1)
+                    {
+                        // The last PR absorbs the rounding remainder so the shares sum exactly.
+                        share = Math.Max(0m, whole.Value - assigned);
+                    }
+                    else
+                    {
+                        var weight = totalBase > 0 ? prShares[i].Base / totalBase : 1m / prShares.Count;
+                        share = Math.Round(whole.Value * weight, 2);
+                        assigned += share;
+                    }
+                    shares[i] = share > 0m ? share : null;
+                }
+                return shares;
+            }
+
+            var freightShares = ApportionAcrossPrs(rfqTemplate.Freight);
+            var otherChargesShares = ApportionAcrossPrs(rfqTemplate.OtherCharges);
+            var discountShares = ApportionAcrossPrs(rfqTemplate.Discount);
+
+            for (int prIndex = 0; prIndex < prShares.Count; prIndex++)
+            {
+                var (pr, prSpecificItems, prBase) = prShares[prIndex];
+                var prQuoteAmount = prBase > 0 ? prBase : (decimal?)null;
 
                 var rfq = new RequestForQuotation
                 {
@@ -329,9 +468,9 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                     QuoteAmount = prQuoteAmount,
                     PaymentTerms = rfqTemplate.PaymentTerms,
                     VatType = rfqTemplate.VatType,
-                    Freight = rfqTemplate.Freight,
-                    OtherCharges = rfqTemplate.OtherCharges,
-                    Discount = rfqTemplate.Discount,
+                    Freight = freightShares[prIndex],
+                    OtherCharges = otherChargesShares[prIndex],
+                    Discount = discountShares[prIndex],
                     Incoterms = rfqTemplate.Incoterms,
                     DeliveryLeadTime = rfqTemplate.DeliveryLeadTime,
                     Warranty = rfqTemplate.Warranty,
@@ -678,15 +817,25 @@ WHERE Id = @Id;";
                 await updateMasterCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            // 3. Rebuild line items on master PR: wipe current and re-insert from kept PRs
-            using (var delItemsCmd = connection.CreateCommand())
+            // 3. Rebuild line items on master PR from the kept PRs. Kept items REUSE their existing
+            // master PrItem Ids (matched by name, preferring equal quantity) so RfqItem and
+            // PurchaseOrderItem rows that reference them by PrItemId stay linked — regenerating
+            // every Guid severed those links on every partial split.
+            var existingMasterItems = new List<(Guid Id, string Name, decimal Qty)>();
+            using (var readItemsCmd = connection.CreateCommand())
             {
-                delItemsCmd.Transaction = tx;
-                delItemsCmd.CommandText = "DELETE FROM PrItem WHERE PrId = @MasterId;";
-                delItemsCmd.Parameters.AddWithValue("@MasterId", masterPrId.ToString());
-                await delItemsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                readItemsCmd.Transaction = tx;
+                readItemsCmd.CommandText = "SELECT Id, ItemName, Quantity FROM PrItem WHERE PrId = @MasterId;";
+                readItemsCmd.Parameters.AddWithValue("@MasterId", masterPrId.ToString());
+                using var reader = await readItemsCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    existingMasterItems.Add((Guid.Parse(reader.GetString(0)), reader.GetString(1), (decimal)reader.GetDouble(2)));
+                }
             }
 
+            var reusedIds = new HashSet<Guid>();
+            var keptItemIds = new List<Guid>();
             int itemSort = 0;
             foreach (var keptPr in keptPrs)
             {
@@ -694,15 +843,50 @@ WHERE Id = @Id;";
                 {
                     foreach (var srcItem in keptPr.Items)
                     {
+                        var srcName = srcItem.ItemName.Trim();
+                        Guid? reuse = null;
+                        foreach (var em in existingMasterItems)
+                        {
+                            if (reusedIds.Contains(em.Id)) continue;
+                            if (string.Equals(em.Name?.Trim(), srcName, StringComparison.OrdinalIgnoreCase) && em.Qty == srcItem.Quantity)
+                            {
+                                reuse = em.Id;
+                                break;
+                            }
+                        }
+                        if (reuse == null)
+                        {
+                            foreach (var em in existingMasterItems)
+                            {
+                                if (reusedIds.Contains(em.Id)) continue;
+                                if (string.Equals(em.Name?.Trim(), srcName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    reuse = em.Id;
+                                    break;
+                                }
+                            }
+                        }
+
+                        var itemId = reuse ?? Guid.NewGuid();
+                        if (reuse.HasValue) reusedIds.Add(reuse.Value);
+                        keptItemIds.Add(itemId);
+
                         using var itemCmd = connection.CreateCommand();
                         itemCmd.Transaction = tx;
                         itemCmd.CommandText = @"
 INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder)
+ON CONFLICT(Id) DO UPDATE SET
+    ItemName = excluded.ItemName,
+    Quantity = excluded.Quantity,
+    Unit = excluded.Unit,
+    EstimatedUnitPrice = excluded.EstimatedUnitPrice,
+    Notes = excluded.Notes,
+    SortOrder = excluded.SortOrder;";
 
-                        itemCmd.Parameters.AddWithValue("@Id", Guid.NewGuid().ToString());
+                        itemCmd.Parameters.AddWithValue("@Id", itemId.ToString());
                         itemCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
-                        itemCmd.Parameters.AddWithValue("@ItemName", srcItem.ItemName.Trim());
+                        itemCmd.Parameters.AddWithValue("@ItemName", srcName);
                         itemCmd.Parameters.AddWithValue("@Quantity", (double)srcItem.Quantity);
                         itemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(srcItem.Unit) ? "pcs" : srcItem.Unit.Trim());
                         itemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", srcItem.EstimatedUnitPrice.HasValue ? (double)srcItem.EstimatedUnitPrice.Value : (object)DBNull.Value);
@@ -713,6 +897,88 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                     }
                 }
             }
+
+            // 3b. Prune master RFQ lines that covered the split-out PRs — leaving them behind kept
+            // the split-out amounts inside the master's quoted totals. A line is pruned when it
+            // references a master item being removed, or is unlinked and named uniquely like a
+            // split-out PR's item (names present on both kept and split PRs are left alone).
+            var removedMasterItemIds = existingMasterItems.Select(e => e.Id).Where(id => !reusedIds.Contains(id)).ToList();
+            var keptNames = new HashSet<string>(
+                keptPrs.SelectMany(p => p.Items ?? new ObservableCollection<PrItem>()).Select(i => i.ItemName.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+            var splitOnlyNames = splitPrs
+                .SelectMany(p => p.Items ?? new ObservableCollection<PrItem>())
+                .Select(i => i.ItemName.Trim())
+                .Where(n => !string.IsNullOrWhiteSpace(n) && !keptNames.Contains(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Only RFQs that actually LOSE rows to the prune are re-totaled afterwards — an RFQ
+            // whose every line is pruned drops to a NULL quote, but an untouched RFQ (e.g. a
+            // lump-sum quote whose item rows carry no prices) must keep its stored amount.
+            var affectedRfqIds = new List<string>();
+            if (removedMasterItemIds.Count > 0 || splitOnlyNames.Count > 0)
+            {
+                var idParams = removedMasterItemIds.Select((id, i) => $"@RmId{i}").ToList();
+                var nameParams = splitOnlyNames.Select((n, i) => $"@RmName{i}").ToList();
+                var conditions = new List<string>();
+                if (idParams.Count > 0)
+                    conditions.Add($"PrItemId IN ({string.Join(", ", idParams)})");
+                if (nameParams.Count > 0)
+                    conditions.Add($"(PrItemId IS NULL AND TRIM(ItemName) COLLATE NOCASE IN ({string.Join(", ", nameParams)}))");
+                var pruneWhere = $@"
+WHERE RfqId IN (SELECT Id FROM RequestForQuotation WHERE PrId = @MasterId)
+  AND ({string.Join(" OR ", conditions)})";
+
+                void AddPruneParameters(SqliteCommand cmd)
+                {
+                    cmd.Parameters.AddWithValue("@MasterId", masterPrId.ToString());
+                    for (int i = 0; i < removedMasterItemIds.Count; i++)
+                        cmd.Parameters.AddWithValue($"@RmId{i}", removedMasterItemIds[i].ToString());
+                    for (int i = 0; i < splitOnlyNames.Count; i++)
+                        cmd.Parameters.AddWithValue($"@RmName{i}", splitOnlyNames[i]);
+                }
+
+                using (var affectedCmd = connection.CreateCommand())
+                {
+                    affectedCmd.Transaction = tx;
+                    affectedCmd.CommandText = $"SELECT DISTINCT RfqId FROM RfqItem {pruneWhere};";
+                    AddPruneParameters(affectedCmd);
+                    using var reader = await affectedCmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        affectedRfqIds.Add(reader.GetString(0));
+                    }
+                }
+
+                using (var pruneCmd = connection.CreateCommand())
+                {
+                    pruneCmd.Transaction = tx;
+                    pruneCmd.CommandText = $"DELETE FROM RfqItem {pruneWhere};";
+                    AddPruneParameters(pruneCmd);
+                    await pruneCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
+            }
+
+            if (affectedRfqIds.Count > 0)
+            {
+                using var retotalCmd = connection.CreateCommand();
+                retotalCmd.Transaction = tx;
+                var rfqParams = affectedRfqIds.Select((id, i) => $"@RfqId{i}").ToList();
+                retotalCmd.CommandText = $@"
+UPDATE RequestForQuotation
+SET QuoteAmount = (SELECT SUM(Quantity * MAX(0, QuotedUnitPrice - COALESCE(Discount, 0)))
+                   FROM RfqItem
+                   WHERE RfqId = RequestForQuotation.Id AND IsQuoted = 1 AND QuotedUnitPrice > 0)
+WHERE Id IN ({string.Join(", ", rfqParams)});";
+                for (int i = 0; i < affectedRfqIds.Count; i++)
+                    retotalCmd.Parameters.AddWithValue($"@RfqId{i}", affectedRfqIds[i]);
+                await retotalCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            // Finally drop the master items that belonged to the split-out PRs (their RfqItem
+            // references were pruned above; PurchaseOrderItem links fall back to SET NULL + name).
+            await DeleteDepartedChildrenAsync(connection, tx, "PrItem", "PrId", masterPrId, keptItemIds).ConfigureAwait(false);
 
             await tx.CommitAsync().ConfigureAwait(false);
 

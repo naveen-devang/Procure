@@ -57,13 +57,6 @@ namespace Procure.Models
         public bool HasItems => Items != null && Items.Count > 0;
         public int ItemsCount => Items?.Count ?? 0;
 
-        public string FormattedValue
-        {
-            get
-            {
-                var cur = string.IsNullOrWhiteSpace(Currency) ? "AED" : Currency;
-                return $"{cur} {Value:N0}";
-            }
-        }
+        public string FormattedValue => Procure.Utilities.MoneyFormat.Format(Currency, Value);
     }
 }

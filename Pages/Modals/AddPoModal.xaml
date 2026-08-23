@@ -9,6 +9,16 @@
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsAddPoModalVisible}">
 
+    <ContentView.Resources>
+        <!-- One shared options array for every card's VAT picker; a per-card inline x:Array
+             allocated a fresh list per row. Values must match the model's VatType strings. -->
+        <x:Array x:Key="PoVatTypeOptions" Type="{x:Type x:String}">
+            <x:String>5%</x:String>
+            <x:String>RC</x:String>
+            <x:String>V0</x:String>
+        </x:Array>
+    </ContentView.Resources>
+
     <!-- Backdrop Dimmer Overlay -->
     <Grid BackgroundColor="{AppThemeBinding Light=#66000000, Dark=#99000000}">
         <Grid.GestureRecognizers>
@@ -445,7 +455,6 @@
                                                                         <!-- Checkbox -->
                                                                         <CheckBox Grid.Column="0"
                                                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                                                  CheckedChanged="OnPoItemCheckedChanged"
                                                                                   HorizontalOptions="Center"
                                                                                   VerticalOptions="Center" />
 
@@ -557,9 +566,12 @@
                                                             <!-- VAT Type Picker -->
                                                             <VerticalStackLayout Grid.Column="4" Spacing="2">
                                                                 <Label Text="VAT Type" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                                                <Picker ItemsSource="{Binding AvailableVatTypes, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                <!-- ItemsSource must be populated before SelectedItem applies (attribute order is
+                                                                     preserved, and a StaticResource resolves immediately): a late-resolving
+                                                                     RelativeSource binding left the Picker at index -1 and pushed null back into
+                                                                     VatType, silently dropping the VAT from the PO value. -->
+                                                                <Picker ItemsSource="{StaticResource PoVatTypeOptions}"
                                                                         SelectedItem="{Binding VatType, Mode=TwoWay}"
-                                                                        SelectedIndexChanged="OnPoVatTypeSelectedIndexChanged"
                                                                         HeightRequest="30" FontSize="11.5" />
                                                             </VerticalStackLayout>
                                                         </Grid>

@@ -238,19 +238,39 @@ namespace Procure.Utilities
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
+    // Shared by the three PoFulfillment converters: one text classification plus pre-parsed Color
+    // singletons. Color.FromArgb re-parsed a hex string and allocated per conversion, and the PO
+    // wizard's banner runs four of these converters on every recalculation.
+    internal static class PoFulfillmentPalette
+    {
+        internal const int Over = 0, Pending = 1, Complete = 2, Neutral = 3;
+
+        internal static int Classify(object? value)
+        {
+            var text = value as string ?? string.Empty;
+            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase))
+                return Over;
+            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase))
+                return Pending;
+            if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
+                return Complete;
+            return Neutral;
+        }
+
+        internal static readonly Color[] TextDark = { Color.FromArgb("#FF99A4"), Color.FromArgb("#FFC83B"), Color.FromArgb("#6CCB5F"), Color.FromArgb("#D2D0CE") };
+        internal static readonly Color[] TextLight = { Color.FromArgb("#A80000"), Color.FromArgb("#8A5700"), Color.FromArgb("#107C41"), Color.FromArgb("#494847") };
+        internal static readonly Color[] BgDark = { Color.FromArgb("#3F1011"), Color.FromArgb("#3B2E08"), Color.FromArgb("#143823"), Color.FromArgb("#2D2C2C") };
+        internal static readonly Color[] BgLight = { Color.FromArgb("#FDE7E9"), Color.FromArgb("#FFF4CE"), Color.FromArgb("#E7F3ED"), Color.FromArgb("#F3F2F1") };
+        internal static readonly Color[] StrokeDark = { Color.FromArgb("#5C1A1C"), Color.FromArgb("#5C4910"), Color.FromArgb("#275A38"), Color.FromArgb("#3D3B39") };
+        internal static readonly Color[] StrokeLight = { Color.FromArgb("#F1B0B7"), Color.FromArgb("#FFE28A"), Color.FromArgb("#A3D9B8"), Color.FromArgb("#E0DFDD") };
+    }
+
     public class PoFulfillmentColorConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            var text = value as string ?? string.Empty;
-            var isDark = ThemeHelper.IsDark;
-            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#FF99A4") : Color.FromArgb("#A80000");
-            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#FFC83B") : Color.FromArgb("#8A5700");
-            if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#6CCB5F") : Color.FromArgb("#107C41");
-            return isDark ? Color.FromArgb("#D2D0CE") : Color.FromArgb("#494847");
+            var state = PoFulfillmentPalette.Classify(value);
+            return ThemeHelper.IsDark ? PoFulfillmentPalette.TextDark[state] : PoFulfillmentPalette.TextLight[state];
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
@@ -260,15 +280,8 @@ namespace Procure.Utilities
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            var text = value as string ?? string.Empty;
-            var isDark = ThemeHelper.IsDark;
-            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#3F1011") : Color.FromArgb("#FDE7E9");
-            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#3B2E08") : Color.FromArgb("#FFF4CE");
-            if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#143823") : Color.FromArgb("#E7F3ED");
-            return isDark ? Color.FromArgb("#2D2C2C") : Color.FromArgb("#F3F2F1");
+            var state = PoFulfillmentPalette.Classify(value);
+            return ThemeHelper.IsDark ? PoFulfillmentPalette.BgDark[state] : PoFulfillmentPalette.BgLight[state];
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
@@ -278,15 +291,8 @@ namespace Procure.Utilities
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            var text = value as string ?? string.Empty;
-            var isDark = ThemeHelper.IsDark;
-            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#5C1A1C") : Color.FromArgb("#F1B0B7");
-            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#5C4910") : Color.FromArgb("#FFE28A");
-            if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
-                return isDark ? Color.FromArgb("#275A38") : Color.FromArgb("#A3D9B8");
-            return isDark ? Color.FromArgb("#3D3B39") : Color.FromArgb("#E0DFDD");
+            var state = PoFulfillmentPalette.Classify(value);
+            return ThemeHelper.IsDark ? PoFulfillmentPalette.StrokeDark[state] : PoFulfillmentPalette.StrokeLight[state];
         }
 
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();

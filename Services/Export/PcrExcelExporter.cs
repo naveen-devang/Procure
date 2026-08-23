@@ -214,7 +214,8 @@ namespace Procure.Services.Export
             // 2. Metadata Header Rows (3 structured rows matching PDF layout)
             var collectiveNo = string.IsNullOrWhiteSpace(pcr.PcrNo) ? $"PCR-{pr.PrNo}" : pcr.PcrNo;
             var dateStr = DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-            var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&amp;I" : pr.Description.Trim();
+            // Raw string here — EscapeXml at the point of use escapes it exactly once.
+            var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&I" : pr.Description.Trim();
             var prDisplay = PcrPdfExporter.FormatPrNumbers(pr);
             var rfqDisplay = PcrPdfExporter.FormatRfqNumbers(selectedRfqs);
 
@@ -259,14 +260,24 @@ namespace Procure.Services.Export
             for (int i = 0; i < supplierCount; i++)
             {
                 string colLetter = GetColumnLetter(4 + i);
-                var vendorName = string.IsNullOrWhiteSpace(selectedRfqs[i].Vendor) ? $"Supplier {i + 1}" : selectedRfqs[i].Vendor;
+                var rfqHeader = selectedRfqs[i];
+                var vendorName = string.IsNullOrWhiteSpace(rfqHeader.Vendor) ? $"Supplier {i + 1}" : rfqHeader.Vendor;
+                // The sheet's money cells are bare numbers, so the currency (and any partial-quote
+                // marker) must ride on the column header or mixed-currency quotes compare as equals.
+                var vendorCur = string.IsNullOrWhiteSpace(rfqHeader.Currency) ? "AED" : rfqHeader.Currency;
+                var headerText = $"{vendorName} ({vendorCur})";
+                if (rfqHeader.HasQuoteCompletenessBadge && rfqHeader.IsPartialQuote)
+                {
+                    headerText += $" — {rfqHeader.QuoteCompletenessBadge}";
+                }
                 sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(vendorName)}</t></is></c>");
+            <c r=""{colLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(headerText)}</t></is></c>");
             }
 
             string lastPriceColLetter = GetColumnLetter(totalCols);
+            var historicalCur = selectedRfqs.Count > 0 && !string.IsNullOrWhiteSpace(selectedRfqs[0].Currency) ? selectedRfqs[0].Currency : "AED";
             sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""3"" t=""inlineStr""><is><t>Historical Price</t></is></c>
+            <c r=""{lastPriceColLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml($"Historical Price ({historicalCur})")}</t></is></c>
         </row>");
             r++;
 
@@ -329,20 +340,27 @@ namespace Procure.Services.Export
         <row r=""{r}"" ht=""36"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>{itemIndex++}</t></is></c>
             <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t>{EscapeXml(item.ItemName)}</t></is></c>
-            <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{item.Quantity.ToString("0.##", CultureInfo.InvariantCulture)} {EscapeXml(item.Unit)}</t></is></c>");
+            <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {EscapeXml(item.Unit)}</t></is></c>");
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;
+                    bool rowLastPriceFromQuote = false;
 
                     for (int i = 0; i < supplierCount; i++)
                     {
                         string colLetter = GetColumnLetter(4 + i);
                         var rfq = selectedRfqs[i];
-                        var rfqItem = rfq.Items?.FirstOrDefault(ri => (ri.PrItemId.HasValue && ri.PrItemId.Value == item.Id) || string.Equals(ri.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase));
-                        
+                        // Exact PrItemId link wins; name matching is only a fallback for unlinked
+                        // lines — a flat OR let a name collision beat the correct link.
+                        var rfqItem = rfq.Items?.FirstOrDefault(ri => ri.PrItemId.HasValue && ri.PrItemId.Value == item.Id)
+                                   ?? rfq.Items?.FirstOrDefault(ri => !ri.PrItemId.HasValue && string.Equals(ri.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase));
+
                         if (rfqItem?.QuotedUnitPrice != null && rfqItem.QuotedUnitPrice.Value > 0)
                         {
+                            // Net of the per-unit discount, so qty x printed price reconciles with
+                            // the Total Price Excl. VAT row (which sums discounted line totals).
+                            var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
                             sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""7""><v>{rfqItem.QuotedUnitPrice.Value.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{colLetter}{r}"" s=""7""><v>{netUnitPrice.ToString(CultureInfo.InvariantCulture)}</v></c>");
                         }
                         else if (rfq.BaseAmount > 0 && prItems.Count == 1)
                         {
@@ -355,9 +373,12 @@ namespace Procure.Services.Export
             <c r=""{colLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>");
                         }
 
-                        if (rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
+                        // First supplier (in fixed pr.Rfqs order) with a historical price wins;
+                        // last-wins made the printed baseline depend on which vendor sat last.
+                        if (!rowLastPriceFromQuote && rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
                         {
                             rowLastPrice = rfqItem.LastPrice.Value;
+                            rowLastPriceFromQuote = true;
                         }
                     }
 
@@ -423,9 +444,15 @@ namespace Procure.Services.Export
                 r++;
             }
 
+            // An unquoted vendor prints "-" in the money rows — a numeric 0.00 read as a zero
+            // quote. Gated on quote PRESENCE, not amount, so a genuine zero-net quote (e.g. fully
+            // discounted lines) still prints its numbers.
+            static (bool isNum, decimal numVal, string strVal) MoneyOrDash(RequestForQuotation rf, decimal value) =>
+                (rf.IsQuoteReceived || rf.PricedItemsCount > 0) ? (true, value, "") : (false, 0m, "-");
+
             // Row 1: Total Price Excl. VAT
             AddSummaryRow("Total Price Excl. VAT",
-                rf => (true, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m), ""),
+                rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)),
                 (true, totalLastPriceSum, ""));
 
             // Row 2: Discount
@@ -433,9 +460,10 @@ namespace Procure.Services.Export
                 rf => (rf.Discount.HasValue && rf.Discount.Value > 0) ? (true, rf.Discount.Value, "") : (false, 0m, "-"),
                 (false, 0m, "-"));
 
-            // Row 3: Total Price Excl. VAT After Discount
+            // Row 3: Total Price Excl. VAT After Discount (unclamped — the model clamps only the
+            // final NetTaxable, and an early clamp made the printed rows fail arithmetic checks)
             AddSummaryRow("Total Price Excl. VAT After Discount",
-                rf => (true, Math.Max(0m, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)), ""),
+                rf => MoneyOrDash(rf, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)),
                 (true, totalLastPriceSum, ""));
 
             // Row 4: Freight/Shipping Charges
@@ -448,15 +476,22 @@ namespace Procure.Services.Export
                 rf => (rf.OtherCharges.HasValue && rf.OtherCharges.Value > 0) ? (true, rf.OtherCharges.Value, "") : (false, 0m, "-"),
                 (false, 0m, "-"));
 
+            // The historical column's VAT treatment follows the compared quotes' predominant
+            // VatType instead of a hardcoded 5% (which inflated it against RC/V0 quotes).
+            var historicalVatType = selectedRfqs.Count > 0
+                ? selectedRfqs.GroupBy(rf => string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType)
+                    .OrderByDescending(g => g.Count()).Select(g => g.Key).First()
+                : "5%";
+
             // Row 6: VAT
             AddSummaryRow("VAT",
                 rf => (false, 0m, string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType),
-                (false, 0m, "5%"));
+                (false, 0m, historicalVatType));
 
             // Row 7: Total Price Incl. VAT
-            decimal lastPriceInclVat = totalLastPriceSum * 1.05m;
+            decimal lastPriceInclVat = historicalVatType == "5%" ? totalLastPriceSum * 1.05m : totalLastPriceSum;
             AddSummaryRow("Total Price Incl. VAT",
-                rf => (true, rf.TotalLandedCost, ""),
+                rf => MoneyOrDash(rf, rf.TotalLandedCost),
                 (true, lastPriceInclVat, ""));
 
             // Row 8: Payment Terms
@@ -479,9 +514,10 @@ namespace Procure.Services.Export
                 rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty),
                 (false, 0m, "-"));
 
-            // Row 12: Technical Approval
+            // Row 12: Technical Approval — blank means "not recorded"; substituting "Approved"
+            // fabricated approval status on a signature document.
             AddSummaryRow("Technical Approval",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "Approved" : rf.TechnicalApproval),
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval),
                 (false, 0m, "-"));
 
             r += 1; // Gap before remarks

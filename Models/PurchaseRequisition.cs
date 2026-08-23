@@ -157,8 +157,38 @@ namespace Procure.Models
         {
             get
             {
-                var cur = Currency;
-                return $"{cur} {TotalPoValue:N0}";
+                if (Pos == null || Pos.Count == 0)
+                {
+                    return MoneyFormat.Format(Currency, 0m);
+                }
+
+                // Single-currency (the overwhelmingly common case) takes a plain loop: this getter
+                // re-runs for every realized board card on each hierarchy refresh, so the GroupBy
+                // machinery is reserved for genuinely mixed-currency PRs.
+                var firstCur = string.IsNullOrWhiteSpace(Pos[0].Currency) ? "AED" : Pos[0].Currency;
+                var singleCurrency = true;
+                decimal total = 0m;
+                foreach (var po in Pos)
+                {
+                    var cur = string.IsNullOrWhiteSpace(po.Currency) ? "AED" : po.Currency;
+                    if (!string.Equals(cur, firstCur, StringComparison.OrdinalIgnoreCase))
+                    {
+                        singleCurrency = false;
+                        break;
+                    }
+                    total += po.Value;
+                }
+                if (singleCurrency)
+                {
+                    return MoneyFormat.Format(firstCur, total);
+                }
+
+                // Per-currency totals (like the PO wizard footer): a raw sum across currencies
+                // stamped with the first PO's currency was meaningless for multi-currency PRs.
+                var groups = Pos
+                    .GroupBy(p => string.IsNullOrWhiteSpace(p.Currency) ? "AED" : p.Currency)
+                    .Select(g => MoneyFormat.Format(g.Key, g.Sum(p => p.Value)));
+                return string.Join(" • ", groups);
             }
         }
 

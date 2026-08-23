@@ -38,7 +38,7 @@
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Spacing="4">
-                    <Label Text="Total Combined PO Value ($) *" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Label Text="{Binding BatchPoCurrency, StringFormat='Total Combined PO Value ({0}) *'}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                     <Entry Text="{Binding BatchPoTotalValue, Mode=TwoWay}" Placeholder="0.00" Keyboard="Numeric" HeightRequest="36" />
                 </VerticalStackLayout>
 

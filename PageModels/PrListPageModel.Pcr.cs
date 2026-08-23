@@ -408,12 +408,15 @@ namespace Procure.PageModels
 
             if (pr.Rfqs != null && pr.Rfqs.Count > 0)
             {
-                int initialCount = 0;
+                // Quote-received RFQs fill the 5 export slots first — picking purely by list
+                // position let unquoted vendors (exported as blank columns) crowd out real quotes.
+                var preferred = new HashSet<Guid>(pr.Rfqs
+                    .OrderByDescending(r => r.IsQuoteReceived ? 1 : 0)
+                    .Take(5)
+                    .Select(r => r.Id));
                 foreach (var rfq in pr.Rfqs)
                 {
-                    bool isSel = initialCount < 5;
-                    if (isSel) initialCount++;
-                    var sel = new ExportRfqSelection(rfq, isSel);
+                    var sel = new ExportRfqSelection(rfq, preferred.Contains(rfq.Id));
                     sel.PropertyChanged += OnExportRfqSelectionPropertyChanged;
                     ExportRfqSelections.Add(sel);
                 }
@@ -461,6 +464,30 @@ namespace Procure.PageModels
             ExportTargetPr = null;
         }
 
+        // The modal promises "This is saved for future exports" — previously a PR without a PCR
+        // record got a transient PriceComparisonRequest that was never persisted, so the typed
+        // remarks (and the generated PcrNo) silently vanished after every export.
+        private async Task<PriceComparisonRequest> GetOrCreateSavedPcrAsync(PurchaseRequisition pr)
+        {
+            if (pr.Pcr != null)
+            {
+                pr.Pcr.Remarks = ExportPcrRemarks;
+                await _prRepo.SavePcrAsync(pr.Pcr);
+                return pr.Pcr;
+            }
+
+            var pcr = new PriceComparisonRequest
+            {
+                Id = Guid.NewGuid(),
+                PrId = pr.Id,
+                PcrNo = $"PCR-{pr.PrNo.Replace("PR-", "")}",
+                Remarks = ExportPcrRemarks
+            };
+            await _prRepo.SavePcrAsync(pcr);
+            pr.Pcr = pcr;
+            return pcr;
+        }
+
         [RelayCommand]
         public async Task ExportPcrExcelAsync()
         {
@@ -478,19 +505,7 @@ namespace Procure.PageModels
 
             try
             {
-                if (ExportTargetPr.Pcr != null)
-                {
-                    ExportTargetPr.Pcr.Remarks = ExportPcrRemarks;
-                    await _prRepo.SavePcrAsync(ExportTargetPr.Pcr);
-                }
-
-                var pcr = ExportTargetPr.Pcr ?? new PriceComparisonRequest
-                {
-                    Id = Guid.NewGuid(),
-                    PrId = ExportTargetPr.Id,
-                    PcrNo = $"PCR-{ExportTargetPr.PrNo.Replace("PR-", "")}",
-                    Remarks = ExportPcrRemarks
-                };
+                var pcr = await GetOrCreateSavedPcrAsync(ExportTargetPr);
 
                 var filePath = await _pcrExportService.ExportPcrToExcelAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
                 CloseExportPcrModal();
@@ -521,19 +536,7 @@ namespace Procure.PageModels
 
             try
             {
-                if (ExportTargetPr.Pcr != null)
-                {
-                    ExportTargetPr.Pcr.Remarks = ExportPcrRemarks;
-                    await _prRepo.SavePcrAsync(ExportTargetPr.Pcr);
-                }
-
-                var pcr = ExportTargetPr.Pcr ?? new PriceComparisonRequest
-                {
-                    Id = Guid.NewGuid(),
-                    PrId = ExportTargetPr.Id,
-                    PcrNo = $"PCR-{ExportTargetPr.PrNo.Replace("PR-", "")}",
-                    Remarks = ExportPcrRemarks
-                };
+                var pcr = await GetOrCreateSavedPcrAsync(ExportTargetPr);
 
                 var filePath = await _pcrExportService.ExportPcrToPdfAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
                 CloseExportPcrModal();

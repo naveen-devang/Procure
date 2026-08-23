@@ -42,7 +42,11 @@ namespace Procure.Data.Repositories
             return list;
         }
 
-        public async Task SaveDefinitionAsync(CustomColumnDefinition definition)
+        // Like PurchaseRequisitionRepository's writes: Microsoft.Data.Sqlite completes its async
+        // members synchronously, so without the Task.Run hop these writes ran on the dispatcher.
+        public Task SaveDefinitionAsync(CustomColumnDefinition definition) => Task.Run(() => SaveDefinitionCoreAsync(definition));
+
+        private async Task SaveDefinitionCoreAsync(CustomColumnDefinition definition)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -67,7 +71,9 @@ ON CONFLICT(Id) DO UPDATE SET
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        public async Task DeleteDefinitionAsync(Guid id)
+        public Task DeleteDefinitionAsync(Guid id) => Task.Run(() => DeleteDefinitionCoreAsync(id));
+
+        private async Task DeleteDefinitionCoreAsync(Guid id)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
@@ -115,7 +121,9 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
             return list;
         }
 
-        public async Task SaveValuesForPrAsync(Guid prId, IEnumerable<CustomFieldValue> values)
+        public Task SaveValuesForPrAsync(Guid prId, IEnumerable<CustomFieldValue> values) => Task.Run(() => SaveValuesForPrCoreAsync(prId, values));
+
+        private async Task SaveValuesForPrCoreAsync(Guid prId, IEnumerable<CustomFieldValue> values)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();

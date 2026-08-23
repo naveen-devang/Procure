@@ -217,8 +217,13 @@ namespace Procure.Services.Export
 
                 for (int i = 0; i < supplierCount; i++)
                 {
+                    // Truncate the raw name first, then append the badge — appending first let the
+                    // 22-char cap eat the badge for any vendor name longer than 12 characters.
                     var vendorName = selectedRfqs[i].Vendor;
-                    if (vendorName.Length > 22) vendorName = vendorName.Substring(0, 20) + "..";
+                    var isPartial = selectedRfqs[i].IsPartialQuote;
+                    var maxNameLen = isPartial ? 12 : 22;
+                    if (vendorName.Length > maxNameLen) vendorName = vendorName.Substring(0, maxNameLen - 2) + "..";
+                    if (isPartial) vendorName += " (Partial)";
                     DrawText(vendorName, colX[3 + i], curY - 13, font: "F2", fontSize: 7.5, align: "center", width: colWidth);
                     DrawText("Unit Price", colX[3 + i], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: colWidth);
                 }
@@ -281,28 +286,36 @@ namespace Procure.Services.Export
                     if (desc.Length > 36) desc = desc.Substring(0, 34) + "..";
                     DrawText(desc, colX[1] + 4, curY - 13, font: "F1", fontSize: 7.5);
 
-                    var qtyStr = $"{item.Quantity:0.##} {item.Unit}";
+                    var qtyStr = $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}";
                     DrawText(qtyStr, colX[2], curY - 13, font: "F1", fontSize: 7.5, align: "center", width: qtyWidth);
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;
+                    bool rowLastPriceFromQuote = false;
 
                     for (int i = 0; i < supplierCount; i++)
                     {
                         var rfq = selectedRfqs[i];
                         var cur = string.IsNullOrWhiteSpace(rfq.Currency) ? "AED" : rfq.Currency.Trim();
-                        var rfqItem = rfq.Items?.FirstOrDefault(ri => (ri.PrItemId.HasValue && ri.PrItemId.Value == item.Id) || string.Equals(ri.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase));
+                        // Exact PrItemId link wins; name matching only covers unlinked lines.
+                        var rfqItem = rfq.Items?.FirstOrDefault(ri => ri.PrItemId.HasValue && ri.PrItemId.Value == item.Id)
+                                   ?? rfq.Items?.FirstOrDefault(ri => !ri.PrItemId.HasValue && string.Equals(ri.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase));
                         if (rfqItem?.QuotedUnitPrice != null && rfqItem.QuotedUnitPrice.Value > 0)
                         {
-                            DrawMoneyCell(colX[3 + i], colWidth, curY - 13, cur, rfqItem.QuotedUnitPrice.Value, fontSize: 7.5, showZeroAsDash: true);
+                            // Net of per-unit discount so qty x price reconciles with the totals.
+                            var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
+                            DrawMoneyCell(colX[3 + i], colWidth, curY - 13, cur, netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
                         }
                         else
                         {
                             DrawText("-", colX[3 + i], curY - 13, font: "F1", fontSize: 8, align: "center", width: colWidth);
                         }
 
-                        if (rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
+                        // First supplier in fixed order wins; last-wins made the printed
+                        // historical baseline depend on supplier position.
+                        if (!rowLastPriceFromQuote && rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
                         {
                             rowLastPrice = rfqItem.LastPrice.Value;
+                            rowLastPriceFromQuote = true;
                         }
                     }
 
@@ -370,16 +383,25 @@ namespace Procure.Services.Export
                 curY -= rowH;
             }
 
+            // Unquoted vendors print "-" instead of a 0.00 that reads as a zero quote. Gated on
+            // quote PRESENCE (null for no quote) with showZeroAsDash off, so a genuine zero or
+            // negative figure from a quoted vendor still prints — matching the Excel exporter.
+            static bool HasQuote(RequestForQuotation rf) => rf.IsQuoteReceived || rf.PricedItemsCount > 0;
+
             DrawSummaryMoneyRow("Total Price Excl. VAT",
-                rf => ((rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)), false),
+                rf => (HasQuote(rf) ? (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) : (decimal?)null, false),
                 totalLastPriceSum, isBold: true);
 
             DrawSummaryMoneyRow("Discount",
                 rf => (rf.Discount, true),
                 null);
 
+            // Unclamped — the model clamps only the final NetTaxable; the early clamp made the
+            // printed breakdown fail arithmetic checks in the discount-exceeds-base edge case.
             DrawSummaryMoneyRow("Total Price Excl. VAT After Discount",
-                rf => (Math.Max(0m, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)), false),
+                rf => (HasQuote(rf)
+                    ? ((rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m))
+                    : (decimal?)null, false),
                 totalLastPriceSum, isBold: true);
 
             DrawSummaryMoneyRow("Freight/Shipping Charges",
@@ -390,13 +412,20 @@ namespace Procure.Services.Export
                 rf => (rf.OtherCharges, true),
                 null);
 
+            // Historical column VAT follows the compared quotes' predominant VatType rather than
+            // a hardcoded 5% that inflated the baseline against RC/V0 quotes.
+            var historicalVatType = selectedRfqs.Count > 0
+                ? selectedRfqs.GroupBy(rf => string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType)
+                    .OrderByDescending(g => g.Count()).Select(g => g.Key).First()
+                : "5%";
+
             DrawSummaryTextRow("VAT",
                 rf => (string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType),
-                "5%");
+                historicalVatType);
 
-            decimal lastPriceInclVat = totalLastPriceSum * 1.05m;
+            decimal lastPriceInclVat = historicalVatType == "5%" ? totalLastPriceSum * 1.05m : totalLastPriceSum;
             DrawSummaryMoneyRow("Total Price Incl. VAT",
-                rf => (rf.TotalLandedCost, false),
+                rf => (HasQuote(rf) ? rf.TotalLandedCost : (decimal?)null, false),
                 lastPriceInclVat, isBold: true);
 
             DrawSummaryTextRow("Payment Terms",
@@ -415,8 +444,9 @@ namespace Procure.Services.Export
                 rf => (string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty),
                 "-");
 
+            // Blank means "not recorded" — substituting "Approved" fabricated approval status.
             DrawSummaryTextRow("Technical Approval",
-                rf => (string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "Approved" : rf.TechnicalApproval),
+                rf => (string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval),
                 "-");
 
             currentPage.TableBottomY = curY;
@@ -482,7 +512,7 @@ namespace Procure.Services.Export
                 var ptoText = (pIdx < totalPages - 1) ? "P.T.O." : "";
                 text = text.Replace($"##PTO_{pIdx + 1}_PLACEHOLDER##", ptoText);
 
-                pageStreamBytes.Add(Encoding.ASCII.GetBytes(text));
+                pageStreamBytes.Add(EncodeWinAnsi(text));
             }
 
             using var pdfMs = new MemoryStream();
@@ -529,14 +559,14 @@ namespace Procure.Services.Export
             // Object font1 (Helvetica)
             offsets.Add(pdfMs.Position);
             pdfWriter.WriteLine($"{font1ObjId} 0 obj");
-            pdfWriter.WriteLine("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+            pdfWriter.WriteLine("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
             pdfWriter.WriteLine("endobj");
             pdfWriter.Flush();
 
             // Object font2 (Helvetica-Bold)
             offsets.Add(pdfMs.Position);
             pdfWriter.WriteLine($"{font2ObjId} 0 obj");
-            pdfWriter.WriteLine("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+            pdfWriter.WriteLine("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
             pdfWriter.WriteLine("endobj");
             pdfWriter.Flush();
 
@@ -595,6 +625,60 @@ namespace Procure.Services.Export
                 return (r / 255.0, g / 255.0, b / 255.0);
             }
             return (0, 0, 0);
+        }
+
+        // Encodes page-stream text as WinAnsi (cp1252) — the font objects declare
+        // /WinAnsiEncoding to match — so accented and typographic characters survive instead of
+        // degrading to '?' the way Encoding.ASCII rendered them. Characters outside cp1252
+        // (e.g. Arabic, which the base-14 Helvetica cannot render anyway) still fall back to '?'.
+        private static byte[] EncodeWinAnsi(string text)
+        {
+            var bytes = new byte[text.Length];
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                byte b;
+                if (c < 0x80 || (c >= 0xA0 && c <= 0xFF))
+                {
+                    b = (byte)c;
+                }
+                else
+                {
+                    b = c switch
+                    {
+                        '€' => 0x80, // €
+                        '‚' => 0x82,
+                        'ƒ' => 0x83,
+                        '„' => 0x84,
+                        '…' => 0x85, // …
+                        '†' => 0x86,
+                        '‡' => 0x87,
+                        'ˆ' => 0x88,
+                        '‰' => 0x89,
+                        'Š' => 0x8A,
+                        '‹' => 0x8B,
+                        'Œ' => 0x8C,
+                        'Ž' => 0x8E,
+                        '‘' => 0x91, // '
+                        '’' => 0x92, // '
+                        '“' => 0x93, // "
+                        '”' => 0x94, // "
+                        '•' => 0x95, // •
+                        '–' => 0x96, // –
+                        '—' => 0x97, // —
+                        '˜' => 0x98,
+                        '™' => 0x99, // ™
+                        'š' => 0x9A,
+                        '›' => 0x9B,
+                        'œ' => 0x9C,
+                        'ž' => 0x9E,
+                        'Ÿ' => 0x9F,
+                        _ => (byte)'?'
+                    };
+                }
+                bytes[i] = b;
+            }
+            return bytes;
         }
 
         private static string EscapePdfText(string text)

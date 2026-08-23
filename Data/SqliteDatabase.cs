@@ -56,7 +56,8 @@ namespace Procure.Data
                 // A database already stamped with the current schema version needs none of the work
                 // below. Skipping it avoids re-running the CREATE script plus one PRAGMA
                 // table_info round-trip per migrated column on every single launch.
-                if (await ReadSchemaVersionAsync(connection).ConfigureAwait(false) != DatabaseConstants.SchemaVersion)
+                var storedVersion = await ReadSchemaVersionAsync(connection).ConfigureAwait(false);
+                if (storedVersion != DatabaseConstants.SchemaVersion)
                 {
                     using (var cmd = connection.CreateCommand())
                     {
@@ -65,7 +66,7 @@ namespace Procure.Data
                     }
 
                     // Run safe incremental migrations for existing tables
-                    await MigrateSchemaAsync(connection).ConfigureAwait(false);
+                    await MigrateSchemaAsync(connection, storedVersion).ConfigureAwait(false);
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
                 }
 
@@ -100,7 +101,7 @@ namespace Procure.Data
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        private static async Task MigrateSchemaAsync(SqliteConnection connection)
+        private static async Task MigrateSchemaAsync(SqliteConnection connection, int fromVersion)
         {
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "Plant", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "PrType", "TEXT").ConfigureAwait(false);
@@ -108,6 +109,10 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "Warranty", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "TechnicalApproval", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "Discount", "REAL").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RequestForQuotation", "OtherCharges", "REAL").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RequestForQuotation", "VatType", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RequestForQuotation", "Currency", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RequestForQuotation", "SharedPrs", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "Discount", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "LastPrice", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PriceComparisonRequest", "Remarks", "TEXT").ConfigureAwait(false);
@@ -119,6 +124,25 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "VatType", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
+
+            // One-time repair: the PO wizard's VAT-picker bug saved Value without VAT while the
+            // row still records a VatType, leaving Value inconsistent with its own breakdown.
+            // Recompute Value from the stored components wherever it deviates; rows without a
+            // BaseAmount (legacy rows) carry no breakdown and are left untouched. Gated to the
+            // v4 upgrade only — later schema bumps must not re-run it over rows written after
+            // the fix, whose component rounding can legitimately differ by a cent or two.
+            if (fromVersion < 4)
+            using (var repair = connection.CreateCommand())
+            {
+                repair.CommandText = @"
+UPDATE PurchaseOrder
+SET Value = ROUND(MAX(0, COALESCE(BaseAmount,0) + COALESCE(Freight,0) + COALESCE(OtherCharges,0) - COALESCE(Discount,0))
+            * (CASE WHEN COALESCE(VatType,'5%') = '5%' THEN 1.05 ELSE 1.0 END), 2)
+WHERE COALESCE(BaseAmount, 0) > 0
+  AND ABS(Value - MAX(0, COALESCE(BaseAmount,0) + COALESCE(Freight,0) + COALESCE(OtherCharges,0) - COALESCE(Discount,0))
+            * (CASE WHEN COALESCE(VatType,'5%') = '5%' THEN 1.05 ELSE 1.0 END)) > 0.01;";
+                await repair.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
 
             // Backfill the search text for every existing row. Only reached when the schema version
             // moved, so this runs once per database, not once per launch. ~240ms at 20,000 PRs.

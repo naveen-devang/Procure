@@ -81,7 +81,27 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string FormattedCalculatedRfqGrandTotal { get; set; } = string.Empty;
 
-        partial void OnNewRfqQuoteAmountChanged(decimal? value) => RecalculateRfqTotals();
+        // Bounds the item table's virtualizing CollectionView: grows with the list up to ~8 rows,
+        // then the table scrolls internally instead of realizing every row.
+        [ObservableProperty]
+        public partial double RfqItemsListHeight { get; set; } = 42;
+
+        // Distinguishes the recalc's own item-sum sync from a user-typed lump sum: after the sync
+        // has driven NewRfqQuoteAmount, clearing every price must zero the total instead of
+        // falling back to the stale synced figure (which then saved as a phantom quote).
+        private bool _rfqQuoteAmountAutoSynced;
+        private bool _syncingRfqQuoteAmount;
+
+        partial void OnNewRfqQuoteAmountChanged(decimal? value)
+        {
+            if (_syncingRfqQuoteAmount)
+            {
+                // The recalc itself is writing the synced sum; re-entering it doubled every pass.
+                return;
+            }
+            _rfqQuoteAmountAutoSynced = false;
+            RecalculateRfqTotals();
+        }
         partial void OnNewRfqFreightChanged(decimal? value) => RecalculateRfqTotals();
         partial void OnNewRfqOtherChargesChanged(decimal? value) => RecalculateRfqTotals();
         partial void OnNewRfqDiscountChanged(decimal? value) => RecalculateRfqTotals();
@@ -103,7 +123,20 @@ namespace Procure.PageModels
                 if (quotedSum > 0)
                 {
                     CalculatedRfqBaseTotal = quotedSum;
+                    _syncingRfqQuoteAmount = true;
                     NewRfqQuoteAmount = quotedSum;
+                    _syncingRfqQuoteAmount = false;
+                    _rfqQuoteAmountAutoSynced = true;
+                }
+                else if (_rfqQuoteAmountAutoSynced)
+                {
+                    // The lump sum was machine-written from the items; with every price cleared
+                    // the items are authoritative again, so the total drops to zero.
+                    CalculatedRfqBaseTotal = 0m;
+                    _syncingRfqQuoteAmount = true;
+                    NewRfqQuoteAmount = null;
+                    _syncingRfqQuoteAmount = false;
+                    _rfqQuoteAmountAutoSynced = false;
                 }
                 else
                 {
@@ -126,15 +159,17 @@ namespace Procure.PageModels
             var cur = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency;
             FormattedCalculatedRfqGrandTotal = $"{cur} {CalculatedRfqGrandTotal:N2}";
             HasEditingRfqItems = EditingRfqItems != null && EditingRfqItems.Count > 0;
+            RfqItemsListHeight = Math.Clamp(EditingRfqItems?.Count ?? 0, 1, 8) * 42;
         }
 
         private void OnEditingRfqItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // LineTotal is only ever raised as a companion of the four source properties below;
+            // matching it too ran the recalc twice for every edit.
             if (e.PropertyName == nameof(RfqItem.IsQuoted) ||
                 e.PropertyName == nameof(RfqItem.QuotedUnitPrice) ||
                 e.PropertyName == nameof(RfqItem.Discount) ||
-                e.PropertyName == nameof(RfqItem.Quantity) ||
-                e.PropertyName == nameof(RfqItem.LineTotal))
+                e.PropertyName == nameof(RfqItem.Quantity))
             {
                 RecalculateRfqTotals();
             }
@@ -207,15 +242,14 @@ namespace Procure.PageModels
                 if (row.HasUnitPrice)
                 {
                     targetItem.QuotedUnitPrice = row.UnitPrice;
-                    if (row.UnitPrice.HasValue)
-                    {
-                        targetItem.IsQuoted = true;
-                    }
+                    // A blank cell in the pasted column explicitly un-quotes the row; treating it
+                    // as absent shifted every following price onto the wrong item.
+                    targetItem.IsQuoted = row.UnitPrice.HasValue;
                 }
 
                 if (row.HasDiscount)
                 {
-                    targetItem.Discount = row.Discount;
+                    targetItem.Discount = ResolvePastedDiscount(row, targetItem);
                 }
 
                 if (row.HasLastPrice)
@@ -225,6 +259,19 @@ namespace Procure.PageModels
             }
 
             RecalculateRfqTotals();
+        }
+
+        // "5%" pasted into the per-unit discount column carries a percentage; storing the bare
+        // number applied it as 5 currency units. Convert against the row's unit price, or drop
+        // the value when no price is available to convert with.
+        private static decimal? ResolvePastedDiscount(RfqPricingPasteRow row, RfqItem targetItem)
+        {
+            if (!row.Discount.HasValue || !row.DiscountIsPercent)
+            {
+                return row.Discount;
+            }
+            var unitPrice = row.HasUnitPrice ? row.UnitPrice : targetItem.QuotedUnitPrice;
+            return unitPrice.HasValue ? Math.Round(unitPrice.Value * row.Discount.Value / 100m, 2) : null;
         }
 
         public void HandleRfqUnitPricePaste(RfqItem startItem, string rawText) =>
@@ -241,6 +288,7 @@ namespace Procure.PageModels
         {
             EditingRfq = null;
             IsEditingRfq = false;
+            _rfqQuoteAmountAutoSynced = false;
             ModalRfqTitle = "Add Request for Quotation (RFQ)";
             TargetPrForRfq = pr;
             NewRfqNo = string.Empty;
@@ -296,6 +344,7 @@ namespace Procure.PageModels
             if (rfq == null) return;
             EditingRfq = rfq;
             IsEditingRfq = true;
+            _rfqQuoteAmountAutoSynced = false;
             ModalRfqTitle = $"Edit Commercial Terms - {rfq.Vendor}";
             TargetPrForRfq = LoadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
             NewRfqNo = rfq.RfqNo;
@@ -422,6 +471,13 @@ namespace Procure.PageModels
                             EditingRfq.Status = RfqStatus.QuoteReceived;
                             EditingRfq.QuoteReceivedDate = DateTime.Today;
                         }
+                    }
+                    else if (EditingRfq.Status == RfqStatus.QuoteReceived)
+                    {
+                        // Clearing every price returns the RFQ to awaiting-quote; the one-way
+                        // escalation previously left a phantom QuoteReceived state behind.
+                        EditingRfq.Status = RfqStatus.Sent;
+                        EditingRfq.QuoteReceivedDate = null;
                     }
 
                     await _prRepo.SaveRfqAsync(EditingRfq);
