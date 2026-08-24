@@ -71,6 +71,14 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.100" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11" />
+		<!-- TEMPORARY DOWNGRADE for A/B testing: pinned to 2.4.0 on 2026-08-24, but a multi-second
+		     cursor stall (busy cursor on dropdown open, I-beam reverting late on Entry click) showed up
+		     immediately after and didn't go away even after fixing the modal-construction issue found
+		     separately. 2.4.0's headline change is to the InputPointerSource subsystem (new OS
+		     touchpad/mouse haptics) - the exact layer that draws cursor icons - so this pins back to the
+		     floor CommunityToolkit.Maui.Core 15.0.0 already requires, to test whether 2.4.0 itself is the
+		     cause. Revert to 2.4.0 (or try 2.3.1) once that's confirmed either way. -->
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
 	</ItemGroup>
 
 	<ItemGroup>
