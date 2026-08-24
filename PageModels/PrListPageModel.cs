@@ -103,6 +103,11 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string ListSummary { get; set; } = "Showing 0 requisitions";
 
+        // Compact "N of M" for the header pill next to the page title; empty until the first
+        // load so the pill stays hidden instead of flashing "0 of 0" during startup.
+        [ObservableProperty]
+        public partial string ListSummaryPill { get; set; } = string.Empty;
+
 
         public List<string> StatusFilterOptions { get; } = new()
         {
@@ -531,10 +536,14 @@ namespace Procure.PageModels
             Skip: skip,
             Take: take);
 
-        private void UpdateListSummary() =>
+        private void UpdateListSummary()
+        {
             ListSummary = TotalFilteredCount == 0
                 ? "No requisitions found"
                 : $"Showing {FilteredPrs.Count} of {TotalFilteredCount} requisitions";
+            // Compact form for the header pill; the full sentence above becomes its tooltip.
+            ListSummaryPill = $"{FilteredPrs.Count} of {TotalFilteredCount}";
+        }
 
         /// <summary>Merge for appended rows: reuses any instance already loaded, subscribes the rest, and
         /// drops nothing - appending never removes anything from the board.</summary>

@@ -17,8 +17,8 @@
         <!-- The CollectionView must own the scrolling. Nested in a ScrollView it is handed infinite
              height, measures every item and silently stops virtualizing - which is the freeze this
              page was built around before. So: chrome pinned in rows 0 and 2, cards scroll in row 1. -->
-        <Grid RowDefinitions="Auto, *, Auto"
-              Padding="28,24,28,36"
+        <Grid RowDefinitions="Auto, *"
+              Padding="28,24,28,24"
               RowSpacing="20">
 
             <VerticalStackLayout Grid.Row="0" Spacing="20" MaximumWidthRequest="1600" HorizontalOptions="Fill">
@@ -26,10 +26,31 @@
                 <!-- Page Header: Title + Primary Actions -->
                 <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto">
                     <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
-                        <Label Text="Purchase Requisitions"
-                               FontFamily="SegoeSemibold"
-                               FontSize="26"
-                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Purchase Requisitions"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="26"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                            <!-- Row-count pill (was a pinned footer strip; the list got that space back).
+                                 Full "Showing N of M requisitions" lives in the tooltip. -->
+                            <Border Padding="8,3"
+                                    StrokeThickness="1"
+                                    Stroke="{AppThemeBinding Light={StaticResource PillBorderLight}, Dark={StaticResource PillBorderDark}}"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource PillBgLight}, Dark={StaticResource PillBgDark}}"
+                                    VerticalOptions="Center"
+                                    IsVisible="{Binding ListSummaryPill, Converter={StaticResource NullToBoolConverter}}"
+                                    ToolTipProperties.Text="{Binding ListSummary}">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="4" />
+                                </Border.StrokeShape>
+                                <Label Text="{Binding ListSummaryPill}"
+                                       FontSize="11.5"
+                                       FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                       VerticalOptions="Center" />
+                            </Border>
+                        </HorizontalStackLayout>
 
                         <Label Text="Manage procurement lifecycle across vendor RFQs, multi-role PCR approvals, and purchase orders."
                                FontSize="13"
@@ -624,14 +645,6 @@
                     </CollectionView.ItemTemplate>
                 </CollectionView>
 
-            <!-- List footer. Pinned, so "Showing N of M" stays readable however far you have scrolled. -->
-            <Label Grid.Row="2"
-                   IsVisible="{Binding IsBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                   Text="{Binding ListSummary}"
-                   FontSize="12"
-                   FontFamily="SegoeSemibold"
-                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                   VerticalOptions="Center" />
         </Grid>
 
         <!-- ================= MODALS LAYER (Modular ContentView Components) ================= -->
