@@ -259,6 +259,12 @@ namespace Procure
                 CompactThemeBtn.Text = isDark ? "\uE708" : "\uE706";
                 ToolTipProperties.SetText(CompactThemeBtn, isDark ? "Switch to Light Theme" : "Switch to Dark Theme");
             }
+
+#if WINDOWS
+            // The native title bar is OS chrome, outside the MAUI page tree AppThemeBinding reaches -
+            // every path that lands here is also a path where the app's own theme choice changed.
+            Procure.Utilities.TitleBarHelper.Apply();
+#endif
         }
     }
 }

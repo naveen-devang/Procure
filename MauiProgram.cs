@@ -39,6 +39,11 @@ namespace Procure
                                 {
                                     presenter.Maximize();
                                 }
+
+                                if (appWindow != null)
+                                {
+                                    Procure.Utilities.TitleBarHelper.Initialize(appWindow);
+                                }
                             }
                             catch
                             {
