@@ -22,6 +22,7 @@
             <converters:PoPillTextColorConverter x:Key="PoPillTextColorConverter" />
             <converters:PcrPillTextColorConverter x:Key="PcrPillTextColorConverter" />
             <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <converters:StringEqualsToBorderWidthConverter x:Key="StringEqualsToBorderWidthConverter" />
             <converters:BoolToInvertedBoolConverter x:Key="BoolToInvertedBoolConverter" />
             <converters:BoolToFilterChipBgConverter x:Key="BoolToFilterChipBgConverter" />
             <converters:BoolToFilterChipStrokeConverter x:Key="BoolToFilterChipStrokeConverter" />

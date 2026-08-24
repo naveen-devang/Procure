@@ -94,6 +94,18 @@ namespace Procure.Utilities
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
+    /// <summary>Highlights whichever option button matches the bound value - the Settings page's Color
+    /// Mode and Pastel Accent buttons all shared one fixed BorderWidth, so none of them ever visibly
+    /// showed which was selected. Bind BorderWidth through this with ConverterParameter set to the
+    /// button's own CommandParameter; 2 when it matches the selection, 0 otherwise.</summary>
+    public class StringEqualsToBorderWidthConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => string.Equals(value as string, parameter as string, StringComparison.OrdinalIgnoreCase) ? 2.0 : 0.0;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
     public class NullToBoolConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

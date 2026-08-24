@@ -57,7 +57,9 @@
                                     HeightRequest="40"
                                     FontSize="13"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                    BorderColor="{DynamicResource Primary}"
+                                    BorderWidth="{Binding SelectedThemeMode, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Dark}" />
 
                             <!-- Light Mode -->
                             <Button Grid.Column="1"
@@ -68,7 +70,9 @@
                                     HeightRequest="40"
                                     FontSize="13"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                    BorderColor="{DynamicResource Primary}"
+                                    BorderWidth="{Binding SelectedThemeMode, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Light}" />
 
                             <!-- System Default -->
                             <Button Grid.Column="2"
@@ -79,7 +83,9 @@
                                     HeightRequest="40"
                                     FontSize="13"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                    BorderColor="{DynamicResource Primary}"
+                                    BorderWidth="{Binding SelectedThemeMode, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=System}" />
                         </Grid>
                     </VerticalStackLayout>
 
@@ -101,7 +107,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1A3A82EE"
-                                    TextColor="#60CDFF" />
+                                    TextColor="#60CDFF"
+                                    BorderColor="#60CDFF"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Blue}" />
 
                             <!-- Purple -->
                             <Button Grid.Row="0" Grid.Column="1"
@@ -112,7 +120,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1A8B6CE8"
-                                    TextColor="#B198F0" />
+                                    TextColor="#B198F0"
+                                    BorderColor="#B198F0"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Purple}" />
 
                             <!-- Mint -->
                             <Button Grid.Row="0" Grid.Column="2"
@@ -123,7 +133,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1A2E9E6D"
-                                    TextColor="#6CCB5F" />
+                                    TextColor="#6CCB5F"
+                                    BorderColor="#6CCB5F"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Mint}" />
 
                             <!-- Coral -->
                             <Button Grid.Row="0" Grid.Column="3"
@@ -134,7 +146,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1AE07238"
-                                    TextColor="#FFA043" />
+                                    TextColor="#FFA043"
+                                    BorderColor="#FFA043"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Coral}" />
 
                             <!-- Pink / Rose -->
                             <Button Grid.Row="1" Grid.Column="0"
@@ -145,7 +159,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1AD95382"
-                                    TextColor="#FF99A4" />
+                                    TextColor="#FF99A4"
+                                    BorderColor="#FF99A4"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Pink}" />
 
                             <!-- Crimson / Red -->
                             <Button Grid.Row="1" Grid.Column="1"
@@ -156,7 +172,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1AC83E4D"
-                                    TextColor="#FF7B7B" />
+                                    TextColor="#FF7B7B"
+                                    BorderColor="#FF7B7B"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Red}" />
 
                             <!-- Amber / Yellow -->
                             <Button Grid.Row="1" Grid.Column="2"
@@ -167,7 +185,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1AD48B17"
-                                    TextColor="#FCE100" />
+                                    TextColor="#FCE100"
+                                    BorderColor="#FCE100"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Yellow}" />
 
                             <!-- Teal / Aqua -->
                             <Button Grid.Row="1" Grid.Column="3"
@@ -178,7 +198,9 @@
                                     FontSize="12"
                                     FontFamily="SegoeSemibold"
                                     BackgroundColor="#1A1E989B"
-                                    TextColor="#48CAE4" />
+                                    TextColor="#48CAE4"
+                                    BorderColor="#48CAE4"
+                                    BorderWidth="{Binding SelectedAccentTheme, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Teal}" />
                         </Grid>
                     </VerticalStackLayout>
 
