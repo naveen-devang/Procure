@@ -255,7 +255,6 @@ namespace Procure.PageModels
                 await _prRepo.SaveAsync(CurrentEditingPr);
                 CurrentEditingPr.NotifyHierarchyChanged();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 _editSnapshot = null;
                 IsEditModalVisible = false;
@@ -305,7 +304,6 @@ namespace Procure.PageModels
                 pr.PropertyChanged -= OnPrItemPropertyChanged;
                 _selectedIds.Remove(pr.Id);
                 ApplyFilters();
-                UpdateStatusBanner();
             }
             catch (Exception ex)
             {

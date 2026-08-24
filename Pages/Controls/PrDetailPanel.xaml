@@ -39,7 +39,7 @@
                     </VerticalStackLayout>
                     <Button Grid.Column="2" Text="&#xE748; Split PR"
                             FontFamily="Segoe Fluent Icons"
-                            Command="{Binding SplitMasterPrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                            Command="{Binding SplitMasterPrCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                             CommandParameter="{Binding .}"
                             FontSize="11" HeightRequest="28" Padding="10,0"
                             Style="{StaticResource SecondaryButton}"
@@ -67,7 +67,7 @@
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                    VerticalOptions="Center" />
                             <Button Grid.Column="1" Text="+ Add RFQ"
-                                    Command="{Binding OpenAddRfqModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                    Command="{Binding OpenAddRfqModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="11" HeightRequest="28" Padding="10,0"
                                     BorderWidth="1"
@@ -107,7 +107,7 @@
                                                     <!-- Split / Unlink Shared RFQ Button -->
                                                     <Button Text="&#xE748;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding SplitSharedRfqCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                            Command="{Binding SplitSharedRfqCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                             CommandParameter="{Binding .}"
                                                             IsVisible="{Binding IsSharedRfq}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -119,7 +119,7 @@
                                                     <!-- Edit Icon Button -->
                                                     <Button Text="&#xE70F;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding OpenEditRfqModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                            Command="{Binding OpenEditRfqModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                             BackgroundColor="Transparent"
@@ -130,7 +130,7 @@
                                                     <!-- Delete Icon Button -->
                                                     <Button Text="&#xE74D;"
                                                             FontFamily="Segoe Fluent Icons"
-                                                            Command="{Binding DeleteRfqCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                            Command="{Binding DeleteRfqCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                             CommandParameter="{Binding .}"
                                                             FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                             BackgroundColor="Transparent"
@@ -385,7 +385,7 @@
                                     Text="&#xEDE1;"
                                     FontFamily="Segoe Fluent Icons"
                                     IsVisible="{Binding HasPcr}"
-                                    Command="{Binding OpenExportPcrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                    Command="{Binding OpenExportPcrModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0"
                                     BackgroundColor="Transparent"
@@ -398,7 +398,7 @@
                             <Button Grid.Column="3"
                                     Text="&#xE713;"
                                     FontFamily="Segoe Fluent Icons"
-                                    Command="{Binding OpenApprovalConfigModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                    Command="{Binding OpenApprovalConfigModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                     CommandParameter="{Binding .}"
                                     FontSize="14" WidthRequest="28" HeightRequest="28" Padding="0"
                                     BackgroundColor="Transparent"
@@ -446,7 +446,7 @@
                                                         <!-- Unset: Clean Button Filling 142px -->
                                                         <Button Grid.Column="1" Text="+ Sent Date"
                                                                 IsVisible="{Binding HasSentDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                Command="{Binding SetApprovalSentTodayCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                Command="{Binding SetApprovalSentTodayCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                 CommandParameter="{Binding .}"
                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                 HorizontalOptions="Fill"
@@ -471,7 +471,7 @@
                                                                                     DateSelected="OnApprovalDateSelected"
                                                                                     VerticalOptions="Center" />
                                                                         <Button Grid.Column="1" Text="✕"
-                                                                                Command="{Binding ClearSentDateCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                                Command="{Binding ClearSentDateCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                                 CommandParameter="{Binding .}"
                                                                                 FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
                                                                                 BackgroundColor="Transparent"
@@ -493,7 +493,7 @@
                                                         <!-- Unset: Clean Button Filling 142px -->
                                                         <Button Grid.Column="1" Text="+ Received Date"
                                                                 IsVisible="{Binding HasReceivedDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
-                                                                Command="{Binding SetApprovalReceivedTodayCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                Command="{Binding SetApprovalReceivedTodayCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                 CommandParameter="{Binding .}"
                                                                 FontSize="10" HeightRequest="26" Padding="6,0"
                                                                 HorizontalOptions="Fill"
@@ -515,7 +515,7 @@
                                                                                     DateSelected="OnApprovalDateSelected"
                                                                                     VerticalOptions="Center" />
                                                                         <Button Grid.Column="1" Text="✕"
-                                                                                Command="{Binding ClearReceivedDateCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                                Command="{Binding ClearReceivedDateCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                                 CommandParameter="{Binding .}"
                                                                                 FontSize="9" WidthRequest="19" HeightRequest="26" Padding="0"
                                                                                 BackgroundColor="Transparent"
@@ -549,7 +549,7 @@
                                        TextColor="{StaticResource Gray400}"
                                        HorizontalOptions="Center" />
                                 <Button Text="+ Create &amp; Submit PCR"
-                                        Command="{Binding CreatePcrForPrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                        Command="{Binding CreatePcrForPrCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                         CommandParameter="{Binding .}"
                                         Style="{StaticResource PrimaryButton}"
                                         FontSize="12" HeightRequest="32" Padding="14,0" />
@@ -578,7 +578,7 @@
                                        VerticalOptions="Center" />
 
                                 <Button Grid.Column="1" Text="+ Add PO"
-                                        Command="{Binding OpenAddPoModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                        Command="{Binding OpenAddPoModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                         CommandParameter="{Binding .}"
                                         FontSize="11" HeightRequest="28" Padding="10,0"
                                         BorderWidth="1"
@@ -650,7 +650,7 @@
                                             <Button Grid.Row="0" Grid.Column="2"
                                                     Text="&#xE70F;"
                                                     FontFamily="Segoe Fluent Icons"
-                                                    Command="{Binding OpenEditPoModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                    Command="{Binding OpenEditPoModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                     CommandParameter="{Binding .}"
                                                     FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                     BackgroundColor="Transparent"
@@ -679,7 +679,7 @@
                                                 <!-- Split Combined PO Button -->
                                                 <Button Text="&#xE748;"
                                                         FontFamily="Segoe Fluent Icons"
-                                                        Command="{Binding SplitCombinedPoCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                        Command="{Binding SplitCombinedPoCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                         CommandParameter="{Binding .}"
                                                         IsVisible="{Binding IsCombinedPo}"
                                                         FontSize="10" HeightRequest="24" WidthRequest="24" Padding="0"
@@ -691,7 +691,7 @@
                                                 <!-- Delete PO Button -->
                                                 <Button Text="&#xE74D;"
                                                         FontFamily="Segoe Fluent Icons"
-                                                        Command="{Binding DeletePoCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                        Command="{Binding DeletePoCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                         CommandParameter="{Binding .}"
                                                         FontSize="11" HeightRequest="24" WidthRequest="24" Padding="0"
                                                         BackgroundColor="Transparent"
@@ -843,7 +843,7 @@
 
                     <Button Grid.Column="1"
                             Text="Edit Requisition &amp; Fields"
-                            Command="{Binding OpenEditPrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                            Command="{Binding OpenEditPrModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                             CommandParameter="{Binding .}"
                             FontSize="12" HeightRequest="32" Padding="14,0"
                             Style="{StaticResource SecondaryButton}"

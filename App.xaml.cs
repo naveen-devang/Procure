@@ -87,6 +87,17 @@ namespace Procure
                 MinimumWidth = 800,
                 MinimumHeight = 550
             };
+
+#if DEBUG
+            // Opt-in only: PROCURE_BOARD_SELFCHECK=1. Placed here rather than the constructor -
+            // AppShell (just built above) is what constructs the PrListPageModel singleton this check
+            // needs, and the constructor runs before AppShell exists.
+            if (Environment.GetEnvironmentVariable("PROCURE_BOARD_SELFCHECK") == "1")
+            {
+                _ = Utilities.BoardMemorySelfCheck.RunAsync();
+            }
+#endif
+
             return window;
         }
     }

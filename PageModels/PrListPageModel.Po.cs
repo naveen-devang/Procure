@@ -109,6 +109,14 @@ namespace Procure.PageModels
             AddPoModalSubtitle = $"PR: {pr.PrNo} • {(pr.Rfqs?.Count ?? 0)} Supplier Quote(s) available";
             IsAddPoModalVisible = true;
 
+            // Let the modal shell and the step-1 skeleton actually paint before building
+            // PoRfqSelections below. Without this yield, the modal's own first-build (now deferred by
+            // LazyExpander's placeholder) plus this population loop - which realises a real native
+            // element per RFQ selection AND per item inside it, non-virtualized - ran as one
+            // uninterrupted block on the UI thread, so "smooth skeleton loading" never actually got a
+            // frame to show, and the OS read the gap as the app not responding to the click.
+            await Task.Yield();
+
             // Cleanup previous listeners if any
             if (PoRfqSelections != null)
             {
@@ -192,6 +200,10 @@ namespace Procure.PageModels
             IsPoModalStep2Loading = true;
             AddPoModalSubtitle = $"Editing PO for PR: {pr.PrNo} • Vendor: {po.Vendor}";
             IsAddPoModalVisible = true;
+
+            // See OpenAddPoModalAsync - lets the modal shell and step-2 skeleton paint before
+            // building PoRfqSelections below.
+            await Task.Yield();
 
             // Cleanup previous listeners if any
             if (PoRfqSelections != null)
@@ -511,7 +523,6 @@ namespace Procure.PageModels
                 }
 
                 TargetPrForPo.NotifyHierarchyChanged();
-                UpdateStatusBanner();
                 CloseAddPoModal();
             }
             catch (Exception ex)

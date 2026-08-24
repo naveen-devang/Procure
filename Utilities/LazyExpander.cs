@@ -22,9 +22,12 @@ namespace Procure.Utilities
     /// flight when a container is recycled checks IsExpanded again before building, so it either builds
     /// for the new row or drops itself.
     ///
-    /// ponytail: content is never torn down again once built - collapsing only hides it. Under
+    /// By default content is never torn down again once built - collapsing only hides it. Under
     /// recycling that bounds peak memory at roughly (containers on screen x panel size) rather than at
-    /// every card ever opened, so a release-on-collapse is no longer worth its complexity.
+    /// every card ever opened. Set <see cref="AutoReleaseDelay"/> to trade that back: a card collapsed
+    /// and left alone that long releases its content and rebuilds from scratch (same two-phase
+    /// placeholder-then-build flow) if reopened. Unset by default, so every other user of this
+    /// component - the ten modals, the loading skeleton - is unaffected.
     /// </summary>
     public sealed class LazyExpander : ContentView
     {
@@ -42,7 +45,22 @@ namespace Procure.Utilities
         public static readonly BindableProperty PlaceholderTemplateProperty = BindableProperty.Create(
             nameof(PlaceholderTemplate), typeof(DataTemplate), typeof(LazyExpander));
 
+        /// <summary>Null (default) means never release, matching every prior use of this component.
+        /// Set on the one usage that wraps a PR card's detail panel; the modals and the skeleton leave
+        /// this unset.</summary>
+        public static readonly BindableProperty AutoReleaseDelayProperty = BindableProperty.Create(
+            nameof(AutoReleaseDelay), typeof(TimeSpan?), typeof(LazyExpander), (TimeSpan?)null);
+
         private bool _contentBuilt;
+
+        // Bumped on every collapse-armed-for-release and every recycle (BindingContext change). A
+        // release callback captures the generation it was scheduled under; if the number has moved by
+        // the time it fires, it targets a different row (or the same row re-expanded) and does nothing.
+        // This is the one piece of complexity a release-on-collapse needed that made it not worth doing
+        // before - containers here are recycled by the CollectionView above, so "10 seconds after this
+        // container collapsed" and "10 seconds after this PR's card collapsed" are different questions,
+        // and only the second one is the intended behavior.
+        private int _generation;
 
         public LazyExpander() => IsVisible = false;
 
@@ -65,6 +83,23 @@ namespace Procure.Utilities
             set => SetValue(PlaceholderTemplateProperty, value);
         }
 
+        public TimeSpan? AutoReleaseDelay
+        {
+            get => (TimeSpan?)GetValue(AutoReleaseDelayProperty);
+            set => SetValue(AutoReleaseDelayProperty, value);
+        }
+
+        /// <summary>Test seam for BoardMemorySelfCheck.</summary>
+        internal bool HasBuiltContentForTest => _contentBuilt;
+
+        protected override void OnBindingContextChanged()
+        {
+            base.OnBindingContextChanged();
+            // A different row now owns this recycled container - any release timer already in flight
+            // was scheduled for whatever row was here before and must not act on this one.
+            unchecked { _generation++; }
+        }
+
         private static void OnIsExpandedChanged(BindableObject bindable, object oldValue, object newValue)
         {
             var expander = (LazyExpander)bindable;
@@ -72,8 +107,13 @@ namespace Procure.Utilities
             if (!(bool)newValue)
             {
                 expander.IsVisible = false;
+                expander.ArmAutoRelease();
                 return;
             }
+
+            // Reopened - this generation's collapse is moot, and a same-generation release callback
+            // (already in flight, already past its IsExpanded check) still must not fire.
+            unchecked { expander._generation++; }
 
             if (expander._contentBuilt || expander.ContentTemplate is null)
             {
@@ -110,6 +150,38 @@ namespace Procure.Utilities
             if (_contentBuilt || ContentTemplate is null) return;
             _contentBuilt = true;
             Content = (View)ContentTemplate.CreateContent();
+        }
+
+        /// <summary>Schedules a release for the current generation, no-op if <see cref="AutoReleaseDelay"/>
+        /// is unset. The callback re-checks both the generation and IsExpanded before acting, so a
+        /// recycle or a reopen in the meantime silently cancels it - there is nothing to unschedule.</summary>
+        private void ArmAutoRelease()
+        {
+            var delay = AutoReleaseDelay;
+            if (delay is null) return;
+
+            // Dispatcher is only populated once the element is attached to a live page/handler; a
+            // standalone instance (as in BoardMemorySelfCheck) falls back to the current-thread
+            // dispatcher, same as ShowToast elsewhere in this codebase.
+            var dispatcher = Dispatcher ?? Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread();
+            if (dispatcher is null) return;
+
+            var generation = _generation;
+            dispatcher.DispatchDelayed(delay.Value, () =>
+            {
+                if (_generation != generation || IsExpanded) return;
+                Release();
+            });
+        }
+
+        /// <summary>Drops built content back to the pre-first-expand state. The next IsExpanded=true
+        /// runs BuildContent (and the placeholder flow, if configured) exactly as it would on a card
+        /// that was never opened this session.</summary>
+        private void Release()
+        {
+            if (!_contentBuilt) return;
+            _contentBuilt = false;
+            Content = null;
         }
     }
 }

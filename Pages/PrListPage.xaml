@@ -13,6 +13,19 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
 
+    <ContentPage.Resources>
+        <!-- Shown for one frame on a modal's first-ever open, before its real content (a full form,
+             sometimes with non-virtualized per-row lists) is built. Without this, LazyExpander built
+             the whole modal synchronously on the click that opened it - dim overlay, form, everything -
+             with no frame in between to paint anything, which is what read as a stuck busy cursor.
+             Same dim backdrop every modal uses, so swapping to the real content doesn't flash. -->
+        <DataTemplate x:Key="ModalPlaceholder">
+            <Grid BackgroundColor="#99000000">
+                <ActivityIndicator IsRunning="True" HorizontalOptions="Center" VerticalOptions="Center" />
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
     <Grid>
         <!-- The CollectionView must own the scrolling. Nested in a ScrollView it is handed infinite
              height, measures every item and silently stops virtualizing - which is the freeze this
@@ -142,33 +155,6 @@
                             TextColor="{Binding FilterUrgentOnly, Converter={StaticResource BoolToFilterChipTextConverter}}" />
                 </Grid>
 
-                <!-- Transient InfoBar / Notification (Clean Windows 11 Inline InfoBar) -->
-                <Border IsVisible="{Binding IsStatusMessageVisible}"
-                        StrokeThickness="1"
-                        Stroke="{AppThemeBinding Light={StaticResource AlertWarningBorderLight}, Dark={StaticResource AlertWarningBorderDark}}"
-                        Background="{AppThemeBinding Light={StaticResource AlertWarningBgLight}, Dark={StaticResource AlertWarningBgDark}}"
-                        Padding="14,10">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="6" />
-                    </Border.StrokeShape>
-                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
-                        <Label Grid.Column="0" Text="&#xE7BA;"
-                               FontFamily="Segoe Fluent Icons"
-                               FontSize="14"
-                               TextColor="{AppThemeBinding Light={StaticResource AlertWarningIconLight}, Dark={StaticResource AlertWarningIconDark}}"
-                               VerticalOptions="Center" />
-                        <Label Grid.Column="1" Text="{Binding StatusMessage}"
-                               FontSize="12"
-                               FontFamily="SegoeSemibold"
-                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
-                               VerticalOptions="Center" />
-                        <Button Grid.Column="2" Text="✕"
-                                Command="{Binding DismissStatusMessageCommand}"
-                                BackgroundColor="Transparent"
-                                TextColor="{StaticResource Gray400}"
-                                FontSize="12" HeightRequest="26" WidthRequest="26" Padding="0" />
-                    </Grid>
-                </Border>
 
                 <!-- Batch Action Bar (Visible when 1 or more PRs are selected) -->
                 <Border IsVisible="{Binding IsBatchSelectionActive}"
@@ -315,7 +301,7 @@
                                           ColumnSpacing="10"
                                           BackgroundColor="Transparent">
                                         <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding ToggleExpandCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                            <TapGestureRecognizer Command="{Binding ToggleExpandCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                   CommandParameter="{Binding .}" />
                                         </Grid.GestureRecognizers>
 
@@ -329,7 +315,7 @@
                                         <!-- Priority Badge (Clickable: toggles Urgent / Normal) -->
                                         <Button Grid.Column="1"
                                                 Text="{Binding Priority}"
-                                                Command="{Binding TogglePriorityCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                Command="{Binding TogglePriorityCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="11"
                                                 FontFamily="SegoeSemibold"
@@ -553,7 +539,7 @@
                                         <Button Grid.Column="8" VerticalOptions="Center"
                                                 Text="&#xE70F;"
                                                 FontFamily="Segoe Fluent Icons"
-                                                Command="{Binding OpenEditPrModalCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                Command="{Binding OpenEditPrModalCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12"
                                                 HeightRequest="30"
@@ -567,7 +553,7 @@
                                         <Button Grid.Column="9" VerticalOptions="Center"
                                                 Text="&#xE74D;"
                                                 FontFamily="Segoe Fluent Icons"
-                                                Command="{Binding DeletePrCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                Command="{Binding DeletePrCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                 CommandParameter="{Binding .}"
                                                 FontSize="12"
                                                 HeightRequest="30"
@@ -588,7 +574,7 @@
                                     </Grid>
 
                                     <!-- EXPANDED DETAIL VIEW (3-COLUMN NATIVE FLUENT PANEL) -->
-                                    <converters:LazyExpander IsExpanded="{Binding IsExpanded}">
+                                    <converters:LazyExpander IsExpanded="{Binding IsExpanded}" AutoReleaseDelay="0:0:10">
                                         <converters:LazyExpander.PlaceholderTemplate>
                                         <DataTemplate>
                                             <!-- Shown for one frame while the real panel builds, so a
@@ -634,7 +620,7 @@
 
                                     <converters:LazyExpander.ContentTemplate>
                                         <DataTemplate x:DataType="models:PurchaseRequisition">
-                                            <controls:PrDetailPanel PageModel="{Binding Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}" />
+                                            <controls:PrDetailPanel PageModel="{Binding Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}" />
                                         </DataTemplate>
                                     </converters:LazyExpander.ContentTemplate>
                                     </converters:LazyExpander>
@@ -648,52 +634,52 @@
         </Grid>
 
         <!-- ================= MODALS LAYER (Modular ContentView Components) ================= -->
-        <converters:LazyExpander IsExpanded="{Binding IsEditModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsEditModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:EditPrModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsAddRfqModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsAddRfqModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:AddRfqModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsAddPoModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsAddPoModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:AddPoModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsApprovalConfigModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsApprovalConfigModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:ApprovalConfigModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsExportPcrModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsExportPcrModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:ExportPcrModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsMergePrModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsMergePrModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:MergePrModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsSplitPrModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsSplitPrModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:SplitPrModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsBatchRfqModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsBatchRfqModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:BatchRfqModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsBatchPoModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsBatchPoModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:BatchPoModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
-        <converters:LazyExpander IsExpanded="{Binding IsBatchCreateModalVisible}">
+        <converters:LazyExpander IsExpanded="{Binding IsBatchCreateModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:BatchCreateModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>

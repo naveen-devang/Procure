@@ -374,7 +374,6 @@ namespace Procure.PageModels
                 IsBatchCreateModalVisible = false;
                 BatchPrEntries.Clear();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 ShowToast($"Created {validEntries.Count} purchase requisitions");
             }

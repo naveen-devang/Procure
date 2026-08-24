@@ -436,7 +436,6 @@ namespace Procure.PageModels
                 IsBatchRfqModalVisible = false;
                 UpdateSelectionState();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 if (Shell.Current != null)
                 {
@@ -544,7 +543,6 @@ namespace Procure.PageModels
                 IsBatchPoModalVisible = false;
                 UpdateSelectionState();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 if (Shell.Current != null)
                 {

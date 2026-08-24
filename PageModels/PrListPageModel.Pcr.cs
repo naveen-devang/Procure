@@ -58,7 +58,6 @@ namespace Procure.PageModels
                 pr.Status = ProcurementStatus.PcrSubmitted;
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
-                UpdateStatusBanner();
             }
             catch (Exception ex)
             {
@@ -275,7 +274,6 @@ namespace Procure.PageModels
                 }
 
                 ConfiguringPr.NotifyHierarchyChanged();
-                UpdateStatusBanner();
                 CloseApprovalConfigModal();
             }
             catch (Exception ex)
@@ -305,7 +303,6 @@ namespace Procure.PageModels
 
                     parentPr.Pcr.NotifyApprovalsChanged();
                     parentPr.NotifyHierarchyChanged();
-                    UpdateStatusBanner();
                 }
             }
             catch (Exception ex)

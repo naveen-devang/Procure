@@ -301,7 +301,6 @@ namespace Procure.PageModels
                 SelectedPrsForMerge.Clear();
                 UpdateSelectionState();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 ShowToast($"Combined {selected.Count} requisitions into {masterPr.PrNo}");
             }
@@ -518,7 +517,6 @@ namespace Procure.PageModels
                 CloseSplitPrModal();
                 UpdateSelectionState();
                 ApplyFilters();
-                UpdateStatusBanner();
 
                 if (Shell.Current != null)
                 {

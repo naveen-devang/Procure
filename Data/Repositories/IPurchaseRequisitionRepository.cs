@@ -28,9 +28,6 @@ namespace Procure.Data.Repositories
         /// GetAllAsync remains only for the CSV export, which genuinely wants every row.</summary>
         Task<PrPage> GetPageAsync(PrQuery query);
 
-        /// <summary>The attention banner's two counts, over every PR rather than the current page.</summary>
-        Task<(int Overdue, int PcrPending)> GetBannerCountsAsync(int normalOverdueDays, int urgentOverdueDays);
-
         /// <summary>Specific PRs with their child graph - how the board keeps a selection loaded once it
         /// scrolls outside the visible window.</summary>
         Task<List<PurchaseRequisition>> GetByIdsAsync(IReadOnlyCollection<Guid> ids);

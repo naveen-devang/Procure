@@ -411,13 +411,13 @@
                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                                         
                                                         <Button Grid.Column="1" Text="Select All Items"
-                                                                Command="{Binding SelectAllPoRfqItemsCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                Command="{Binding SelectAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />
 
                                                         <Button Grid.Column="2" Text="Deselect All Items"
-                                                                Command="{Binding DeselectAllPoRfqItemsCommand, Source={RelativeSource AncestorType={x:Type pageModels:PrListPageModel}}}"
+                                                                Command="{Binding DeselectAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
                                                                 CommandParameter="{Binding .}"
                                                                 Style="{StaticResource SecondaryButton}"
                                                                 FontSize="10.5" HeightRequest="26" Padding="8,0" />

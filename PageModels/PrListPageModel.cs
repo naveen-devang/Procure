@@ -38,6 +38,16 @@ namespace Procure.PageModels
         /// <see cref="GetSelectedPrsAsync"/> or a repository query for anything wider.</summary>
         public IReadOnlyList<PurchaseRequisition> LoadedPrs => _loadedPrs;
 
+        /// <summary>Test seam for BoardMemorySelfCheck: sets the loaded window directly, in memory, no
+        /// database round-trip, so the release-threshold logic can be exercised at 500+ rows without
+        /// generating or fetching that many real PRs. Also updates FilteredPrs, since BoardDisappearing's
+        /// release path clears both.</summary>
+        internal void SeedLoadedPrsForTest(List<PurchaseRequisition> prs)
+        {
+            _loadedPrs = prs;
+            FilteredPrs = new ObservableCollection<PurchaseRequisition>(prs);
+        }
+
         /// <summary>Selection has to outlive the page it was made on: a checked PR that scrolls out of
         /// the window is evicted from memory, so the ids are the record and PurchaseRequisition.IsSelected
         /// is just the checkbox binding, restored from here whenever a page loads.</summary>
@@ -68,12 +78,6 @@ namespace Procure.PageModels
 
         [ObservableProperty]
         public partial bool IsBusy { get; set; }
-
-        [ObservableProperty]
-        public partial string StatusMessage { get; set; } = string.Empty;
-
-        [ObservableProperty]
-        public partial bool IsStatusMessageVisible { get; set; }
 
         [ObservableProperty]
         public partial string ToastText { get; set; } = string.Empty;
@@ -162,7 +166,19 @@ namespace Procure.PageModels
             {
                 Application.Current.RequestedThemeChanged += OnAppRequestedThemeChanged;
             }
+
+            Current = this;
         }
+
+        /// <summary>The one instance DI ever constructs (registered AddSingleton). Lets card rows and
+        /// the detail panel - both realised inside a DataTemplate, where a plain {Binding} only sees the
+        /// template's own BindingContext - reach page-level commands via {x:Static ...Current} instead
+        /// of {RelativeSource AncestorType=...}. AncestorType walks the live element tree on every bind
+        /// and every container recycle; x:Static is a direct field read, and unlike {x:Reference} it
+        /// does not depend on template scope, so it does not hit the NRE-inside-templates bug that
+        /// reverted the last attempt to move off AncestorType (see git history on PrListPage.xaml).
+        /// Safe as a static: the instance it points to already outlives the process either way.</summary>
+        public static PrListPageModel? Current { get; private set; }
 
         // Registered as a DI singleton, so the container disposes it at shutdown — that is the
         // only point at which these two subscriptions may be released.
@@ -188,7 +204,6 @@ namespace Procure.PageModels
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
                         ApplyFilters();
-                        UpdateStatusBanner();
                     });
                     break;
 
@@ -252,7 +267,6 @@ namespace Procure.PageModels
             {
                 _fillPending = false;
                 ApplyFilters();
-                UpdateStatusBanner();
             }
             else if (!_hasLoadedOnce)
             {
@@ -262,12 +276,46 @@ namespace Procure.PageModels
             }
         }
 
-        /// <summary>Called from PrListPage.OnDisappearing. Nothing to tear down: the CollectionView
-        /// recycles containers, so what is realised is bounded by the viewport however far the user
-        /// scrolled. This used to drop the window back to one batch, which meant removing hundreds of
-        /// rows one at a time - each destroying a card and relaying out the rest - and that quadratic
-        /// teardown, run inside OnDisappearing, was the tab-switch freeze. The board keeps its place.</summary>
-        public void BoardDisappearing() => _isBoardVisible = false;
+        /// <summary>Above this many loaded rows, leaving the board releases the window instead of
+        /// keeping it (see <see cref="BoardDisappearing"/>). Below it, memory is small enough that
+        /// keeping your place is worth more than the RAM.</summary>
+        private const int ReleaseThreshold = 500;
+
+        /// <summary>Called from PrListPage.OnDisappearing. Below <see cref="ReleaseThreshold"/> loaded
+        /// rows, nothing is torn down: the CollectionView recycles containers, so what is realised is
+        /// bounded by the viewport however far the user scrolled, and the board keeps its place exactly
+        /// as before this method existed. This used to unconditionally drop the window back to one
+        /// batch, which meant removing hundreds of rows one at a time - each destroying a card and
+        /// relaying out the rest - and that quadratic teardown, run inside OnDisappearing, was the
+        /// original tab-switch freeze; the threshold exists so a light session never risks it again.
+        ///
+        /// Above the threshold, the loaded window is real memory - a PR's full RFQ/PO/item graph, not a
+        /// row - so it is released here, immediately, while the user is already looking at another tab
+        /// rather than at the board. Unsubscribing before dropping the reference matters: PropertyChanged
+        /// stays wired to <see cref="OnPrItemPropertyChanged"/> otherwise, and the row can never be
+        /// collected. The next <see cref="BoardAppearing"/> finds _hasLoadedOnce false and takes the
+        /// exact path a first-ever open takes - same skeleton, same fast first paint - not new code.</summary>
+        public void BoardDisappearing()
+        {
+            _isBoardVisible = false;
+
+            if (_loadedPrs.Count <= ReleaseThreshold) return;
+
+            foreach (var pr in _loadedPrs)
+            {
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+            }
+
+            _loadedPrs = new List<PurchaseRequisition>();
+            FilteredPrs.Clear();
+            _hasLoadedOnce = false;
+            _hasEverLoaded = false;
+            TotalFilteredCount = 0;
+            UpdateListSummary();
+
+            if (Procure.Utilities.BoardTrace.IsEnabled)
+                Procure.Utilities.BoardTrace.Mark("board-window-released");
+        }
 
         private bool _loadInFlight;
 
@@ -291,7 +339,6 @@ namespace Procure.PageModels
                 {
                     _fillPending = false;
                     ApplyFilters();
-                    UpdateStatusBanner();
                 }
                 else
                 {
@@ -403,9 +450,6 @@ namespace Procure.PageModels
             FilterPcrPendingOnly = false;
             FilterUrgentOnly = false;
         }
-
-        [RelayCommand]
-        public void DismissStatusMessage() => IsStatusMessageVisible = false;
 
         /// <summary>The board is out of date - re-read what is currently shown. Keeps its ~23 call sites
         /// and their meaning; <paramref name="resetToTop"/> is for the cases where the match set itself
@@ -718,37 +762,6 @@ namespace Procure.PageModels
             }
         }
 
-        /// <summary>The banner counts every PR, not just the loaded page, so they come from SQL. Fire and
-        /// forget for the same reason ApplyFilters is: callers treat it as "the board changed".</summary>
-        private void UpdateStatusBanner() => _ = UpdateStatusBannerAsync();
-
-        private async Task UpdateStatusBannerAsync()
-        {
-            try
-            {
-                var normalDays = _settingsService.NormalOverdueDays;
-                var urgentDays = _settingsService.UrgentOverdueDays;
-
-                var (overdue, pcrPending) = await Task
-                    .Run(() => _prRepo.GetBannerCountsAsync(normalDays, urgentDays))
-                    .ConfigureAwait(true);
-
-                if (overdue > 0 || pcrPending > 0)
-                {
-                    StatusMessage = $"Attention: {overdue} PR(s) are overdue past SLA threshold and {pcrPending} PCR(s) are awaiting signature.";
-                    IsStatusMessageVisible = true;
-                }
-                else
-                {
-                    IsStatusMessageVisible = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
-        }
-
         [RelayCommand]
         public async Task ChangePrStatusAsync(PurchaseRequisition pr)
         {
@@ -786,7 +799,6 @@ namespace Procure.PageModels
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyStatusChanged();
                 if (RowFilterActive) ApplyFilters();
-                UpdateStatusBanner();
             }
             catch (Exception ex)
             {
@@ -817,7 +829,6 @@ namespace Procure.PageModels
                     }
 
                     parentPr.NotifyHierarchyChanged();
-                    UpdateStatusBanner();
                 }
 
                 if (RowFilterActive) ApplyFilters();
@@ -851,7 +862,6 @@ namespace Procure.PageModels
                     }
 
                     parentPr.NotifyHierarchyChanged();
-                    UpdateStatusBanner();
                 }
 
                 if (RowFilterActive) ApplyFilters();
@@ -874,7 +884,6 @@ namespace Procure.PageModels
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyStatusChanged();
                 if (RowFilterActive) ApplyFilters();
-                UpdateStatusBanner();
             }
             catch (Exception ex)
             {

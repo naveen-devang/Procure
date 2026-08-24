@@ -178,6 +178,7 @@ namespace Procure.Pages
 
             TuneNativeList();
             MaybeStartAutoFling();
+            MaybeStartAutoExpand();
             return true;
         }
 
@@ -232,6 +233,36 @@ namespace Procure.Pages
                 Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(900), Fling);
             }
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(2), Fling);
+        }
+
+        // Deterministic expand driver for A/B memory measurement: PROCURE_TRACE_EXPAND=<n> expands the
+        // first n currently-loaded cards' detail panels, spaced out so each gets its own frame, then
+        // marks expand-done. Diagnostics-only, inert without the env var - same pattern as the fling
+        // driver above.
+        private bool _expandStarted;
+
+        private void MaybeStartAutoExpand()
+        {
+            if (_expandStarted) return;
+            if (!int.TryParse(Environment.GetEnvironmentVariable("PROCURE_TRACE_EXPAND"), out var count) || count <= 0) return;
+            _expandStarted = true;
+
+            var index = 0;
+            void ExpandNext()
+            {
+                var rows = _viewModel.FilteredPrs;
+                if (index >= count || index >= rows.Count)
+                {
+                    Procure.Utilities.BoardTrace.Mark($"expand-done n={index}");
+                    return;
+                }
+                rows[index].IsExpanded = true;
+                index++;
+                if (Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"expand step={index}");
+                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(150), ExpandNext);
+            }
+            Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), ExpandNext);
         }
 
         private static Microsoft.UI.Xaml.Controls.ScrollViewer? FindScrollViewer(Microsoft.UI.Xaml.DependencyObject node)

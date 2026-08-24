@@ -481,31 +481,6 @@ ORDER BY CreatedAt DESC;";
             return prs;
         }
 
-        /// <summary>The two numbers the board's attention banner shows, over every PR rather than the
-        /// current page. One query instead of a walk of the whole table in memory.
-        /// ponytail: 138ms at 20,000 PRs - the slowest thing left, almost all of it the PCR half. It runs
-        /// on a background thread and only on changes that can move the numbers, so nothing waits on it.
-        /// Measured alternatives that did NOT help: an aggregate join instead of the correlated EXISTS
-        /// pair (same time), and an index-usable CreatedAt range instead of substr (13x slower - most
-        /// rows match, so SQLite is right to scan). Cache it per data change if it ever does bite.</summary>
-        public async Task<(int Overdue, int PcrPending)> GetBannerCountsAsync(int normalOverdueDays, int urgentOverdueDays)
-        {
-            await _db.InitializeAsync().ConfigureAwait(false);
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync().ConfigureAwait(false);
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $@"
-SELECT
-    (SELECT COUNT(*) FROM PurchaseRequisition WHERE {SqlOverdue}),
-    (SELECT COUNT(*) FROM PriceComparisonRequest p WHERE {SqlPcrPending});";
-            AddOverdueCutoffs(cmd, normalOverdueDays, urgentOverdueDays);
-
-            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            if (!await reader.ReadAsync().ConfigureAwait(false)) return (0, 0);
-            return (reader.GetInt32(0), reader.GetInt32(1));
-        }
-
         // PurchaseRequisition.IsOverdue in SQL: not in a terminal status, and older than the threshold
         // for its priority. CreatedAt is written with ToString("o"), so substr(...,1,10) is its date.
         private const string SqlOverdue = @"Status NOT IN ('Delivered', 'Closed', 'Cancelled', 'Merged')
