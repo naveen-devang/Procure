@@ -13,22 +13,71 @@ namespace Procure.Services.Export
         private class PdfPage
         {
             public StringBuilder Stream { get; } = new();
-            public double TableTopY { get; set; }
-            public double TableBottomY { get; set; }
+
+            // NaN means "not yet recorded" - auto-scale lets curY run well below zero for a long
+            // sheet (the whole point is drawing past where a normal page would have broken), so a
+            // plain "> 0" unset-check was silently skipping every column line once that happened.
+            public double TableTopY { get; set; } = double.NaN;
+            public double TableBottomY { get; set; } = double.NaN;
         }
 
         public static byte[] GeneratePdf(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks)
+            string remarks,
+            PcrPdfOptions? options = null)
         {
-            const double pageWidth = 842; // A4 Landscape
-            const double pageHeight = 595;
-            const double marginLeft = 36;
-            const double marginRight = 36;
-            const double contentWidth = pageWidth - marginLeft - marginRight; // 770 pt
-            const double bottomLimit = 36;
+            options ??= new PcrPdfOptions();
+            bool shrink = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
+
+            // Base size is always expressed landscape (width > height); portrait swaps the two.
+            // ISO sizes converted from mm at 72/25.4 pt/mm; US sizes from inches at 72 pt/in.
+            var (baseWidth, baseHeight) = options.PaperSize switch
+            {
+                PdfPaperSize.A0 => (3370.0, 2384.0),
+                PdfPaperSize.A1 => (2384.0, 1684.0),
+                PdfPaperSize.A2 => (1684.0, 1191.0),
+                PdfPaperSize.A3 => (1191.0, 842.0),
+                PdfPaperSize.A5 => (595.0, 420.0),
+                PdfPaperSize.A6 => (420.0, 298.0),
+                PdfPaperSize.Letter => (792.0, 612.0),
+                PdfPaperSize.Legal => (1008.0, 612.0),
+                PdfPaperSize.Tabloid => (1224.0, 792.0),
+                PdfPaperSize.Executive => (756.0, 522.0),
+                _ => (842.0, 595.0) // A4
+            };
+            bool portrait = options.Orientation == PdfOrientation.Portrait;
+            double pageWidth = portrait ? baseHeight : baseWidth;
+            double pageHeight = portrait ? baseWidth : baseHeight;
+
+            double margin = options.MarginPreset switch
+            {
+                PdfMarginPreset.Narrow => 18,
+                PdfMarginPreset.Wide => 54,
+                _ => 36 // Normal
+            };
+            double marginLeft = margin;
+            double marginRight = margin;
+            double marginTop = margin;
+            double contentWidth = pageWidth - marginLeft - marginRight;
+            double bottomLimit = margin;
+
+            // Shrink-to-fit tightens every gap and row height below so a short comparison sheet has a
+            // real chance of landing on one page instead of spilling a near-empty footer onto its own
+            // page: the totals block (12 summary rows + remarks + signature boxes) is ~270-285pt tall,
+            // more than half a landscape page, so the un-tightened layout only ever fits ~10-item lists.
+            double titleGap = shrink ? 18 : 22;
+            double metaLineGap = shrink ? 11 : 14;
+            double metaGapAfter = shrink ? 13 : 18;
+            double continuationHeaderGap = shrink ? 13 : 16;
+            double tableHeaderRowH1 = shrink ? 17 : 20;
+            double tableHeaderRowH2 = shrink ? 11 : 14;
+            double itemRowH = shrink ? 17 : 20;
+            double summaryRowH = shrink ? 11.5 : 13.5;
+            double afterTableGap = shrink ? 8 : 14;
+            double remarksGap = shrink ? 14 : 18;
+            double signatureBoxHeight = shrink ? 58 : 75;
 
             int supplierCount = selectedRfqs.Count;
             const double slNoWidth = 30;
@@ -83,8 +132,7 @@ namespace Procure.Services.Export
                 var (r, g, b) = HexToRgb(colorHex);
                 var safeText = EscapePdfText(text);
 
-                double charWidth = fontSize * 0.52;
-                double approxWidth = text.Length * charWidth;
+                double approxWidth = MeasureTextWidth(text, font, fontSize);
 
                 double finalX = x;
                 if (align == "center" && width > 0)
@@ -107,8 +155,7 @@ namespace Procure.Services.Export
             void DrawFittedText(string text, double x, double y, string font = "F1", double baseFontSize = 8.5, string align = "left", double maxWidth = 350, string colorHex = "000000")
             {
                 if (string.IsNullOrEmpty(text)) return;
-                double charWidth = baseFontSize * 0.52;
-                double approxWidth = text.Length * charWidth;
+                double approxWidth = MeasureTextWidth(text, font, baseFontSize);
 
                 double finalFontSize = baseFontSize;
                 if (approxWidth > maxWidth && maxWidth > 0)
@@ -138,7 +185,7 @@ namespace Procure.Services.Export
 
             void CloseCurrentPageTable()
             {
-                if (currentPage != null && currentPage.TableTopY > 0 && currentPage.TableBottomY > 0)
+                if (currentPage != null && !double.IsNaN(currentPage.TableTopY) && !double.IsNaN(currentPage.TableBottomY))
                 {
                     // Draw vertical column lines for the page's table portion
                     for (int i = 1; i < colX.Count; i++)
@@ -164,27 +211,32 @@ namespace Procure.Services.Export
 
                 if (isFirstPage)
                 {
-                    curY = pageHeight - 36;
+                    curY = pageHeight - marginTop;
 
                     // Title
                     var title = $"PRICE COMPARISON-{plantCode}";
                     DrawText(title, marginLeft, curY, font: "F2", fontSize: 13, align: "center", width: contentWidth);
-                    curY -= 22;
+                    curY -= titleGap;
 
-                    const double leftColWidth = 460;
-                    const double rightColX = marginLeft + 490; // 526 pt (anchored right, straight vertical alignment)
-                    const double rightColWidth = contentWidth - 490; // 280 pt (up to table right edge)
+                    // Proportional to contentWidth (calibrated against A4's 770pt content area) rather
+                    // than the fixed 460/490pt this used to be - those were tuned for A4 and, on a
+                    // wider page (A3, Wide margins, ...), left the right-hand metadata block anchored
+                    // well short of the table's actual right edge, reading as "shifted toward center".
+                    const double referenceContentWidth = 770.0;
+                    double leftColWidth = contentWidth * (460.0 / referenceContentWidth);
+                    double rightColX = marginLeft + (contentWidth * (490.0 / referenceContentWidth));
+                    double rightColWidth = (marginLeft + contentWidth) - rightColX;
 
                     // Row 1: Date (Left) & Collective Number (Right)
                     DrawText($"Date : {dateStr}", marginLeft, curY, font: "F2", fontSize: 8.5);
                     DrawFittedText($"Collective Number : {collectiveNo}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
-                    curY -= 14;
+                    curY -= metaLineGap;
 
                     // Row 2: Requested By (Left) & Requested For (Right)
                     DrawText($"Requested By : {pr.Requestor}", marginLeft, curY, font: "F2", fontSize: 8.5);
                     var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&I" : pr.Description.Trim();
                     DrawFittedText($"Requested For : {reqFor}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
-                    curY -= 14;
+                    curY -= metaLineGap;
 
                     // Row 3: PR Number (Left) & RFQ Number (Right)
                     var prDisplay = FormatPrNumbers(pr);
@@ -192,21 +244,21 @@ namespace Procure.Services.Export
 
                     DrawFittedText($"PR Number : {prDisplay}", marginLeft, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: leftColWidth);
                     DrawFittedText($"RFQ Number : {rfqDisplay}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
-                    curY -= 18;
+                    curY -= metaGapAfter;
                 }
                 else
                 {
-                    curY = pageHeight - 32;
+                    curY = pageHeight - (marginTop - 4);
 
                     // Running Header on continuation pages (ASCII hyphen to avoid font substitution)
                     var runningHeader = $"PRICE COMPARISON-{plantCode} - Requisition {pr.PrNo}";
                     DrawText(runningHeader, marginLeft, curY, font: "F2", fontSize: 9.5);
-                    curY -= 16;
+                    curY -= continuationHeaderGap;
                 }
 
                 // Table Header
-                double rowH1 = 20;
-                double rowH2 = 14;
+                double rowH1 = tableHeaderRowH1;
+                double rowH2 = tableHeaderRowH2;
                 currentPage.TableTopY = curY;
 
                 DrawRect(marginLeft, curY - rowH1 - rowH2, contentWidth, rowH1 + rowH2, lineWidth: 0.5, fillHex: "F2F4F7");
@@ -247,6 +299,38 @@ namespace Procure.Services.Export
             int itemIndex = 1;
             decimal totalLastPriceSum = 0m;
 
+            const int summaryRowsCount = 12;
+            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksGap
+                + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
+
+            // Shrink-to-fit's tightened row heights above only buy back so much - a long item list
+            // still overflows the tightened layout onto a second, near-empty page (the original bug
+            // report). Rather than tune row heights further, work out exactly how much extra uniform
+            // scale the WHOLE page needs to make everything fit, then apply it as a single PDF
+            // transform at the end - the same "shrink the whole sheet" effect as a photocopier or
+            // Word's own Fit-to-Page, and it always lands on exactly one page for any item count that
+            // clears the legibility floor below.
+            bool useAutoScale = false;
+            double autoScale = 1.0;
+            if (shrink && prItems.Count > 0)
+            {
+                double headerBlockHeight = titleGap + (2 * metaLineGap) + metaGapAfter + tableHeaderRowH1 + tableHeaderRowH2;
+                double neededHeight = headerBlockHeight + (itemRowH * prItems.Count) + footerBlockNeeded;
+                double availableForOnePage = pageHeight - marginTop - bottomLimit;
+
+                if (neededHeight > availableForOnePage)
+                {
+                    var candidate = availableForOnePage / neededHeight;
+                    // Below this the text stops being worth reading - a sheet this long paginates
+                    // instead, exactly like it did before shrink-to-fit existed.
+                    if (candidate >= 0.4)
+                    {
+                        autoScale = candidate;
+                        useAutoScale = true;
+                    }
+                }
+            }
+
             if (prItems.Count == 0)
             {
                 double rowH = 18;
@@ -269,10 +353,11 @@ namespace Procure.Services.Export
             {
                 foreach (var item in prItems)
                 {
-                    double rowH = 20;
+                    double rowH = itemRowH;
 
-                    // Check if current row exceeds printable space
-                    if (curY - rowH < bottomLimit + 10)
+                    // Check if current row exceeds printable space - skipped under auto-scale, which
+                    // guarantees everything fits on the one page already started.
+                    if (!useAutoScale && curY - rowH < bottomLimit + 10)
                     {
                         currentPage.TableBottomY = curY;
                         StartNewPage(isFirstPage: false);
@@ -335,10 +420,9 @@ namespace Procure.Services.Export
                 }
             }
 
-            // CHECK SPACE FOR SUMMARY ROWS + REMARKS + SIGNATURE BOXES
-            // Total needed height = 12 summary rows (12 * 13.5 = 162 pt) + gap (12) + remarks (20) + gap (14) + signature boxes (75) = ~283 pt
-            const double footerBlockNeeded = 283;
-            if (curY - footerBlockNeeded < bottomLimit)
+            // CHECK SPACE FOR SUMMARY ROWS + REMARKS + SIGNATURE BOXES (footerBlockNeeded computed
+            // above, alongside the auto-scale decision that already accounts for it)
+            if (!useAutoScale && curY - footerBlockNeeded < bottomLimit)
             {
                 currentPage.TableBottomY = curY;
                 StartNewPage(isFirstPage: false);
@@ -347,7 +431,7 @@ namespace Procure.Services.Export
             // SUMMARY & FINANCIAL TERMS ROWS
             void DrawSummaryMoneyRow(string label, Func<RequestForQuotation, (decimal? amount, bool showZeroAsDash)> valFunc, decimal? lastVal, bool isBold = false)
             {
-                double rowH = 13.5;
+                double rowH = summaryRowH;
                 DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
 
                 DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
@@ -367,7 +451,7 @@ namespace Procure.Services.Export
 
             void DrawSummaryTextRow(string label, Func<RequestForQuotation, string> valFunc, string lastVal, bool isBold = false)
             {
-                double rowH = 13.5;
+                double rowH = summaryRowH;
                 DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
 
                 DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
@@ -452,49 +536,65 @@ namespace Procure.Services.Export
             currentPage.TableBottomY = curY;
             CloseCurrentPageTable();
 
-            curY -= 14;
+            curY -= afterTableGap;
 
             // REMARKS SECTION
             var remarksDisplay = string.IsNullOrWhiteSpace(remarks) ? "None" : remarks.Trim();
             DrawText($"Remarks : {remarksDisplay}", marginLeft, curY, font: "F2", fontSize: 8.5);
-            curY -= 18;
+            curY -= remarksGap;
 
-            // BOTTOM SIGNATURE / APPROVER BOXES
-            var approverRoles = new List<string> { "Buyer" };
-            if (pcr.Approvals != null && pcr.Approvals.Count > 0)
+            // BOTTOM SIGNATURE / APPROVER BOXES — omitted entirely when the export is a quick
+            // internal proof that isn't going for wet-ink signoff yet.
+            if (options.IncludeSignatureBoxes)
             {
-                foreach (var app in pcr.Approvals)
+                var approverRoles = new List<string> { "Buyer" };
+                if (pcr.Approvals != null && pcr.Approvals.Count > 0)
                 {
-                    var roleName = app.RoleDisplayName;
-                    if (!approverRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
+                    foreach (var app in pcr.Approvals)
                     {
-                        approverRoles.Add(roleName);
+                        var roleName = app.RoleDisplayName;
+                        if (!approverRoles.Contains(roleName, StringComparer.OrdinalIgnoreCase))
+                        {
+                            approverRoles.Add(roleName);
+                        }
                     }
                 }
+                else
+                {
+                    approverRoles.Add("Procurement Manager");
+                    approverRoles.Add("Finance Controller");
+                    approverRoles.Add("CFO");
+                    approverRoles.Add("CEO");
+                }
+
+                int boxCount = approverRoles.Count;
+                double boxGap = 10;
+                double totalBoxWidth = contentWidth - ((boxCount - 1) * boxGap);
+                double boxWidth = totalBoxWidth / boxCount;
+                double boxHeight = signatureBoxHeight;
+                double boxTitleH = 17;
+
+                for (int b = 0; b < boxCount; b++)
+                {
+                    double bx = marginLeft + (b * (boxWidth + boxGap));
+                    double by = curY - boxHeight;
+
+                    DrawRect(bx, by, boxWidth, boxHeight, lineWidth: 0.8, fillHex: "FFFFFF");
+                    DrawRect(bx, by + boxHeight - boxTitleH, boxWidth, boxTitleH, lineWidth: 0.5, fillHex: "F2F4F7");
+                    DrawText(approverRoles[b], bx, by + boxHeight - 12, font: "F2", fontSize: 8, align: "center", width: boxWidth);
+                }
             }
-            else
+
+            // Apply the auto-scale computed before the item loop: a uniform PDF transform ahead of
+            // every drawing operator on this (guaranteed single) page, so everything drawn afterward
+            // renders smaller and stays anchored to the top-left content corner instead of spilling
+            // past the bottom margin.
+            if (useAutoScale)
             {
-                approverRoles.Add("Procurement Manager");
-                approverRoles.Add("Finance Controller");
-                approverRoles.Add("CFO");
-                approverRoles.Add("CEO");
-            }
-
-            int boxCount = approverRoles.Count;
-            double boxGap = 10;
-            double totalBoxWidth = contentWidth - ((boxCount - 1) * boxGap);
-            double boxWidth = totalBoxWidth / boxCount;
-            double boxHeight = 75;
-            double boxTitleH = 17;
-
-            for (int b = 0; b < boxCount; b++)
-            {
-                double bx = marginLeft + (b * (boxWidth + boxGap));
-                double by = curY - boxHeight;
-
-                DrawRect(bx, by, boxWidth, boxHeight, lineWidth: 0.8, fillHex: "FFFFFF");
-                DrawRect(bx, by + boxHeight - boxTitleH, boxWidth, boxTitleH, lineWidth: 0.5, fillHex: "F2F4F7");
-                DrawText(approverRoles[b], bx, by + boxHeight - 12, font: "F2", fontSize: 8, align: "center", width: boxWidth);
+                double topY = pageHeight - marginTop;
+                double tx = marginLeft * (1 - autoScale);
+                double ty = topY * (1 - autoScale);
+                pages[0].Stream.Insert(0, $"{autoScale:F4} 0 0 {autoScale:F4} {tx:F2} {ty:F2} cm\n");
             }
 
             // MULTI-PAGE PDF BINARY COMPILATION
@@ -551,7 +651,7 @@ namespace Procure.Services.Export
 
                 offsets.Add(pdfMs.Position);
                 pdfWriter.WriteLine($"{pageObjId} 0 obj");
-                pdfWriter.WriteLine($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 {font1ObjId} 0 R /F2 {font2ObjId} 0 R >> >> /Contents {streamObjId} 0 R >>");
+                pdfWriter.WriteLine($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {pageWidth:F0} {pageHeight:F0}] /Resources << /Font << /F1 {font1ObjId} 0 R /F2 {font2ObjId} 0 R >> >> /Contents {streamObjId} 0 R >>");
                 pdfWriter.WriteLine("endobj");
                 pdfWriter.Flush();
             }
@@ -611,6 +711,46 @@ namespace Procure.Services.Export
             pdfWriter.Flush();
 
             return pdfMs.ToArray();
+        }
+
+        // Adobe Core-14 AFM glyph widths (1/1000 em), ASCII 32-126 - real per-character widths instead
+        // of the flat "fontSize * 0.52 per character" estimate this replaced. The flat estimate was
+        // eyeballed against A4's narrower columns; the accumulated per-character error it carries
+        // doesn't scale with column width, so it stayed a fixed few points off while the columns grew
+        // on wider paper/margins, reading as "not centered" once there was more surrounding space to
+        // judge the offset against.
+        private static readonly short[] HelveticaWidths =
+        {
+            278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,
+            556,556,556,556,556,556,556,556,556,556,
+            278,278,584,584,584,556,1015,
+            667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+            278,278,278,469,556,333,
+            556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,
+            334,260,334,584
+        };
+
+        private static readonly short[] HelveticaBoldWidths =
+        {
+            278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
+            556,556,556,556,556,556,556,556,556,556,
+            333,333,584,584,584,611,975,
+            722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+            333,278,333,584,556,333,
+            556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
+            389,280,389,584
+        };
+
+        private static double MeasureTextWidth(string text, string font, double fontSize)
+        {
+            var table = font == "F2" ? HelveticaBoldWidths : HelveticaWidths;
+            double units = 0;
+            foreach (var ch in text)
+            {
+                var idx = ch - 32;
+                units += (idx >= 0 && idx < table.Length) ? table[idx] : 556; // outside the table: a mid-width guess
+            }
+            return units * fontSize / 1000.0;
         }
 
         private static (double r, double g, double b) HexToRgb(string hex)

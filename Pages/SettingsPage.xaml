@@ -623,6 +623,83 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Section 6: Keyboard Shortcuts -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="20">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <Border.Shadow>
+                    <Shadow Brush="#0A000000" Offset="0,2" Radius="6" Opacity="0.5" />
+                </Border.Shadow>
+
+                <VerticalStackLayout Spacing="14">
+                    <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                            <Label Text="Keyboard Shortcuts"
+                                   FontFamily="SegoeSemibold"
+                                   FontSize="15"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Label Text="Click a shortcut, then press a new key combination. Press Escape while recording to cancel without changing it."
+                                   FontSize="12" TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1"
+                                Text="Reset All to Defaults"
+                                Command="{Binding ResetAllShortcutsCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                FontSize="11"
+                                HeightRequest="32"
+                                Padding="12,0" />
+                    </Grid>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding ShortcutRows}" Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:ShortcutRowViewModel">
+                                <Border Padding="12,8" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="6" />
+                                    </Border.StrokeShape>
+
+                                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                            <Label Text="{Binding DisplayName}"
+                                                   FontFamily="SegoeSemibold" FontSize="12.5"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                            <Label Text="{Binding Scope}"
+                                                   FontSize="10.5" TextColor="{StaticResource Gray400}" />
+                                        </VerticalStackLayout>
+
+                                        <Button Grid.Column="1"
+                                                Text="{Binding DisplayText}"
+                                                Command="{Binding StartRecordingCommand}"
+                                                FontSize="11.5" WidthRequest="140" HeightRequest="30" Padding="8,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Click, then press a new key combination" />
+
+                                        <Button Grid.Column="2" Text="&#xE72C;"
+                                                FontFamily="Segoe Fluent Icons"
+                                                Command="{Binding ResetToDefaultCommand}"
+                                                IsVisible="{Binding IsCustomized}"
+                                                FontSize="12" WidthRequest="30" HeightRequest="30" Padding="0"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                                CornerRadius="4"
+                                                ToolTipProperties.Text="Reset to default" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

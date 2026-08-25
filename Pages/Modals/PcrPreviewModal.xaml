@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Procure.PageModels"
+             x:Class="Procure.Pages.Modals.PcrPreviewModal"
+             x:DataType="viewmodels:PrListPageModel"
+             IsVisible="{Binding IsPcrPreviewVisible}">
+
+    <!-- Backdrop Dimmer Overlay -->
+    <Grid BackgroundColor="{AppThemeBinding Light=#66000000, Dark=#99000000}">
+        <Grid.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding ClosePcrPreviewCommand}" />
+        </Grid.GestureRecognizers>
+
+        <!-- Centered Modal Dialog Card - near-fullscreen so the sheet is actually readable -->
+        <Border Margin="28"
+                HorizontalOptions="Fill"
+                VerticalOptions="Fill"
+                StrokeThickness="1"
+                Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                Padding="0">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="8" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="#000000" Offset="0,10" Radius="24" Opacity="0.35" />
+            </Border.Shadow>
+            <Border.GestureRecognizers>
+                <!-- Catch taps inside modal so they don't dismiss -->
+                <TapGestureRecognizer />
+            </Border.GestureRecognizers>
+
+            <Grid RowDefinitions="Auto, *, Auto">
+                <!-- 1. MODAL HEADER -->
+                <Grid Grid.Row="0"
+                      ColumnDefinitions="*, Auto"
+                      Padding="20,16,16,14"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Preview Price Comparison Sheet"
+                               FontSize="16"
+                               FontFamily="SegoeSemibold"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Label Text="{Binding PcrPreviewPageSummary}"
+                               FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+
+                    <!-- Close Button -->
+                    <Button Grid.Column="1"
+                            Text="✕"
+                            Command="{Binding ClosePcrPreviewCommand}"
+                            FontSize="13"
+                            WidthRequest="32"
+                            HeightRequest="32"
+                            Padding="0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="0"
+                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                            ToolTipProperties.Text="Close Dialog" />
+                </Grid>
+
+                <!-- 2. MODAL BODY: page preview on the left, layout options on the right -->
+                <Grid Grid.Row="1" ColumnDefinitions="*, 250" Padding="20,16" ColumnSpacing="16">
+
+                    <!-- Rendered page, one at a time, with pager + zoom below -->
+                    <Grid Grid.Column="0" RowDefinitions="*, Auto" RowSpacing="10">
+
+                        <Grid Grid.Row="0" x:Name="PreviewViewport">
+                            <!-- Plain clipping frame, not a ScrollView: the previous version resized
+                                 the image (via WidthRequest) on every wheel tick while a ScrollView's
+                                 native ScrollViewer had pointer capture for the same gesture, which
+                                 could leave that capture stuck - the whole modal (and once it captured
+                                 hard enough, the app) stopped responding to any further input. Zoom is
+                                 now a pure Scale transform (no layout/measure pass, nothing for a
+                                 scroll container to fight over) and panning is an explicit drag
+                                 gesture instead of overloading the mouse wheel.
+
+                                 Clipping is done via an explicit Clip geometry set in code-behind
+                                 (PreviewClipHost.SizeChanged), not Border's own shape-clip - a Scale
+                                 transform on a grandchild render past a plain-Rectangle Border's edges
+                                 without being clipped, since Border's shape-clip appears to only be
+                                 applied for rounded corners on this MAUI/WinUI version. -->
+                            <Grid x:Name="PreviewClipHost" HorizontalOptions="Fill" VerticalOptions="Fill">
+                                <Border x:Name="PreviewSheetFrame"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                        BackgroundColor="White"
+                                        Padding="0"
+                                        HorizontalOptions="Center"
+                                        VerticalOptions="Center"
+                                        Scale="{Binding PcrPreviewZoom}"
+                                        TranslationX="{Binding PcrPreviewPanX}"
+                                        TranslationY="{Binding PcrPreviewPanY}">
+                                    <Border.Shadow>
+                                        <Shadow Brush="#000000" Offset="0,4" Radius="12" Opacity="0.2" />
+                                    </Border.Shadow>
+                                    <Border.GestureRecognizers>
+                                        <PanGestureRecognizer PanUpdated="OnPreviewPanUpdated" />
+                                    </Border.GestureRecognizers>
+                                    <Image Source="{Binding PcrPreviewCurrentPage}"
+                                           Aspect="AspectFit"
+                                           WidthRequest="700" />
+                                </Border>
+                            </Grid>
+
+                            <!-- Rendering overlay -->
+                            <VerticalStackLayout IsVisible="{Binding IsPcrPreviewBusy}"
+                                                 BackgroundColor="{AppThemeBinding Light=#CCFFFFFF, Dark=#CC17171A}"
+                                                 VerticalOptions="Center" HorizontalOptions="Center" Spacing="10">
+                                <ActivityIndicator IsRunning="{Binding IsPcrPreviewBusy}"
+                                                    Color="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}" />
+                                <Label Text="Rendering preview…" FontSize="12"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- Pager (multi-page sheets only) + zoom indicator, Word/Excel-style -->
+                        <Grid Grid.Row="1" ColumnDefinitions="*, Auto, *">
+                            <HorizontalStackLayout Grid.Column="1" Spacing="10" HorizontalOptions="Center"
+                                                    IsVisible="{Binding IsPcrPagerVisible}">
+                                <Button Text="&#8249;"
+                                        Command="{Binding PreviousPcrPreviewPageCommand}"
+                                        WidthRequest="30" HeightRequest="30" Padding="0" FontSize="14"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Button Text="&#8250;"
+                                        Command="{Binding NextPcrPreviewPageCommand}"
+                                        WidthRequest="30" HeightRequest="30" Padding="0" FontSize="14"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </HorizontalStackLayout>
+
+                            <Label Grid.Column="2" HorizontalOptions="End" VerticalOptions="Center"
+                                   Text="{Binding PcrPreviewZoomLabel, StringFormat='{0} · Ctrl+scroll to zoom · drag to pan'}"
+                                   FontSize="11"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- Printer selection + layout options -->
+                    <ScrollView Grid.Column="1">
+                      <VerticalStackLayout Spacing="12">
+                        <Border StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                Padding="14">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="16">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Printer"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding PcrAvailablePrinters}"
+                                            SelectedItem="{Binding PcrSelectedPrinter, Mode=TwoWay}"
+                                            FontSize="12"
+                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                            TitleColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                            Title="No printers found" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Paper Size"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding PcrPaperSizeOptions}"
+                                            SelectedItem="{Binding PcrPaperSize, Mode=TwoWay}"
+                                            FontSize="12"
+                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Pages to Print"
+                                           FontSize="13"
+                                           FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Placeholder="All pages (e.g. 1-3, 5)"
+                                           Text="{Binding PcrPageRangeText, Mode=TwoWay}"
+                                           FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                           PlaceholderColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                </VerticalStackLayout>
+
+                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding PcrDoubleSided, Mode=TwoWay}" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="Print on both sides" FontSize="12.5" VerticalOptions="Center"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                Padding="14"
+                                VerticalOptions="Start">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+
+                            <VerticalStackLayout Spacing="16">
+                                <Label Text="Layout Options"
+                                       FontSize="13"
+                                       FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                <!-- Scaling -->
+                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding PcrShrinkToFit, Mode=TwoWay}" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="Fit sheet to one page" FontSize="12.5" VerticalOptions="Center"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                </Grid>
+
+                                <!-- Orientation -->
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Orientation" FontSize="11.5" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                                        <Button Grid.Column="0" Text="Landscape" FontSize="10.5"
+                                                Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Landscape"
+                                                HeightRequest="32" Padding="2,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                BorderColor="{DynamicResource Primary}"
+                                                BorderWidth="{Binding PcrOrientation, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Landscape}" />
+                                        <Button Grid.Column="1" Text="Portrait" FontSize="10.5"
+                                                Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Portrait"
+                                                HeightRequest="32" Padding="2,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                BorderColor="{DynamicResource Primary}"
+                                                BorderWidth="{Binding PcrOrientation, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Portrait}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+
+                                <!-- Margins -->
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="Margins" FontSize="11.5" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                                        <Button Grid.Column="0" Text="Normal" FontSize="10.5"
+                                                Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Normal"
+                                                HeightRequest="32" Padding="2,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                BorderColor="{DynamicResource Primary}"
+                                                BorderWidth="{Binding PcrMarginPreset, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Normal}" />
+                                        <Button Grid.Column="1" Text="Narrow" FontSize="10.5"
+                                                Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Narrow"
+                                                HeightRequest="32" Padding="2,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                BorderColor="{DynamicResource Primary}"
+                                                BorderWidth="{Binding PcrMarginPreset, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Narrow}" />
+                                        <Button Grid.Column="2" Text="Wide" FontSize="10.5"
+                                                Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Wide"
+                                                HeightRequest="32" Padding="2,0"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                                BorderColor="{DynamicResource Primary}"
+                                                BorderWidth="{Binding PcrMarginPreset, Converter={StaticResource StringEqualsToBorderWidthConverter}, ConverterParameter=Wide}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+
+                                <!-- Signature boxes -->
+                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding PcrIncludeSignatureBoxes, Mode=TwoWay}" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="Include signature boxes" FontSize="12.5" VerticalOptions="Center"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+                      </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
+
+                <!-- 3. MODAL FOOTER ACTION BUTTONS -->
+                <Grid Grid.Row="2"
+                      ColumnDefinitions="Auto, *, Auto, Auto"
+                      ColumnSpacing="8"
+                      Padding="20,14"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <!-- Back Button -->
+                    <Button Grid.Column="0"
+                            Text="&#8592; Back"
+                            Command="{Binding BackToPcrExportModalCommand}"
+                            FontSize="12"
+                            HeightRequest="34"
+                            Padding="16,0"
+                            BackgroundColor="Transparent"
+                            BorderWidth="1"
+                            BorderColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- Save As Button -->
+                    <Button Grid.Column="2"
+                            Text="Save As…"
+                            Command="{Binding SavePcrPreviewCommand}"
+                            IsEnabled="{Binding IsPcrPreviewBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                            FontSize="12"
+                            FontFamily="SegoeSemibold"
+                            HeightRequest="34"
+                            Padding="16,0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                            CornerRadius="4" />
+
+                    <!-- Print Button (Primary) -->
+                    <Button Grid.Column="3"
+                            Text="Print…"
+                            Command="{Binding PrintPcrPreviewCommand}"
+                            IsEnabled="{Binding IsPcrPreviewBusy, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                            Style="{StaticResource PrimaryButton}"
+                            FontSize="12"
+                            HeightRequest="34"
+                            Padding="18,0"
+                            CornerRadius="4" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentView>

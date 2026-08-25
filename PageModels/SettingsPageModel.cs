@@ -23,6 +23,11 @@ namespace Procure.PageModels
         private readonly SeedDataService _seedDataService;
         private readonly SqliteDatabase _sqliteDb;
         private readonly IErrorHandler _errorHandler;
+        private readonly IKeyboardShortcutService _keyboardShortcutService;
+
+        // Built once from the registry - each row watches the shared service itself, so nothing here
+        // needs to refresh them individually when a binding changes or a recording completes.
+        public ObservableCollection<ShortcutRowViewModel> ShortcutRows { get; }
 
         [ObservableProperty]
         public partial string SelectedThemeMode { get; set; } = "Dark";
@@ -106,13 +111,18 @@ namespace Procure.PageModels
             IUpdateService updateService,
             SeedDataService seedDataService,
             SqliteDatabase sqliteDb,
-            IErrorHandler errorHandler)
+            IErrorHandler errorHandler,
+            IKeyboardShortcutService keyboardShortcutService)
         {
             _settingsService = settingsService;
             _updateService = updateService;
             _seedDataService = seedDataService;
             _sqliteDb = sqliteDb;
             _errorHandler = errorHandler;
+            _keyboardShortcutService = keyboardShortcutService;
+
+            ShortcutRows = new ObservableCollection<ShortcutRowViewModel>(
+                Procure.Utilities.KeyboardShortcutRegistry.All.Select(d => new ShortcutRowViewModel(d, _keyboardShortcutService)));
 
             SelectedThemeMode = _settingsService.AppTheme;
             SelectedAccentTheme = _settingsService.AccentTheme;
@@ -465,5 +475,8 @@ namespace Procure.PageModels
             DefaultApprovalStages.Add(ApprovalRoles.Ceo);
             _settingsService.SetDefaultApprovalRoles(DefaultApprovalStages);
         }
+
+        [RelayCommand]
+        public void ResetAllShortcuts() => _keyboardShortcutService.ResetAllToDefaults();
     }
 }

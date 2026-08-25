@@ -12,10 +12,26 @@ namespace Procure.Services.Export
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks);
 
-        Task<string> ExportPcrToPdfAsync(
+        byte[] GeneratePcrPdfBytes(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks);
+            string remarks,
+            PcrPdfOptions options);
+
+        // Null return means the user cancelled the save dialog.
+        Task<string?> SavePcrPdfAsync(byte[] pdfBytes, string suggestedFileName);
+
+        IReadOnlyList<string> GetAvailablePrinters();
+
+        string GetDefaultPrinterName();
+
+        // Prints the same rasterized bitmaps the preview modal shows, so the printed sheet always
+        // matches what was on screen rather than whatever scaling a printer driver's own dialog picks.
+        // pageIndices is 0-based; null or empty means every page. A PDF/XPS-writer "printer" is routed
+        // through the Save As file picker instead of GDI printing, since that's what it actually does
+        // and it's the only way to get a real answer on whether the user went through with it; the
+        // returned bool reflects that (false = the save/print was cancelled).
+        Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices);
     }
 }

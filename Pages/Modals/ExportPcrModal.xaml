@@ -181,7 +181,7 @@
 
                     <!-- Export PDF Button -->
                     <Button Grid.Column="2"
-                            Text="Export PDF (.pdf)"
+                            Text="Export/Print PDF"
                             Command="{Binding ExportPcrPdfCommand}"
                             FontSize="12"
                             FontFamily="SegoeSemibold"

@@ -13,13 +13,15 @@ namespace Procure.Pages
     public partial class PrListPage : ContentPage, IThemeTransitionable
     {
         private readonly PrListPageModel _viewModel;
+        private readonly Procure.Services.IKeyboardShortcutService _shortcuts;
 
-        public PrListPage(PrListPageModel viewModel)
+        public PrListPage(PrListPageModel viewModel, Procure.Services.IKeyboardShortcutService shortcuts)
         {
             Procure.Utilities.BoardTrace.Mark("page-inflate-start");
             InitializeComponent();
             Procure.Utilities.BoardTrace.Mark("page-inflate-done");
             BindingContext = _viewModel = viewModel;
+            _shortcuts = shortcuts;
 
             // Watch for IsBusy changes to start/stop the shimmer animation
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -41,6 +43,10 @@ namespace Procure.Pages
                 if (!HookBoardScrollViewer())
                     Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(400), () => HookBoardScrollViewer());
             });
+
+            // Re-claim keyboard routing every time this page becomes the active one - switching back
+            // from Dashboard/Settings/Columns leaves focus wherever that page last had it, not here.
+            Dispatcher.Dispatch(FocusPageRootForKeyboard);
 #endif
 
 #if DEBUG
@@ -76,6 +82,21 @@ namespace Procure.Pages
                 root.PreviewKeyDown -= OnPagePreviewKeyDown;
                 root.PreviewKeyDown += OnPagePreviewKeyDown;
             }
+            FocusPageRootForKeyboard();
+        }
+
+        // WinUI only routes PreviewKeyDown along the path to whatever element currently holds logical
+        // keyboard focus - with nothing focused (the state right after this page or any modal on it
+        // first appears), no key reaches this hook at all, Escape and every shortcut included, until
+        // the user happens to click or arrow-key something into focus first. Grabbing programmatic
+        // focus on the page's own root the moment it's available closes that gap without needing a
+        // visible focus target - it's never meant to look focused, only to give the input system
+        // somewhere to route from.
+        private void FocusPageRootForKeyboard()
+        {
+            if (Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement root) return;
+            root.IsTabStop = true;
+            root.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
         }
 
         protected override void OnHandlerChanging(HandlerChangingEventArgs args)
@@ -97,8 +118,124 @@ namespace Procure.Pages
 
         private void OnPagePreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
         {
-            if (e.Key != Windows.System.VirtualKey.Escape) return;
-            if (_viewModel.CloseTopmostModal()) e.Handled = true;
+            // Recording a new binding in Settings is handled at the Shell level, above this page in
+            // the tunnel - nothing here needs to know or care while that's in progress.
+
+            if (e.Key == Windows.System.VirtualKey.Escape)
+            {
+                if (_viewModel.CloseTopmostModal()) e.Handled = true;
+                return;
+            }
+
+            if (TryHandleModalScopedShortcut(e.Key)) { e.Handled = true; return; }
+
+            // Board-level shortcuts only make sense when nothing is sitting on top of the board.
+            if (_viewModel.IsAnyModalVisible) return;
+
+            var s = _shortcuts;
+            if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.FocusSearch), e.Key))
+            {
+                SearchEntry.Focus();
+                e.Handled = true;
+            }
+            else if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.NewPr), e.Key))
+            {
+                _viewModel.OpenBatchCreateModalCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.RefreshBoard), e.Key))
+            {
+                _viewModel.RefreshBoardCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ExportCsv), e.Key))
+            {
+                _viewModel.ExportCsvCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+
+        // Only ever acts on the one modal that's actually open - "Save" in a Batch Create dialog
+        // must never also try to save an Edit PR dialog that happens to be visible at the same time
+        // (it can't be, today, but the check costs nothing and keeps that true).
+        private bool TryHandleModalScopedShortcut(Windows.System.VirtualKey key)
+        {
+            var s = _shortcuts;
+            bool IsSave() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalSave), key);
+            bool IsSelectAll() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalSelectAll), key);
+            bool IsPaste() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalPaste), key);
+
+            // Ctrl+A/Ctrl+V and bare arrow keys all have a native meaning inside a focused text field
+            // (select-all-text, paste-text, move-cursor) - stepping on that inside, say, the "Pages to
+            // Print" box would be a regression, not a feature. Ctrl+S has no such native meaning in a
+            // plain text box, so it's never guarded.
+            var textFieldFocused = IsTextInputFocused();
+
+            if (_viewModel.IsPcrPreviewVisible)
+            {
+                if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.PcrPrint), key))
+                { _viewModel.PrintPcrPreviewCommand.Execute(null); return true; }
+                if (IsSave())
+                { _viewModel.SavePcrPreviewCommand.Execute(null); return true; }
+                if (!textFieldFocused && _viewModel.IsPcrPagerVisible && Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.PcrPrevPage), key))
+                { _viewModel.PreviousPcrPreviewPageCommand.Execute(null); return true; }
+                if (!textFieldFocused && _viewModel.IsPcrPagerVisible && Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.PcrNextPage), key))
+                { _viewModel.NextPcrPreviewPageCommand.Execute(null); return true; }
+                if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.PcrZoomIn), key))
+                { AdjustPcrZoom(0.1); return true; }
+                if (Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.PcrZoomOut), key))
+                { AdjustPcrZoom(-0.1); return true; }
+                return false;
+            }
+
+            if (IsSave())
+            {
+                if (_viewModel.IsEditModalVisible) { _viewModel.SavePrModalCommand.Execute(null); return true; }
+                if (_viewModel.IsAddRfqModalVisible) { _viewModel.SaveNewRfqCommand.Execute(null); return true; }
+                if (_viewModel.IsAddPoModalVisible) { _viewModel.SaveNewPoCommand.Execute(null); return true; }
+                if (_viewModel.IsApprovalConfigModalVisible) { _viewModel.SaveApprovalConfigModalCommand.Execute(null); return true; }
+                if (_viewModel.IsMergePrModalVisible) { _viewModel.ConfirmMergePrModalCommand.Execute(null); return true; }
+                if (_viewModel.IsSplitPrModalVisible) { _viewModel.ConfirmSplitPrModalCommand.Execute(null); return true; }
+                if (_viewModel.IsBatchCreateModalVisible) { _viewModel.SaveBatchPrsModalCommand.Execute(null); return true; }
+                if (_viewModel.IsBatchRfqModalVisible) { _viewModel.SaveBatchRfqModalCommand.Execute(null); return true; }
+                if (_viewModel.IsBatchPoModalVisible) { _viewModel.SaveBatchPoModalCommand.Execute(null); return true; }
+                return false;
+            }
+
+            if (!textFieldFocused && IsSelectAll())
+            {
+                if (_viewModel.IsBatchRfqModalVisible) { _viewModel.SelectAllBatchRfqItemsCommand.Execute(null); return true; }
+                if (_viewModel.IsAddPoModalVisible) { _viewModel.SelectAllPoRfqsCommand.Execute(null); return true; }
+                return false;
+            }
+
+            if (!textFieldFocused && IsPaste() && _viewModel.IsBatchCreateModalVisible)
+            {
+                _viewModel.PasteBatchPrRowsFromClipboardCommand.Execute(null);
+                return true;
+            }
+
+            return false;
+        }
+
+        // Whether a native text-editable control currently has keyboard focus - Ctrl+A/Ctrl+V and the
+        // bare arrow keys all mean something different (and expected) inside one of those, so the
+        // modal-scoped shortcuts that would otherwise collide with them back off while it's focused.
+        private bool IsTextInputFocused()
+        {
+            if (Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement root || root.XamlRoot is null) return false;
+            var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root.XamlRoot);
+            return focused is Microsoft.UI.Xaml.Controls.TextBox or Microsoft.UI.Xaml.Controls.PasswordBox or Microsoft.UI.Xaml.Controls.RichEditBox;
+        }
+
+        // Keyboard equivalent of Ctrl+scroll in the preview modal - resets pan too, same as every
+        // other zoom-affecting change there (page switch, layout option change), so a keyboard zoom
+        // never leaves the view panned somewhere the now-different zoom level can't show.
+        private void AdjustPcrZoom(double step)
+        {
+            _viewModel.PcrPreviewZoom = Math.Clamp(Math.Round(_viewModel.PcrPreviewZoom + step, 2), 0.5, 2.5);
+            _viewModel.PcrPreviewPanX = 0;
+            _viewModel.PcrPreviewPanY = 0;
         }
 #endif
 
@@ -109,6 +246,18 @@ namespace Procure.Pages
                 ToastPill.Opacity = 0;
                 _ = ToastPill.FadeToAsync(1.0, 150, Easing.CubicOut);
                 return;
+            }
+
+            // A modal just opened (or closed). Its content (Buttons, Pickers, Entries...) never
+            // auto-claims focus, so without this, Escape and every other shortcut go dead the instant
+            // it appears - exactly the PDF Preview modal report. Dispatched so the LazyExpander has
+            // finished swapping its placeholder for the real content first. Harmless on close too -
+            // it just hands keyboard routing back to the board.
+            if (e.PropertyName != null &&
+                (e.PropertyName.EndsWith("ModalVisible", StringComparison.Ordinal) ||
+                 e.PropertyName == nameof(PrListPageModel.IsPcrPreviewVisible)))
+            {
+                Dispatcher.Dispatch(FocusPageRootForKeyboard);
             }
 
             if (e.PropertyName != nameof(PrListPageModel.IsBusy)) return;

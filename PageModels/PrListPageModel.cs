@@ -253,6 +253,28 @@ namespace Procure.PageModels
         [RelayCommand]
         public Task LoadPrsAsync() => LoadCoreAsync(fillUi: true);
 
+        /// <summary>Bound to the board's "Refresh" button. A plain LoadPrsAsync re-reads only the
+        /// window already on screen (see ReloadWindowAsync), so at 20,000 rows scrolled deep it would
+        /// keep the whole loaded window in memory. This drops the window first - same release path as
+        /// <see cref="BoardDisappearing"/> above <see cref="ReleaseThreshold"/> - so the reload that
+        /// follows takes the exact first-open path: empty board, skeleton, top of the list.</summary>
+        [RelayCommand]
+        public async Task RefreshBoardAsync()
+        {
+            if (_loadInFlight) return;
+
+            foreach (var pr in _loadedPrs) pr.PropertyChanged -= OnPrItemPropertyChanged;
+            _loadedPrs = new List<PurchaseRequisition>();
+            FilteredPrs.Clear();
+            _hasLoadedOnce = false;
+            _hasEverLoaded = false;
+            _pageGeneration++;
+            TotalFilteredCount = 0;
+            UpdateListSummary();
+
+            await LoadCoreAsync(fillUi: true);
+        }
+
         /// <summary>Warms the data before the board's XAML has ever been built. The card fill waits for
         /// <see cref="BoardAppearing"/>, unless the user reaches the board first - see LoadCoreAsync.</summary>
         public Task PreloadDataAsync() => LoadCoreAsync(fillUi: false);
@@ -903,6 +925,7 @@ namespace Procure.PageModels
         {
             // Config/export modals first - they open on top of the board's other overlays.
             if (IsApprovalConfigModalVisible) { CloseApprovalConfigModal(); return true; }
+            if (IsPcrPreviewVisible) { ClosePcrPreview(); return true; }
             if (IsExportPcrModalVisible) { CloseExportPcrModal(); return true; }
             if (IsEditModalVisible) { CloseEditModal(); return true; }
             if (IsAddRfqModalVisible) { CloseAddRfqModal(); return true; }
@@ -914,6 +937,14 @@ namespace Procure.PageModels
             if (IsBatchCreateModalVisible) { CloseBatchCreateModal(); return true; }
             return false;
         }
+
+        /// <summary>Gates the board's own shortcuts (search focus, new PR, refresh, export) so they
+        /// don't fire out from under whatever modal is currently on top of them.</summary>
+        public bool IsAnyModalVisible =>
+            IsApprovalConfigModalVisible || IsPcrPreviewVisible || IsExportPcrModalVisible ||
+            IsEditModalVisible || IsAddRfqModalVisible || IsAddPoModalVisible ||
+            IsMergePrModalVisible || IsSplitPrModalVisible || IsBatchRfqModalVisible ||
+            IsBatchPoModalVisible || IsBatchCreateModalVisible;
 
     }
 }

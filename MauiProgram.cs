@@ -95,6 +95,7 @@ namespace Procure
 
             // Services
             builder.Services.AddSingleton<ISettingsService, SettingsService>();
+            builder.Services.AddSingleton<IKeyboardShortcutService, KeyboardShortcutService>();
             builder.Services.AddSingleton<IDashboardMetricsService, DashboardMetricsService>();
             builder.Services.AddSingleton<ICsvExportService, CsvExportService>();
             builder.Services.AddSingleton<IPcrExportService, PcrExportService>();

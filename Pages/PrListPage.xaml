@@ -81,7 +81,7 @@
 
                         <Button Text="Refresh"
                                 ImageSource="{StaticResource IconRefresh}"
-                                Command="{Binding LoadPrsCommand}"
+                                Command="{Binding RefreshBoardCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 HeightRequest="38"
                                 Padding="14,0" />
@@ -98,6 +98,7 @@
                 <Grid ColumnDefinitions="*, 150, Auto, Auto, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
                     <!-- Search Input (Direct Native WinUI 3 Control) -->
                     <Entry Grid.Column="0"
+                           x:Name="SearchEntry"
                            Text="{Binding SearchText, Mode=TwoWay}"
                            Placeholder="Search by PR #, item, requestor..."
                            FontSize="13"
@@ -657,6 +658,11 @@
         <converters:LazyExpander IsExpanded="{Binding IsExportPcrModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
             <converters:LazyExpander.ContentTemplate>
                 <DataTemplate><modals:ExportPcrModal /></DataTemplate>
+            </converters:LazyExpander.ContentTemplate>
+        </converters:LazyExpander>
+        <converters:LazyExpander IsExpanded="{Binding IsPcrPreviewVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
+            <converters:LazyExpander.ContentTemplate>
+                <DataTemplate><modals:PcrPreviewModal /></DataTemplate>
             </converters:LazyExpander.ContentTemplate>
         </converters:LazyExpander>
         <converters:LazyExpander IsExpanded="{Binding IsMergePrModalVisible}" PlaceholderTemplate="{StaticResource ModalPlaceholder}">
