@@ -85,14 +85,12 @@ namespace Procure.PageModels
             }
             BatchSharedCustomValues = new ObservableCollection<CustomFieldValue>(sharedVals);
 
-            // Populate 3 initial PR rows
-            var entries = new ObservableCollection<BatchPrEntry>();
-            for (int i = 0; i < 3; i++)
+            // One row by default - the common case is a single PR. "+ Add Row" or pasting multiple
+            // PRs from Excel (PasteBatchPrRowsFromClipboardAsync) both still grow this as needed.
+            BatchPrEntries = new ObservableCollection<BatchPrEntry>
             {
-                entries.Add(CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType));
-            }
-
-            BatchPrEntries = entries;
+                CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType)
+            };
             UpdateBatchEntriesSummary();
             IsBatchCreateModalVisible = true;
         }
