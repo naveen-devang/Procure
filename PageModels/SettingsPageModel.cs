@@ -405,6 +405,77 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
+        public async Task ChangeDatabaseLocationAsync()
+        {
+            if (Shell.Current == null) return;
+
+            try
+            {
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(GetActiveWindow());
+                var picker = new Windows.Storage.Pickers.FolderPicker();
+                picker.FileTypeFilter.Add("*");
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder is null) return;
+
+                var newDir = folder.Path;
+                if (string.Equals(newDir, DatabaseConstants.DatabaseDirectory, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // FolderPicker only returns folders that already exist, but existence doesn't guarantee
+                // write access (e.g. a protected system folder) - catch that now rather than after the
+                // restart, where the only recovery is editing Preferences by hand.
+                try
+                {
+                    var probePath = Path.Combine(newDir, $".procure-write-check-{Guid.NewGuid():N}");
+                    File.WriteAllText(probePath, string.Empty);
+                    File.Delete(probePath);
+                }
+                catch (Exception writeEx)
+                {
+                    await Shell.Current.DisplayAlertAsync("Can't Use This Folder",
+                        $"Procure can't write to that folder: {writeEx.Message}", "OK");
+                    return;
+                }
+
+                var existingDbPath = Path.Combine(newDir, DatabaseConstants.DatabaseFilename);
+                var message = File.Exists(existingDbPath)
+                    ? $"Procure will restart and load the existing database found at:\n\n{existingDbPath}\n\nEverything currently loaded (PRs, boards, dashboard) will be released - your app settings stay as they are."
+                    : $"Procure will restart and create a new, empty database at:\n\n{existingDbPath}\n\nEverything currently loaded (PRs, boards, dashboard) will be released - your app settings stay as they are.";
+
+                var confirm = await Shell.Current.DisplayAlertAsync(
+                    "Change Database Location", message, "Restart & Switch", "Cancel");
+                if (!confirm) return;
+
+                _settingsService.DatabaseDirectory = newDir;
+                RestartApplication();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        // Relaunches the same executable and ends this process. A DB directory change touches data
+        // every singleton page/pagemodel already loaded into memory (PR Board, Dashboard, Call-Off,
+        // Manage Columns, per-row detail panels) - restarting is what actually releases all of it in one
+        // guaranteed step, rather than hunting down and resetting each cache individually. Settings are
+        // Preferences-backed (Windows registry), entirely separate from the SQLite file, so they survive.
+        private static void RestartApplication()
+        {
+            var exePath = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exePath))
+            {
+                Process.Start(new ProcessStartInfo { FileName = exePath, UseShellExecute = true });
+            }
+            Environment.Exit(0);
+        }
+
+        private static Microsoft.UI.Xaml.Window GetActiveWindow()
+            => (Microsoft.UI.Xaml.Window)Microsoft.Maui.Controls.Application.Current!.Windows[0].Handler!.PlatformView!;
+
+        [RelayCommand]
         public async Task ResetDatabaseAsync()
         {
             if (Shell.Current == null) return;

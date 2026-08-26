@@ -600,6 +600,11 @@
                                 Style="{StaticResource SecondaryButton}"
                                 HeightRequest="36"
                                 Padding="16,0" />
+                        <Button Text="Change Database Location..."
+                                Command="{Binding ChangeDatabaseLocationCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                HeightRequest="36"
+                                Padding="16,0" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
             </Border>
