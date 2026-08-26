@@ -109,6 +109,36 @@ namespace Procure.Services.Export
                 }
                 printDocument.DocumentName = jobTitle;
 
+                // PrintDocument defaults to Portrait/whatever paper the driver defaults to,
+                // regardless of what's actually being drawn - previously nothing here ever told it
+                // otherwise, so a landscape PCR sheet was sent as a Portrait job: the printer fed
+                // and marked the physical page as Portrait while the (correctly landscape) bitmap
+                // got squeezed to fit that narrow Portrait MarginBounds, which is why the printout
+                // needed rotating to read and looked scaled differently than the preview.
+                // The rasterized bitmap already carries this job's real geometry - PcrPdfExporter's
+                // chosen orientation and paper size, baked in at render time - so reading it back
+                // from the first selected page's own pixel dimensions (at the same DPI the
+                // rasterizer used) gives an accurate page description without this method needing
+                // to know about PcrPdfOptions at all.
+                using (var firstImage = System.Drawing.Image.FromStream(new MemoryStream(allPages[selectedPages[0]])))
+                {
+                    bool isLandscape = firstImage.Width > firstImage.Height;
+                    double widthIn = firstImage.Width / PcrPdfRasterizer.DefaultDpi;
+                    double heightIn = firstImage.Height / PcrPdfRasterizer.DefaultDpi;
+
+                    // PaperSize.Width/Height are always the sheet's un-rotated (portrait-convention)
+                    // dimensions - Landscape is what actually flips how it's fed/measured. Storing
+                    // the already-landscape pixel size directly here would make GDI swap it a
+                    // second time when Landscape is applied.
+                    var (paperWidthIn, paperHeightIn) = isLandscape ? (heightIn, widthIn) : (widthIn, heightIn);
+
+                    printDocument.DefaultPageSettings.Landscape = isLandscape;
+                    printDocument.DefaultPageSettings.PaperSize = new System.Drawing.Printing.PaperSize(
+                        "PCR Sheet",
+                        (int)Math.Round(paperWidthIn * 100),
+                        (int)Math.Round(paperHeightIn * 100));
+                }
+
                 // CanDuplex queries the driver and has been seen to throw on some virtual/PDF
                 // printers rather than just returning false - guarded so a duplex request never
                 // blocks the actual print, it just silently prints one-sided instead.

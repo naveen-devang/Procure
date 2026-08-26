@@ -10,7 +10,11 @@ namespace Procure.Services.Export
     // PDF byte format PcrPdfExporter hand-writes.
     public static class PcrPdfRasterizer
     {
-        public static async Task<List<byte[]>> RenderPagesAsync(byte[] pdfBytes, double dpi = 130)
+        // Shared with PcrExportService.PrintPcrPdfAsync, which reconstructs each page's real
+        // physical size from its rendered pixel dimensions - both must agree on the same DPI.
+        public const double DefaultDpi = 130;
+
+        public static async Task<List<byte[]>> RenderPagesAsync(byte[] pdfBytes, double dpi = DefaultDpi)
         {
             using var inputStream = new InMemoryRandomAccessStream();
             using (var writer = new DataWriter(inputStream))
