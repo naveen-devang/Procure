@@ -589,7 +589,6 @@
                             </Border.StrokeShape>
                             <Label Text="{Binding DatabasePath}"
                                    FontSize="12"
-                                   FontFamily="Consolas"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                    LineBreakMode="CharacterWrap" />
                         </Border>

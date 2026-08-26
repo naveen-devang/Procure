@@ -331,12 +331,20 @@ namespace Procure.Pages.Modals
         }
 #endif
 
+        // IsFocused guards all five handlers below: TextChanged fires for a value set
+        // programmatically by data binding just as it does for real typing (there's no built-in way
+        // to tell them apart), so without this guard, an item whose stored text already contained an
+        // embedded \n/\r/\t would trigger this "paste" handling the instant BindableLayoutController
+        // bound that row's Entry - mutating the same collection it was still enumerating. Same crash
+        // class already found and fixed in EditPrModal.xaml.cs. A real paste can only happen while
+        // the Entry has focus; a binding-driven initial value is applied before anything does.
         private void OnBatchItemNameTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     var parentBatchPr = ViewModel.BatchPrEntries.FirstOrDefault(b => b.Items.Contains(item));
                     if (parentBatchPr != null)
@@ -351,9 +359,10 @@ namespace Procure.Pages.Modals
         private void OnBatchItemQuantityTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     var parentBatchPr = ViewModel.BatchPrEntries.FirstOrDefault(b => b.Items.Contains(item));
                     if (parentBatchPr != null)
@@ -368,9 +377,10 @@ namespace Procure.Pages.Modals
         private void OnBatchItemUnitTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     var parentBatchPr = ViewModel.BatchPrEntries.FirstOrDefault(b => b.Items.Contains(item));
                     if (parentBatchPr != null)
@@ -385,9 +395,10 @@ namespace Procure.Pages.Modals
         private void OnBatchPrNoTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is BatchPrEntry batchEntry)
+                if (entry.BindingContext is BatchPrEntry batchEntry)
                 {
                     ViewModel.HandleBatchPrRowPaste(batchEntry, e.NewTextValue, isPrNoColumn: true);
                 }
@@ -397,9 +408,10 @@ namespace Procure.Pages.Modals
         private void OnBatchDescriptionTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is BatchPrEntry batchEntry)
+                if (entry.BindingContext is BatchPrEntry batchEntry)
                 {
                     ViewModel.HandleBatchPrRowPaste(batchEntry, e.NewTextValue, isPrNoColumn: false);
                 }

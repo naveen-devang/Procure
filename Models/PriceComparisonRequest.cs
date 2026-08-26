@@ -20,7 +20,7 @@ namespace Procure.Models
         [ObservableProperty]
         public partial string Remarks { get; set; } = string.Empty;
 
-        private ObservableCollection<Approval> _approvals = new();
+        private ObservableCollection<Approval> _approvals = [];
         public ObservableCollection<Approval> Approvals
         {
             get => _approvals;
@@ -31,7 +31,7 @@ namespace Procure.Models
                     _approvals.CollectionChanged -= OnApprovalsCollectionChanged;
                     foreach (var a in _approvals) a.PropertyChanged -= OnApprovalItemPropertyChanged;
                 }
-                if (SetProperty(ref _approvals, value ?? new ObservableCollection<Approval>()))
+                if (SetProperty(ref _approvals, value ?? []))
                 {
                     if (_approvals != null)
                     {
@@ -83,13 +83,13 @@ namespace Procure.Models
         {
             if (Approvals.Count == 0)
             {
-                var roles = customDefaultRoles?.ToList() ?? new List<string>
-                {
+                var roles = customDefaultRoles?.ToList() ??
+                [
                     ApprovalRoles.ProcurementManager,
                     ApprovalRoles.FinanceController,
                     ApprovalRoles.Cfo,
                     ApprovalRoles.Ceo
-                };
+                ];
 
                 int order = 0;
                 foreach (var role in roles)
