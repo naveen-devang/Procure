@@ -160,7 +160,7 @@
                 <!-- Batch Action Bar (Visible when 1 or more PRs are selected) -->
                 <Border IsVisible="{Binding IsBatchSelectionActive}"
                         StrokeThickness="1"
-                        Stroke="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                        Stroke="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
                         Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
                         Padding="16,10">
                     <Border.StrokeShape>
@@ -364,7 +364,7 @@
                                                        FontSize="11"
                                                        FontFamily="SegoeSemibold"
                                                        VerticalOptions="Center"
-                                                       TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                       TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
                                                        IsVisible="{Binding Plant, Converter={StaticResource NullToBoolConverter}}" />
                                             </HorizontalStackLayout>
                                         </VerticalStackLayout>
@@ -548,7 +548,7 @@
                                                 Padding="0"
                                                 CornerRadius="4"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
-                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
                                                 ToolTipProperties.Text="Edit PR" />
 
                                         <Button Grid.Column="9" VerticalOptions="Center"

@@ -59,7 +59,7 @@
                                         <Label Text="&#xE71E;"
                                                FontFamily="Segoe Fluent Icons"
                                                FontSize="14"
-                                               TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                               TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
                                                VerticalOptions="Center" />
                                         <Label Text="Shared Defaults &amp; Tags" FontFamily="SegoeSemibold" FontSize="13"
                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
@@ -215,7 +215,7 @@
                                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DuplicateBatchPrRowCommand}"
                                                                 CommandParameter="{Binding .}"
                                                                 BackgroundColor="Transparent"
-                                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                                TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
                                                                 ToolTipProperties.Text="Duplicate PR Row"
                                                                 HeightRequest="30" WidthRequest="30" Padding="0" FontSize="13" />
 
