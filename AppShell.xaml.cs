@@ -30,6 +30,7 @@ namespace Procure
 
             UpdateThemeButtonHighlights();
             UpdateSidebarLayout(_settingsService.IsSidebarCompact);
+            UpdateMaterialsTabVisibility();
 
             // Warm the PR Board's data while the user is still on the Dashboard - the page model holds
             // the rows and has no visual tree, so this costs a query and nothing else. Opening the board
@@ -186,6 +187,7 @@ namespace Procure
             if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoDashboard), e.Key)) route = "main";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoPrBoard), e.Key)) route = "prboard";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoColumns), e.Key)) route = "columns";
+            else if (_settingsService.IsRawPackingTabEnabled && Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoMaterials), e.Key)) route = "materials";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoSettings), e.Key)) route = "settings";
 
             if (route != null)
@@ -216,6 +218,27 @@ namespace Procure
                 case nameof(ISettingsService.IsSidebarCompact):
                     UpdateSidebarLayout(_settingsService.IsSidebarCompact);
                     break;
+                case nameof(ISettingsService.IsRawPackingTabEnabled):
+                    UpdateMaterialsTabVisibility();
+                    break;
+            }
+        }
+
+        // Hides the tab from the sidebar entirely rather than just blocking navigation to it - the
+        // route still exists, but CallOffPageModel/CallOffRepository are DI singletons that never
+        // get constructed until MaterialsContent.Content is actually assigned (see OnNavigating),
+        // so turning this off costs nothing beyond hiding the icon: no query, no PoChangeNotifier
+        // subscription, nothing sitting in memory.
+        private void UpdateMaterialsTabVisibility()
+        {
+            var enabled = _settingsService.IsRawPackingTabEnabled;
+            Shell.SetFlyoutItemIsVisible(MaterialsContent, enabled);
+
+            // Being turned off while it's the page on screen would otherwise strand the user on a
+            // tab whose sidebar entry just disappeared.
+            if (!enabled && CurrentPage is Pages.CallOffPage)
+            {
+                _ = GoToAsync("//main");
             }
         }
 

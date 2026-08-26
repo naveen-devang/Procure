@@ -19,6 +19,7 @@ namespace Procure.Services
         private const string KeySidebarCompact = "Procure_SidebarCompact";
         private const string KeyAutoCollapseOnNarrow = "Procure_AutoCollapseOnNarrow";
         private const string KeyDefaultCurrency = "Procure_DefaultCurrency";
+        private const string KeyRawPackingTabEnabled = "Procure_RawPackingTabEnabled";
 
         // Cached values. Preferences (a registry read on unpackaged WinUI) is hit at most
         // once per key, lazily on first get; setters keep the cache in sync afterwards.
@@ -31,6 +32,7 @@ namespace Procure.Services
         private bool? _autoCollapseSidebarOnNarrow;
         private string? _defaultCurrency;
         private List<string>? _defaultApprovalRoles;
+        private bool? _isRawPackingTabEnabled;
 
         public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
 
@@ -200,6 +202,21 @@ namespace Procure.Services
                 Preferences.Default.Set(KeyAutoCollapseOnNarrow, value);
                 _autoCollapseSidebarOnNarrow = value;
                 SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(AutoCollapseSidebarOnNarrow)));
+            }
+        }
+
+        // Off by default - most installs don't track Raw/Packing Material call-offs, and leaving
+        // it off costs nothing extra since CallOffPageModel/Repository are DI singletons that
+        // don't even get constructed until the tab is first opened.
+        public bool IsRawPackingTabEnabled
+        {
+            get => _isRawPackingTabEnabled ??= Preferences.Default.Get(KeyRawPackingTabEnabled, false);
+            set
+            {
+                if (IsRawPackingTabEnabled == value) return;
+                Preferences.Default.Set(KeyRawPackingTabEnabled, value);
+                _isRawPackingTabEnabled = value;
+                SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(nameof(IsRawPackingTabEnabled)));
             }
         }
 

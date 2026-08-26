@@ -1,3 +1,4 @@
+using System.Linq;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
@@ -73,6 +74,26 @@ namespace Procure
                         handler.PlatformView.Padding = new Microsoft.UI.Xaml.Thickness(0);
                         handler.PlatformView.Margin = new Microsoft.UI.Xaml.Thickness(0);
                     });
+
+                    // Every Label renders as a native WinUI TextBlock, which already has this built
+                    // in - lets any label's text (PR numbers, vendor names, amounts, ...) be selected
+                    // and copied anywhere in the app. Excluded for icon-glyph labels (Segoe Fluent
+                    // Icons and the bundled FluentUI font) - selecting a private-use-area glyph is
+                    // meaningless and would show a selection caret over what's meant to read as a
+                    // plain icon/button.
+                    //
+                    // Also excluded wherever an ancestor has its own TapGestureRecognizer (row
+                    // expand/select, delete buttons, ...): a selection-enabled TextBlock's hit-test
+                    // area is its whole layout box, not just its glyphs, so inside a row that relies
+                    // on tapping ANYWHERE - including a label's own blank trailing space in a
+                    // Fill-width column - to expand or select, the label silently swallowed that
+                    // click before it ever reached the row's own tap handler.
+                    Microsoft.Maui.Handlers.LabelHandler.Mapper.AppendToMapping("SelectableLabelText", (handler, view) =>
+                    {
+                        if (view.Font.Family is "Segoe Fluent Icons" or Fonts.FluentUI.FontFamily) return;
+                        if (view is Microsoft.Maui.Controls.Label label && HasTapGestureAncestor(label)) return;
+                        handler.PlatformView.IsTextSelectionEnabled = true;
+                    });
 #endif
                 })
                 .ConfigureFonts(fonts =>
@@ -127,5 +148,22 @@ namespace Procure
 
             return builder.Build();
         }
+
+#if WINDOWS
+        private static bool HasTapGestureAncestor(Microsoft.Maui.Controls.Element element)
+        {
+            var current = element.Parent;
+            while (current != null)
+            {
+                if (current is Microsoft.Maui.Controls.View v &&
+                    v.GestureRecognizers.Any(g => g is Microsoft.Maui.Controls.TapGestureRecognizer))
+                {
+                    return true;
+                }
+                current = current.Parent;
+            }
+            return false;
+        }
+#endif
     }
 }

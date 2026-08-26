@@ -19,6 +19,7 @@ namespace Procure.Services
         string DefaultCurrency { get; set; } // AED, USD, EUR, etc.
         bool IsSidebarCompact { get; set; }
         bool AutoCollapseSidebarOnNarrow { get; set; }
+        bool IsRawPackingTabEnabled { get; set; }
         bool AutoCheckUpdatesOnStartup { get; set; }
         IReadOnlyList<PastelThemeOption> AvailableAccentThemes { get; }
         List<string> GetDefaultApprovalRoles();

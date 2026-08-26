@@ -54,6 +54,9 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool AutoCollapseSidebarOnNarrow { get; set; } = true;
 
+        [ObservableProperty]
+        public partial bool IsRawPackingTabEnabled { get; set; }
+
         // Default Currency
         [ObservableProperty]
         public partial string DefaultCurrency { get; set; } = "AED";
@@ -133,6 +136,7 @@ namespace Procure.PageModels
             AutoCheckUpdates = _settingsService.AutoCheckUpdatesOnStartup;
             IsSidebarCompact = _settingsService.IsSidebarCompact;
             AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
+            IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
             DefaultCurrency = _settingsService.DefaultCurrency;
             CurrentVersion = $"v{_updateService.CurrentVersionString}";
 
@@ -158,6 +162,9 @@ namespace Procure.PageModels
                         break;
                     case nameof(ISettingsService.AutoCollapseSidebarOnNarrow):
                         AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
+                        break;
+                    case nameof(ISettingsService.IsRawPackingTabEnabled):
+                        IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
                         break;
                     case nameof(ISettingsService.DefaultCurrency):
                         DefaultCurrency = _settingsService.DefaultCurrency;
@@ -204,6 +211,14 @@ namespace Procure.PageModels
             if (_settingsService.AutoCollapseSidebarOnNarrow != value)
             {
                 _settingsService.AutoCollapseSidebarOnNarrow = value;
+            }
+        }
+
+        partial void OnIsRawPackingTabEnabledChanged(bool value)
+        {
+            if (_settingsService.IsRawPackingTabEnabled != value)
+            {
+                _settingsService.IsRawPackingTabEnabled = value;
             }
         }
 

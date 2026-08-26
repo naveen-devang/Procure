@@ -237,6 +237,19 @@
                                     VerticalOptions="Center" />
                         </Grid>
 
+                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="Raw &amp; Packing Materials Tab" FontSize="13" FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Show the delivery call-off tracker in the sidebar. Existing purchase orders aren't affected either way, and will show automatically if you turn this back on."
+                                       FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1"
+                                    IsToggled="{Binding IsRawPackingTabEnabled}"
+                                    OnColor="{DynamicResource Primary}"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
                         <Grid ColumnDefinitions="*, 140" VerticalOptions="Center">
                             <VerticalStackLayout Grid.Column="0" Spacing="2">
                                 <Label Text="Default Currency" FontSize="13" FontFamily="SegoeSemibold"

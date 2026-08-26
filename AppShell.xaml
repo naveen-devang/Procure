@@ -53,18 +53,18 @@
         Route="prboard" />
 
     <ShellContent
-        x:Name="ColumnsContent"
-        Title="Custom Columns"
-        ToolTipProperties.Text="Custom Columns"
-        Icon="{StaticResource IconColumns}"
-        Route="columns" />
-
-    <ShellContent
         x:Name="MaterialsContent"
         Title="Raw &amp; Packing"
         ToolTipProperties.Text="Raw &amp; Packing Materials"
         Icon="{StaticResource IconMaterials}"
         Route="materials" />
+
+    <ShellContent
+        x:Name="ColumnsContent"
+        Title="Custom Columns"
+        ToolTipProperties.Text="Custom Columns"
+        Icon="{StaticResource IconColumns}"
+        Route="columns" />
 
     <ShellContent
         x:Name="SettingsContent"

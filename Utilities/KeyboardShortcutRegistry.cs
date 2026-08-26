@@ -12,6 +12,7 @@ namespace Procure.Utilities
         public const string GoDashboard = "Global.GoDashboard";
         public const string GoPrBoard = "Global.GoPrBoard";
         public const string GoColumns = "Global.GoColumns";
+        public const string GoMaterials = "Global.GoMaterials";
         public const string GoSettings = "Global.GoSettings";
         public const string ToggleSidebar = "Global.ToggleSidebar";
 
@@ -40,6 +41,7 @@ namespace Procure.Utilities
             new(KeyboardShortcutIds.GoDashboard, "Go to Dashboard", "Global", "Ctrl+1"),
             new(KeyboardShortcutIds.GoPrBoard, "Go to PR Board", "Global", "Ctrl+2"),
             new(KeyboardShortcutIds.GoColumns, "Go to Custom Columns", "Global", "Ctrl+3"),
+            new(KeyboardShortcutIds.GoMaterials, "Go to Raw & Packing", "Global", "Ctrl+Number4"),
             new(KeyboardShortcutIds.GoSettings, "Go to Settings", "Global", "Ctrl+Comma"),
             new(KeyboardShortcutIds.ToggleSidebar, "Toggle Sidebar", "Global", "Ctrl+B"),
 
