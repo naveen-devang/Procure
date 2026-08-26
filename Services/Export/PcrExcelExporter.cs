@@ -161,6 +161,17 @@ namespace Procure.Services.Export
 </styleSheet>");
         }
 
+        // No live text measurement is available in this hand-written OOXML writer, so wrapping is
+        // estimated from character count against the column's own fixed width (set in <cols>
+        // above) rather than measured pixel-for-pixel - close enough to size the row, since Excel's
+        // own wrapText does the real wrapping once the row is tall enough to show it.
+        private static int EstimateWrappedLineCount(string text, int charsPerLine, int maxLines)
+        {
+            if (string.IsNullOrEmpty(text)) return 1;
+            var lines = (int)Math.Ceiling(text.Length / (double)charsPerLine);
+            return Math.Clamp(lines, 1, maxLines);
+        }
+
         private static void AddWorksheet(
             ZipArchive archive,
             PurchaseRequisition pr,
@@ -176,6 +187,19 @@ namespace Procure.Services.Export
             int totalCols = 3 + supplierCount + 1; // e.g. 3 + 5 + 1 = 9 cols (A through I)
             string lastColLetter = GetColumnLetter(totalCols);
 
+            // Description column only widens as far as its own longest item name actually needs -
+            // not simply however many (or few) vendor columns there are, which used to hand a short
+            // name like "GYPSUM" the same oversized column as a genuinely long description. No live
+            // text measurement is available in this hand-written writer, so character count against
+            // the column's own width (set below) stands in for it - same idea as EstimateWrappedLineCount.
+            // Still bounded both ways: never narrower than the old fixed 42, never so wide it crowds
+            // vendor/price columns below a floor that would force a long vendor name into 5-6 wrapped lines.
+            const int descColWidthFloor = 42;
+            const int descColWidthCap = 70;
+            const int vendorColWidth = 18;
+            var widestItemNameLength = pr.Items?.Count > 0 ? pr.Items.Max(i => i.ItemName?.Length ?? 0) : 0;
+            int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
+
             var sb = new StringBuilder();
             sb.Append(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
 <worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"">
@@ -185,13 +209,13 @@ namespace Procure.Services.Export
     <sheetFormatPr defaultRowHeight=""18""/>
     <cols>
         <col min=""1"" max=""1"" width=""8"" customWidth=""1""/>
-        <col min=""2"" max=""2"" width=""42"" customWidth=""1""/>
+        <col min=""2"" max=""2"" width=""{descColWidth}"" customWidth=""1""/>
         <col min=""3"" max=""3"" width=""12"" customWidth=""1""/>");
 
             for (int i = 4; i <= totalCols; i++)
             {
                 sb.Append($@"
-        <col min=""{i}"" max=""{i}"" width=""18"" customWidth=""1""/>");
+        <col min=""{i}"" max=""{i}"" width=""{vendorColWidth}"" customWidth=""1""/>");
             }
 
             sb.Append(@"
@@ -251,8 +275,32 @@ namespace Procure.Services.Export
 
             // 4. Table Main Header Row (Row r): Sl No, Item Description, Quantity, Supplier Names..., Last Price
             int tableHeaderRow1 = r;
+
+            // Header texts are built up front so the row's own height can be sized to whichever
+            // vendor's name is longest, before the <row> tag is written - the cell style already
+            // has wrapText+vertical-center on, so once the row is tall enough, a short name centers
+            // in it for free and only the long one actually needs the second line.
+            var vendorHeaderTexts = new string[supplierCount];
+            for (int i = 0; i < supplierCount; i++)
+            {
+                var rfqHeader = selectedRfqs[i];
+                var vendorName = string.IsNullOrWhiteSpace(rfqHeader.Vendor) ? $"Supplier {i + 1}" : rfqHeader.Vendor;
+                // The sheet's money cells are bare numbers, so the currency must ride on the column
+                // header or mixed-currency quotes compare as equals. No partial-quote marker here -
+                // an unquoted item already prints "-" in that vendor's own price cell.
+                var vendorCur = string.IsNullOrWhiteSpace(rfqHeader.Currency) ? "AED" : rfqHeader.Currency;
+                vendorHeaderTexts[i] = $"{vendorName} ({vendorCur})";
+            }
+
+            const int headerCharsPerLine = 16; // vendor columns are fixed at width="18"
+            var headerLines = vendorHeaderTexts
+                .Select(t => EstimateWrappedLineCount(t, headerCharsPerLine, maxLines: 2))
+                .DefaultIfEmpty(1)
+                .Max();
+            var headerRowHeight = headerLines > 1 ? 44 : 28;
+
             sb.Append($@"
-        <row r=""{r}"" ht=""28"">
+        <row r=""{r}"" ht=""{headerRowHeight}"">
             <c r=""A{r}"" s=""3"" t=""inlineStr""><is><t>Sl No.</t></is></c>
             <c r=""B{r}"" s=""3"" t=""inlineStr""><is><t>Item Description</t></is></c>
             <c r=""C{r}"" s=""3"" t=""inlineStr""><is><t>Quantity</t></is></c>");
@@ -260,18 +308,8 @@ namespace Procure.Services.Export
             for (int i = 0; i < supplierCount; i++)
             {
                 string colLetter = GetColumnLetter(4 + i);
-                var rfqHeader = selectedRfqs[i];
-                var vendorName = string.IsNullOrWhiteSpace(rfqHeader.Vendor) ? $"Supplier {i + 1}" : rfqHeader.Vendor;
-                // The sheet's money cells are bare numbers, so the currency (and any partial-quote
-                // marker) must ride on the column header or mixed-currency quotes compare as equals.
-                var vendorCur = string.IsNullOrWhiteSpace(rfqHeader.Currency) ? "AED" : rfqHeader.Currency;
-                var headerText = $"{vendorName} ({vendorCur})";
-                if (rfqHeader.HasQuoteCompletenessBadge && rfqHeader.IsPartialQuote)
-                {
-                    headerText += $" — {rfqHeader.QuoteCompletenessBadge}";
-                }
                 sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(headerText)}</t></is></c>");
+            <c r=""{colLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(vendorHeaderTexts[i])}</t></is></c>");
             }
 
             string lastPriceColLetter = GetColumnLetter(totalCols);
@@ -334,10 +372,17 @@ namespace Procure.Services.Export
             }
             else
             {
+                var descCharsPerLine = descColWidth - 2; // tracks the column's own (now variable) width
                 foreach (var item in prItems)
                 {
+                    // Sized per-row from this item's own name only, not uniformly across every
+                    // item row - a five-word item three rows down growing its own row shouldn't
+                    // change the height of every short one-word row around it.
+                    var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 3);
+                    var itemRowHeight = 20 + (descLines * 16);
+
                     sb.Append($@"
-        <row r=""{r}"" ht=""36"">
+        <row r=""{r}"" ht=""{itemRowHeight}"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>{itemIndex++}</t></is></c>
             <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t>{EscapeXml(item.ItemName)}</t></is></c>
             <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {EscapeXml(item.Unit)}</t></is></c>");

@@ -81,10 +81,38 @@ namespace Procure.Services.Export
 
             int supplierCount = selectedRfqs.Count;
             const double slNoWidth = 30;
-            const double descWidth = 170;
             const double qtyWidth = 45;
-            double remainingWidth = contentWidth - slNoWidth - descWidth - qtyWidth; // ~525 pt
-            double colWidth = remainingWidth / (supplierCount + 1); // suppliers + last price
+
+            // Fetched early (normally built alongside the item-render loop further down) purely so
+            // its item names can drive the description column's width below - content-driven, not
+            // just "how many vendor columns are there".
+            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
+
+            // The description column only grows as wide as its own longest item name actually needs
+            // - not simply however much space fewer vendor columns leave spare, which used to hand
+            // "GYPSUM" the same oversized column as a genuinely long description. Still bounded both
+            // ways: never smaller than the old fixed 170pt, and never wide enough to crowd vendor/
+            // price columns below a readable floor - a long vendor name forced into a too-narrow
+            // column would wrap 5-6 lines deep, which is worse than a slightly-under-ideal
+            // description column.
+            const double descWidthFloor = 170;
+            const double descWidthCap = 300;
+            const double vendorColWidthFloor = 90;
+            const double descPadding = 16;
+
+            double vendorColsCount = supplierCount + 1; // suppliers + historical price
+            double availableForDescAndVendors = contentWidth - slNoWidth - qtyWidth;
+            double maxDescWidthByVendorFloor = availableForDescAndVendors - (vendorColsCount * vendorColWidthFloor);
+
+            double widestItemTextWidth = prItems.Count > 0
+                ? prItems.Max(item => MeasureTextWidth(item.ItemName, "F1", 7.5))
+                : 0;
+            double idealDescWidth = widestItemTextWidth + descPadding;
+            double effectiveDescCap = Math.Max(descWidthFloor, Math.Min(descWidthCap, maxDescWidthByVendorFloor));
+            double descWidth = Math.Clamp(idealDescWidth, descWidthFloor, effectiveDescCap);
+
+            double remainingWidth = availableForDescAndVendors - descWidth;
+            double colWidth = remainingWidth / vendorColsCount; // suppliers + last price
 
             var colX = new List<double> { marginLeft, marginLeft + slNoWidth, marginLeft + slNoWidth + descWidth, marginLeft + slNoWidth + descWidth + qtyWidth };
             for (int i = 0; i <= supplierCount; i++)
@@ -166,6 +194,75 @@ namespace Procure.Services.Export
                 DrawText(text, x, y, font: font, fontSize: finalFontSize, align: align, width: maxWidth, colorHex: colorHex);
             }
 
+            // Greedy wrap against the column's real width (via the exporter's own
+            // MeasureTextWidth), capped at maxLines. Breaks after a space OR after ; , : - so a
+            // compound token with no spaces at all (e.g. "TUBE;PN:153032,M:QS-6,PBT,6MM,6MM") still
+            // has real places to wrap, the way Word treats punctuation as a line-break opportunity
+            // even without whitespace - rather than one bare word landing alone on a line while
+            // everything else piles onto the next. A chunk with no break point at all (rare: truly
+            // no spaces or punctuation) still renders whole on its own line - never split mid-word.
+            List<string> WrapText(string text, string font, double fontSize, double maxWidth, int maxLines)
+            {
+                if (string.IsNullOrEmpty(text)) return new List<string> { string.Empty };
+
+                var chunks = System.Text.RegularExpressions.Regex.Matches(text, @"[^\s;,:\-]*[\s;,:\-]+|[^\s;,:\-]+$")
+                    .Select(m => m.Value)
+                    .Where(c => c.Length > 0)
+                    .ToList();
+
+                var lines = new List<string>();
+                var current = string.Empty;
+
+                foreach (var chunk in chunks)
+                {
+                    var candidate = current + chunk;
+                    if (current.Length == 0 || MeasureTextWidth(candidate.TrimEnd(), font, fontSize) <= maxWidth)
+                    {
+                        current = candidate;
+                    }
+                    else
+                    {
+                        lines.Add(current.TrimEnd());
+                        current = chunk;
+                    }
+                }
+                if (current.Length > 0) lines.Add(current.TrimEnd());
+                if (lines.Count == 0) lines.Add(string.Empty);
+
+                // Wrapping the whole string needed more lines than the cap allows, or the single
+                // word left on the capped line is itself still wider than the column - either way
+                // content got cut, so the last visible line needs an ellipsis.
+                var needsEllipsis = lines.Count > maxLines
+                    || MeasureTextWidth(lines[Math.Min(lines.Count, maxLines) - 1], font, fontSize) > maxWidth;
+
+                if (lines.Count > maxLines) lines = lines.Take(maxLines).ToList();
+
+                if (needsEllipsis)
+                {
+                    var last = lines[^1];
+                    while (last.Length > 0 && MeasureTextWidth(last + "..", font, fontSize) > maxWidth)
+                    {
+                        last = last[..^1];
+                    }
+                    lines[^1] = last.TrimEnd() + "..";
+                }
+
+                return lines;
+            }
+
+            // Draws a small block of already-wrapped lines vertically centered within a row band
+            // that runs from y (top) down by rowHeight - so a 1-line neighbor in the same header
+            // row still reads as centered once the row grows to fit someone else's 2-line name.
+            void DrawCenteredBlock(List<string> lines, double x, double topY, double rowHeight, double lineHeight, string font, double fontSize, double width, string align = "center")
+            {
+                var blockHeight = lines.Count * lineHeight;
+                var firstBaselineY = topY - ((rowHeight - blockHeight) / 2.0) - (lineHeight * 0.75);
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    DrawText(lines[i], x, firstBaselineY - (i * lineHeight), font: font, fontSize: fontSize, align: align, width: width);
+                }
+            }
+
             void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount, bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false)
             {
                 if (amount.HasValue && (!showZeroAsDash || amount.Value > 0))
@@ -193,6 +290,27 @@ namespace Procure.Services.Export
                         DrawLine(colX[i], currentPage.TableBottomY, colX[i], currentPage.TableTopY, width: 0.5);
                     }
                 }
+            }
+
+            // Vendor/Historical header wrap - measured against each column's real width, so the
+            // header row only grows when a name genuinely needs a second line; everyone else's
+            // single line still ends up centered once DrawCenteredBlock sees the taller row.
+            // No "(Partial)" marker here - an unquoted item already prints "-" in that vendor's
+            // own price cell, so flagging it again on the header would be redundant.
+            const double vendorHeaderLineHeight = 9.0;
+            var vendorHeaderLines = new List<List<string>>();
+            for (int i = 0; i < supplierCount; i++)
+            {
+                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, colWidth - 6, maxLines: 2));
+            }
+            var historicalHeaderLines = WrapText("Historical Price", "F2", 7.5, colWidth - 6, maxLines: 2);
+
+            var maxHeaderLines = Math.Max(
+                vendorHeaderLines.Select(l => l.Count).DefaultIfEmpty(1).Max(),
+                historicalHeaderLines.Count);
+            if (maxHeaderLines > 1)
+            {
+                tableHeaderRowH1 += (maxHeaderLines - 1) * vendorHeaderLineHeight;
             }
 
             void StartNewPage(bool isFirstPage)
@@ -269,18 +387,11 @@ namespace Procure.Services.Export
 
                 for (int i = 0; i < supplierCount; i++)
                 {
-                    // Truncate the raw name first, then append the badge — appending first let the
-                    // 22-char cap eat the badge for any vendor name longer than 12 characters.
-                    var vendorName = selectedRfqs[i].Vendor;
-                    var isPartial = selectedRfqs[i].IsPartialQuote;
-                    var maxNameLen = isPartial ? 12 : 22;
-                    if (vendorName.Length > maxNameLen) vendorName = vendorName.Substring(0, maxNameLen - 2) + "..";
-                    if (isPartial) vendorName += " (Partial)";
-                    DrawText(vendorName, colX[3 + i], curY - 13, font: "F2", fontSize: 7.5, align: "center", width: colWidth);
+                    DrawCenteredBlock(vendorHeaderLines[i], colX[3 + i], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, colWidth);
                     DrawText("Unit Price", colX[3 + i], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: colWidth);
                 }
 
-                DrawText("Historical Price", colX[3 + supplierCount], curY - 13, font: "F2", fontSize: 7.5, align: "center", width: colWidth);
+                DrawCenteredBlock(historicalHeaderLines, colX[3 + supplierCount], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, colWidth);
                 DrawText("Unit Price", colX[3 + supplierCount], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: colWidth);
 
                 DrawLine(colX[3], curY - rowH1, marginLeft + contentWidth, curY - rowH1, width: 0.5);
@@ -294,10 +405,20 @@ namespace Procure.Services.Export
             // Base currency for Last Price column
             var defaultCur = string.IsNullOrWhiteSpace(selectedRfqs.FirstOrDefault()?.Currency) ? "AED" : selectedRfqs.First().Currency.Trim();
 
-            // RENDER LINE ITEMS
-            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
+            // RENDER LINE ITEMS (prItems fetched earlier, alongside the description-column sizing)
             int itemIndex = 1;
             decimal totalLastPriceSum = 0m;
+
+            // Per-item description wrap - measured against the actual description column width, so
+            // only a row whose own item name genuinely needs a second line grows; every other row
+            // keeps its normal single-line height. Replaces the old fixed 36-character truncation.
+            const double itemDescLineHeight = 9.0;
+            var itemDescLines = prItems
+                .Select(item => WrapText(item.ItemName, "F1", 7.5, descWidth - 8, maxLines: 2))
+                .ToList();
+            var itemRowHeights = itemDescLines
+                .Select(lines => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight)
+                .ToList();
 
             const int summaryRowsCount = 12;
             double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksGap
@@ -315,7 +436,7 @@ namespace Procure.Services.Export
             if (shrink && prItems.Count > 0)
             {
                 double headerBlockHeight = titleGap + (2 * metaLineGap) + metaGapAfter + tableHeaderRowH1 + tableHeaderRowH2;
-                double neededHeight = headerBlockHeight + (itemRowH * prItems.Count) + footerBlockNeeded;
+                double neededHeight = headerBlockHeight + itemRowHeights.Sum() + footerBlockNeeded;
                 double availableForOnePage = pageHeight - marginTop - bottomLimit;
 
                 if (neededHeight > availableForOnePage)
@@ -351,9 +472,10 @@ namespace Procure.Services.Export
             }
             else
             {
-                foreach (var item in prItems)
+                for (int itemPos = 0; itemPos < prItems.Count; itemPos++)
                 {
-                    double rowH = itemRowH;
+                    var item = prItems[itemPos];
+                    double rowH = itemRowHeights[itemPos];
 
                     // Check if current row exceeds printable space - skipped under auto-scale, which
                     // guarantees everything fits on the one page already started.
@@ -365,14 +487,16 @@ namespace Procure.Services.Export
 
                     DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
 
-                    DrawText(itemIndex.ToString(), colX[0], curY - 13, font: "F1", fontSize: 8, align: "center", width: slNoWidth);
+                    // Same single-line vertical center DrawCenteredBlock computes for a 1-line
+                    // block - shared here so the price cells line up with a wrapped 2-line
+                    // description instead of sitting fixed near the top of a taller row.
+                    double singleLineCenterY = curY - ((rowH - itemDescLineHeight) / 2.0) - (itemDescLineHeight * 0.75);
 
-                    var desc = item.ItemName;
-                    if (desc.Length > 36) desc = desc.Substring(0, 34) + "..";
-                    DrawText(desc, colX[1] + 4, curY - 13, font: "F1", fontSize: 7.5);
+                    DrawCenteredBlock(new List<string> { itemIndex.ToString() }, colX[0], curY, rowH, itemDescLineHeight, "F1", 8, slNoWidth);
+                    DrawCenteredBlock(itemDescLines[itemPos], colX[1] + 4, curY, rowH, itemDescLineHeight, "F1", 7.5, descWidth - 4, align: "left");
 
                     var qtyStr = $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}";
-                    DrawText(qtyStr, colX[2], curY - 13, font: "F1", fontSize: 7.5, align: "center", width: qtyWidth);
+                    DrawCenteredBlock(new List<string> { qtyStr }, colX[2], curY, rowH, itemDescLineHeight, "F1", 7.5, qtyWidth);
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;
                     bool rowLastPriceFromQuote = false;
@@ -388,11 +512,11 @@ namespace Procure.Services.Export
                         {
                             // Net of per-unit discount so qty x price reconciles with the totals.
                             var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
-                            DrawMoneyCell(colX[3 + i], colWidth, curY - 13, cur, netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
+                            DrawMoneyCell(colX[3 + i], colWidth, singleLineCenterY, cur, netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
                         }
                         else
                         {
-                            DrawText("-", colX[3 + i], curY - 13, font: "F1", fontSize: 8, align: "center", width: colWidth);
+                            DrawText("-", colX[3 + i], singleLineCenterY, font: "F1", fontSize: 8, align: "center", width: colWidth);
                         }
 
                         // First supplier in fixed order wins; last-wins made the printed
@@ -408,11 +532,11 @@ namespace Procure.Services.Export
 
                     if (rowLastPrice > 0)
                     {
-                        DrawMoneyCell(colX[3 + supplierCount], colWidth, curY - 13, defaultCur, rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
+                        DrawMoneyCell(colX[3 + supplierCount], colWidth, singleLineCenterY, defaultCur, rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
                     }
                     else
                     {
-                        DrawText("-", colX[3 + supplierCount], curY - 13, font: "F1", fontSize: 8, align: "center", width: colWidth);
+                        DrawText("-", colX[3 + supplierCount], singleLineCenterY, font: "F1", fontSize: 8, align: "center", width: colWidth);
                     }
 
                     curY -= rowH;
