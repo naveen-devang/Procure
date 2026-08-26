@@ -88,6 +88,11 @@ namespace Procure
                     // on tapping ANYWHERE - including a label's own blank trailing space in a
                     // Fill-width column - to expand or select, the label silently swallowed that
                     // click before it ever reached the row's own tap handler.
+                    //
+                    // This was suspected (wrongly) as the cause of the Edit PR crash and briefly
+                    // reverted - the real cause was a reentrant ObservableCollection mutation in
+                    // EditPrModal's TextChanged handlers (see PrListPageModel.Pr.cs / EditPrModal.xaml.cs),
+                    // now fixed there directly. Nothing here was ever at fault.
                     Microsoft.Maui.Handlers.LabelHandler.Mapper.AppendToMapping("SelectableLabelText", (handler, view) =>
                     {
                         if (view.Font.Family is "Segoe Fluent Icons" or Fonts.FluentUI.FontFamily) return;

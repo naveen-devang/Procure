@@ -140,8 +140,32 @@ namespace Procure.PageModels
             }
         }
 
+        private bool _isOpeningEditPrModal;
+
         [RelayCommand]
         public async Task OpenEditPrModalAsync(PurchaseRequisition pr)
+        {
+            // A second click before this reaches IsEditModalVisible = true (there's an await right
+            // below, so that window is real - IsEditModalVisible itself isn't set yet during it, so
+            // it can't be the guard) let two calls both populate EditingPrItems/EditingCustomValues
+            // around the same time. The modal's BindableLayout rebuilding its children while a
+            // previous rebuild was still enumerating them threw "Collection was modified" and took
+            // the whole process down with it - a plain managed exception, but one that crossed a
+            // WinRT dispatch boundary and surfaced as an unrecoverable native fault instead.
+            if (_isOpeningEditPrModal) return;
+            _isOpeningEditPrModal = true;
+
+            try
+            {
+                await OpenEditPrModalCoreAsync(pr);
+            }
+            finally
+            {
+                _isOpeningEditPrModal = false;
+            }
+        }
+
+        private async Task OpenEditPrModalCoreAsync(PurchaseRequisition pr)
         {
             var defs = await _customColumnRepo.GetAllDefinitionsAsync();
             CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(defs);
@@ -180,9 +204,13 @@ namespace Procure.PageModels
                 {
                     Id = i.Id,
                     PrId = i.PrId,
-                    ItemName = i.ItemName,
+                    // Stripped defensively - a merge/consolidation path apparently can leave an
+                    // embedded \n/\r/\t in one of these (see PR-2026-008). The modal's own
+                    // TextChanged handlers now guard on IsFocused so this alone would no longer
+                    // crash, but a name with a stray newline in it is bad data regardless of that.
+                    ItemName = StripControlChars(i.ItemName),
                     Quantity = i.Quantity,
-                    Unit = string.IsNullOrWhiteSpace(i.Unit) ? "pcs" : i.Unit,
+                    Unit = string.IsNullOrWhiteSpace(i.Unit) ? "pcs" : StripControlChars(i.Unit),
                     EstimatedUnitPrice = i.EstimatedUnitPrice,
                     Notes = i.Notes,
                     SortOrder = i.SortOrder
@@ -207,6 +235,9 @@ namespace Procure.PageModels
 
             IsEditModalVisible = true;
         }
+
+        private static string StripControlChars(string? value) =>
+            string.IsNullOrEmpty(value) ? string.Empty : value.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ").Trim();
 
         [RelayCommand]
         public async Task SavePrModalAsync()

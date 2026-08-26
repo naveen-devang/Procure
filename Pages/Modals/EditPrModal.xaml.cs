@@ -209,9 +209,10 @@ namespace Procure.Pages.Modals
         private void OnEditingItemNameTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return; // see IsFocused note below
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     ViewModel.HandleInlineItemPaste(item, e.NewTextValue, ViewModel.EditingPrItems);
                 }
@@ -221,21 +222,33 @@ namespace Procure.Pages.Modals
         private void OnEditingItemQuantityTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     ViewModel.HandleInlineQuantityPaste(item, e.NewTextValue, ViewModel.EditingPrItems);
                 }
             }
         }
 
+        // IsFocused guards all three handlers above: TextChanged fires for a value set
+        // programmatically by data binding just as it does for real typing (there is no built-in way
+        // to tell them apart - see Microsoft's own Entry docs), so without this guard, an item whose
+        // stored ItemName/Quantity/Unit already contained an embedded \n/\r/\t (as a "Consolidated
+        // Master Requisition" merge apparently produced for PR-2026-008) triggered this "paste"
+        // handling the instant BindableLayoutController.CreateChildren() bound that row's Entry -
+        // mutating EditingPrItems while CreateChildren() was still enumerating it, which threw
+        // "Collection was modified" from inside a native TextChanged callback and crashed the whole
+        // process instead of surfacing as a catchable .NET exception. A real paste can only happen
+        // while the Entry has focus; a binding-driven initial value is applied before anything does.
         private void OnEditingItemUnitTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.NewTextValue) || ViewModel == null) return;
+            if (sender is not Entry { IsFocused: true } entry) return;
             if (e.NewTextValue.Contains('\n') || e.NewTextValue.Contains('\r') || e.NewTextValue.Contains('\t'))
             {
-                if (sender is Entry entry && entry.BindingContext is PrItem item)
+                if (entry.BindingContext is PrItem item)
                 {
                     ViewModel.HandleInlineUnitPaste(item, e.NewTextValue, ViewModel.EditingPrItems);
                 }
