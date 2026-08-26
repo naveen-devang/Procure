@@ -91,6 +91,7 @@ namespace Procure
             // Database & Repositories
             builder.Services.AddSingleton<SqliteDatabase>();
             builder.Services.AddSingleton<ICustomColumnRepository, CustomColumnRepository>();
+            builder.Services.AddSingleton<ICallOffRepository, CallOffRepository>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
             // Services
@@ -115,6 +116,9 @@ namespace Procure
 
             builder.Services.AddSingleton<ManageColumnsPageModel>();
             builder.Services.AddSingleton<ManageColumnsPage>();
+
+            builder.Services.AddSingleton<CallOffPageModel>();
+            builder.Services.AddSingleton<CallOffPage>();
 
             builder.Services.AddSingleton<SettingsPageModel>();
             builder.Services.AddSingleton<SettingsPage>();

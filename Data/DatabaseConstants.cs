@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 4;
+        public const int SchemaVersion = 5;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -255,6 +255,15 @@ CREATE TABLE IF NOT EXISTS CustomFieldValue (
 );
 CREATE INDEX IF NOT EXISTS IX_CFV_PrId ON CustomFieldValue(PrId);
 CREATE INDEX IF NOT EXISTS IX_CFV_ColumnId ON CustomFieldValue(ColumnId);
+
+CREATE TABLE IF NOT EXISTS PoItemCallOff (
+    Id TEXT PRIMARY KEY,
+    PoItemId TEXT NOT NULL REFERENCES PurchaseOrderItem(Id) ON DELETE CASCADE,
+    CallOffDate TEXT NOT NULL,
+    Quantity REAL NOT NULL,
+    Note TEXT
+);
+CREATE INDEX IF NOT EXISTS IX_PoItemCallOff_PoItemId ON PoItemCallOff(PoItemId);
 ";
     }
 }

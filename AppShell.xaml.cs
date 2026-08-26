@@ -81,6 +81,8 @@ namespace Procure
             }
             else if (ColumnsContent.Content is null && target.Contains("columns", StringComparison.Ordinal))
                 ColumnsContent.Content = _services.GetRequiredService<ManageColumnsPage>();
+            else if (MaterialsContent.Content is null && target.Contains("materials", StringComparison.Ordinal))
+                MaterialsContent.Content = _services.GetRequiredService<CallOffPage>();
             else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
                 SettingsContent.Content = _services.GetRequiredService<SettingsPage>();
         }

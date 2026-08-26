@@ -142,7 +142,12 @@ namespace Procure.PageModels
                 for (int i = 0; i < pr.Rfqs.Count; i++)
                 {
                     var rfq = pr.Rfqs[i];
-                    var existingPo = pr.Pos?.FirstOrDefault(p => (p.LinkedRfqId.HasValue && p.LinkedRfqId.Value == rfq.Id) || (!string.IsNullOrWhiteSpace(p.Vendor) && !string.IsNullOrWhiteSpace(rfq.Vendor) && string.Equals(p.Vendor.Trim(), rfq.Vendor.Trim(), StringComparison.OrdinalIgnoreCase)));
+                    // Matched by LinkedRfqId only - every PO this wizard creates sets it (see
+                    // ApplySelectionToPo below). Matching on vendor name too used to mean any vendor
+                    // with one PO already raised could never get a second, separate PO from the same
+                    // PR, even with quantity still unallocated - vendor name alone doesn't mean "same
+                    // order".
+                    var existingPo = pr.Pos?.FirstOrDefault(p => p.LinkedRfqId.HasValue && p.LinkedRfqId.Value == rfq.Id);
 
                     PoRfqSelection selection;
                     if (existingPo != null)
@@ -523,6 +528,7 @@ namespace Procure.PageModels
                 }
 
                 TargetPrForPo.NotifyHierarchyChanged();
+                Procure.Utilities.PoChangeNotifier.NotifyChanged();
                 CloseAddPoModal();
             }
             catch (Exception ex)
@@ -645,6 +651,7 @@ namespace Procure.PageModels
                     parentPr.Pos.Remove(po);
                     parentPr.NotifyHierarchyChanged();
                 }
+                Procure.Utilities.PoChangeNotifier.NotifyChanged();
             }
             catch (Exception ex)
             {

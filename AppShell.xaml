@@ -60,6 +60,13 @@
         Route="columns" />
 
     <ShellContent
+        x:Name="MaterialsContent"
+        Title="Raw &amp; Packing"
+        ToolTipProperties.Text="Raw &amp; Packing Materials"
+        Icon="{StaticResource IconMaterials}"
+        Route="materials" />
+
+    <ShellContent
         x:Name="SettingsContent"
         Title="Settings"
         ToolTipProperties.Text="Settings"

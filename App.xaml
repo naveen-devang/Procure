@@ -75,6 +75,12 @@
                              FontFamily="{x:Static f:FluentUI.FontFamily}"
                              Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                              Size="{StaticResource IconSize}" />
+
+            <FontImageSource x:Key="IconMaterials"
+                             Glyph="{x:Static f:FluentUI.arrow_download_24_regular}"
+                             FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
