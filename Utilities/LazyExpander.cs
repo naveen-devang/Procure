@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Maui;
 using Microsoft.Maui.Controls;
 
 namespace Procure.Utilities
@@ -140,7 +141,9 @@ namespace Procure.Utilities
                 else
                 {
                     // Collapsed again before we got here - drop the placeholder.
+                    var placeholder = expander.Content;
                     expander.Content = null;
+                    DisconnectRecursively(placeholder);
                 }
             });
         }
@@ -181,7 +184,27 @@ namespace Procure.Utilities
         {
             if (!_contentBuilt) return;
             _contentBuilt = false;
+            var old = Content;
             Content = null;
+            DisconnectRecursively(old);
+        }
+
+        // .NET MAUI never calls DisconnectHandler() on its own when a view is detached (Content = null
+        // included) - that step is intentionally left to the app (see dotnet/maui issue #21809 and
+        // discussion #21918). Skipping it leaves every native WinUI control under the released content,
+        // and its ComWrappers/GCHandle native-interop bookkeeping, permanently rooted even though the
+        // managed Content looks empty - confirmed via gcdump on this exact panel.
+        private static void DisconnectRecursively(IView? view)
+        {
+            if (view is null) return;
+            if (view is IVisualTreeElement tree)
+            {
+                foreach (var child in tree.GetVisualChildren())
+                {
+                    if (child is IView childView) DisconnectRecursively(childView);
+                }
+            }
+            view.Handler?.DisconnectHandler();
         }
     }
 }
