@@ -27,11 +27,20 @@ namespace Procure.Services
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         private readonly ILogger<UpdateService>? _logger;
-        private UpdateManager? _manager;
+
+        // Built eagerly here, not lazily inside CheckForUpdatesAsync - IsInstalled/CurrentVersion
+        // are purely local reads (no network access), and SettingsPageModel reads
+        // CurrentVersionString once at construction, before a user ever clicks "Check for
+        // Updates". A lazily-created manager meant that first read always fell through to
+        // AppInfo.Current.VersionString (a stale build-time value, not the actual installed
+        // Velopack version), showing the wrong "Installed Version" until the first manual check.
+        private readonly UpdateManager _manager =
+            new(new GithubSource($"https://github.com/{Procure.AppConstants.GitHubRepository}", null, prerelease: false));
+
         private VelopackUpdateInfo? _pendingUpdate;
 
         public string CurrentVersionString =>
-            _manager?.IsInstalled == true && _manager.CurrentVersion != null
+            _manager.IsInstalled && _manager.CurrentVersion != null
                 ? _manager.CurrentVersion.ToString()
                 : AppInfo.Current.VersionString;
 
@@ -47,16 +56,6 @@ namespace Procure.Services
         public UpdateService(ILogger<UpdateService>? logger = null)
         {
             _logger = logger;
-        }
-
-        private UpdateManager GetManager(string repoOwnerAndName)
-        {
-            // Built lazily against the repo passed to CheckForUpdatesAsync (always
-            // AppConstants.GitHubRepository in practice) rather than at construction, since the
-            // interface never gave a constructor-time place to know it. The repo is public, so
-            // no access token is needed here.
-            var repoUrl = $"https://github.com/{repoOwnerAndName.Trim().Trim('/')}";
-            return _manager ??= new UpdateManager(new GithubSource(repoUrl, null, prerelease: false));
         }
 
         public async Task<UpdateInfo> CheckForUpdatesAsync(string repoOwnerAndName)
@@ -75,9 +74,7 @@ namespace Procure.Services
 
             try
             {
-                var manager = GetManager(repoOwnerAndName);
-
-                if (!manager.IsInstalled)
+                if (!_manager.IsInstalled)
                 {
                     // Running unpackaged (e.g. F5 in the debugger, or a manually copied publish
                     // folder) - Velopack has nothing to check against. Not an error, just nothing
@@ -86,7 +83,7 @@ namespace Procure.Services
                     return result;
                 }
 
-                _pendingUpdate = await manager.CheckForUpdatesAsync();
+                _pendingUpdate = await _manager.CheckForUpdatesAsync();
                 if (_pendingUpdate == null)
                 {
                     return result;
@@ -123,7 +120,7 @@ namespace Procure.Services
 
         public async Task<string> DownloadUpdateAsync(UpdateInfo update, IProgress<double>? progress = null, CancellationToken ct = default)
         {
-            if (_manager == null || _pendingUpdate == null)
+            if (_pendingUpdate == null)
             {
                 throw new InvalidOperationException("No pending update to download - call CheckForUpdatesAsync first.");
             }
@@ -139,7 +136,7 @@ namespace Procure.Services
 
         public bool LaunchInstaller(string installerPath)
         {
-            if (_manager == null || _pendingUpdate == null)
+            if (_pendingUpdate == null)
             {
                 _logger?.LogError("LaunchInstaller called with no pending Velopack update.");
                 return false;
