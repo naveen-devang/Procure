@@ -16,6 +16,11 @@ namespace Procure.WinUI
         /// </summary>
         public App()
         {
+            // Must run before anything else - this is what lets Velopack intercept
+            // install/update/uninstall command-line invocations on launch (e.g. the
+            // "apply this pending update and relaunch" hop after ApplyUpdatesAndRestart).
+            Velopack.VelopackApp.Build().Run();
+
             this.InitializeComponent();
         }
 

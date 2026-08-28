@@ -13,5 +13,10 @@ namespace Procure.Services
         Task<string> DownloadUpdateAsync(UpdateInfo update, IProgress<double>? progress = null, CancellationToken ct = default);
         bool LaunchInstaller(string installerPath);
         Task OpenReleaseInBrowserAsync(string releaseUrl);
+
+        // Independent of the Velopack-backed check above (which only looks at the *latest*
+        // available release) - this looks up the notes for whatever version is currently
+        // running, for the one-time "What's New" prompt shown right after an update lands.
+        Task<string?> GetReleaseNotesForVersionAsync(string repoOwnerAndName, string version);
     }
 }

@@ -1,0 +1,88 @@
+name: Release
+
+# Push a version tag (e.g. `git tag v1.4.0 && git push --tags`) and this handles the rest:
+# bump Windows App SDK if a newer stable version exists, publish, pack with Velopack, and
+# upload to GitHub Releases with notes generated from the commits since the last tag.
+# Everyone's already-installed app picks up the new release on its own next check.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0 # full history - needed to diff commits since the previous tag
+
+      - name: Bump Windows App SDK if a newer stable version exists
+        shell: pwsh
+        run: |
+          $csprojPath = "Procure.csproj"
+          $content = Get-Content $csprojPath -Raw
+          if ($content -notmatch 'Microsoft\.WindowsAppSDK"\s+Version="([\d\.]+)"') {
+            Write-Host "Could not find a pinned Microsoft.WindowsAppSDK version - skipping bump check."
+            exit 0
+          }
+          $current = $matches[1]
+
+          $versions = (Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk/index.json").versions
+          $latestStable = $versions | Where-Object { $_ -notmatch '-' } | Select-Object -Last 1
+
+          if ([version]$latestStable -gt [version]$current) {
+            Write-Host "Bumping Microsoft.WindowsAppSDK: $current -> $latestStable"
+            $updated = $content -replace [regex]::Escape("Microsoft.WindowsAppSDK`" Version=`"$current`""), "Microsoft.WindowsAppSDK`" Version=`"$latestStable`""
+            Set-Content -Path $csprojPath -Value $updated -NoNewline
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add $csprojPath
+            git commit -m "Bump Microsoft.WindowsAppSDK to $latestStable [automated]"
+            git push origin HEAD:main
+          } else {
+            Write-Host "Microsoft.WindowsAppSDK is already current ($current)."
+          }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish -f net10.0-windows10.0.19041.0 -c Release `
+            -p:RuntimeIdentifierOverride=win-x64 `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=true
+
+      - name: Generate release notes from commits since the previous tag
+        shell: pwsh
+        run: |
+          $currentTag = "${{ github.ref_name }}"
+          $prevTag = git describe --tags --abbrev=0 "$currentTag~1" 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $prevTag) {
+            git log --pretty=format:"- %s" | Out-File -FilePath notes.md -Encoding utf8
+          } else {
+            git log "$prevTag..$currentTag" --pretty=format:"- %s" | Out-File -FilePath notes.md -Encoding utf8
+          }
+          Get-Content notes.md
+
+      - name: Pack with Velopack
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          vpk pack -u Procure -v $version -e Procure.exe `
+            -p bin\Release\net10.0-windows10.0.19041.0\win-x64\publish `
+            --releaseNotes notes.md
+
+      - name: Upload to GitHub Releases
+        shell: pwsh
+        run: |
+          vpk upload github --repoUrl https://github.com/${{ github.repository }} `
+            --publish --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"

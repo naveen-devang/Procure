@@ -28,6 +28,10 @@ namespace Procure
                 _ = CheckForUpdatesInBackgroundAsync();
             }
 
+            // One-time "What's New" prompt right after an update lands and relaunches the app -
+            // independent of the check above, which only ever looks at *future* releases.
+            _ = ShowWhatsNewIfJustUpdatedAsync();
+
 #if DEBUG
             // Opt-in only: PROCURE_SELFCHECK=1. One environment read on a Debug launch, nothing in Release.
             if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
@@ -73,6 +77,47 @@ namespace Procure
             catch
             {
                 // Silently ignore background check failures on startup
+            }
+        }
+
+        private const string LastWhatsNewVersionShownKey = "LastWhatsNewVersionShown";
+
+        private async Task ShowWhatsNewIfJustUpdatedAsync()
+        {
+            try
+            {
+                await Task.Delay(1500); // Let the window/shell finish standing up first
+                var updateService = _services.GetRequiredService<IUpdateService>();
+                var currentVersion = updateService.CurrentVersionString;
+
+                var lastShown = Microsoft.Maui.Storage.Preferences.Default.Get(LastWhatsNewVersionShownKey, string.Empty);
+                if (string.IsNullOrEmpty(lastShown))
+                {
+                    // First run ever with this preference - nothing to announce, just start
+                    // tracking from here so the *next* real update shows its notes.
+                    Microsoft.Maui.Storage.Preferences.Default.Set(LastWhatsNewVersionShownKey, currentVersion);
+                    return;
+                }
+
+                if (lastShown == currentVersion) return;
+
+                var notes = string.IsNullOrWhiteSpace(AppConstants.GitHubRepository)
+                    ? null
+                    : await updateService.GetReleaseNotesForVersionAsync(AppConstants.GitHubRepository, currentVersion);
+
+                Microsoft.Maui.Storage.Preferences.Default.Set(LastWhatsNewVersionShownKey, currentVersion);
+
+                if (Current?.Windows.Count > 0 && Current.Windows[0].Page is Shell shell)
+                {
+                    var message = string.IsNullOrWhiteSpace(notes)
+                        ? "Procure has been updated. Check Settings for release details."
+                        : notes;
+                    await shell.DisplayAlertAsync($"What's New in v{currentVersion}", message, "OK");
+                }
+            }
+            catch
+            {
+                // Silently ignore - this is a nice-to-have, never worth blocking startup over.
             }
         }
 

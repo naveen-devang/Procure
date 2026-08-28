@@ -1,7 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -9,30 +6,40 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Storage;
-using Procure.Models;
+using Velopack;
+using Velopack.Sources;
+using UpdateInfo = Procure.Models.UpdateInfo;
+using VelopackUpdateInfo = Velopack.UpdateInfo;
 
 namespace Procure.Services
 {
+    // Backed by Velopack instead of hand-rolled GitHub API calls + ShellExecute. The old
+    // implementation could check for and download a release, but had no way to actually apply
+    // it - a running Windows app can't overwrite its own files, and "launch whatever got
+    // downloaded" only works if that happens to be a real installer. Velopack's
+    // ApplyUpdatesAndRestart does that safely (exit, swap files, relaunch), and its GithubSource
+    // reads the same public GitHub Releases feed this always pointed at.
+    //
+    // IUpdateService's shape is unchanged on purpose, so PageModels/SettingsPageModel.cs and its
+    // Settings UI didn't need to change at all - only what happens underneath each call did.
     public class UpdateService : IUpdateService
     {
-        private static readonly HttpClient _httpClient = new()
-        {
-            Timeout = TimeSpan.FromSeconds(30)
-        };
+        private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         private readonly ILogger<UpdateService>? _logger;
+        private UpdateManager? _manager;
+        private VelopackUpdateInfo? _pendingUpdate;
 
-        public string CurrentVersionString => AppInfo.Current.VersionString;
+        public string CurrentVersionString =>
+            _manager?.IsInstalled == true && _manager.CurrentVersion != null
+                ? _manager.CurrentVersion.ToString()
+                : AppInfo.Current.VersionString;
 
         public Version CurrentVersion
         {
             get
             {
-                if (Version.TryParse(AppInfo.Current.VersionString, out var v))
-                {
-                    return v;
-                }
+                if (Version.TryParse(CurrentVersionString, out var v)) return v;
                 return new Version(1, 0, 0);
             }
         }
@@ -42,9 +49,19 @@ namespace Procure.Services
             _logger = logger;
         }
 
+        private UpdateManager GetManager(string repoOwnerAndName)
+        {
+            // Built lazily against the repo passed to CheckForUpdatesAsync (always
+            // AppConstants.GitHubRepository in practice) rather than at construction, since the
+            // interface never gave a constructor-time place to know it. The repo is public, so
+            // no access token is needed here.
+            var repoUrl = $"https://github.com/{repoOwnerAndName.Trim().Trim('/')}";
+            return _manager ??= new UpdateManager(new GithubSource(repoUrl, null, prerelease: false));
+        }
+
         public async Task<UpdateInfo> CheckForUpdatesAsync(string repoOwnerAndName)
         {
-            var updateInfo = new UpdateInfo
+            var result = new UpdateInfo
             {
                 CurrentVersionString = CurrentVersionString,
                 IsUpdateAvailable = false
@@ -53,170 +70,113 @@ namespace Procure.Services
             if (string.IsNullOrWhiteSpace(repoOwnerAndName) || !repoOwnerAndName.Contains('/'))
             {
                 _logger?.LogWarning("Invalid repository name format for update check: {Repo}", repoOwnerAndName);
-                return updateInfo;
+                return result;
             }
-
-            var cleanRepo = repoOwnerAndName.Trim().Trim('/');
-            var url = $"https://api.github.com/repos/{cleanRepo}/releases/latest";
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Procure-App", CurrentVersionString));
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
             try
             {
-                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                var manager = GetManager(repoOwnerAndName);
 
-                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                if (!manager.IsInstalled)
                 {
-                    _logger?.LogInformation("No GitHub releases found for repository: {Repo}", cleanRepo);
-                    return updateInfo;
+                    // Running unpackaged (e.g. F5 in the debugger, or a manually copied publish
+                    // folder) - Velopack has nothing to check against. Not an error, just nothing
+                    // to report.
+                    _logger?.LogInformation("Velopack reports app is not installed - skipping update check.");
+                    return result;
                 }
 
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                var tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
-                var title = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
-                var body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
-                var htmlUrl = root.TryGetProperty("html_url", out var htmlProp) ? htmlProp.GetString() ?? "" : "";
-
-                DateTime? publishedAt = null;
-                if (root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt))
+                _pendingUpdate = await manager.CheckForUpdatesAsync();
+                if (_pendingUpdate == null)
                 {
-                    publishedAt = dt;
+                    return result;
                 }
 
-                updateInfo.TagName = tagName;
-                updateInfo.Title = string.IsNullOrWhiteSpace(title) ? tagName : title;
-                updateInfo.ReleaseNotes = body;
-                updateInfo.ReleaseUrl = htmlUrl;
-                updateInfo.PublishedAt = publishedAt;
-
-                var cleanTag = tagName.TrimStart('v', 'V').Trim();
-                updateInfo.LatestVersionString = cleanTag;
-
-                if (TryParseSemanticVersion(cleanTag, out var latestVer))
+                var asset = _pendingUpdate.TargetFullRelease;
+                result.TagName = $"v{asset.Version}";
+                result.Title = result.TagName;
+                result.ReleaseNotes = asset.NotesMarkdown ?? string.Empty;
+                result.ReleaseUrl = $"https://github.com/{repoOwnerAndName.Trim().Trim('/')}/releases/tag/{result.TagName}";
+                result.LatestVersionString = asset.Version.ToString();
+                result.AssetName = asset.FileName;
+                result.SizeBytes = asset.Size;
+                result.IsUpdateAvailable = true;
+                if (Version.TryParse(asset.Version.ToString().Split('-')[0], out var v))
                 {
-                    updateInfo.Version = latestVer;
-                    updateInfo.IsUpdateAvailable = latestVer > CurrentVersion;
-                }
-                else
-                {
-                    updateInfo.IsUpdateAvailable = !string.IsNullOrWhiteSpace(cleanTag) &&
-                                                   !cleanTag.Equals(CurrentVersionString, StringComparison.OrdinalIgnoreCase);
+                    result.Version = v;
                 }
 
-                // Locate installer asset if available (.exe, .msix, .msi, .zip)
-                if (root.TryGetProperty("assets", out var assetsProp) && assetsProp.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var asset in assetsProp.EnumerateArray())
-                    {
-                        var assetName = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                        var downloadUrl = asset.TryGetProperty("browser_download_url", out var d) ? d.GetString() ?? "" : "";
-                        var size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
-
-                        if (assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-                            assetName.EndsWith(".msix", StringComparison.OrdinalIgnoreCase) ||
-                            assetName.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
-                        {
-                            updateInfo.AssetName = assetName;
-                            updateInfo.DownloadUrl = downloadUrl;
-                            updateInfo.SizeBytes = size;
-                            break; // Priority to native installers
-                        }
-
-                        if (string.IsNullOrEmpty(updateInfo.DownloadUrl) &&
-                            assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                        {
-                            updateInfo.AssetName = assetName;
-                            updateInfo.DownloadUrl = downloadUrl;
-                            updateInfo.SizeBytes = size;
-                        }
-                    }
-                }
-
-                return updateInfo;
+                return result;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to check for GitHub updates on {Repo}", cleanRepo);
+                _logger?.LogError(ex, "Failed to check for updates on {Repo}", repoOwnerAndName);
                 throw;
             }
         }
 
         public async Task<string> DownloadUpdateAsync(UpdateInfo update, IProgress<double>? progress = null, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(update.DownloadUrl))
+            if (_manager == null || _pendingUpdate == null)
             {
-                throw new InvalidOperationException("No download URL available for this release asset.");
+                throw new InvalidOperationException("No pending update to download - call CheckForUpdatesAsync first.");
             }
 
-            var tempDir = FileSystem.CacheDirectory;
-            if (!Directory.Exists(tempDir))
-            {
-                Directory.CreateDirectory(tempDir);
-            }
-
-            var fileName = !string.IsNullOrWhiteSpace(update.AssetName)
-                ? update.AssetName
-                : $"Procure-Update-{update.TagName}.exe";
-
-            var destinationPath = Path.Combine(tempDir, fileName);
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, update.DownloadUrl);
-            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Procure-App", CurrentVersionString));
-
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? update.SizeBytes;
-
-            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-
-            var buffer = new byte[81920];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
-            {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                totalRead += bytesRead;
-
-                if (totalBytes > 0 && progress != null)
-                {
-                    var percentage = (double)totalRead / totalBytes;
-                    progress.Report(percentage);
-                }
-            }
-
+            await _manager.DownloadUpdatesAsync(_pendingUpdate, p => progress?.Report(p / 100.0), ct);
             progress?.Report(1.0);
-            return destinationPath;
+
+            // Velopack tracks the downloaded package itself; there's no installer file path for
+            // the caller to do anything with. This return value only exists so LaunchInstaller
+            // (below) has a non-null argument to receive, per the unchanged interface shape.
+            return "velopack-update-ready";
         }
 
         public bool LaunchInstaller(string installerPath)
         {
+            if (_manager == null || _pendingUpdate == null)
+            {
+                _logger?.LogError("LaunchInstaller called with no pending Velopack update.");
+                return false;
+            }
+
             try
             {
-                if (!File.Exists(installerPath)) return false;
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = installerPath,
-                    UseShellExecute = true
-                };
-
-                Process.Start(psi);
+                // Exits the app, swaps in the new files, and relaunches - the actual "install"
+                // step the old ShellExecute-based version never had.
+                _manager.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to launch installer process: {Path}", installerPath);
+                _logger?.LogError(ex, "Failed to apply Velopack update.");
                 return false;
+            }
+        }
+
+        public async Task<string?> GetReleaseNotesForVersionAsync(string repoOwnerAndName, string version)
+        {
+            if (string.IsNullOrWhiteSpace(repoOwnerAndName) || string.IsNullOrWhiteSpace(version))
+                return null;
+
+            var tag = version.StartsWith('v') ? version : $"v{version}";
+            var url = $"https://api.github.com/repos/{repoOwnerAndName.Trim().Trim('/')}/releases/tags/{tag}";
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Procure-App", version));
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+
+                using var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return null;
+
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                return doc.RootElement.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() : null;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to fetch release notes for {Version}", version);
+                return null;
             }
         }
 
@@ -231,35 +191,6 @@ namespace Procure.Services
             {
                 _logger?.LogError(ex, "Failed to open release URL in browser: {Url}", releaseUrl);
             }
-        }
-
-        private static bool TryParseSemanticVersion(string input, out Version version)
-        {
-            version = new Version(1, 0, 0);
-            if (string.IsNullOrWhiteSpace(input)) return false;
-
-            var clean = input.Split('-')[0].Trim(); // Remove prerelease tags like -beta
-            var parts = clean.Split('.');
-
-            if (parts.Length == 1 && int.TryParse(parts[0], out var major))
-            {
-                version = new Version(major, 0, 0);
-                return true;
-            }
-            if (parts.Length == 2 && int.TryParse(parts[0], out major) && int.TryParse(parts[1], out var minor))
-            {
-                version = new Version(major, minor, 0);
-                return true;
-            }
-
-            if (Version.TryParse(clean, out var parsedVersion) && parsedVersion != null)
-            {
-                version = parsedVersion;
-                return true;
-            }
-
-            version = new Version(1, 0, 0);
-            return false;
         }
     }
 }
