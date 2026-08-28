@@ -39,10 +39,18 @@ namespace Procure.Services
 
         private VelopackUpdateInfo? _pendingUpdate;
 
+        // AppInfo.Current.VersionString is not a fallback worth showing: it reads
+        // ApplicationDisplayVersion/ApplicationVersion from Procure.csproj, which MAUI's build
+        // bakes into the assembly regardless of what's actually running - they're scaffold
+        // defaults that were never meant to track real releases, and Velopack's own version (set
+        // per-release via `vpk pack -v`) doesn't come from them at all. Showing that string here
+        // looks like a real version number but means nothing, which is worse than admitting there
+        // isn't a real installed version to report (true for any run that isn't through a
+        // Velopack-managed install - a debug launch, or the raw publish folder's exe).
         public string CurrentVersionString =>
             _manager.IsInstalled && _manager.CurrentVersion != null
                 ? _manager.CurrentVersion.ToString()
-                : AppInfo.Current.VersionString;
+                : "Dev build";
 
         public Version CurrentVersion
         {
