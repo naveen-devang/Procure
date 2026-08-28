@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -52,8 +52,6 @@ namespace Procure.PageModels
         /// the window is evicted from memory, so the ids are the record and PurchaseRequisition.IsSelected
         /// is just the checkbox binding, restored from here whenever a page loads.</summary>
         private readonly HashSet<Guid> _selectedIds = new();
-
-        private CancellationTokenSource? _searchDebounce;
 
         [ObservableProperty]
         public partial ObservableCollection<PurchaseRequisition> FilteredPrs { get; set; } = new();
@@ -189,9 +187,6 @@ namespace Procure.PageModels
             {
                 Application.Current.RequestedThemeChanged -= OnAppRequestedThemeChanged;
             }
-            _searchDebounce?.Cancel();
-            _searchDebounce?.Dispose();
-            _searchDebounce = null;
         }
 
         private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
@@ -431,20 +426,20 @@ namespace Procure.PageModels
             return merged;
         }
 
+        private int _searchGeneration;
+
         partial void OnSearchTextChanged(string value)
         {
-            // Debounce search — cancel any pending filter and wait 300ms
-            // to avoid re-filtering on every single keystroke
-            _searchDebounce?.Cancel();
-            _searchDebounce?.Dispose();
-            _searchDebounce = new CancellationTokenSource();
-            var token = _searchDebounce.Token;
-
-            Task.Delay(300, token).ContinueWith(_ =>
-            {
-                if (!token.IsCancellationRequested)
-                    MainThread.BeginInvokeOnMainThread(() => ApplyFilters(true));
-            }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+            // Debounce - re-filtering on every keystroke re-queries and rebuilds the board. Same
+            // generation-counter idiom as ShowToast above and LazyExpander: a superseded pass is
+            // retired by the counter, so there is no CancellationTokenSource to allocate per
+            // keystroke and the callback already runs on the UI thread with nothing to marshal back.
+            var generation = ++_searchGeneration;
+            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+                {
+                    if (generation == _searchGeneration) ApplyFilters(true);
+                });
         }
 
         partial void OnSelectedStatusFilterChanged(string value) => ApplyFilters(true);
@@ -485,6 +480,10 @@ namespace Procure.PageModels
 
         // Bumped on every load so a page that arrives after a newer one is discarded.
         private int _pageGeneration;
+
+        /// <summary>Test seam for BoardMemorySelfCheck: counts board reload passes. Only ApplyFilters
+        /// and the Refresh button bump this, so it is exactly what the search debounce collapses.</summary>
+        internal int ReloadPassesForTest => _pageGeneration;
         private bool _loadingMore;
         private bool _loadMorePending;
         private int _lastVisibleIndex;

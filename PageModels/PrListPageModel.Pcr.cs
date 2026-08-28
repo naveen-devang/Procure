@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -459,6 +459,20 @@ namespace Procure.PageModels
             ExportRfqSelections.Clear();
             IsExportPcrModalVisible = false;
             ExportTargetPr = null;
+            ReleasePcrPreview();
+        }
+
+        /// <summary>Drops the rendered preview's memory: one LOH-sized PNG per page, the PDF bytes,
+        /// and the PR graph they were rendered from. Called from every path that dismisses the export
+        /// modal, because Back-then-close reached neither ClosePcrPreview nor a regenerate and left
+        /// all of it stranded on this singleton for the rest of the session.</summary>
+        private void ReleasePcrPreview()
+        {
+            PcrPreviewPages.Clear();
+            PcrPreviewCurrentPage = null;
+            _pcrPreviewBytes = null;
+            _pcrPreviewPr = null;
+            _pcrPreviewRfqs = null;
         }
 
         // The modal promises "This is saved for future exports" — previously a PR without a PCR
@@ -782,16 +796,11 @@ namespace Procure.PageModels
         public void ClosePcrPreview()
         {
             IsPcrPreviewVisible = false;
-            PcrPreviewPages.Clear();
-            PcrPreviewCurrentPage = null;
             PcrPreviewPageIndex = 0;
             PcrPreviewZoom = 1.0;
             PcrPreviewPanX = 0;
             PcrPreviewPanY = 0;
             IsPcrPagerVisible = false;
-            _pcrPreviewBytes = null;
-            _pcrPreviewPr = null;
-            _pcrPreviewRfqs = null;
             PcrDoubleSided = false;
             PcrPageRangeText = string.Empty;
             PcrShrinkToFit = false;

@@ -41,7 +41,7 @@ namespace Procure.Services.Export
                 });
 
                 pageStream.Seek(0);
-                var reader = new DataReader(pageStream.GetInputStreamAt(0));
+                using var reader = new DataReader(pageStream.GetInputStreamAt(0));
                 await reader.LoadAsync((uint)pageStream.Size);
                 var bytes = new byte[pageStream.Size];
                 reader.ReadBytes(bytes);

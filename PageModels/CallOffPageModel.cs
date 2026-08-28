@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -132,7 +132,21 @@ namespace Procure.PageModels
             }
         }
 
-        partial void OnSearchTextChanged(string value) => RebuildGroups();
+        private int _searchGeneration;
+
+        // Debounce, matching the PR board. Every keystroke used to re-filter every line, re-group
+        // them, allocate an ObservableCollection per group and then replace Groups outright - which
+        // rebuilds the whole CollectionView. Generation counter rather than a CancellationTokenSource:
+        // this already runs on the UI thread, so a superseded pass just fails the check and returns.
+        partial void OnSearchTextChanged(string value)
+        {
+            var generation = ++_searchGeneration;
+            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+                {
+                    if (generation == _searchGeneration) RebuildGroups();
+                });
+        }
 
         // Lowest balance % first (3B): the lines most behind on delivery surface at the top,
         // same call as the earlier design pass. Search matches material, vendor, or PO number,
