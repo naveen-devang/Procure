@@ -220,7 +220,7 @@
                             </VerticalStackLayout>
                             <Switch Grid.Column="1"
                                     IsToggled="{Binding IsSidebarCompact}"
-                                    OnColor="{DynamicResource Primary}"
+                                    OnColor="{DynamicResource PrimaryPastelFill}"
                                     VerticalOptions="Center" />
                         </Grid>
 
@@ -233,7 +233,7 @@
                             </VerticalStackLayout>
                             <Switch Grid.Column="1"
                                     IsToggled="{Binding AutoCollapseSidebarOnNarrow}"
-                                    OnColor="{DynamicResource Primary}"
+                                    OnColor="{DynamicResource PrimaryPastelFill}"
                                     VerticalOptions="Center" />
                         </Grid>
 
@@ -246,7 +246,7 @@
                             </VerticalStackLayout>
                             <Switch Grid.Column="1"
                                     IsToggled="{Binding IsRawPackingTabEnabled}"
-                                    OnColor="{DynamicResource Primary}"
+                                    OnColor="{DynamicResource PrimaryPastelFill}"
                                     VerticalOptions="Center" />
                         </Grid>
 

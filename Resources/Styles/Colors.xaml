@@ -5,6 +5,7 @@
 
     <!-- Windows 11 Fluent 2 Design System Color Tokens -->
     <Color x:Key="Primary">#0078D4</Color>
+    <Color x:Key="PrimaryPastelFill">#B3D9F5</Color>
     <Color x:Key="PrimaryDark">#60CDFF</Color>
     <Color x:Key="PrimaryDarkText">#001C38</Color>
     <Color x:Key="Secondary">#2B2B2B</Color>

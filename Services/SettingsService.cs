@@ -287,7 +287,16 @@ namespace Procure.Services
             var palette = PastelPalettes.FirstOrDefault(p => p.Id.Equals(accentId, StringComparison.OrdinalIgnoreCase))
                           ?? PastelPalettes[0];
 
+            // LightColor/DarkColor are tuned for text/border contrast against a plain
+            // background, so they read as medium-saturated rather than pastel - fine for
+            // small text, but a large solid fill (a toggle's track) in that same color looks
+            // noticeably darker/more saturated than the picker's own soft chip look. This is
+            // a softened variant for exactly those large-fill spots (see Switch.OnColor
+            // bindings in SettingsPage.xaml) without touching the contrast-tuned original.
+            var pastelFill = palette.LightColor.WithSaturation(palette.LightColor.GetSaturation() * 0.55f).WithLuminosity(0.78f);
+
             Application.Current.Resources["Primary"] = palette.LightColor;
+            Application.Current.Resources["PrimaryPastelFill"] = pastelFill;
             Application.Current.Resources["PrimaryDark"] = palette.DarkColor;
             Application.Current.Resources["SecondaryDarkText"] = palette.DarkColor;
             Application.Current.Resources["FluentPrimaryBg"] = palette.BgColor;
@@ -298,6 +307,7 @@ namespace Procure.Services
             foreach (var dict in Application.Current.Resources.MergedDictionaries)
             {
                 dict["Primary"] = palette.LightColor;
+                dict["PrimaryPastelFill"] = pastelFill;
                 dict["PrimaryDark"] = palette.DarkColor;
                 dict["SecondaryDarkText"] = palette.DarkColor;
                 dict["FluentPrimaryBg"] = palette.BgColor;
