@@ -84,8 +84,12 @@ jobs:
       - name: Upload to GitHub Releases
         shell: pwsh
         run: |
-          # vpk uploads everything in the output dir, including the legacy Squirrel-compat
-          # "RELEASES" file (no client here uses it) - drop it so it doesn't show up as a release asset.
-          Remove-Item -Path Releases\RELEASES -ErrorAction SilentlyContinue
           vpk upload github --repoUrl https://github.com/${{ github.repository }} `
             --publish --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"
+
+          # vpk always uploads a legacy Squirrel-compat "RELEASES" file itself (not read from
+          # disk, so deleting it beforehand does nothing) - no client here uses it, strip it
+          # from the published release afterward instead.
+          gh release delete-asset "${{ github.ref_name }}" RELEASES -y --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
