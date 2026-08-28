@@ -45,6 +45,7 @@ namespace Procure
             if (Environment.GetEnvironmentVariable("PROCURE_UPDATE_SELFCHECK") == "1")
             {
                 Utilities.UpdateCheckSchedulerSelfCheck.Run();
+                Utilities.UpdateStateStoreSelfCheck.Run();
             }
 #endif
         }
@@ -52,13 +53,12 @@ namespace Procure
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
             => Procure.Utilities.ThemeHelper.Invalidate();
 
-        private const string LastUpdateCheckUtcKey = "LastUpdateCheckUtc";
-
         // No permission asked, no popup: checks on launch and at least once every 24h for as long
         // as the app stays open (UpdateCheckScheduler.ShouldCheckNow is the gate, persisted across
-        // launches via Preferences so restarting the app daily still only checks once a day rather
-        // than once per launch). Finding an update downloads it immediately in the background: the
-        // only thing the user ever sees is AppShell's sidebar card, and only once the download is
+        // launches via UpdateStateStore - see its own comment for why that's a plain file and not
+        // Preferences - so restarting the app daily still only checks once a day rather than once
+        // per launch). Finding an update downloads it immediately in the background: the only
+        // thing the user ever sees is AppShell's sidebar card, and only once the download is
         // actually done and there's something to restart into.
         private async Task CheckForUpdatesInBackgroundAsync()
         {
@@ -70,12 +70,12 @@ namespace Procure
                 {
                     if (!string.IsNullOrWhiteSpace(AppConstants.GitHubRepository))
                     {
-                        var lastCheck = Microsoft.Maui.Storage.Preferences.Default.Get(LastUpdateCheckUtcKey, DateTime.MinValue);
+                        var lastCheck = Utilities.UpdateStateStore.GetLastUpdateCheckUtc();
                         if (Utilities.UpdateCheckScheduler.ShouldCheckNow(lastCheck, DateTime.UtcNow))
                         {
                             var updateService = _services.GetRequiredService<IUpdateService>();
                             var update = await updateService.CheckForUpdatesAsync(AppConstants.GitHubRepository);
-                            Microsoft.Maui.Storage.Preferences.Default.Set(LastUpdateCheckUtcKey, DateTime.UtcNow);
+                            Utilities.UpdateStateStore.SetLastUpdateCheckUtc(DateTime.UtcNow);
 
                             if (update.IsUpdateAvailable)
                             {
@@ -103,8 +103,6 @@ namespace Procure
             }
         }
 
-        private const string LastWhatsNewVersionShownKey = "LastWhatsNewVersionShown";
-
         private async Task ShowWhatsNewIfJustUpdatedAsync()
         {
             try
@@ -113,12 +111,12 @@ namespace Procure
                 var updateService = _services.GetRequiredService<IUpdateService>();
                 var currentVersion = updateService.CurrentVersionString;
 
-                var lastShown = Microsoft.Maui.Storage.Preferences.Default.Get(LastWhatsNewVersionShownKey, string.Empty);
+                var lastShown = Utilities.UpdateStateStore.GetLastWhatsNewVersionShown();
                 if (string.IsNullOrEmpty(lastShown))
                 {
-                    // First run ever with this preference - nothing to announce, just start
-                    // tracking from here so the *next* real update shows its notes.
-                    Microsoft.Maui.Storage.Preferences.Default.Set(LastWhatsNewVersionShownKey, currentVersion);
+                    // First run ever with this marker - nothing to announce, just start tracking
+                    // from here so the *next* real update shows its notes.
+                    Utilities.UpdateStateStore.SetLastWhatsNewVersionShown(currentVersion);
                     return;
                 }
 
@@ -128,7 +126,7 @@ namespace Procure
                     ? null
                     : await updateService.GetReleaseNotesForVersionAsync(AppConstants.GitHubRepository, currentVersion);
 
-                Microsoft.Maui.Storage.Preferences.Default.Set(LastWhatsNewVersionShownKey, currentVersion);
+                Utilities.UpdateStateStore.SetLastWhatsNewVersionShown(currentVersion);
 
                 if (Current?.Windows.Count > 0 && Current.Windows[0].Page is Shell shell)
                 {
