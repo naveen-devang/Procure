@@ -24,6 +24,9 @@
             <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
             <converters:StringEqualsToBorderWidthConverter x:Key="StringEqualsToBorderWidthConverter" />
             <converters:BoolToInvertedBoolConverter x:Key="BoolToInvertedBoolConverter" />
+            <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
+            <converters:IntGreaterThanZeroConverter x:Key="IntGreaterThanZeroConverter" />
+            <converters:ReferenceEqualsConverter x:Key="ReferenceEqualsConverter" />
             <converters:BoolToFilterChipBgConverter x:Key="BoolToFilterChipBgConverter" />
             <converters:BoolToFilterChipStrokeConverter x:Key="BoolToFilterChipStrokeConverter" />
             <converters:BoolToFilterChipTextConverter x:Key="BoolToFilterChipTextConverter" />

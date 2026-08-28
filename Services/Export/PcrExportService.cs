@@ -120,9 +120,10 @@ namespace Procure.Services.Export
                 // from the first selected page's own pixel dimensions (at the same DPI the
                 // rasterizer used) gives an accurate page description without this method needing
                 // to know about PcrPdfOptions at all.
+                bool isLandscapeJob;
                 using (var firstImage = System.Drawing.Image.FromStream(new MemoryStream(allPages[selectedPages[0]])))
                 {
-                    bool isLandscape = firstImage.Width > firstImage.Height;
+                    bool isLandscape = isLandscapeJob = firstImage.Width > firstImage.Height;
                     double widthIn = firstImage.Width / PcrPdfRasterizer.DefaultDpi;
                     double heightIn = firstImage.Height / PcrPdfRasterizer.DefaultDpi;
 
@@ -145,8 +146,13 @@ namespace Procure.Services.Export
                 var canDuplex = false;
                 try { canDuplex = printDocument.PrinterSettings.CanDuplex; } catch { /* treat as no duplex support */ }
 
+                // Vertical/Horizontal here mean flip-on-long-edge / flip-on-short-edge of the
+                // physical sheet, not "portrait/landscape" content - a landscape job (this sheet's
+                // default) needs the short-edge flip to come out right-side-up on the back; using
+                // the long-edge flip unconditionally left double-sided landscape printouts upside
+                // down on every other page.
                 printDocument.PrinterSettings.Duplex = doubleSided && canDuplex
-                    ? System.Drawing.Printing.Duplex.Vertical
+                    ? (isLandscapeJob ? System.Drawing.Printing.Duplex.Horizontal : System.Drawing.Printing.Duplex.Vertical)
                     : System.Drawing.Printing.Duplex.Simplex;
 
                 var cursor = 0;
@@ -156,8 +162,12 @@ namespace Procure.Services.Export
 
                     // Fit the rasterized page into the printable area ourselves, preserving aspect
                     // ratio, so the printed sheet matches the on-screen preview instead of whatever
-                    // scaling a printer driver's own dialog would otherwise apply.
-                    var bounds = e.MarginBounds;
+                    // scaling a printer driver's own dialog would otherwise apply. PageBounds (the
+                    // full physical sheet), not MarginBounds - the bitmap already has its own margin
+                    // preset (Normal/Narrow/Wide) baked in from PcrPdfExporter, so fitting it inside
+                    // MarginBounds as well stacked a second margin on top and threw off both the
+                    // scale and the position versus the preview/PDF.
+                    var bounds = e.PageBounds;
                     var scale = Math.Min((double)bounds.Width / image.Width, (double)bounds.Height / image.Height);
                     var width = (int)(image.Width * scale);
                     var height = (int)(image.Height * scale);

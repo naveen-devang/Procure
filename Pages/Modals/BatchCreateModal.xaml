@@ -25,17 +25,18 @@
                 <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
             </Border.Shadow>
 
-            <!-- Shared defaults stay pinned; the PR rows live in a virtualizing CollectionView in
-                 the star row. The old ScrollView realized every pasted row (50 PRs x ~30 controls)
-                 and re-measured all of them on every keystroke — that was the typing lag here. -->
+            <!-- Master-detail: a lightweight list of PRs on the left (visible once there's more
+                 than one row), a full form for whichever row is selected on the right. Only the
+                 selected row's fields ever exist in the visual tree, so this is lighter than the
+                 old one-full-card-per-row layout even before counting virtualization. -->
             <Grid RowDefinitions="Auto, Auto, Auto, *, Auto" RowSpacing="16">
                 <!-- Dialog Header -->
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" VerticalOptions="Center">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
-                        <Label Text="Bulk Create Purchase Requisitions"
+                        <Label Text="{Binding ModalTitle}"
                                FontFamily="SegoeSemibold" FontSize="18"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                        <Label Text="Quickly create multiple requisitions at once with shared tags, requestor, and customizable line items."
+                        <Label Text="{Binding ModalSubtitle}"
                                FontSize="12"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
@@ -45,318 +46,312 @@
                             HeightRequest="30" WidthRequest="30" Padding="0" />
                 </Grid>
 
-                <!-- Section A: Shared Defaults & Tags -->
+                <!-- New Row Defaults - pre-fills rows added via "+ Add Row" and fills in whatever
+                     a pasted Excel row doesn't specify. It never touches a row that already
+                     exists, unlike the old "Apply Defaults to All Rows" button it replaces -
+                     that's what made a hand-edited row's Plant/Type silently revert. -->
                 <Border Grid.Row="1" StrokeThickness="1"
-                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
-                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
-                                Padding="16">
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="8" />
-                            </Border.StrokeShape>
-                            <VerticalStackLayout Spacing="12">
-                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
-                                    <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
-                                        <Label Text="&#xE71E;"
-                                               FontFamily="Segoe Fluent Icons"
-                                               FontSize="14"
-                                               TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
-                                               VerticalOptions="Center" />
-                                        <Label Text="Shared Defaults &amp; Tags" FontFamily="SegoeSemibold" FontSize="13"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
-                                               VerticalOptions="Center" />
-                                        <Label Text="(Applies to all PR rows below)" FontSize="11"
-                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                               VerticalOptions="Center" />
-                                    </HorizontalStackLayout>
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                        Padding="14,10">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <VerticalStackLayout Spacing="6">
+                        <Grid ColumnDefinitions="Auto, 110, 160, 90, 150, *" ColumnSpacing="10" VerticalOptions="Center">
+                            <Label Grid.Column="0" Text="New Row Defaults" FontFamily="SegoeSemibold" FontSize="12"
+                                   VerticalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            <Picker Grid.Column="1" ItemsSource="{Binding AllPlants}" SelectedItem="{Binding BatchSharedPlant, Mode=TwoWay}" HeightRequest="32" FontSize="11" />
+                            <Picker Grid.Column="2" ItemsSource="{Binding AllPrTypes}" SelectedItem="{Binding BatchSharedPrType, Mode=TwoWay}" HeightRequest="32" FontSize="11" />
+                            <Picker Grid.Column="3" ItemsSource="{Binding AllPriorities}" SelectedItem="{Binding BatchSharedPriority, Mode=TwoWay}" HeightRequest="32" FontSize="11" />
+                            <Entry Grid.Column="4" Text="{Binding BatchSharedRequestor, Mode=TwoWay}" Placeholder="Default requestor" HeightRequest="32" FontSize="11" />
+                            <Entry Grid.Column="5" Text="{Binding BatchSharedNotes, Mode=TwoWay}" Placeholder="Notes / purpose" HeightRequest="32" FontSize="11" />
+                        </Grid>
+                        <Label Text="Pre-fills new rows and fills blanks when pasting from Excel - never changes a row you've already edited."
+                               FontSize="10" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </VerticalStackLayout>
+                </Border>
 
-                                    <Button Grid.Column="1" Text="Apply Defaults to All Rows"
-                                            Command="{Binding ApplySharedFieldsToAllCommand}"
-                                            Style="{StaticResource SecondaryButton}"
-                                            FontSize="11" HeightRequest="28" Padding="12,0"
-                                            VerticalOptions="Center" />
-                                </Grid>
-
-                                <!-- Shared Fields Grid -->
-                                <Grid ColumnDefinitions="140, 100, 170, 110, *" ColumnSpacing="12">
-                                    <VerticalStackLayout Grid.Column="0" Spacing="4">
-                                        <Label Text="Default Requestor" FontSize="11" FontFamily="SegoeSemibold"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Entry x:Name="SharedRequestorEntry" Text="{Binding BatchSharedRequestor, Mode=TwoWay}" Placeholder="e.g. Operations Team" HeightRequest="34" FontSize="12" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                        <Label Text="Default Plant" FontSize="11" FontFamily="SegoeSemibold"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Picker ItemsSource="{Binding AllPlants}" SelectedItem="{Binding BatchSharedPlant, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="2" Spacing="4">
-                                        <Label Text="Default PR Type *" FontSize="11" FontFamily="SegoeSemibold"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Picker ItemsSource="{Binding AllPrTypes}" SelectedItem="{Binding BatchSharedPrType, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="3" Spacing="4">
-                                        <Label Text="Default Priority" FontSize="11" FontFamily="SegoeSemibold"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Picker ItemsSource="{Binding AllPriorities}" SelectedItem="{Binding BatchSharedPriority, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                    </VerticalStackLayout>
-
-                                    <VerticalStackLayout Grid.Column="4" Spacing="4">
-                                        <Label Text="Shared Notes / Purpose" FontSize="11" FontFamily="SegoeSemibold"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Entry Text="{Binding BatchSharedNotes, Mode=TwoWay}" Placeholder="Common project / batch notes..." HeightRequest="34" FontSize="12" />
-                                    </VerticalStackLayout>
-                                </Grid>
-
-                                <!-- Shared Custom Fields / Tags -->
-                                <VerticalStackLayout Spacing="6" IsVisible="{Binding BatchSharedCustomValues.Count, Converter={StaticResource NullToBoolConverter}}">
-                                    <Label Text="Shared Team Tags / Custom Fields" FontSize="11" FontFamily="SegoeSemibold"
-                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                    <HorizontalStackLayout BindableLayout.ItemsSource="{Binding BatchSharedCustomValues}" Spacing="10">
-                                        <BindableLayout.ItemTemplate>
-                                            <DataTemplate x:DataType="models:CustomFieldValue">
-                                                <VerticalStackLayout Spacing="4">
-                                                    <Label Text="{Binding ColumnName}" FontSize="11" FontFamily="SegoeSemibold"
-                                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-
-                                                    <!-- Select (Dropdown Picker) -->
-                                                    <Picker IsVisible="{Binding IsSelect}"
-                                                            ItemsSource="{Binding OptionsList}"
-                                                            SelectedItem="{Binding Value, Mode=TwoWay}"
-                                                            WidthRequest="130"
-                                                            HeightRequest="34" FontSize="12" />
-
-                                                    <!-- Date (DatePicker - snug width matching CalendarDatePicker) -->
-                                                    <DatePicker IsVisible="{Binding IsDate}"
-                                                                Date="{Binding DateValue, Mode=TwoWay}"
-                                                                Format="yyyy-MM-dd"
-                                                                WidthRequest="125"
-                                                                HeightRequest="34" FontSize="12" />
-
-                                                    <!-- Number -->
-                                                    <Entry IsVisible="{Binding IsNumber}"
-                                                           Text="{Binding Value, Mode=TwoWay}"
-                                                           Keyboard="Numeric"
-                                                           WidthRequest="105"
-                                                           HeightRequest="34" FontSize="12" />
-
-                                                    <!-- Text / Default -->
-                                                    <Entry IsVisible="{Binding IsText}"
-                                                           Text="{Binding Value, Mode=TwoWay}"
-                                                           WidthRequest="120"
-                                                           HeightRequest="34" FontSize="12" />
-                                                </VerticalStackLayout>
-                                            </DataTemplate>
-                                        </BindableLayout.ItemTemplate>
-                                    </HorizontalStackLayout>
-                                </VerticalStackLayout>
-                            </VerticalStackLayout>
-                        </Border>
-
-                <!-- Section B header: Requisitions List toolbar -->
+                <!-- Toolbar -->
                 <Grid Grid.Row="2" ColumnDefinitions="*, Auto" VerticalOptions="Center">
-                                <Label Grid.Column="0" Text="Requisition Entries" FontFamily="SegoeSemibold" FontSize="14"
-                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
-                                    <Button Text="Paste PRs from Excel"
-                                            Command="{Binding PasteBatchPrRowsFromClipboardCommand}"
-                                            ToolTipProperties.Text="Paste a column of requisition titles from Excel"
-                                            Style="{StaticResource SecondaryButton}"
-                                            FontSize="11" HeightRequest="28" Padding="12,0" />
-                                    <Button Text="+ Add Another PR"
-                                            Command="{Binding AddBatchPrRowCommand}"
-                                            Style="{StaticResource SecondaryButton}"
-                                            FontSize="11" HeightRequest="28" Padding="12,0" />
-                                </HorizontalStackLayout>
+                    <Label Grid.Column="0" Text="{Binding RequisitionsSectionLabel}" FontFamily="SegoeSemibold" FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <!-- No separate "Paste PRs from Excel" button here - pasting a multi-line block
+                         straight into the PR Number/Description fields already fans out into rows
+                         (HandleBatchPrRowPaste), and Ctrl+V with the modal open and no field
+                         focused does the same (PrListPage.xaml.cs). The button was a third,
+                         redundant entry point to the exact same command. -->
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="+ Add Row"
+                                Command="{Binding AddBatchPrRowCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                FontSize="11" HeightRequest="28" Padding="12,0" />
+                    </HorizontalStackLayout>
                 </Grid>
 
-                <!-- PR rows: virtualized -->
-                <CollectionView Grid.Row="3" ItemsSource="{Binding BatchPrEntries}" SelectionMode="None">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="12" />
-                    </CollectionView.ItemsLayout>
-                    <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="models:BatchPrEntry">
-                                        <Border StrokeThickness="1"
-                                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
-                                                Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
-                                                Padding="16">
-                                            <Border.StrokeShape>
-                                                <RoundRectangle CornerRadius="8" />
-                                            </Border.StrokeShape>
+                <!-- Master-detail split. The list column's width and the gap next to it both
+                     collapse to 0 with a single row - a plain IsVisible on the column's content
+                     would leave the fixed-width Grid column (and its ColumnSpacing) reserved and
+                     empty, the same reservation gap the earlier badge fix ran into. -->
+                <Grid Grid.Row="3" ColumnDefinitions="Auto, *"
+                      ColumnSpacing="{Binding IsBulkMode, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter='16|0'}">
+                    <CollectionView Grid.Column="0"
+                                    WidthRequest="{Binding IsBulkMode, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter='220|0'}"
+                                    ItemsSource="{Binding BatchPrEntries}"
+                                    SelectionMode="None">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="6" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:BatchPrEntry">
+                                <!-- Selection is a plain identity check against SelectedBatchEntry, not
+                                     CollectionView's own SelectionMode/VisualStateManager "Selected"
+                                     state - that's unreliable on WinUI (only a partial highlight
+                                     rendered). The TapGestureRecognizer also makes this row count as a
+                                     "tap-to-select" region for MauiProgram's app-wide text-selection
+                                     rule, so none of its labels render as selectable text - the
+                                     highlighted card itself is the only selection feedback needed. -->
+                                <Border StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                        Padding="10,8">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="7" />
+                                    </Border.StrokeShape>
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.SelectBatchPrRowCommand}"
+                                                               CommandParameter="{Binding .}" />
+                                    </Border.GestureRecognizers>
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Value="True">
+                                            <DataTrigger.Binding>
+                                                <MultiBinding Converter="{StaticResource ReferenceEqualsConverter}">
+                                                    <Binding Path="." />
+                                                    <Binding Source="{x:Reference ThisModal}" Path="BindingContext.SelectedBatchEntry" />
+                                                </MultiBinding>
+                                            </DataTrigger.Binding>
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                                            <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
 
-                                            <VerticalStackLayout Spacing="12">
-                                                <!-- Row 1: Primary Requisition Info (PR No, Description, Actions) -->
-                                                <Grid ColumnDefinitions="160, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
-                                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                                        <Label Text="PR Number *" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Entry Text="{Binding PrNo, Mode=TwoWay}"
-                                                               Loaded="OnBatchPrNoEntryLoaded"
-                                                               TextChanged="OnBatchPrNoTextChanged"
-                                                               Placeholder="e.g. PR-2026-001"
-                                                               HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Spacing="3">
+                                        <Label Text="{Binding PrNo}" FontFamily="SegoeSemibold" FontSize="11.5"
+                                               LineBreakMode="TailTruncation"
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="{Binding ItemsCount, StringFormat='{0} item(s)'}" FontSize="9.5"
+                                                   IsVisible="{Binding HasItems}"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                            <BoxView WidthRequest="6" HeightRequest="6" CornerRadius="3"
+                                                     Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                                                     IsVisible="{Binding HasCustomizations}"
+                                                     VerticalOptions="Center"
+                                                     ToolTipProperties.Text="Has custom field values set" />
+                                        </HorizontalStackLayout>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
 
-                                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                                        <Label Text="Description / Summary *" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Entry Text="{Binding Description, Mode=TwoWay}"
-                                                               Loaded="OnBatchDescriptionEntryLoaded"
-                                                               TextChanged="OnBatchDescriptionTextChanged"
-                                                               Placeholder="Requisition title or item summary..." HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
+                    <!-- Detail pane: the selected row's full form. Every field binds through
+                         SelectedBatchEntry rather than resetting BindingContext down the tree, so
+                         this whole subtree stays compiled-binding-checked against PrListPageModel
+                         like the rest of the file. -->
+                    <ScrollView Grid.Column="1">
+                        <!-- BindingContext scoped to the selected row (and x:DataType matching it),
+                             the same pattern the old per-row CollectionView template used - it's what
+                             lets the PR Number/Description Loaded+Paste code-behind hooks below find a
+                             real BatchPrEntry on BindingContext (ExecuteBatchPrNoPasteAsync etc. cast
+                             sender.BindingContext to BatchPrEntry), so pasting a multi-row block
+                             straight into a field still fans out into new rows exactly as before. -->
+                        <VerticalStackLayout Spacing="14" Padding="0,0,16,0"
+                                             BindingContext="{Binding SelectedBatchEntry}"
+                                             x:DataType="models:BatchPrEntry">
+                            <Grid ColumnDefinitions="*, *" ColumnSpacing="12">
+                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                    <Label Text="PR Number *" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry x:Name="DetailPrNoEntry" Text="{Binding PrNo, Mode=TwoWay}"
+                                           Loaded="OnBatchPrNoEntryLoaded"
+                                           TextChanged="OnBatchPrNoTextChanged"
+                                           Placeholder="e.g. PR-2026-001 - or paste multiple rows"
+                                           HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
 
-                                                    <!-- Row Actions -->
-                                                    <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="End" Margin="0,0,0,2">
-                                                        <Button Text="&#xE8C8;"
-                                                                FontFamily="Segoe Fluent Icons"
-                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.DuplicateBatchPrRowCommand}"
-                                                                CommandParameter="{Binding .}"
-                                                                BackgroundColor="Transparent"
-                                                                TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
-                                                                ToolTipProperties.Text="Duplicate PR Row"
-                                                                HeightRequest="30" WidthRequest="30" Padding="0" FontSize="13" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="Description / Summary *" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding Description, Mode=TwoWay}"
+                                           Loaded="OnBatchDescriptionEntryLoaded"
+                                           TextChanged="OnBatchDescriptionTextChanged"
+                                           Placeholder="Requisition title or item summary..." HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
+                            </Grid>
 
-                                                        <Button Text="&#xE74D;"
-                                                                FontFamily="Segoe Fluent Icons"
-                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchPrRowCommand}"
-                                                                CommandParameter="{Binding .}"
-                                                                BackgroundColor="Transparent"
-                                                                TextColor="{StaticResource FluentCritical}"
-                                                                ToolTipProperties.Text="Remove PR Row"
-                                                                HeightRequest="30" WidthRequest="30" Padding="0" FontSize="12" />
-                                                    </HorizontalStackLayout>
-                                                </Grid>
+                            <Grid ColumnDefinitions="*, *, *, *" ColumnSpacing="12">
+                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                    <Label Text="PR Type *" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPrTypes}"
+                                            SelectedItem="{Binding PrType, Mode=TwoWay}" HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
 
-                                                <!-- Row 2: Secondary Attributes (PR Type, Plant, Priority, Requestor) -->
-                                                <Grid ColumnDefinitions="160, 110, 120, *" ColumnSpacing="12" VerticalOptions="Center">
-                                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                                        <Label Text="PR Type *" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPrTypes}"
-                                                                SelectedItem="{Binding PrType, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="Plant" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPlants}"
+                                            SelectedItem="{Binding Plant, Mode=TwoWay}" HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
 
-                                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                                        <Label Text="Plant" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPlants}"
-                                                                SelectedItem="{Binding Plant, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                    <Label Text="Priority" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPriorities}"
+                                            SelectedItem="{Binding Priority, Mode=TwoWay}" HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
 
-                                                    <VerticalStackLayout Grid.Column="2" Spacing="2">
-                                                        <Label Text="Priority" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Picker ItemsSource="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AllPriorities}"
-                                                                SelectedItem="{Binding Priority, Mode=TwoWay}" HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="3" Spacing="4">
+                                    <Label Text="Requestor" FontSize="11" FontFamily="SegoeSemibold"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Entry Text="{Binding Requestor, Mode=TwoWay}" Placeholder="Requestor name / team" HeightRequest="36" FontSize="12" />
+                                </VerticalStackLayout>
+                            </Grid>
 
-                                                    <VerticalStackLayout Grid.Column="3" Spacing="2">
-                                                        <Label Text="Requestor" FontSize="11" FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        <Entry Text="{Binding Requestor, Mode=TwoWay}" Placeholder="Requestor name / team" HeightRequest="34" FontSize="12" />
-                                                    </VerticalStackLayout>
-                                                </Grid>
+                            <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
 
-                                                <!-- Row 2: Line Items Sub-Table -->
-                                                <Border StrokeThickness="1"
-                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
-                                                        Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
-                                                        Padding="12,10">
-                                                    <Border.StrokeShape>
-                                                        <RoundRectangle CornerRadius="6" />
-                                                    </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="8">
+                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                    <Label Grid.Column="0" Text="Line Items" FontFamily="SegoeSemibold" FontSize="14"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                           VerticalOptions="Center" />
+                                    <!-- No separate "Paste Items" button - pasting a multi-line block
+                                         straight into an item's name field already splits into
+                                         multiple item rows (HandleInlineItemPaste), same parser the
+                                         button called. -->
+                                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                        <Button Text="+ Add Item"
+                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AddBatchItemToPrCommand}"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                FontSize="11" HeightRequest="28" Padding="10,0" />
+                                    </HorizontalStackLayout>
+                                </Grid>
 
-                                                    <VerticalStackLayout Spacing="8">
-                                                        <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
-                                                            <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
-                                                                <Label Text="&#xE74C;"
-                                                                       FontFamily="Segoe Fluent Icons"
-                                                                       FontSize="12"
-                                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                                                       VerticalOptions="Center" />
-                                                                <Label Text="Line Items" FontFamily="SegoeSemibold" FontSize="12"
-                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
-                                                                       VerticalOptions="Center" />
-                                                            </HorizontalStackLayout>
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PrItem">
+                                            <Grid ColumnDefinitions="*, 75, 70, 90, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                                                <Entry Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
+                                                       Loaded="OnBatchItemNameEntryLoaded"
+                                                       TextChanged="OnBatchItemNameTextChanged"
+                                                       Placeholder="Item name / spec... (or paste multiple)" HeightRequest="34" FontSize="12" />
+                                                <Entry Grid.Column="1" Text="{Binding Quantity, Mode=TwoWay}"
+                                                       Loaded="OnBatchItemQuantityEntryLoaded"
+                                                       TextChanged="OnBatchItemQuantityTextChanged"
+                                                       Placeholder="Qty" Keyboard="Numeric" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
+                                                <Entry Grid.Column="2" Text="{Binding Unit, Mode=TwoWay}"
+                                                       Loaded="OnBatchItemUnitEntryLoaded"
+                                                       TextChanged="OnBatchItemUnitTextChanged"
+                                                       Placeholder="pcs" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
+                                                <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
+                                                       Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
+                                                <Button Grid.Column="4" Text="&#xE74D;"
+                                                        FontFamily="Segoe Fluent Icons"
+                                                        Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchItemFromPrCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        BackgroundColor="Transparent"
+                                                        TextColor="{StaticResource FluentCritical}"
+                                                        ToolTipProperties.Text="Remove Item"
+                                                        HeightRequest="28" WidthRequest="28" Padding="0" FontSize="11" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
 
-                                                            <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
-                                                                <Button Text="Paste Items"
-                                                                        Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.PasteBatchPrItemsFromClipboardCommand}"
-                                                                        CommandParameter="{Binding .}"
-                                                                        ToolTipProperties.Text="Paste items from Excel into this requisition"
-                                                                        FontSize="10.5" HeightRequest="24" Padding="8,0"
-                                                                        Style="{StaticResource SecondaryButton}"
-                                                                        VerticalOptions="Center" />
-                                                                <Button Text="+ Add Item"
-                                                                        Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AddBatchItemToPrCommand}"
-                                                                        CommandParameter="{Binding .}"
-                                                                        FontSize="10.5" HeightRequest="24" Padding="8,0"
-                                                                        Style="{StaticResource SecondaryButton}"
-                                                                        VerticalOptions="Center" />
-                                                            </HorizontalStackLayout>
-                                                        </Grid>
+                            <!-- Custom Fields - every column defined on the Custom Columns page shows up
+                                 here automatically, because SelectedBatchEntry.CustomValues already
+                                 carries one entry per column (seeded in CreateNewBatchPrEntry). Hidden
+                                 entirely when no custom columns exist at all. -->
+                            <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                     IsVisible="{Binding Source={x:Reference ThisModal}, Path=BindingContext.CustomColumnDefinitions.Count, Converter={StaticResource IntGreaterThanZeroConverter}}" />
 
-                                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Items}" Spacing="6">
-                                                            <BindableLayout.ItemTemplate>
-                                                                <DataTemplate x:DataType="models:PrItem">
-                                                                    <Grid ColumnDefinitions="*, 75, 70, 90, Auto" ColumnSpacing="6" VerticalOptions="Center">
-                                                                        <Entry Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
-                                                                               Loaded="OnBatchItemNameEntryLoaded"
-                                                                               TextChanged="OnBatchItemNameTextChanged"
-                                                                               Placeholder="Item name / spec..." HeightRequest="30" FontSize="11.5" />
-                                                                        <Entry Grid.Column="1" Text="{Binding Quantity, Mode=TwoWay}"
-                                                                               Loaded="OnBatchItemQuantityEntryLoaded"
-                                                                               TextChanged="OnBatchItemQuantityTextChanged"
-                                                                               Placeholder="Qty" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" HorizontalTextAlignment="Center" />
-                                                                        <Entry Grid.Column="2" Text="{Binding Unit, Mode=TwoWay}"
-                                                                               Loaded="OnBatchItemUnitEntryLoaded"
-                                                                               TextChanged="OnBatchItemUnitTextChanged"
-                                                                               Placeholder="pcs" HeightRequest="30" FontSize="11.5" HorizontalTextAlignment="Center" />
-                                                                        <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
-                                                                               Placeholder="Price" Keyboard="Numeric" HeightRequest="30" FontSize="11.5" />
-                                                                        <Button Grid.Column="4" Text="&#xE74D;"
-                                                                                FontFamily="Segoe Fluent Icons"
-                                                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.RemoveBatchItemFromPrCommand}"
-                                                                                CommandParameter="{Binding .}"
-                                                                                BackgroundColor="Transparent"
-                                                                                TextColor="{StaticResource FluentCritical}"
-                                                                                ToolTipProperties.Text="Remove Item"
-                                                                                HeightRequest="26" WidthRequest="26" Padding="0" FontSize="10" />
-                                                                    </Grid>
-                                                                </DataTemplate>
-                                                            </BindableLayout.ItemTemplate>
-                                                        </VerticalStackLayout>
-                                                    </VerticalStackLayout>
-                                                </Border>
+                            <VerticalStackLayout Spacing="8"
+                                                  IsVisible="{Binding Source={x:Reference ThisModal}, Path=BindingContext.CustomColumnDefinitions.Count, Converter={StaticResource IntGreaterThanZeroConverter}}">
+                                <Grid ColumnDefinitions="*, Auto" VerticalOptions="Center">
+                                    <Label Grid.Column="0" Text="Custom Fields" FontFamily="SegoeSemibold" FontSize="14"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                           VerticalOptions="Center" />
+                                    <Button Grid.Column="1" Text="Copy to all rows"
+                                            Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.CopyCustomFieldsToAllRowsCommand}"
+                                            CommandParameter="{Binding .}"
+                                            ToolTipProperties.Text="Fills this value into any other row that doesn't already have one set - never overwrites"
+                                            IsVisible="{Binding Source={x:Reference ThisModal}, Path=BindingContext.IsBulkMode}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" HeightRequest="28" Padding="10,0" />
+                                </Grid>
 
+                                <!-- BindableLayout only ever stacks children into its host in order - it
+                                     has no ItemsLayout/column-span concept (that's CollectionView-only),
+                                     so this follows EditPrModal's proven one-field-per-line pattern
+                                     rather than attempting a grid host, which would leave every field
+                                     stacked at 0,0. -->
+                                <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding CustomValues}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CustomFieldValue">
+                                            <VerticalStackLayout Spacing="4">
+                                                <Label Text="{Binding ColumnName}" FontSize="11" FontFamily="SegoeSemibold"
+                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                                                <Picker IsVisible="{Binding IsSelect}"
+                                                        ItemsSource="{Binding OptionsList}"
+                                                        SelectedItem="{Binding Value, Mode=TwoWay}"
+                                                        HorizontalOptions="Fill"
+                                                        HeightRequest="34" FontSize="12" />
+
+                                                <DatePicker IsVisible="{Binding IsDate}"
+                                                            Date="{Binding DateValue, Mode=TwoWay}"
+                                                            Format="yyyy-MM-dd"
+                                                            HorizontalOptions="Fill"
+                                                            HeightRequest="34" FontSize="12" />
+
+                                                <Entry IsVisible="{Binding IsNumber}"
+                                                       Text="{Binding Value, Mode=TwoWay}"
+                                                       Keyboard="Numeric"
+                                                       HorizontalOptions="Fill"
+                                                       HeightRequest="34" />
+
+                                                <Entry IsVisible="{Binding IsText}"
+                                                       Text="{Binding Value, Mode=TwoWay}"
+                                                       HorizontalOptions="Fill"
+                                                       HeightRequest="34" />
                                             </VerticalStackLayout>
-                                        </Border>
-                                    </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
 
                 <!-- Dialog Footer -->
-                <Grid Grid.Row="4" ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center" Margin="0,4,0,0">
-                    <Button Grid.Column="0" Text="+ Add Another Requisition"
-                            Command="{Binding AddBatchPrRowCommand}"
-                            Style="{StaticResource SecondaryButton}"
-                            HeightRequest="36" Padding="14,0" />
-
-                    <Label Grid.Column="1" Text="{Binding BatchEntriesSummary}"
+                <Grid Grid.Row="4" ColumnDefinitions="*, Auto" VerticalOptions="Center" Margin="0,4,0,0">
+                    <Label Grid.Column="0" Text="{Binding BatchEntriesSummary}"
+                           IsVisible="{Binding IsBulkMode}"
                            FontSize="12" FontFamily="SegoeSemibold"
-                           HorizontalOptions="Center" VerticalOptions="Center"
+                           VerticalOptions="Center"
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
-                    <HorizontalStackLayout Grid.Column="2" Spacing="10" VerticalOptions="Center">
+                    <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
                         <Button Text="Cancel"
                                 Command="{Binding CloseBatchCreateModalCommand}"
                                 Style="{StaticResource CancelButton}"
                                 HeightRequest="36" Padding="16,0" />
 
-                        <Button Text="Create All Requisitions"
+                        <Button Text="{Binding SaveButtonText}"
                                 Command="{Binding SaveBatchPrsModalCommand}"
                                 Style="{StaticResource PrimaryButton}"
                                 HeightRequest="36" Padding="20,0" />

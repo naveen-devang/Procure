@@ -9,7 +9,7 @@
              IsVisible="{Binding IsEditModalVisible}">
 
     <Grid BackgroundColor="#99000000">
-        <Border MaximumWidthRequest="650"
+        <Border MaximumWidthRequest="950"
                 Margin="24"
                 VerticalOptions="Center"
                 HorizontalOptions="Center"
@@ -24,18 +24,22 @@
                 <Shadow Brush="#30000000" Offset="0,8" Radius="20" Opacity="0.8" />
             </Border.Shadow>
 
-            <ScrollView MaximumHeightRequest="650">
-                <VerticalStackLayout Spacing="16">
-                    <Grid ColumnDefinitions="*, Auto">
-                        <Label Grid.Column="0" Text="{Binding EditModalTitle}"
-                               FontFamily="SegoeSemibold" FontSize="18"
-                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                        <Button Grid.Column="1" Text="✕"
-                                Command="{Binding CloseEditModalCommand}"
-                                BackgroundColor="Transparent" TextColor="{StaticResource Gray400}"
-                                HeightRequest="30" WidthRequest="30" Padding="0" />
-                    </Grid>
+            <Grid RowDefinitions="Auto, *" RowSpacing="16">
+                <!-- Header sits outside the ScrollView so its close button never falls under
+                     the scrollbar track (it used to, when both lived in the same scrolling
+                     stack). -->
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
+                    <Label Grid.Column="0" Text="{Binding EditModalTitle}"
+                           FontFamily="SegoeSemibold" FontSize="18"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Button Grid.Column="1" Text="✕"
+                            Command="{Binding CloseEditModalCommand}"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Gray400}"
+                            HeightRequest="30" WidthRequest="30" Padding="0" />
+                </Grid>
 
+                <ScrollView Grid.Row="1" MaximumHeightRequest="650">
+                <VerticalStackLayout Spacing="16" Padding="0,0,16,0">
                     <Grid ColumnDefinitions="*, *, 100, 140" ColumnSpacing="12" RowDefinitions="Auto">
                         <VerticalStackLayout Grid.Column="0" Spacing="4">
                             <Label Text="PR Number *" FontSize="12" FontFamily="SegoeSemibold"
@@ -208,7 +212,8 @@
                                 HeightRequest="36" Padding="20,0" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
-            </ScrollView>
+                </ScrollView>
+            </Grid>
         </Border>
     </Grid>
 </ContentView>

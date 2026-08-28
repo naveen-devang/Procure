@@ -128,6 +128,45 @@ namespace Procure.Utilities
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
+    // Collapses a Grid column's width/spacing to 0 rather than just hiding its content - a Grid's
+    // Auto/fixed column keeps reserving space for an invisible child, only binding the dimension
+    // itself actually removes it. ConverterParameter is "trueValue|falseValue".
+    public class BoolToDoubleConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b && parameter is string s)
+            {
+                var parts = s.Split('|');
+                if (parts.Length == 2 && double.TryParse(parts[b ? 0 : 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+                    return result;
+            }
+            return 0d;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
+    public class IntGreaterThanZeroConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => value is int i && i > 0;
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
+    // Drives a list row's "selected" highlight directly off object identity instead of a
+    // CollectionView SelectionMode + VisualStateManager "Selected" state - that combination is
+    // unreliable on WinUI (the highlight only partially renders), where a plain equality check is
+    // deterministic regardless of platform VSM support.
+    public class ReferenceEqualsConverter : IMultiValueConverter
+    {
+        public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture)
+            => values.Length == 2 && ReferenceEquals(values[0], values[1]);
+
+        public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
     public class BoolToFilterChipBgConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

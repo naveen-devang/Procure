@@ -46,7 +46,7 @@ namespace Procure.Utilities
             new(KeyboardShortcutIds.ToggleSidebar, "Toggle Sidebar", "Global", "Ctrl+B"),
 
             new(KeyboardShortcutIds.FocusSearch, "Focus Search", "PR Board", "Ctrl+F"),
-            new(KeyboardShortcutIds.NewPr, "New PR (Bulk Create)", "PR Board", "Ctrl+N"),
+            new(KeyboardShortcutIds.NewPr, "Add PR", "PR Board", "Ctrl+N"),
             new(KeyboardShortcutIds.RefreshBoard, "Refresh Board", "PR Board", "F5"),
             new(KeyboardShortcutIds.ExportCsv, "Export CSV", "PR Board", "Ctrl+E"),
 

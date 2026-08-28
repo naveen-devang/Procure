@@ -86,7 +86,7 @@
                                 HeightRequest="38"
                                 Padding="14,0" />
 
-                        <Button Text="+ Bulk Create"
+                        <Button Text="+ Add PR"
                                 Command="{Binding OpenBatchCreateModalCommand}"
                                 Style="{StaticResource PrimaryButton}"
                                 HeightRequest="38"

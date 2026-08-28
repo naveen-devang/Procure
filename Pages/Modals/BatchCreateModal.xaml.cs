@@ -27,7 +27,7 @@ namespace Procure.Pages.Modals
 
         private void FocusFirstField() => Dispatcher.Dispatch(() =>
         {
-            if (IsVisible) SharedRequestorEntry.Focus();
+            if (IsVisible) DetailPrNoEntry.Focus();
         });
 
         private static Entry? GetEntryFromSender(object sender)

@@ -52,6 +52,36 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string BatchEntriesSummary { get; set; } = "3 requisitions ready";
 
+        // Presentation only - derived from BatchPrEntries.Count so the modal reads as "Add PR"
+        // for the common one-row case and switches to "Add PRs" framing (row numbers, per-row
+        // duplicate/remove, pluralized copy) once a second row shows up via "+ Add Another PR"
+        // or a multi-row paste. Recomputed everywhere BatchPrEntries changes - see
+        // UpdateBatchEntriesSummary, the one place all of those paths already funnel through.
+        [ObservableProperty]
+        public partial bool IsBulkMode { get; set; }
+
+        [ObservableProperty]
+        public partial string ModalTitle { get; set; } = "Add PR";
+
+        [ObservableProperty]
+        public partial string ModalSubtitle { get; set; } = "Fill in the requisition details below.";
+
+        [ObservableProperty]
+        public partial string SaveButtonText { get; set; } = "Add PR";
+
+        [ObservableProperty]
+        public partial string RequisitionsSectionLabel { get; set; } = "Requisition Details";
+
+        // The row currently shown in the detail pane. Null only when BatchPrEntries is empty
+        // (never true while the modal is open - there's always at least one row). Selection is
+        // driven by an explicit TapGestureRecognizer + command on each row, not CollectionView's
+        // own SelectionMode - the native selection VisualStateManager "Selected" state is
+        // unreliable on WinUI, so the row's highlight is a plain identity check instead.
+        [ObservableProperty]
+        public partial BatchPrEntry? SelectedBatchEntry { get; set; }
+
+        [RelayCommand]
+        public void SelectBatchPrRow(BatchPrEntry row) => SelectedBatchEntry = row;
 
         // ================= BULK / MULTI-PR CREATION OPERATIONS =================
 
@@ -91,6 +121,7 @@ namespace Procure.PageModels
             {
                 CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType)
             };
+            SelectedBatchEntry = BatchPrEntries[0];
             UpdateBatchEntriesSummary();
             IsBatchCreateModalVisible = true;
         }
@@ -145,6 +176,7 @@ namespace Procure.PageModels
         {
             var entry = CreateNewBatchPrEntry(BatchSharedRequestor, BatchSharedPriority, BatchSharedPlant, BatchSharedPrType);
             BatchPrEntries.Add(entry);
+            SelectedBatchEntry = entry;
             UpdateBatchEntriesSummary();
         }
 
@@ -152,11 +184,21 @@ namespace Procure.PageModels
         public void RemoveBatchPrRow(BatchPrEntry row)
         {
             if (BatchPrEntries.Count <= 1) return;
-            if (BatchPrEntries.Contains(row))
+            var removedIndex = BatchPrEntries.IndexOf(row);
+            if (removedIndex < 0) return;
+
+            BatchPrEntries.Remove(row);
+
+            // Land on whichever row took the removed one's place - the row after it, or the new
+            // last row if it was the last - rather than jumping back to row 1 mid-edit of a
+            // faraway row.
+            if (SelectedBatchEntry == row)
             {
-                BatchPrEntries.Remove(row);
-                UpdateBatchEntriesSummary();
+                var landingIndex = Math.Min(removedIndex, BatchPrEntries.Count - 1);
+                SelectedBatchEntry = BatchPrEntries[landingIndex];
             }
+
+            UpdateBatchEntriesSummary();
         }
 
         [RelayCommand]
@@ -214,37 +256,30 @@ namespace Procure.PageModels
             };
 
             BatchPrEntries.Add(duplicate);
+            SelectedBatchEntry = duplicate;
             UpdateBatchEntriesSummary();
         }
 
+        // Copies the source row's custom-field values onto every other row, but only into a
+        // field that row hasn't already got a value for - it never overwrites a tag someone
+        // already typed on another PR. Lives on each row's Custom Fields section, not as one
+        // global "apply defaults" button, since it's this row's tags being fanned out, not a
+        // separate defaults panel's.
         [RelayCommand]
-        public void ApplySharedFieldsToAll()
+        public void CopyCustomFieldsToAllRows(BatchPrEntry source)
         {
             foreach (var entry in BatchPrEntries)
             {
-                if (!string.IsNullOrWhiteSpace(BatchSharedRequestor))
-                    entry.Requestor = BatchSharedRequestor.Trim();
+                if (entry == source) continue;
 
-                if (!string.IsNullOrWhiteSpace(BatchSharedPlant))
-                    entry.Plant = BatchSharedPlant;
-
-                if (!string.IsNullOrWhiteSpace(BatchSharedPrType))
-                    entry.PrType = BatchSharedPrType;
-
-                entry.Priority = BatchSharedPriority;
-
-                if (!string.IsNullOrWhiteSpace(BatchSharedNotes))
-                    entry.Notes = BatchSharedNotes.Trim();
-
-                foreach (var sharedVal in BatchSharedCustomValues)
+                foreach (var sourceVal in source.CustomValues)
                 {
-                    if (!string.IsNullOrWhiteSpace(sharedVal.Value))
+                    if (string.IsNullOrWhiteSpace(sourceVal.Value)) continue;
+
+                    var target = entry.CustomValues.FirstOrDefault(v => v.ColumnId == sourceVal.ColumnId);
+                    if (target != null && string.IsNullOrWhiteSpace(target.Value))
                     {
-                        var target = entry.CustomValues.FirstOrDefault(v => v.ColumnId == sharedVal.ColumnId);
-                        if (target != null)
-                        {
-                            target.Value = sharedVal.Value;
-                        }
+                        target.Value = sourceVal.Value;
                     }
                 }
             }
@@ -286,6 +321,35 @@ namespace Procure.PageModels
         {
             var count = BatchPrEntries.Count;
             BatchEntriesSummary = count == 1 ? "1 requisition ready to create" : $"{count} requisitions ready to create";
+
+            // Safety net for any path that mutates BatchPrEntries without also managing selection
+            // directly - falls back to the first row rather than leaving the detail pane pointed
+            // at a row that's no longer in the list.
+            if (count > 0 && (SelectedBatchEntry == null || !BatchPrEntries.Contains(SelectedBatchEntry)))
+            {
+                SelectedBatchEntry = BatchPrEntries[0];
+            }
+
+            for (int i = 0; i < BatchPrEntries.Count; i++)
+            {
+                BatchPrEntries[i].DisplayIndex = i + 1;
+            }
+
+            IsBulkMode = count > 1;
+            if (IsBulkMode)
+            {
+                ModalTitle = "Add PRs";
+                ModalSubtitle = "Add multiple requisitions at once with shared tags, requestor, and customizable line items.";
+                SaveButtonText = $"Add {count} PRs";
+                RequisitionsSectionLabel = "Requisitions";
+            }
+            else
+            {
+                ModalTitle = "Add PR";
+                ModalSubtitle = "Fill in the requisition details below.";
+                SaveButtonText = "Add PR";
+                RequisitionsSectionLabel = "Requisition Details";
+            }
         }
 
         [RelayCommand]
@@ -371,6 +435,7 @@ namespace Procure.PageModels
                 // rows now are, and the merge hands the board the instances it is already bound to.
                 IsBatchCreateModalVisible = false;
                 BatchPrEntries.Clear();
+                SelectedBatchEntry = null;
                 ApplyFilters();
 
                 ShowToast($"Created {validEntries.Count} purchase requisitions");
@@ -390,6 +455,7 @@ namespace Procure.PageModels
         {
             IsBatchCreateModalVisible = false;
             BatchPrEntries.Clear();
+            SelectedBatchEntry = null;
         }
 
         [RelayCommand]
@@ -472,6 +538,7 @@ namespace Procure.PageModels
                     BatchPrEntries.Clear();
                 }
 
+                BatchPrEntry? firstAdded = null;
                 foreach (var parsedEntry in parsedEntries)
                 {
                     // Skip if a row with this PR number is already in BatchPrEntries
@@ -482,7 +549,12 @@ namespace Procure.PageModels
                     }
 
                     BatchPrEntries.Add(parsedEntry);
+                    firstAdded ??= parsedEntry;
                 }
+
+                // Land on the first row this paste actually added, so what just changed is what
+                // you see - not whatever was selected before the paste.
+                if (firstAdded != null) SelectedBatchEntry = firstAdded;
 
                 UpdateBatchEntriesSummary();
             }
