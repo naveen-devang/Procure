@@ -209,7 +209,7 @@
 
                                                 <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12" VerticalOptions="Center">
                                                     <!-- CheckBox -->
-                                                    <CheckBox Grid.Column="0"
+                                                    <CheckBox Color="{DynamicResource Primary}" Grid.Column="0"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                                               VerticalOptions="Center" />
 
@@ -453,7 +453,7 @@
                                                                     </Border.StrokeShape>
                                                                     <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105" ColumnSpacing="8" VerticalOptions="Center">
                                                                         <!-- Checkbox -->
-                                                                        <CheckBox Grid.Column="0"
+                                                                        <CheckBox Color="{DynamicResource Primary}" Grid.Column="0"
                                                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                                                                   HorizontalOptions="Center"
                                                                                   VerticalOptions="Center" />

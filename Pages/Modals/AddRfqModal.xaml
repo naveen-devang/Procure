@@ -191,7 +191,7 @@
                                               Padding="4,2"
                                               VerticalOptions="Center">
                                             <!-- Quoted CheckBox -->
-                                            <CheckBox Grid.Column="0"
+                                            <CheckBox Color="{DynamicResource Primary}" Grid.Column="0"
                                                       IsChecked="{Binding IsQuoted, Mode=TwoWay}"
                                                       CheckedChanged="OnRfqItemCheckedChanged"
                                                       VerticalOptions="Center"

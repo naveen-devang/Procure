@@ -724,7 +724,7 @@
                             <Label Text="&#xE74C;"
                                    FontFamily="Segoe Fluent Icons"
                                    FontSize="14"
-                                   TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                                   TextColor="{DynamicResource AccentPrimary}"
                                    VerticalOptions="Center" />
                             <Label Text="Requisition Line Items" FontFamily="SegoeSemibold" FontSize="13"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"

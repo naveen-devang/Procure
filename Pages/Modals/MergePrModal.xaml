@@ -112,7 +112,7 @@
                             <RoundRectangle CornerRadius="6" />
                         </Border.StrokeShape>
                         <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" VerticalOptions="Center">
-                            <CheckBox Grid.Column="0" IsChecked="{Binding MergeCopyChildRfqs, Mode=TwoWay}" VerticalOptions="Center" />
+                            <CheckBox Color="{DynamicResource Primary}" Grid.Column="0" IsChecked="{Binding MergeCopyChildRfqs, Mode=TwoWay}" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
                                 <Label Text="Copy existing vendor RFQs &amp; quotes into Master PR"
                                        FontFamily="SegoeSemibold" FontSize="12"
