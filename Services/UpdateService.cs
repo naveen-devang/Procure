@@ -97,6 +97,12 @@ namespace Procure.Services
                 result.Title = result.TagName;
                 result.ReleaseNotes = asset.NotesMarkdown ?? string.Empty;
                 result.ReleaseUrl = $"https://github.com/{repoOwnerAndName.Trim().Trim('/')}/releases/tag/{result.TagName}";
+                // Velopack downloads internally (DownloadUpdatesAsync/ApplyUpdatesAndRestart below)
+                // rather than needing a raw HTTP URL - but SettingsPageModel.DownloadAndInstallUpdateAsync
+                // treats a blank DownloadUrl as "nothing to download, open the release page instead",
+                // a fallback written for the old implementation. Any non-empty value keeps it on the
+                // real download path; the release URL is the most meaningful thing to put there.
+                result.DownloadUrl = result.ReleaseUrl;
                 result.LatestVersionString = asset.Version.ToString();
                 result.AssetName = asset.FileName;
                 result.SizeBytes = asset.Size;
