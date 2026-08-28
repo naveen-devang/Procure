@@ -53,16 +53,19 @@ namespace Procure
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
             => Procure.Utilities.ThemeHelper.Invalidate();
 
-        // No permission asked, no popup: checks on launch and at least once every 24h for as long
-        // as the app stays open (UpdateCheckScheduler.ShouldCheckNow is the gate, persisted across
-        // launches via UpdateStateStore - see its own comment for why that's a plain file and not
-        // Preferences - so restarting the app daily still only checks once a day rather than once
-        // per launch). Finding an update downloads it immediately in the background: the only
-        // thing the user ever sees is AppShell's sidebar card, and only once the download is
-        // actually done and there's something to restart into.
+        // No permission asked, no popup: checks every launch, then at least once every 24h for
+        // as long as the app stays open. The persisted lastCheck gate (UpdateStateStore, across
+        // launches) only throttles the *recurring* loop below - it used to also gate the launch
+        // check itself, which meant restarting within the same 24h window (e.g. to pick up a
+        // release that just went out) silently skipped checking at all. Finding an update
+        // downloads it immediately in the background: the only thing the user ever sees is
+        // AppShell's sidebar card, and only once the download is actually done and there's
+        // something to restart into.
         private async Task CheckForUpdatesInBackgroundAsync()
         {
             await Task.Delay(3000); // Allow UI to initialize first
+
+            var isFirstCheck = true;
 
             while (true)
             {
@@ -71,7 +74,7 @@ namespace Procure
                     if (!string.IsNullOrWhiteSpace(AppConstants.GitHubRepository))
                     {
                         var lastCheck = Utilities.UpdateStateStore.GetLastUpdateCheckUtc();
-                        if (Utilities.UpdateCheckScheduler.ShouldCheckNow(lastCheck, DateTime.UtcNow))
+                        if (isFirstCheck || Utilities.UpdateCheckScheduler.ShouldCheckNow(lastCheck, DateTime.UtcNow))
                         {
                             var updateService = _services.GetRequiredService<IUpdateService>();
                             var update = await updateService.CheckForUpdatesAsync(AppConstants.GitHubRepository);
@@ -91,6 +94,7 @@ namespace Procure
                     // must never be visible to someone who was never asked to look at this.
                 }
 
+                isFirstCheck = false;
                 await Task.Delay(Utilities.UpdateCheckScheduler.MinimumInterval);
             }
         }
