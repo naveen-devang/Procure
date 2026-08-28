@@ -12,14 +12,17 @@ namespace Procure
     {
         private readonly ISettingsService _settingsService;
         private readonly IKeyboardShortcutService _shortcuts;
+        private readonly IUpdateService _updateService;
         private readonly IServiceProvider _services;
         private bool _isManuallyToggled;
+        private bool _isUpdateReady;
 
-        public AppShell(IServiceProvider services, ISettingsService settingsService, IKeyboardShortcutService shortcuts)
+        public AppShell(IServiceProvider services, ISettingsService settingsService, IKeyboardShortcutService shortcuts, IUpdateService updateService)
         {
             _services = services;
             _settingsService = settingsService;
             _shortcuts = shortcuts;
+            _updateService = updateService;
             Procure.Utilities.BoardTrace.Mark("shell-ctor-start");
             InitializeComponent();
 
@@ -288,6 +291,50 @@ namespace Procure
             if (CompactFooterLayout != null)
             {
                 CompactFooterLayout.IsVisible = isCompact;
+            }
+
+            UpdateUpdateBannerVisibility();
+        }
+
+        // Expanded sidebar gets the full card; compact (icon-only) has no room for it, so a small
+        // dot stands in instead - both driven off the same _isUpdateReady flag, split only by
+        // which layout is currently showing.
+        private void UpdateUpdateBannerVisibility()
+        {
+            if (UpdateReadyCard != null)
+                UpdateReadyCard.IsVisible = _isUpdateReady && !_settingsService.IsSidebarCompact;
+
+            if (CompactUpdateDot != null)
+                CompactUpdateDot.IsVisible = _isUpdateReady && _settingsService.IsSidebarCompact;
+        }
+
+        // Called from App.xaml.cs once a silently-downloaded update is actually ready to apply -
+        // never in response to anything the user asked for, so this only ever turns the card on,
+        // it doesn't interrupt whatever the user is doing.
+        public void ShowUpdateReadyBanner(string versionTag)
+        {
+            _isUpdateReady = true;
+            if (UpdateReadyTitleLabel != null)
+                UpdateReadyTitleLabel.Text = string.IsNullOrWhiteSpace(versionTag) ? "Update ready" : $"Update ready — {versionTag}";
+            UpdateUpdateBannerVisibility();
+        }
+
+        public void HideUpdateReadyBanner()
+        {
+            _isUpdateReady = false;
+            UpdateUpdateBannerVisibility();
+        }
+
+        private void OnDismissUpdateBannerClicked(object? sender, EventArgs e) => HideUpdateReadyBanner();
+
+        // The update was already downloaded silently in the background - this just applies it.
+        // Velopack exits the process itself on success, so there is normally nothing after this
+        // call; LaunchInstaller's bool return only matters on the rare failure path.
+        private void OnRestartForUpdateClicked(object? sender, EventArgs e)
+        {
+            if (!_updateService.LaunchInstaller(string.Empty))
+            {
+                HideUpdateReadyBanner();
             }
         }
 

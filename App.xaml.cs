@@ -40,43 +40,66 @@ namespace Procure
                     _services.GetRequiredService<Data.SqliteDatabase>(),
                     _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>());
             }
+
+            // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.
+            if (Environment.GetEnvironmentVariable("PROCURE_UPDATE_SELFCHECK") == "1")
+            {
+                Utilities.UpdateCheckSchedulerSelfCheck.Run();
+            }
 #endif
         }
 
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
             => Procure.Utilities.ThemeHelper.Invalidate();
 
+        private const string LastUpdateCheckUtcKey = "LastUpdateCheckUtc";
+
+        // No permission asked, no popup: checks on launch and at least once every 24h for as long
+        // as the app stays open (UpdateCheckScheduler.ShouldCheckNow is the gate, persisted across
+        // launches via Preferences so restarting the app daily still only checks once a day rather
+        // than once per launch). Finding an update downloads it immediately in the background: the
+        // only thing the user ever sees is AppShell's sidebar card, and only once the download is
+        // actually done and there's something to restart into.
         private async Task CheckForUpdatesInBackgroundAsync()
         {
-            try
-            {
-                await Task.Delay(3000); // Allow UI to initialize first
-                var updateService = _services.GetRequiredService<IUpdateService>();
-                if (!string.IsNullOrWhiteSpace(AppConstants.GitHubRepository))
-                {
-                    var update = await updateService.CheckForUpdatesAsync(AppConstants.GitHubRepository);
-                    if (update.IsUpdateAvailable && Current?.Windows.Count > 0)
-                    {
-                        var shell = Current.Windows[0].Page as Shell;
-                        if (shell != null)
-                        {
-                            var view = await shell.DisplayAlertAsync(
-                                "Update Available",
-                                $"A new version of Procure ({update.TagName}) is available. Would you like to view update details in Settings?",
-                                "View in Settings",
-                                "Later");
+            await Task.Delay(3000); // Allow UI to initialize first
 
-                            if (view)
+            while (true)
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(AppConstants.GitHubRepository))
+                    {
+                        var lastCheck = Microsoft.Maui.Storage.Preferences.Default.Get(LastUpdateCheckUtcKey, DateTime.MinValue);
+                        if (Utilities.UpdateCheckScheduler.ShouldCheckNow(lastCheck, DateTime.UtcNow))
+                        {
+                            var updateService = _services.GetRequiredService<IUpdateService>();
+                            var update = await updateService.CheckForUpdatesAsync(AppConstants.GitHubRepository);
+                            Microsoft.Maui.Storage.Preferences.Default.Set(LastUpdateCheckUtcKey, DateTime.UtcNow);
+
+                            if (update.IsUpdateAvailable)
                             {
-                                await shell.GoToAsync("//settings");
+                                await updateService.DownloadUpdateAsync(update);
+                                NotifyUpdateReady(update.TagName);
                             }
                         }
                     }
                 }
+                catch
+                {
+                    // Silently ignore - the next cycle tries again, and a failed check/download
+                    // must never be visible to someone who was never asked to look at this.
+                }
+
+                await Task.Delay(Utilities.UpdateCheckScheduler.MinimumInterval);
             }
-            catch
+        }
+
+        private void NotifyUpdateReady(string versionTag)
+        {
+            if (Current?.Windows.Count > 0 && Current.Windows[0].Page is AppShell shell)
             {
-                // Silently ignore background check failures on startup
+                shell.ShowUpdateReadyBanner(versionTag);
             }
         }
 

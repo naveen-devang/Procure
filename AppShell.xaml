@@ -73,9 +73,62 @@
         Icon="{StaticResource IconSettings}"
         Route="settings" />
 
-    <!-- Flyout Footer: Responsive Theme Switcher -->
+    <!-- Flyout Footer: Update-Ready Card + Responsive Theme Switcher -->
     <Shell.FlyoutFooter>
-        <Grid BackgroundColor="Transparent">
+        <VerticalStackLayout BackgroundColor="Transparent">
+            <!-- Silent auto-update card - hidden by default, shown only once a downloaded update
+                 is actually ready (see App.xaml.cs / AppShell.xaml.cs). Never asks permission to
+                 check or download; this is the first and only thing the user sees, and only when
+                 there's something to act on. -->
+            <Border x:Name="UpdateReadyCard"
+                    IsVisible="False"
+                    Margin="12,0,12,10"
+                    Padding="12,10"
+                    StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="6">
+                    <Grid ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center">
+                        <Ellipse Grid.Column="0" WidthRequest="6" HeightRequest="6" Margin="0,0,6,0"
+                                 Fill="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                        <Label Grid.Column="1" x:Name="UpdateReadyTitleLabel" Text="Update ready"
+                               FontFamily="SegoeSemibold" FontSize="12"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Button Grid.Column="2" Text="&#xE711;"
+                                FontFamily="Segoe Fluent Icons" FontSize="10"
+                                Clicked="OnDismissUpdateBannerClicked"
+                                BackgroundColor="Transparent" Padding="0"
+                                WidthRequest="22" HeightRequest="22"
+                                ToolTipProperties.Text="Dismiss"
+                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    </Grid>
+                    <Label Text="Downloaded in the background. Restart to apply." FontSize="10.5"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                    <HorizontalStackLayout Spacing="6">
+                        <Button Text="Restart" Clicked="OnRestartForUpdateClicked"
+                                Style="{StaticResource PrimaryButton}"
+                                FontSize="11" HeightRequest="28" Padding="12,0" HorizontalOptions="FillAndExpand" />
+                        <Button Text="Later" Clicked="OnDismissUpdateBannerClicked"
+                                Style="{StaticResource CancelButton}"
+                                FontSize="11" HeightRequest="28" Padding="12,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Compact sidebar has no room for the card - a small dot on the theme button stands
+                 in for it; clicking the theme button area still gets you to Settings, where the
+                 same update is always checkable the old manual way regardless. -->
+            <BoxView x:Name="CompactUpdateDot"
+                     IsVisible="False"
+                     WidthRequest="6" HeightRequest="6" CornerRadius="3"
+                     HorizontalOptions="Center" Margin="0,0,0,6"
+                     Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                     ToolTipProperties.Text="Update ready - open Settings to restart" />
+
+            <Grid BackgroundColor="Transparent">
             <!-- Expanded Footer Layout: Full Two-Button Theme Switcher -->
             <Grid x:Name="ExpandedFooterLayout"
                   Padding="16,14"
@@ -143,7 +196,8 @@
                         TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                         ToolTipProperties.Text="Toggle Theme" />
             </Grid>
-        </Grid>
+            </Grid>
+        </VerticalStackLayout>
     </Shell.FlyoutFooter>
 
 </Shell>
