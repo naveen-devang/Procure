@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -722,18 +722,25 @@ namespace Procure.Services.Export
             }
 
             // MULTI-PAGE PDF BINARY COMPILATION
-            int totalPages = pages.Count;
+            // Labels ("Page N of M", P.T.O.) come from the laid-out document; which pages are written
+            // out is a separate, later decision (PagesToEmit), so a subset keeps its original numbering.
+            int laidOutPages = pages.Count;
+            var emit = options.PagesToEmit is { Count: > 0 }
+                ? options.PagesToEmit.Where(i => i >= 0 && i < laidOutPages).Distinct().OrderBy(i => i).ToList()
+                : Enumerable.Range(0, laidOutPages).ToList();
+            if (emit.Count == 0) emit = Enumerable.Range(0, laidOutPages).ToList();
+            int totalPages = emit.Count;
             var pageStreamBytes = new List<byte[]>();
 
-            for (int pIdx = 0; pIdx < totalPages; pIdx++)
+            foreach (var pIdx in emit)
             {
                 var text = pages[pIdx].Stream.ToString();
                 // Replace page placeholder with final page count in top-right corner
-                var pageNumberText = $"Page {pIdx + 1} of {totalPages}";
+                var pageNumberText = $"Page {pIdx + 1} of {laidOutPages}";
                 text = text.Replace($"##PAGE_{pIdx + 1}_PLACEHOLDER##", pageNumberText);
 
                 // Replace P.T.O. placeholder (show on all pages except the last page)
-                var ptoText = (pIdx < totalPages - 1) ? "P.T.O." : "";
+                var ptoText = (pIdx < laidOutPages - 1) ? "P.T.O." : "";
                 text = text.Replace($"##PTO_{pIdx + 1}_PLACEHOLDER##", ptoText);
 
                 pageStreamBytes.Add(EncodeWinAnsi(text));

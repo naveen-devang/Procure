@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
@@ -165,6 +165,12 @@ namespace Procure
             if (Environment.GetEnvironmentVariable("PROCURE_BOARD_SELFCHECK") == "1")
             {
                 _ = Utilities.BoardMemorySelfCheck.RunAsync();
+            }
+
+            // Opt-in only: PROCURE_PRINT_SELFCHECK=1. Measures installed drivers; prints nothing.
+            if (Environment.GetEnvironmentVariable("PROCURE_PRINT_SELFCHECK") == "1")
+            {
+                _ = Utilities.PrintGeometrySelfCheck.RunAsync();
             }
 #endif
 

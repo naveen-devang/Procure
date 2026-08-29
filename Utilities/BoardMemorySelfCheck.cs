@@ -298,7 +298,7 @@ namespace Procure.Utilities
             var pdf = Services.Export.PcrPdfExporter.GeneratePdf(pr, pcr, new[] { rfq }, "selfcheck");
             if (pdf.Length == 0) throw new InvalidOperationException("The exporter produced no PDF bytes.");
 
-            var pages = await Services.Export.PcrPdfRasterizer.RenderPagesAsync(pdf);
+            var pages = (await Services.Export.PcrPdfRasterizer.RenderPagesAsync(pdf)).Pages;
             if (pages.Count < 2)
                 throw new InvalidOperationException(
                     $"Expected a multi-page render to exercise the loop more than once; got {pages.Count} page(s).");

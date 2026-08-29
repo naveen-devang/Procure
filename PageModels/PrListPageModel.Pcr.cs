@@ -593,6 +593,14 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string PcrPageRangeText { get; set; } = string.Empty;
 
+        // Word-style Copies box. Text rather than int so a half-typed or cleared field never throws
+        // a binding error; parsed and clamped to 1-99 at print time.
+        [ObservableProperty]
+        public partial string PcrCopiesText { get; set; } = "1";
+
+        internal static int ParseCopies(string? text)
+            => int.TryParse(text?.Trim(), out var n) ? Math.Clamp(n, 1, 99) : 1;
+
         // Zoom is a pure Scale transform on the page image (no layout pass), and pan is drag-driven
         // (TranslationX/Y) rather than mouse-wheel-driven - see PcrPreviewModal.xaml.cs for why.
         [ObservableProperty]
@@ -701,6 +709,7 @@ namespace Procure.PageModels
 
                 PcrDoubleSided = false;
                 PcrPageRangeText = string.Empty;
+                PcrCopiesText = "1";
 
                 var printers = await Task.Run(() => _pcrExportService.GetAvailablePrinters());
                 PcrAvailablePrinters = new ObservableCollection<string>(printers);
@@ -726,27 +735,7 @@ namespace Procure.PageModels
             IsPcrPreviewBusy = true;
             try
             {
-                var options = new PcrPdfOptions
-                {
-                    LayoutMode = PcrShrinkToFit ? PdfLayoutMode.ShrinkToFit : PdfLayoutMode.AsGenerated,
-                    PaperSize = PcrPaperSize switch
-                    {
-                        "A0" => PdfPaperSize.A0,
-                        "A1" => PdfPaperSize.A1,
-                        "A2" => PdfPaperSize.A2,
-                        "A3" => PdfPaperSize.A3,
-                        "A5" => PdfPaperSize.A5,
-                        "A6" => PdfPaperSize.A6,
-                        "Letter" => PdfPaperSize.Letter,
-                        "Legal" => PdfPaperSize.Legal,
-                        "Tabloid" => PdfPaperSize.Tabloid,
-                        "Executive" => PdfPaperSize.Executive,
-                        _ => PdfPaperSize.A4
-                    },
-                    Orientation = PcrOrientation == "Portrait" ? PdfOrientation.Portrait : PdfOrientation.Landscape,
-                    MarginPreset = PcrMarginPreset switch { "Narrow" => PdfMarginPreset.Narrow, "Wide" => PdfMarginPreset.Wide, _ => PdfMarginPreset.Normal },
-                    IncludeSignatureBoxes = PcrIncludeSignatureBoxes
-                };
+                var options = BuildPcrPdfOptions();
 
                 var pr = _pcrPreviewPr;
                 var pcr = pr.Pcr!;
@@ -756,7 +745,7 @@ namespace Procure.PageModels
                 var (bytes, images) = await Task.Run(async () =>
                 {
                     var pdfBytes = _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options);
-                    var pages = await PcrPdfRasterizer.RenderPagesAsync(pdfBytes);
+                    var pages = (await PcrPdfRasterizer.RenderPagesAsync(pdfBytes)).Pages;
                     return (pdfBytes, pages);
                 });
 
@@ -782,6 +771,30 @@ namespace Procure.PageModels
                 if (generation == _pcrPreviewGeneration) IsPcrPreviewBusy = false;
             }
         }
+
+        /// <summary>The layout options currently shown in the preview panel, as the exporter wants
+        /// them. Shared by the preview render and the print path, which adds a page subset on top.</summary>
+        private PcrPdfOptions BuildPcrPdfOptions() => new()
+        {
+            LayoutMode = PcrShrinkToFit ? PdfLayoutMode.ShrinkToFit : PdfLayoutMode.AsGenerated,
+            PaperSize = PcrPaperSize switch
+            {
+                "A0" => PdfPaperSize.A0,
+                "A1" => PdfPaperSize.A1,
+                "A2" => PdfPaperSize.A2,
+                "A3" => PdfPaperSize.A3,
+                "A5" => PdfPaperSize.A5,
+                "A6" => PdfPaperSize.A6,
+                "Letter" => PdfPaperSize.Letter,
+                "Legal" => PdfPaperSize.Legal,
+                "Tabloid" => PdfPaperSize.Tabloid,
+                "Executive" => PdfPaperSize.Executive,
+                _ => PdfPaperSize.A4
+            },
+            Orientation = PcrOrientation == "Portrait" ? PdfOrientation.Portrait : PdfOrientation.Landscape,
+            MarginPreset = PcrMarginPreset switch { "Narrow" => PdfMarginPreset.Narrow, "Wide" => PdfMarginPreset.Wide, _ => PdfMarginPreset.Normal },
+            IncludeSignatureBoxes = PcrIncludeSignatureBoxes
+        };
 
         /// <summary>Returns to the supplier-selection modal without losing the rendered preview's
         /// source selection — suppliers/remarks are untouched, so reopening regenerates instantly.</summary>
@@ -862,7 +875,23 @@ namespace Procure.PageModels
 
             try
             {
-                var succeeded = await _pcrExportService.PrintPcrPdfAsync(_pcrPreviewBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices);
+                // A PDF/XPS-writer "printer" saves a file, so there is no printer to apply the page
+                // range - cut the PDF itself down to it instead, the way Acrobat's own print-to-PDF
+                // does, keeping the original "Page N of M" labels. A full range is the bytes on screen.
+                var pdfBytes = _pcrPreviewBytes;
+                var isSubset = pageIndices.Count < PcrPreviewPages.Count;
+                if (isSubset && _pcrExportService.IsFileWriterPrinter(PcrSelectedPrinter) && _pcrPreviewRfqs != null)
+                {
+                    var pr = _pcrPreviewPr;
+                    var pcr = pr.Pcr!;
+                    var rfqs = _pcrPreviewRfqs;
+                    var remarks = _pcrPreviewRemarksSnapshot;
+                    var options = BuildPcrPdfOptions() with { PagesToEmit = pageIndices };
+                    pdfBytes = await Task.Run(() => _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options));
+                }
+
+                var copies = ParseCopies(PcrCopiesText);
+                var succeeded = await _pcrExportService.PrintPcrPdfAsync(pdfBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices, copies);
                 ShowToast(succeeded ? $"Sent to {PcrSelectedPrinter}" : "Print cancelled");
             }
             catch (Exception ex)

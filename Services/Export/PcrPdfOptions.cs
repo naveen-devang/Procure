@@ -1,4 +1,4 @@
-namespace Procure.Services.Export
+﻿namespace Procure.Services.Export
 {
     public enum PdfLayoutMode
     {
@@ -42,5 +42,11 @@ namespace Procure.Services.Export
         public PdfOrientation Orientation { get; init; } = PdfOrientation.Landscape;
         public PdfMarginPreset MarginPreset { get; init; } = PdfMarginPreset.Normal;
         public bool IncludeSignatureBoxes { get; init; } = true;
+
+        /// <summary>0-based pages to write out; null or empty means all of them. Layout and the
+        /// "Page N of M" labels are still computed over the full document, so a 3-page subset of a
+        /// 5-page sheet reads "Page 3 of 5" exactly as Acrobat's own page-range print does. Used by
+        /// the print path for PDF/XPS-writer "printers", which save a file rather than print.</summary>
+        public System.Collections.Generic.IReadOnlyList<int>? PagesToEmit { get; init; }
     }
 }
