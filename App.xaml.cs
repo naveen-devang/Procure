@@ -132,11 +132,15 @@ namespace Procure
 
                 if (lastShown == currentVersion) return;
 
+                // Persist the marker before the network round-trip below, not after. A slow or
+                // rate-limited GitHub call (the anonymous API is capped at 60 req/hour per IP) threw
+                // past the old post-fetch write on some launches, so the marker never updated and the
+                // dialog kept reappearing every single launch instead of once per version.
+                Utilities.UpdateStateStore.SetLastWhatsNewVersionShown(currentVersion);
+
                 var notes = string.IsNullOrWhiteSpace(AppConstants.GitHubRepository)
                     ? null
                     : await updateService.GetReleaseNotesForVersionAsync(AppConstants.GitHubRepository, currentVersion);
-
-                Utilities.UpdateStateStore.SetLastWhatsNewVersionShown(currentVersion);
 
                 if (Current?.Windows.Count > 0 && Current.Windows[0].Page is Shell shell)
                 {
