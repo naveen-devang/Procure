@@ -22,6 +22,7 @@
             <converters:PoPillTextColorConverter x:Key="PoPillTextColorConverter" />
             <converters:PcrPillTextColorConverter x:Key="PcrPillTextColorConverter" />
             <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <converters:StringEqualsConverter x:Key="StringEqualsConverter" />
             <converters:StringEqualsToBorderWidthConverter x:Key="StringEqualsToBorderWidthConverter" />
             <converters:BoolToInvertedBoolConverter x:Key="BoolToInvertedBoolConverter" />
             <converters:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
@@ -80,7 +81,7 @@
                              Size="{StaticResource IconSize}" />
 
             <FontImageSource x:Key="IconMaterials"
-                             Glyph="{x:Static f:FluentUI.arrow_download_24_regular}"
+                             Glyph="{x:Static f:FluentUI.building_factory_24_regular}"
                              FontFamily="{x:Static f:FluentUI.FontFamily}"
                              Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                              Size="{StaticResource IconSize}" />

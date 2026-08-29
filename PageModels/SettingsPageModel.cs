@@ -25,9 +25,39 @@ namespace Procure.PageModels
         private readonly IErrorHandler _errorHandler;
         private readonly IKeyboardShortcutService _keyboardShortcutService;
 
+        /// <summary>Backs the Custom Columns section, which moved here from its own sidebar tab. It is a
+        /// DI singleton with its own commands and its own Columns collection; the section's LazyExpander
+        /// template binds straight to this rather than to the page model.</summary>
+        public ManageColumnsPageModel ColumnsModel { get; }
+
         // Built once from the registry - each row watches the shared service itself, so nothing here
         // needs to refresh them individually when a binding changes or a recording completes.
         public ObservableCollection<ShortcutRowViewModel> ShortcutRows { get; }
+
+        /// <summary>The one instance DI ever constructs (AddSingleton). Section item-templates realised
+        /// inside a LazyExpander.ContentTemplate sit in a nested template namescope where {x:Reference}
+        /// to the page does not resolve; they reach page-level commands through this static instead,
+        /// the same pattern PrListPageModel.Current serves on the board.</summary>
+        public static SettingsPageModel? Current { get; private set; }
+
+        /// <summary>Which settings category the right-hand pane shows. Each section's LazyExpander builds
+        /// its content the first time this matches; a section never selected in a session is never built.</summary>
+        [ObservableProperty]
+        public partial string SelectedSection { get; set; } = "Appearance";
+
+        [RelayCommand]
+        public void SelectSection(string section)
+        {
+            if (!string.IsNullOrWhiteSpace(section)) SelectedSection = section;
+        }
+
+        partial void OnSelectedSectionChanged(string value)
+        {
+            // The Custom Columns list used to load on that page's OnAppearing; now it loads the first
+            // (and every) time you open the section. LoadColumnsAsync guards its own re-entry and the
+            // query is a handful of rows.
+            if (value == "Columns") _ = ColumnsModel.LoadColumnsAsync();
+        }
 
         [ObservableProperty]
         public partial string SelectedThemeMode { get; set; } = "Dark";
@@ -115,7 +145,8 @@ namespace Procure.PageModels
             SeedDataService seedDataService,
             SqliteDatabase sqliteDb,
             IErrorHandler errorHandler,
-            IKeyboardShortcutService keyboardShortcutService)
+            IKeyboardShortcutService keyboardShortcutService,
+            ManageColumnsPageModel columnsModel)
         {
             _settingsService = settingsService;
             _updateService = updateService;
@@ -123,6 +154,8 @@ namespace Procure.PageModels
             _sqliteDb = sqliteDb;
             _errorHandler = errorHandler;
             _keyboardShortcutService = keyboardShortcutService;
+            ColumnsModel = columnsModel;
+            Current = this;
 
             ShortcutRows = new ObservableCollection<ShortcutRowViewModel>(
                 Procure.Utilities.KeyboardShortcutRegistry.All.Select(d => new ShortcutRowViewModel(d, _keyboardShortcutService)));

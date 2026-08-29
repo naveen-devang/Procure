@@ -11,7 +11,6 @@ namespace Procure.Utilities
     {
         public const string GoDashboard = "Global.GoDashboard";
         public const string GoPrBoard = "Global.GoPrBoard";
-        public const string GoColumns = "Global.GoColumns";
         public const string GoMaterials = "Global.GoMaterials";
         public const string GoSettings = "Global.GoSettings";
         public const string ToggleSidebar = "Global.ToggleSidebar";
@@ -38,10 +37,12 @@ namespace Procure.Utilities
     {
         public static readonly IReadOnlyList<KeyboardShortcutDefinition> All = new List<KeyboardShortcutDefinition>
         {
-            new(KeyboardShortcutIds.GoDashboard, "Go to Dashboard", "Global", "Ctrl+1"),
-            new(KeyboardShortcutIds.GoPrBoard, "Go to PR Board", "Global", "Ctrl+2"),
-            new(KeyboardShortcutIds.GoColumns, "Go to Custom Columns", "Global", "Ctrl+3"),
-            new(KeyboardShortcutIds.GoMaterials, "Go to Raw & Packing", "Global", "Ctrl+Number4"),
+            // Combo strings must be exactly what ShortcutInput.Capture produces: for the top-row
+            // digit keys that is "Number1".."Number9", not "1".."9". "Ctrl+1" / "Ctrl+2" here never
+            // matched a real keypress - those two shortcuts were dead until this was corrected.
+            new(KeyboardShortcutIds.GoDashboard, "Go to Dashboard", "Global", "Ctrl+Number1"),
+            new(KeyboardShortcutIds.GoPrBoard, "Go to PR Board", "Global", "Ctrl+Number2"),
+            new(KeyboardShortcutIds.GoMaterials, "Go to Raw & Packing", "Global", "Ctrl+Number3"),
             new(KeyboardShortcutIds.GoSettings, "Go to Settings", "Global", "Ctrl+Comma"),
             new(KeyboardShortcutIds.ToggleSidebar, "Toggle Sidebar", "Global", "Ctrl+B"),
 

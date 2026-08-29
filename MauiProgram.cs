@@ -140,8 +140,9 @@ namespace Procure
             builder.Services.AddSingleton<PrListPageModel>();
             builder.Services.AddSingleton<PrListPage>();
 
+            // ManageColumnsPage is gone - its content moved into the Settings page's Custom Columns
+            // section. The model stays: SettingsPageModel takes it by constructor injection.
             builder.Services.AddSingleton<ManageColumnsPageModel>();
-            builder.Services.AddSingleton<ManageColumnsPage>();
 
             builder.Services.AddSingleton<CallOffPageModel>();
             builder.Services.AddSingleton<CallOffPage>();

@@ -13,9 +13,10 @@ namespace Fonts
     {
         public const string FontFamily = "FluentUI";
 
-        // All six are referenced from App.xaml as {x:Static f:FluentUI.<name>}.
+        // All are referenced from App.xaml as {x:Static f:FluentUI.<name>}.
         public const string arrow_clockwise_24_regular = "\uf13e";
         public const string arrow_download_24_regular = "\uf151";
+        public const string building_factory_24_regular = "\ue218";
         public const string desktop_24_regular = "\uf35a";
         public const string document_24_regular = "\uf379";
         public const string settings_24_regular = "\uf6aa";

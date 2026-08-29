@@ -85,9 +85,6 @@ namespace Procure
                 Procure.Utilities.BoardTrace.Mark("click-inflate-done");
             }
             else if (target.Contains("prboard", StringComparison.Ordinal)) targetPage = PrBoardContent.Content as Page;
-            else if (ColumnsContent.Content is null && target.Contains("columns", StringComparison.Ordinal))
-                ColumnsContent.Content = targetPage = _services.GetRequiredService<ManageColumnsPage>();
-            else if (target.Contains("columns", StringComparison.Ordinal)) targetPage = ColumnsContent.Content as Page;
             else if (MaterialsContent.Content is null && target.Contains("materials", StringComparison.Ordinal))
                 MaterialsContent.Content = targetPage = _services.GetRequiredService<CallOffPage>();
             else if (target.Contains("materials", StringComparison.Ordinal)) targetPage = MaterialsContent.Content as Page;
@@ -146,8 +143,45 @@ namespace Procure
                 root.PreviewKeyDown += OnShellPreviewKeyDown;
             }
 
+#if WINDOWS
+            // ShellContent.ToolTipProperties.Text does not reach the WinUI NavigationViewItem the
+            // flyout renders, so a collapsed sidebar has icons with no hover label. Set the tooltip
+            // on each realised item from its own label text. Delayed: the items are not in the tree
+            // yet at handler-changed. Runs again from UpdateMaterialsTabVisibility when that toggle
+            // adds or removes the Raw & Packing item.
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(400), ApplyFlyoutItemTooltips);
+#endif
+
             FocusShellRootForKeyboard();
         }
+
+#if WINDOWS
+        private void ApplyFlyoutItemTooltips()
+        {
+            if (Handler?.PlatformView is not Microsoft.UI.Xaml.DependencyObject root) return;
+
+            foreach (var item in Descendants<Microsoft.UI.Xaml.Controls.NavigationViewItem>(root))
+            {
+                var label = Descendants<Microsoft.UI.Xaml.Controls.TextBlock>(item)
+                    .Select(t => t.Text)
+                    .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+                if (!string.IsNullOrWhiteSpace(label))
+                    Microsoft.UI.Xaml.Controls.ToolTipService.SetToolTip(item, label);
+            }
+        }
+
+        private static IEnumerable<T> Descendants<T>(Microsoft.UI.Xaml.DependencyObject root)
+            where T : Microsoft.UI.Xaml.DependencyObject
+        {
+            var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < count; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
+                if (child is T match) yield return match;
+                foreach (var nested in Descendants<T>(child)) yield return nested;
+            }
+        }
+#endif
 
         // WinUI only routes PreviewKeyDown along the path to whatever element currently holds logical
         // keyboard focus - with nothing focused anywhere (true right after launch, and true on
@@ -220,7 +254,6 @@ namespace Procure
             string? route = null;
             if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoDashboard), e.Key)) route = "main";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoPrBoard), e.Key)) route = "prboard";
-            else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoColumns), e.Key)) route = "columns";
             else if (_settingsService.IsRawPackingTabEnabled && Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoMaterials), e.Key)) route = "materials";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoSettings), e.Key)) route = "settings";
 
@@ -274,6 +307,11 @@ namespace Procure
             {
                 _ = GoToAsync("//main");
             }
+
+#if WINDOWS
+            // Re-tooltip: turning the tab on realises a new NavigationViewItem with no tooltip yet.
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(300), ApplyFlyoutItemTooltips);
+#endif
         }
 
         private void OnShellSizeChanged(object? sender, EventArgs e)
@@ -441,7 +479,7 @@ namespace Procure
         /// <summary>Every page this shell keeps alive - null until first opened.</summary>
         internal IEnumerable<Page?> KeptAlivePages => new Page?[]
         {
-            DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page, ColumnsContent.Content as Page, SettingsContent.Content as Page
+            DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page, SettingsContent.Content as Page
         };
 
         /// <summary>Pushes the current theme into every kept-alive page's native tree - the hidden ones

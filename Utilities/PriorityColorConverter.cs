@@ -107,6 +107,17 @@ namespace Procure.Utilities
         public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
+    /// <summary>True when the bound string equals the ConverterParameter (case-insensitive). Drives the
+    /// Settings page section panes: each LazyExpander's IsExpanded binds through this against
+    /// SelectedSection, so only the chosen section is built and the rest cost nothing.</summary>
+    public class StringEqualsConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => string.Equals(value as string, parameter as string, StringComparison.OrdinalIgnoreCase);
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
     public class NullToBoolConverter : IValueConverter
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

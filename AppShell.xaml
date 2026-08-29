@@ -60,13 +60,6 @@
         Route="materials" />
 
     <ShellContent
-        x:Name="ColumnsContent"
-        Title="Custom Columns"
-        ToolTipProperties.Text="Custom Columns"
-        Icon="{StaticResource IconColumns}"
-        Route="columns" />
-
-    <ShellContent
         x:Name="SettingsContent"
         Title="Settings"
         ToolTipProperties.Text="Settings"

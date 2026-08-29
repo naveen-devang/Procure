@@ -35,12 +35,19 @@ namespace Procure.PageModels
 
         public string[] AvailableDataTypes => CustomFieldDataType.All;
 
+        /// <summary>The one instance DI ever constructs (AddSingleton). The Custom Columns section now
+        /// lives inside the Settings page, realised in a LazyExpander template whose BindingContext is
+        /// this model; the per-row delete button reaches its command through this static, the same
+        /// pattern SettingsPageModel.Current and PrListPageModel.Current use.</summary>
+        public static ManageColumnsPageModel? Current { get; private set; }
+
         public ManageColumnsPageModel(
             ICustomColumnRepository columnRepo,
             IErrorHandler errorHandler)
         {
             _columnRepo = columnRepo;
             _errorHandler = errorHandler;
+            Current = this;
         }
 
         partial void OnNewColumnDataTypeChanged(string value)
