@@ -211,7 +211,15 @@ namespace Procure.PageModels
             }
         }
 
-        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e) => RefreshCardVisuals();
+        // Application.RequestedThemeChanged fires a dispatcher turn AFTER SettingsChanged, so a
+        // queue-flag guard cannot fold the two together. It only carries new information when the
+        // theme follows the OS ("System"); pinned to Light/Dark, the only thing that can raise it
+        // is this app's own AppTheme setter, which SettingsChanged has already handled.
+        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+        {
+            if (_settingsService.AppTheme is "Light" or "Dark") return;
+            RefreshCardVisuals();
+        }
 
         private int _cardVisualsRefreshQueued;
 

@@ -167,6 +167,18 @@ namespace Procure
                 _ = Utilities.BoardMemorySelfCheck.RunAsync();
             }
 
+            // Opt-in only: PROCURE_ACCENT_SELFCHECK=1. Cycles every accent in both modes, then restores.
+            if (Environment.GetEnvironmentVariable("PROCURE_ACCENT_SELFCHECK") == "1")
+            {
+                _ = Utilities.AccentSelfCheck.RunAsync();
+            }
+
+            // Opt-in only: PROCURE_THEME_SELFCHECK=1. Switches the theme for real and back again.
+            if (Environment.GetEnvironmentVariable("PROCURE_THEME_SELFCHECK") == "1")
+            {
+                _ = Utilities.ThemeTransitionSelfCheck.RunAsync();
+            }
+
             // Opt-in only: PROCURE_PRINT_SELFCHECK=1. Measures installed drivers; prints nothing.
             if (Environment.GetEnvironmentVariable("PROCURE_PRINT_SELFCHECK") == "1")
             {

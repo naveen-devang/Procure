@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -68,12 +68,24 @@ namespace Procure.PageModels
             }
         }
 
-        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e) => RefreshCardVisuals();
+        // Application.RequestedThemeChanged fires a dispatcher turn AFTER SettingsChanged, so a
+        // queue-flag guard cannot fold the two together. It only carries new information when the
+        // theme follows the OS ("System"); pinned to Light/Dark, the only thing that can raise it
+        // is this app's own AppTheme setter, which SettingsChanged has already handled.
+        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+        {
+            if (_settingsService.AppTheme is "Light" or "Dark") return;
+            RefreshCardVisuals();
+        }
+
+        // Test seam for ThemeTransitionSelfCheck: one switch must repaint exactly once.
+        internal int CardRepaintsForTest { get; private set; }
 
         private void RefreshCardVisuals()
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
+                CardRepaintsForTest++;
                 foreach (var pr in Metrics.NeedsAttentionPrs)
                 {
                     pr.NotifyHierarchyChanged();

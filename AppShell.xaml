@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <Shell
     x:Class="Procure.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -93,7 +93,7 @@
                 <VerticalStackLayout Spacing="6">
                     <Grid ColumnDefinitions="Auto, *, Auto" VerticalOptions="Center">
                         <Ellipse Grid.Column="0" WidthRequest="6" HeightRequest="6" Margin="0,0,6,0"
-                                 Fill="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                                 Fill="{DynamicResource AccentFill}" />
                         <Label Grid.Column="1" x:Name="UpdateReadyTitleLabel" Text="Update ready"
                                FontFamily="SegoeSemibold" FontSize="12"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
@@ -125,7 +125,7 @@
                      IsVisible="False"
                      WidthRequest="6" HeightRequest="6" CornerRadius="3"
                      HorizontalOptions="Center" Margin="0,0,0,6"
-                     Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                     Color="{DynamicResource AccentFill}"
                      ToolTipProperties.Text="Update ready - open Settings to restart" />
 
             <Grid BackgroundColor="Transparent">

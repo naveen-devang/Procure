@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Controls;
@@ -102,6 +102,12 @@ namespace Procure
             _settingsService.SettingsChanged += OnSettingsChanged;
             SizeChanged -= OnShellSizeChanged;
             SizeChanged += OnShellSizeChanged;
+
+#if WINDOWS
+            // MAUI's title text is created with the window and coloured once for the theme the app
+            // started in; a saved Light theme needs it re-coloured once the tree exists.
+            Dispatcher.Dispatch(Procure.Utilities.TitleBarHelper.Apply);
+#endif
 
             // App-wide shortcuts (page switching, sidebar toggle, shortcut recording) live here
             // rather than on any one page's hook, since Shell's root is the only element alive
@@ -356,18 +362,17 @@ namespace Procure
             await TransitionThemeAsync(isDark ? "Light" : "Dark", CompactThemeBtn);
         }
 
-        // Internal so the Settings page's theme picker goes through the same curtain/fade instead of
-        // hard-flipping the whole app.
+        // Internal so the Settings page's theme picker goes through the same curtain instead of
+        // hard-flipping the whole app. Setting AppTheme raises SettingsChanged, which is what refreshes
+        // the button highlights and the title bar - once. They used to be called explicitly here as
+        // well, so every switch ran them twice and started two competing fades on the same buttons.
         internal async Task TransitionThemeAsync(string targetTheme, Button? clickedBtn = null)
         {
-            if (_isThemeTransitioning) return;
+            if (_isThemeTransitioning || _settingsService.AppTheme == targetTheme) return;
             _isThemeTransitioning = true;
-
-            var isGoingToDark = targetTheme == "Dark";
 
             try
             {
-                // 1. Button micro-animations
                 if (clickedBtn != null)
                 {
                     _ = clickedBtn.ScaleToAsync(0.85, 70, Easing.CubicOut)
@@ -379,33 +384,21 @@ namespace Procure
                     _ = CompactThemeBtn.RelRotateToAsync(180, 250, Easing.CubicOut);
                 }
 
-                // 2. Execute GPU-accelerated curtain transition on current page if supported
-                if (CurrentPage is IThemeTransitionable transitionablePage)
+#if WINDOWS
+                // One curtain over the whole window - sidebar, page, any open modal - rather than one
+                // per page. See ThemeCurtain for why it has to be a compositor animation.
+                if (Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window native)
                 {
-                    await transitionablePage.AnimateThemeTransitionAsync(() =>
-                    {
-                        _settingsService.AppTheme = targetTheme;
-                        UpdateThemeButtonHighlights();
-                    }, isGoingToDark);
+                    await Procure.Utilities.ThemeCurtain.RunAsync(native, targetTheme == "Dark",
+                        () => _settingsService.AppTheme = targetTheme);
+                    return;
                 }
-                else if (CurrentPage != null)
-                {
-                    await CurrentPage.FadeToAsync(0.5, 140, Easing.CubicOut);
-                    _settingsService.AppTheme = targetTheme;
-                    UpdateThemeButtonHighlights();
-                    await Task.Delay(35);
-                    await CurrentPage.FadeToAsync(1.0, 180, Easing.CubicIn);
-                }
-                else
-                {
-                    _settingsService.AppTheme = targetTheme;
-                    UpdateThemeButtonHighlights();
-                }
+#endif
+                _settingsService.AppTheme = targetTheme;
             }
             catch
             {
                 _settingsService.AppTheme = targetTheme;
-                UpdateThemeButtonHighlights();
             }
             finally
             {
@@ -413,8 +406,12 @@ namespace Procure
             }
         }
 
+        // Test seam for ThemeTransitionSelfCheck: one switch must land here exactly once.
+        internal int ThemeHighlightRefreshesForTest { get; private set; }
+
         private void UpdateThemeButtonHighlights()
         {
+            ThemeHighlightRefreshesForTest++;
             var isDark = Procure.Utilities.ThemeHelper.IsDark;
             if (LightModeBtn != null && DarkModeBtn != null)
             {

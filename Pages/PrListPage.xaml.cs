@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,7 +10,7 @@ using Procure.PageModels;
 
 namespace Procure.Pages
 {
-    public partial class PrListPage : ContentPage, IThemeTransitionable
+    public partial class PrListPage : ContentPage
     {
         private readonly PrListPageModel _viewModel;
         private readonly Procure.Services.IKeyboardShortcutService _shortcuts;
@@ -469,35 +469,6 @@ namespace Procure.Pages
                 }
 #endif
                 await _viewModel.ChangePrStatusAsync(pr);
-            }
-        }
-
-        public async Task AnimateThemeTransitionAsync(Action applyTheme, bool isGoingToDark)
-        {
-            try
-            {
-                ThemeCurtain.Color = isGoingToDark ? Color.FromArgb("#202020") : Color.FromArgb("#F3F3F3");
-                ThemeCurtain.Opacity = 0;
-                ThemeCurtain.IsVisible = true;
-
-                // Smooth GPU-accelerated fade-in of curtain (160ms)
-                await ThemeCurtain.FadeToAsync(1.0, 160, Easing.SinInOut);
-
-                // Apply theme swap and refresh items behind the solid curtain
-                applyTheme();
-                await Task.Delay(40);
-
-                // Smooth GPU-accelerated reveal of newly styled UI (200ms)
-                await ThemeCurtain.FadeToAsync(0.0, 200, Easing.SinInOut);
-            }
-            catch
-            {
-                applyTheme();
-            }
-            finally
-            {
-                ThemeCurtain.IsVisible = false;
-                ThemeCurtain.Opacity = 0;
             }
         }
     }

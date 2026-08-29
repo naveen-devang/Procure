@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
@@ -168,13 +168,5 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- Hardware-Accelerated Theme Transition Curtain -->
-        <BoxView x:Name="ThemeCurtain"
-                 InputTransparent="True"
-                 IsVisible="False"
-                 Opacity="0"
-                 ZIndex="9999"
-                 HorizontalOptions="Fill"
-                 VerticalOptions="Fill" />
     </Grid>
 </ContentPage>

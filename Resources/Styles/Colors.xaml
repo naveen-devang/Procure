@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary 
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
@@ -6,6 +6,8 @@
     <!-- Windows 11 Fluent 2 Design System Color Tokens -->
     <Color x:Key="Primary">#0078D4</Color>
     <Color x:Key="PrimaryDark">#60CDFF</Color>
+    <!-- The pastel accent, for fills, in both modes. Overwritten by SettingsService.ApplyAccentColor. -->
+    <Color x:Key="AccentFill">#60CDFF</Color>
     <Color x:Key="PrimaryDarkText">#001C38</Color>
     <Color x:Key="Secondary">#2B2B2B</Color>
     <Color x:Key="SecondaryDarkText">#60CDFF</Color>

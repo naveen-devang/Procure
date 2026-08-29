@@ -1,10 +1,10 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary 
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{DynamicResource Primary}" />
+        <Setter Property="Color" Value="{DynamicResource AccentFill}" />
     </Style>
 
     <Style TargetType="Border">
@@ -18,8 +18,9 @@
     </Style>
 
     <Style TargetType="Button">
-        <Setter Property="TextColor" Value="{StaticResource White}" />
-        <Setter Property="BackgroundColor" Value="{DynamicResource Primary}" />
+        <!-- Pastel fill in both modes (what the accent picker shows), so the text is dark, not white. -->
+        <Setter Property="TextColor" Value="{StaticResource DarkOnLightBackground}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource AccentFill}" />
         <Setter Property="FontFamily" Value="SegoeSemibold"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="BorderWidth" Value="0"/>
@@ -28,7 +29,7 @@
     </Style>
 
     <Style TargetType="CheckBox">
-        <Setter Property="Color" Value="{DynamicResource Primary}" />
+        <Setter Property="Color" Value="{DynamicResource AccentFill}" />
     </Style>
 
     <Style TargetType="Editor">

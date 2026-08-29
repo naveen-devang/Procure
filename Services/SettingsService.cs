@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Maui.Controls;
@@ -278,6 +278,10 @@ namespace Procure.Services
             };
 
             ThemeHelper.Invalidate();
+
+            // Primary is theme-dependent (see ApplyAccentColor), so a theme change re-resolves it.
+            // Reached from the AppTheme setter, which runs under ThemeCurtain - nothing flashes.
+            ApplyAccentColor(AccentTheme);
         }
 
         private void ApplyAccentColor(string accentId)
@@ -287,23 +291,28 @@ namespace Procure.Services
             var palette = PastelPalettes.FirstOrDefault(p => p.Id.Equals(accentId, StringComparison.OrdinalIgnoreCase))
                           ?? PastelPalettes[0];
 
-            Application.Current.Resources["Primary"] = palette.LightColor;
+            // Each accent carries two colours. The pastel (DarkColor) is what the picker shows and is
+            // now what every FILL gets - button backgrounds, toggle tracks, checkboxes, spinners - in
+            // both modes, via AccentFill. It used to be written only to PrimaryDark, which nothing but
+            // a few Dark-mode text/icon spots read, so the pastel was painted on nothing but the swatch.
+            //
+            // Primary stays for text, borders and icons on a plain background, where a pastel on white
+            // is unreadable at text size: deep in Light, pastel in Dark. It follows the theme because
+            // ApplyThemeMode re-runs this. (FluentPrimaryBg/FluentInfo/FocusStroke/SecondaryDarkText
+            // were also written here; nothing reads them - dropped.)
+            var primary = ThemeHelper.IsDark ? palette.DarkColor : palette.LightColor;
+
+            Application.Current.Resources["Primary"] = primary;
             Application.Current.Resources["PrimaryDark"] = palette.DarkColor;
-            Application.Current.Resources["SecondaryDarkText"] = palette.DarkColor;
-            Application.Current.Resources["FluentPrimaryBg"] = palette.BgColor;
-            Application.Current.Resources["FluentInfo"] = palette.DarkColor;
-            Application.Current.Resources["FocusStroke"] = palette.LightColor;
-            Application.Current.Resources["PrimaryBrush"] = new SolidColorBrush(palette.LightColor);
+            Application.Current.Resources["AccentFill"] = palette.DarkColor;
+            Application.Current.Resources["PrimaryBrush"] = new SolidColorBrush(primary);
 
             foreach (var dict in Application.Current.Resources.MergedDictionaries)
             {
-                dict["Primary"] = palette.LightColor;
+                dict["Primary"] = primary;
                 dict["PrimaryDark"] = palette.DarkColor;
-                dict["SecondaryDarkText"] = palette.DarkColor;
-                dict["FluentPrimaryBg"] = palette.BgColor;
-                dict["FluentInfo"] = palette.DarkColor;
-                dict["FocusStroke"] = palette.LightColor;
-                dict["PrimaryBrush"] = new SolidColorBrush(palette.LightColor);
+                dict["AccentFill"] = palette.DarkColor;
+                dict["PrimaryBrush"] = new SolidColorBrush(primary);
             }
         }
     }
