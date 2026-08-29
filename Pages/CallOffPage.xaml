@@ -159,27 +159,41 @@
 
                 <VerticalStackLayout Spacing="16" x:DataType="pageModels:CallOffPageModel">
                     <Grid ColumnDefinitions="*,Auto,*" BindingContext="{Binding SelectedLine}" x:DataType="models:CallOffLine">
-                        <VerticalStackLayout Grid.Column="0" Spacing="4" HorizontalOptions="Start">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4" HorizontalOptions="Start" VerticalOptions="Center">
                             <Label Text="VENDOR" FontSize="10" CharacterSpacing="0.6"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             <Label Text="{Binding Vendor}" FontFamily="SegoeSemibold" FontSize="20"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                         </VerticalStackLayout>
 
-                        <VerticalStackLayout Grid.Column="1" Spacing="4" HorizontalOptions="Center">
-                            <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
-                                <Label Text="PO" FontSize="10" TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
-                                <Label Text="{Binding PoNo}" FontFamily="OpenSansSemibold" FontSize="12.5"
-                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            </HorizontalStackLayout>
-                            <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
-                                <Label Text="PR" FontSize="10" TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
-                                <Label Text="{Binding PrNo}" FontFamily="OpenSansSemibold" FontSize="12.5"
-                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                            </HorizontalStackLayout>
-                        </VerticalStackLayout>
+                        <!-- Two straight columns - every label's right edge and every value's left edge
+                             line up, instead of each row centring independently at its own text width. -->
+                        <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4"
+                              RowDefinitions="Auto,Auto,Auto,Auto" HorizontalOptions="Center" VerticalOptions="Center">
+                            <Label Grid.Row="0" Grid.Column="0" Text="PO" FontSize="10" HorizontalTextAlignment="End"
+                                   TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
+                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding PoNo}" FontFamily="OpenSansSemibold" FontSize="12.5"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
 
-                        <VerticalStackLayout Grid.Column="2" Spacing="4" HorizontalOptions="End">
+                            <Label Grid.Row="1" Grid.Column="0" Text="PR" FontSize="10" HorizontalTextAlignment="End"
+                                   TextColor="{StaticResource Gray400}" VerticalOptions="Center" />
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding PrNo}" FontFamily="OpenSansSemibold" FontSize="12.5"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                            <Label Grid.Row="2" Grid.Column="0" Text="CONTRACT" FontSize="10" HorizontalTextAlignment="End"
+                                   TextColor="{StaticResource Gray400}" VerticalOptions="Center" IsVisible="{Binding HasTransportContractNumber}" />
+                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding TransportContractNumber}" FontFamily="OpenSansSemibold" FontSize="12.5"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   IsVisible="{Binding HasTransportContractNumber}" />
+
+                            <Label Grid.Row="3" Grid.Column="0" Text="TRANSPORTER" FontSize="10" HorizontalTextAlignment="End"
+                                   TextColor="{StaticResource Gray400}" VerticalOptions="Center" IsVisible="{Binding HasTransporterName}" />
+                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding TransporterName}" FontFamily="OpenSansSemibold" FontSize="12.5"
+                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                                   IsVisible="{Binding HasTransporterName}" />
+                        </Grid>
+
+                        <VerticalStackLayout Grid.Column="2" Spacing="4" HorizontalOptions="End" VerticalOptions="Center">
                             <Label Text="MATERIAL" FontSize="10" CharacterSpacing="0.6" HorizontalOptions="End"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             <Label Text="{Binding MaterialName}" FontFamily="SegoeSemibold" FontSize="20" HorizontalOptions="End"
@@ -187,7 +201,10 @@
                         </VerticalStackLayout>
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10" BindingContext="{Binding SelectedLine}" x:DataType="models:CallOffLine">
+                    <!-- Packing Material: 3 tiles. Raw Material: same 3 plus Transport Rate/Unit in the
+                         same row - two separate fixed-column grids, toggled, so neither leaves a gap. -->
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10" BindingContext="{Binding SelectedLine}" x:DataType="models:CallOffLine"
+                          IsVisible="{Binding IsRawMaterial, Converter={StaticResource BoolToInvertedBoolConverter}}">
                         <Border Grid.Column="0" Padding="10,8" StrokeThickness="1"
                                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                                 Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
@@ -215,6 +232,50 @@
                             <VerticalStackLayout Spacing="2">
                                 <Label Text="REMAINING" FontSize="9.5" CharacterSpacing="0.5" TextColor="{StaticResource Gray400}" />
                                 <Label Text="{Binding FormattedRemaining}" FontFamily="OpenSansSemibold" FontSize="14"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10" BindingContext="{Binding SelectedLine}" x:DataType="models:CallOffLine"
+                          IsVisible="{Binding IsRawMaterial}">
+                        <Border Grid.Column="0" Padding="10,8" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="ORDERED" FontSize="9.5" CharacterSpacing="0.5" TextColor="{StaticResource Gray400}" />
+                                <Label Text="{Binding FormattedOrdered}" FontFamily="OpenSansSemibold" FontSize="14"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="1" Padding="10,8" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="DELIVERED" FontSize="9.5" CharacterSpacing="0.5" TextColor="{StaticResource Gray400}" />
+                                <Label Text="{Binding FormattedCalledOff}" FontFamily="OpenSansSemibold" FontSize="14"
+                                       TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="2" Padding="10,8" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="REMAINING" FontSize="9.5" CharacterSpacing="0.5" TextColor="{StaticResource Gray400}" />
+                                <Label Text="{Binding FormattedRemaining}" FontFamily="OpenSansSemibold" FontSize="14"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="3" Padding="10,8" StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="TRANSPORT RATE/UNIT" FontSize="9.5" CharacterSpacing="0.5" TextColor="{StaticResource Gray400}" />
+                                <Label Text="{Binding FormattedTransportRatePerUnit}" FontFamily="OpenSansSemibold" FontSize="14"
                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                             </VerticalStackLayout>
                         </Border>

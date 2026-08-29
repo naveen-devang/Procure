@@ -268,6 +268,36 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedBaseAmount))]
         public partial decimal? CustomBaseAmount { get; set; }
 
+        // Transport details, Raw Material POs only. Kept out of BaseAmount/NetTaxableAmount/
+        // DisplayTotalAmount entirely - haulage is tracked here, never folded into the PO's total.
+        [ObservableProperty]
+        public partial bool IsRawMaterial { get; set; }
+
+        [ObservableProperty]
+        public partial string? TransportContractNumber { get; set; }
+
+        [ObservableProperty]
+        public partial string? TransporterName { get; set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(TransportTotal))]
+        [NotifyPropertyChangedFor(nameof(FormattedTransportTotal))]
+        public partial decimal? TransportRatePerUnit { get; set; }
+
+        public decimal OrderedQuantity => Items?.Where(i => i.IsSelected).Sum(i => i.Quantity) ?? 0m;
+
+        public decimal? TransportTotal => TransportRatePerUnit.HasValue ? TransportRatePerUnit.Value * OrderedQuantity : null;
+
+        public string FormattedTransportTotal
+        {
+            get
+            {
+                if (!TransportTotal.HasValue) return string.Empty;
+                var cur = string.IsNullOrWhiteSpace(Currency) ? "AED" : Currency;
+                return $"{cur} {TransportTotal.Value:N2}";
+            }
+        }
+
         partial void OnFreightChanged(decimal? value) => NotifyCalculationsChanged();
         partial void OnOtherChargesChanged(decimal? value) => NotifyCalculationsChanged();
         partial void OnOverallDiscountChanged(decimal? value) => NotifyCalculationsChanged();
@@ -388,6 +418,7 @@ namespace Procure.Models
             Freight = rfq.Freight;
             OtherCharges = rfq.OtherCharges;
             OverallDiscount = rfq.Discount;
+            IsRawMaterial = string.Equals(pr?.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
 
             if (rfq.Items != null && rfq.Items.Count > 0)
             {
@@ -487,6 +518,10 @@ namespace Procure.Models
             OtherCharges = existingPo.OtherCharges ?? linkedRfq?.OtherCharges;
             OverallDiscount = existingPo.Discount ?? linkedRfq?.Discount;
             CustomBaseAmount = existingPo.BaseAmount;
+            IsRawMaterial = string.Equals(pr?.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+            TransportContractNumber = existingPo.TransportContractNumber;
+            TransporterName = existingPo.TransporterName;
+            TransportRatePerUnit = existingPo.TransportRatePerUnit;
 
             // If PO already has saved PurchaseOrderItems, populate from them
             if (existingPo.Items != null && existingPo.Items.Count > 0)
@@ -656,6 +691,9 @@ namespace Procure.Models
             OnPropertyChanged(nameof(SelectedItemsSummary));
             OnPropertyChanged(nameof(SummaryTitle));
             OnPropertyChanged(nameof(HasOverAllocatedItems));
+            OnPropertyChanged(nameof(OrderedQuantity));
+            OnPropertyChanged(nameof(TransportTotal));
+            OnPropertyChanged(nameof(FormattedTransportTotal));
 
             OnTotalsRecalculated?.Invoke();
         }

@@ -29,7 +29,8 @@ namespace Procure.Data.Repositories
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
 SELECT poi.Id, poi.ItemName, poi.Quantity, poi.Unit, po.Vendor, po.PoNo,
-       COALESCE((SELECT SUM(Quantity) FROM PoItemCallOff WHERE PoItemId = poi.Id), 0), pr.PrNo
+       COALESCE((SELECT SUM(Quantity) FROM PoItemCallOff WHERE PoItemId = poi.Id), 0), pr.PrNo,
+       pr.PrType, po.TransportContractNumber, po.TransporterName, po.TransportRatePerUnit, po.TransportTotal, po.Currency
 FROM PurchaseOrderItem poi
 JOIN PurchaseOrder po ON poi.PoId = po.Id
 JOIN PurchaseRequisition pr ON po.PrId = pr.Id
@@ -48,7 +49,13 @@ ORDER BY poi.ItemName ASC;";
                     Vendor = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
                     PoNo = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
                     CalledOffQuantity = Convert.ToDecimal(reader.GetValue(6), CultureInfo.InvariantCulture),
-                    PrNo = reader.IsDBNull(7) ? string.Empty : reader.GetString(7)
+                    PrNo = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                    PrType = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+                    TransportContractNumber = reader.IsDBNull(9) ? null : reader.GetString(9),
+                    TransporterName = reader.IsDBNull(10) ? null : reader.GetString(10),
+                    TransportRatePerUnit = reader.IsDBNull(11) ? null : (decimal?)reader.GetDouble(11),
+                    TransportTotal = reader.IsDBNull(12) ? null : (decimal?)reader.GetDouble(12),
+                    Currency = reader.IsDBNull(13) ? "AED" : reader.GetString(13)
                 });
             }
 

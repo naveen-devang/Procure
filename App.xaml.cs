@@ -51,7 +51,13 @@ namespace Procure
         }
 
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
-            => Procure.Utilities.ThemeHelper.Invalidate();
+        {
+            Procure.Utilities.ThemeHelper.Invalidate();
+#if WINDOWS
+            // Windows flipped (System mode) or the app did: hidden pages' native trees must follow.
+            if (Shell.Current is AppShell shell) shell.ApplyNativeThemeToPages();
+#endif
+        }
 
         // No permission asked, no popup: checks every launch, then at least once every 24h for
         // as long as the app stays open. The persisted lastCheck gate (UpdateStateStore, across

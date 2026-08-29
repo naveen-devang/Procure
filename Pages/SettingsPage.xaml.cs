@@ -1,4 +1,4 @@
-using Microsoft.Maui.Controls;
+﻿using Microsoft.Maui.Controls;
 using Procure.PageModels;
 
 namespace Procure.Pages
@@ -11,6 +11,14 @@ namespace Procure.Pages
         {
             InitializeComponent();
             BindingContext = _viewModel = viewModel;
+        }
+
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+#if WINDOWS
+            Procure.Utilities.NativeTheme.ForceRepaintOnAppear(this);
+#endif
         }
     }
 }

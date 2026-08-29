@@ -482,8 +482,8 @@ ON CONFLICT(Id) DO UPDATE SET
                 using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType)
-VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency, @BaseAmount, @Freight, @OtherCharges, @Discount, @VatType)
+INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal)
+VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency, @BaseAmount, @Freight, @OtherCharges, @Discount, @VatType, @TransportContractNumber, @TransporterName, @TransportRatePerUnit, @TransportTotal)
 ON CONFLICT(Id) DO UPDATE SET
     PoNo = excluded.PoNo,
     Vendor = excluded.Vendor,
@@ -497,7 +497,11 @@ ON CONFLICT(Id) DO UPDATE SET
     Freight = excluded.Freight,
     OtherCharges = excluded.OtherCharges,
     Discount = excluded.Discount,
-    VatType = excluded.VatType;";
+    VatType = excluded.VatType,
+    TransportContractNumber = excluded.TransportContractNumber,
+    TransporterName = excluded.TransporterName,
+    TransportRatePerUnit = excluded.TransportRatePerUnit,
+    TransportTotal = excluded.TransportTotal;";
 
                 cmd.Parameters.AddWithValue("@Id", po.Id.ToString());
                 cmd.Parameters.AddWithValue("@PrId", po.PrId.ToString());
@@ -514,6 +518,10 @@ ON CONFLICT(Id) DO UPDATE SET
                 cmd.Parameters.AddWithValue("@OtherCharges", po.OtherCharges.HasValue ? (object)po.OtherCharges.Value : DBNull.Value);
                 cmd.Parameters.AddWithValue("@Discount", po.Discount.HasValue ? (object)po.Discount.Value : DBNull.Value);
                 cmd.Parameters.AddWithValue("@VatType", string.IsNullOrWhiteSpace(po.VatType) ? "5%" : po.VatType);
+                cmd.Parameters.AddWithValue("@TransportContractNumber", (object?)po.TransportContractNumber ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@TransporterName", (object?)po.TransporterName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@TransportRatePerUnit", po.TransportRatePerUnit.HasValue ? (object)po.TransportRatePerUnit.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@TransportTotal", po.TransportTotal.HasValue ? (object)po.TransportTotal.Value : DBNull.Value);
 
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 

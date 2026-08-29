@@ -193,7 +193,7 @@ ORDER BY SortOrder ASC;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType
+SELECT Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal
 FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -222,7 +222,11 @@ FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                         Freight = (reader.FieldCount > 11 && !reader.IsDBNull(11)) ? (decimal?)reader.GetDouble(11) : null,
                         OtherCharges = (reader.FieldCount > 12 && !reader.IsDBNull(12)) ? (decimal?)reader.GetDouble(12) : null,
                         Discount = (reader.FieldCount > 13 && !reader.IsDBNull(13)) ? (decimal?)reader.GetDouble(13) : null,
-                        VatType = (reader.FieldCount > 14 && !reader.IsDBNull(14)) ? reader.GetString(14) : "5%"
+                        VatType = (reader.FieldCount > 14 && !reader.IsDBNull(14)) ? reader.GetString(14) : "5%",
+                        TransportContractNumber = (reader.FieldCount > 15 && !reader.IsDBNull(15)) ? reader.GetString(15) : null,
+                        TransporterName = (reader.FieldCount > 16 && !reader.IsDBNull(16)) ? reader.GetString(16) : null,
+                        TransportRatePerUnit = (reader.FieldCount > 17 && !reader.IsDBNull(17)) ? (decimal?)reader.GetDouble(17) : null,
+                        TransportTotal = (reader.FieldCount > 18 && !reader.IsDBNull(18)) ? (decimal?)reader.GetDouble(18) : null
                     });
                 }
             }

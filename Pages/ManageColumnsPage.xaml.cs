@@ -19,6 +19,9 @@ namespace Procure.Pages
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+#if WINDOWS
+            Procure.Utilities.NativeTheme.ForceRepaintOnAppear(this);
+#endif
             await _viewModel.LoadColumnsAsync();
         }
     }

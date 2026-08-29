@@ -71,6 +71,7 @@ namespace Procure.Utilities
         /// <summary>Test seams: the title text's and title bar background's current colours.</summary>
         internal static Color TitleForegroundForTest => TitleBrush.Color;
         internal static Color TitleBackgroundForTest => TitleBgBrush.Color;
+        internal static readonly System.Collections.Generic.List<Storyboard> StoryboardsForTest = new();
         internal static bool TitleBarBrushesOwnedForTest =>
             _rootGrid != null && ReferenceEquals(_rootGrid.Background, TitleBgBrush)
             && _title != null && ReferenceEquals(_title.Foreground, TitleBrush);
@@ -106,6 +107,7 @@ namespace Procure.Utilities
             var to = toDark ? DarkPalette : LightPalette;
             _animating = true;
             TryAttachTitle();
+            StoryboardsForTest.Clear();
             return Task.WhenAll(
                 AnimateAsync(TitleBrush, to.Bg, ms),
                 AnimateAsync(TitleBgBrush, to.Bg, ms),
@@ -190,7 +192,11 @@ namespace Procure.Utilities
             Storyboard.SetTargetProperty(anim, "Color");
             var storyboard = new Storyboard();
             storyboard.Children.Add(anim);
-            storyboard.Completed += (_, _) => { brush.Color = to; tcs.TrySetResult(); };
+            // Commit, then Stop: a held (HoldEnd) animation would keep showing its last frame over
+            // every later assignment - which is exactly how the title bar stayed white after a switch
+            // to System Default resolved to Dark. See ThemeCurtain.FadeAsync.
+            storyboard.Completed += (_, _) => { brush.Color = to; storyboard.Stop(); tcs.TrySetResult(); };
+            StoryboardsForTest.Add(storyboard);
             storyboard.Begin();
             return tcs.Task;
         }

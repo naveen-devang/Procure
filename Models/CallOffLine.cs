@@ -16,6 +16,25 @@ namespace Procure.Models
         public string PrNo { get; set; } = string.Empty;
         public decimal OrderedQuantity { get; set; }
         public string Unit { get; set; } = "pcs";
+        public string PrType { get; set; } = string.Empty;
+
+        // Transport details, Raw Material lines only - kept out of this line's own quantities above.
+        public string? TransportContractNumber { get; set; }
+        public string? TransporterName { get; set; }
+        public decimal? TransportRatePerUnit { get; set; }
+        public decimal? TransportTotal { get; set; }
+        public string Currency { get; set; } = "AED";
+
+        public bool IsRawMaterial => string.Equals(PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+        public bool HasTransportDetails => IsRawMaterial && (TransportRatePerUnit.HasValue || TransportTotal.HasValue
+            || !string.IsNullOrWhiteSpace(TransportContractNumber) || !string.IsNullOrWhiteSpace(TransporterName));
+        public bool HasTransportContractNumber => !string.IsNullOrWhiteSpace(TransportContractNumber);
+        public bool HasTransporterName => !string.IsNullOrWhiteSpace(TransporterName);
+
+        public string FormattedTransportRatePerUnit => TransportRatePerUnit.HasValue
+            ? Procure.Utilities.MoneyFormat.Format(Currency, TransportRatePerUnit.Value) : string.Empty;
+        public string FormattedTransportTotal => TransportTotal.HasValue
+            ? Procure.Utilities.MoneyFormat.Format(Currency, TransportTotal.Value) : string.Empty;
 
         [ObservableProperty]
         public partial bool IsSelected { get; set; }

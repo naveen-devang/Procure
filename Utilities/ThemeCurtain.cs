@@ -1,5 +1,6 @@
 ﻿#if WINDOWS
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -35,6 +36,8 @@ namespace Procure.Utilities
         internal static Windows.Foundation.Size LastRootSizeForTest { get; private set; }
         internal static double OpacityAtApplyForTest { get; private set; }
         internal static long LastRevealMsForTest { get; private set; }
+        internal static bool LastSheetIsDarkForTest { get; private set; }
+        internal static readonly List<Storyboard> StoryboardsForTest = new();
 
         /// <summary>Fades the curtain in, runs <paramref name="applyTheme"/> behind it, waits for the
         /// new theme to be laid out and drawn once underneath, then fades the curtain out.</summary>
@@ -65,6 +68,8 @@ namespace Procure.Utilities
             };
 
             LastRootSizeForTest = xamlRoot.Size;
+            LastSheetIsDarkForTest = toDark;
+            StoryboardsForTest.Clear();
             LastCurtainSizeForTest = new Windows.Foundation.Size(rect.Width, rect.Height);
 
             try
@@ -106,7 +111,11 @@ namespace Procure.Utilities
             Storyboard.SetTargetProperty(anim, "Opacity");
             var storyboard = new Storyboard();
             storyboard.Children.Add(anim);
-            storyboard.Completed += (_, _) => tcs.TrySetResult();
+            // WinUI animations HoldEnd by default: a finished animation keeps sitting on top of the
+            // property, so any value assigned afterwards is stored but never displayed. Commit the end
+            // value as the real value, then stop the animation so it lets go.
+            storyboard.Completed += (_, _) => { target.Opacity = to; storyboard.Stop(); tcs.TrySetResult(); };
+            StoryboardsForTest.Add(storyboard);
             storyboard.Begin();
             return tcs.Task;
         }
@@ -116,6 +125,58 @@ namespace Procure.Utilities
             var tcs = new TaskCompletionSource();
             if (!queue.TryEnqueue(DispatcherQueuePriority.Low, () => tcs.TrySetResult())) tcs.TrySetResult();
             return tcs.Task;
+        }
+
+        /// <summary>Masks a single page reveal with a brief opaque cover in the current theme's sheet
+        /// colour, opened BEFORE the page is shown (call from OnNavigating, before Shell swaps content)
+        /// and held ~150ms before fading. A page navigated to after the app's theme changed can show a
+        /// visibly wrong frame for an instant even though every colour underneath it is already correct
+        /// - a native repaint hint (see NativeTheme.ForceRepaintOnAppear) was tried and did not clear it
+        /// for every user, and diagnosing the exact WinUI mechanism further was not converging. This
+        /// does not depend on diagnosing it: nothing wrong can be seen under an opaque cover, regardless
+        /// of cause. Fire-and-forget from OnNavigating is safe - Popup.IsOpen takes effect before the
+        /// caller's own synchronous return, so it is up before Shell's content swap paints anything.</summary>
+        internal static Task? LastMaskTaskForTest { get; set; }
+
+        public static Task MaskPageRevealAsync(Microsoft.UI.Xaml.Window window, bool isDark, int holdMs = 150, int fadeMs = 120)
+        {
+            var task = MaskPageRevealCoreAsync(window, isDark, holdMs, fadeMs);
+            LastMaskTaskForTest = task;
+            return task;
+        }
+
+        private static async Task MaskPageRevealCoreAsync(Microsoft.UI.Xaml.Window window, bool isDark, int holdMs, int fadeMs)
+        {
+            if (window.Content is not FrameworkElement root || root.XamlRoot is null) return;
+            var xamlRoot = root.XamlRoot;
+
+            var rect = new Rectangle
+            {
+                Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(isDark ? Dark : Light),
+                Opacity = 1.0, // opaque immediately - no fade-in, the reveal itself must never be seen
+                IsHitTestVisible = false,
+                Width = xamlRoot.Size.Width,
+                Height = xamlRoot.Size.Height
+            };
+            var popup = new Popup
+            {
+                XamlRoot = xamlRoot,
+                Child = rect,
+                IsHitTestVisible = false,
+                IsLightDismissEnabled = false,
+                ShouldConstrainToRootBounds = true
+            };
+
+            try
+            {
+                popup.IsOpen = true;
+                await Task.Delay(holdMs);
+                await FadeAsync(rect, 0.0, fadeMs);
+            }
+            finally
+            {
+                popup.IsOpen = false;
+            }
         }
     }
 }

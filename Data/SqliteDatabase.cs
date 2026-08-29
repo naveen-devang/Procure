@@ -122,6 +122,10 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "OtherCharges", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "Discount", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "VatType", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportContractNumber", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransporterName", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportRatePerUnit", "REAL").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportTotal", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
 

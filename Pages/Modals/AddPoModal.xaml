@@ -400,6 +400,39 @@
                                                            VerticalOptions="Center" />
                                                 </Grid>
 
+                                                <!-- Transport Details - Raw Material POs only, kept out of the PO's own amount below -->
+                                                <Border IsVisible="{Binding IsRawMaterial}"
+                                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                        StrokeShape="RoundRectangle 8" Padding="12,10">
+                                                    <VerticalStackLayout Spacing="8">
+                                                        <Label Text="Transport" FontSize="12" FontFamily="SegoeSemibold"
+                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                        <Grid ColumnDefinitions="*, *, *, *" ColumnSpacing="12">
+                                                            <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                                                <Label Text="Contract Number" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding TransportContractNumber, Mode=TwoWay}" Placeholder="e.g. TC-2026-014" HeightRequest="34" FontSize="12" />
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="Transporter Name" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding TransporterName, Mode=TwoWay}" Placeholder="e.g. Al Futtaim Logistics" HeightRequest="34" FontSize="12" />
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                                                <Label Text="Rate per Unit" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Entry Text="{Binding TransportRatePerUnit, Mode=TwoWay}"
+                                                                       TextChanged="OnPoTransportRateTextChanged"
+                                                                       Placeholder="0.00" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="3" Spacing="4">
+                                                                <Label Text="Total (calculated)" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                <Label Text="{Binding FormattedTransportTotal}" FontSize="14" FontFamily="SegoeSemibold" VerticalOptions="Center" HeightRequest="34"
+                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <Label Text="Kept out of PO Value, Base Price and VAT - tracked separately." FontSize="10"
+                                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                    </VerticalStackLayout>
+                                                </Border>
+
                                                 <!-- LINE ITEMS SECTION (When RFQ has line items) -->
                                                 <VerticalStackLayout IsVisible="{Binding HasItems}" Spacing="8">
                                                     <!-- Items Table Header & Quick Action Buttons -->

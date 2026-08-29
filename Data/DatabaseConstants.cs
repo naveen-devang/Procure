@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 5;
+        public const int SchemaVersion = 6;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -217,7 +217,11 @@ CREATE TABLE IF NOT EXISTS PurchaseOrder (
     Freight REAL DEFAULT 0,
     OtherCharges REAL DEFAULT 0,
     Discount REAL DEFAULT 0,
-    VatType TEXT DEFAULT '5%'
+    VatType TEXT DEFAULT '5%',
+    TransportContractNumber TEXT,
+    TransporterName TEXT,
+    TransportRatePerUnit REAL,
+    TransportTotal REAL
 );
 CREATE INDEX IF NOT EXISTS IX_PO_PrId ON PurchaseOrder(PrId);
 CREATE INDEX IF NOT EXISTS IX_PO_LinkedRfqId ON PurchaseOrder(LinkedRfqId);

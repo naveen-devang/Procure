@@ -554,6 +554,12 @@ namespace Procure.PageModels
             po.Discount = rfqSel.OverallDiscount;
             po.VatType = rfqSel.VatType;
 
+            // Transport is never folded into po.Value/BaseAmount above - stored and shown separately.
+            po.TransportContractNumber = rfqSel.IsRawMaterial ? rfqSel.TransportContractNumber?.Trim() : null;
+            po.TransporterName = rfqSel.IsRawMaterial ? rfqSel.TransporterName?.Trim() : null;
+            po.TransportRatePerUnit = rfqSel.IsRawMaterial ? rfqSel.TransportRatePerUnit : null;
+            po.TransportTotal = rfqSel.IsRawMaterial ? rfqSel.TransportTotal : null;
+
             po.Items.Clear();
             if (rfqSel.HasItems)
             {

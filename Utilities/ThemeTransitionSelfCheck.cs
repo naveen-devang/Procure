@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
+using System.Linq;
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Procure.Data;
 using Procure.PageModels;
@@ -34,6 +36,10 @@ namespace Procure.Utilities
                 await Task.Delay(3000);
                 await CheckRevealSurvivesStallAsync(log);
                 await CheckRealSwitchAsync(log);
+                await CheckHiddenPagesFollowAsync(log);
+                await CheckSystemModeAsync(log);
+                await CheckRepaintNudgeOnAppearAsync(log);
+                await CheckRevealMaskOnRaceAsync(log);
                 Report("PASS", log);
             }
             catch (Exception ex)
@@ -149,6 +155,147 @@ namespace Procure.Utilities
             await Task.Delay(250);
             if (settings.AppTheme != original)
                 throw new InvalidOperationException($"Could not restore the original theme {original}.");
+        }
+
+        // --- B1: hidden pages are already on the new theme before they are shown -------------------
+
+        private static async Task CheckHiddenPagesFollowAsync(StringBuilder log)
+        {
+            var shell = (AppShell)Shell.Current!;
+            var settings = IPlatformApplication.Current!.Services.GetRequiredService<ISettingsService>();
+            var original = settings.AppTheme;
+
+            // Give Settings a native tree, then leave it hidden.
+            await shell.GoToAsync("//settings"); await Task.Delay(800);
+            await shell.GoToAsync("//main"); await Task.Delay(500);
+
+            var target = original == "Dark" ? "Light" : "Dark";
+            try
+            {
+                await shell.TransitionThemeAsync(target);
+                await Task.Delay(200);
+                var expect = target == "Dark" ? Microsoft.UI.Xaml.ElementTheme.Dark : Microsoft.UI.Xaml.ElementTheme.Light;
+                var pages = NativeTheme.DescribeForTest(shell.KeptAlivePages).ToList();
+                var hidden = pages.Where(p => !p.Loaded).ToList();
+                log.AppendLine($"hidden pages after -> {target}: " + string.Join(", ", pages.Select(p => $"{p.Page}={p.Actual}{(p.Loaded ? "" : "(hidden)")}")));
+                if (hidden.Count == 0)
+                    throw new InvalidOperationException("No hidden page with a native tree to check - Settings should have been kept alive.");
+                var stale = pages.Where(p => p.Actual != expect).ToList();
+                if (stale.Count > 0)
+                    throw new InvalidOperationException("Pages still on the old native theme before being shown: " +
+                        string.Join(", ", stale.Select(p => p.Page)) + " - they would re-theme on arrival, the blink on tab switch.");
+            }
+            finally
+            {
+                await shell.TransitionThemeAsync(original);
+                await Task.Delay(200);
+            }
+        }
+
+        // --- A1 + A2: System Default resolves to the OS, and no animation is left holding ----------
+
+        private static async Task CheckSystemModeAsync(StringBuilder log)
+        {
+            var shell = (AppShell)Shell.Current!;
+            var settings = IPlatformApplication.Current!.Services.GetRequiredService<ISettingsService>();
+            var original = settings.AppTheme;
+            var osDark = Application.Current!.PlatformAppTheme == AppTheme.Dark;
+
+            if (NativeTheme.ResolveIsDark("System") != osDark)
+                throw new InvalidOperationException($"ResolveIsDark(System) = {NativeTheme.ResolveIsDark("System")} but Windows is {(osDark ? "Dark" : "Light")}.");
+            if (!NativeTheme.ResolveIsDark("Dark") || NativeTheme.ResolveIsDark("Light"))
+                throw new InvalidOperationException("ResolveIsDark(Dark/Light) is wrong.");
+
+            try
+            {
+                // Start from the opposite of the OS so a System switch actually changes something.
+                await shell.TransitionThemeAsync(osDark ? "Light" : "Dark"); await Task.Delay(200);
+                await shell.TransitionThemeAsync("System"); await Task.Delay(200);
+
+                log.AppendLine($"System switch: OS {(osDark ? "Dark" : "Light")}, sheet was {(ThemeCurtain.LastSheetIsDarkForTest ? "dark" : "light")}, title bg {TitleBarHelper.TitleBackgroundForTest}, text {TitleBarHelper.TitleForegroundForTest}");
+                if (ThemeCurtain.LastSheetIsDarkForTest != osDark)
+                    throw new InvalidOperationException("A switch to System Default used the wrong sheet colour - System was treated as Light/Dark by name instead of asking Windows.");
+
+                var expectBg = osDark ? Windows.UI.Color.FromArgb(255, 0x20, 0x20, 0x20) : Windows.UI.Color.FromArgb(255, 0xF3, 0xF3, 0xF3);
+                if (TitleBarHelper.TitleBackgroundForTest != expectBg)
+                    throw new InvalidOperationException($"Title bar background is {TitleBarHelper.TitleBackgroundForTest} after System; expected {expectBg}.");
+
+                // A2: every storyboard the switch started must have let go of its property. A held
+                // one keeps showing its last frame over whatever is assigned later - the white bar.
+                var held = ThemeCurtain.StoryboardsForTest.Concat(TitleBarHelper.StoryboardsForTest)
+                    .Where(sb => sb.GetCurrentState() != Microsoft.UI.Xaml.Media.Animation.ClockState.Stopped).ToList();
+                log.AppendLine($"storyboards after switch: {ThemeCurtain.StoryboardsForTest.Count + TitleBarHelper.StoryboardsForTest.Count}, still holding: {held.Count}");
+                if (held.Count > 0)
+                    throw new InvalidOperationException($"{held.Count} animation(s) are still holding their last frame after the switch - later colour assignments are stored but never shown.");
+            }
+            finally
+            {
+                await shell.TransitionThemeAsync(original);
+                await Task.Delay(200);
+            }
+        }
+
+        // --- The compositor-cache fix: reappearing after a switch forces one repaint nudge --------
+        // Every colour on a hidden page is already correct (measured directly, both here and by hand
+        // with a real build) - the flash reported was Windows reusing a detached page's last-composited
+        // frame for an instant on reattach, not a stale value. NativeTheme.ForceRepaintOnAppear nudges
+        // Opacity by an imperceptible amount across two frames, which is what actually clears it.
+
+        private static async Task CheckRepaintNudgeOnAppearAsync(StringBuilder log)
+        {
+            var shell = (AppShell)Shell.Current!;
+
+            // Warm each page's native tree first (a page's very first-ever reveal races its own Handler
+            // creation and has no prior composited frame to correct anyway - only a REAPPEARANCE, after
+            // the page has already been shown once, is the scenario the nudge exists for).
+            await shell.GoToAsync("//settings"); await Task.Delay(400);
+            await shell.GoToAsync("//prboard"); await Task.Delay(400);
+            await shell.GoToAsync("//main"); await Task.Delay(400);
+
+            int n0, n1, n2, n3;
+            n0 = NativeTheme.RepaintNudgesForTest;
+            await shell.GoToAsync("//settings"); await Task.Delay(200); n1 = NativeTheme.RepaintNudgesForTest;
+            await shell.GoToAsync("//prboard"); await Task.Delay(200); n2 = NativeTheme.RepaintNudgesForTest;
+            await shell.GoToAsync("//main"); await Task.Delay(200); n3 = NativeTheme.RepaintNudgesForTest;
+            log.AppendLine($"repaint nudges (already-warmed pages): settings +{n1-n0}, prboard +{n2-n1}, main +{n3-n2} (total {n3-n0})");
+            if (n3 - n0 < 3)
+                throw new InvalidOperationException($"Only {n3-n0} of 3 REAPPEARANCES triggered a repaint nudge - a page shown a second time could show its previous frame. Last skip: {NativeTheme.LastSkipReasonForTest}");
+        }
+
+        // --- Final defence: a page shown for the first time after a theme change is masked --------
+        // Repaint hints (ForceRepaintOnAppear) were not enough on their own in every report; this
+        // covers it unconditionally by never letting a wrong frame be visible at all.
+
+        private static async Task CheckRevealMaskOnRaceAsync(StringBuilder log)
+        {
+            var shell = (AppShell)Shell.Current!;
+            var settings = IPlatformApplication.Current!.Services.GetRequiredService<ISettingsService>();
+            var original = settings.AppTheme;
+            var target = original == "Dark" ? "Light" : "Dark";
+            try
+            {
+                // Warm Settings, then leave it - the switch below must mark it for masking.
+                await shell.GoToAsync("//settings"); await Task.Delay(400);
+                await shell.GoToAsync("//main"); await Task.Delay(200);
+
+                await shell.TransitionThemeAsync(target);
+
+                ThemeCurtain.LastMaskTaskForTest = null;
+                await shell.GoToAsync("//settings");
+                var maskTask = ThemeCurtain.LastMaskTaskForTest;
+                if (maskTask == null)
+                    throw new InvalidOperationException("Navigating to a page dirtied by a theme switch started no reveal mask.");
+                var sw = Stopwatch.StartNew();
+                await maskTask;
+                log.AppendLine($"reveal mask: held+faded for {sw.ElapsedMilliseconds} ms (expect >=150ms hold + fade)");
+                if (sw.ElapsedMilliseconds < 150)
+                    throw new InvalidOperationException($"The reveal mask only ran {sw.ElapsedMilliseconds} ms - it did not actually hold.");
+            }
+            finally
+            {
+                await shell.TransitionThemeAsync(original);
+                await Task.Delay(200);
+            }
         }
 
         private static void Report(string result, StringBuilder log)

@@ -50,6 +50,22 @@ namespace Procure.Models
         [ObservableProperty]
         public partial string VatType { get; set; } = "5%";
 
+        // Transport details, Raw Material POs only. Deliberately never folded into Value/BaseAmount -
+        // haulage is tracked here so it shows next to the PO, not inside its total.
+        [ObservableProperty]
+        public partial string? TransportContractNumber { get; set; }
+
+        [ObservableProperty]
+        public partial string? TransporterName { get; set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedTransportRatePerUnit))]
+        public partial decimal? TransportRatePerUnit { get; set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedTransportTotal))]
+        public partial decimal? TransportTotal { get; set; }
+
         [ObservableProperty]
         public partial ObservableCollection<PurchaseOrderItem> Items { get; set; } = new();
 
@@ -57,6 +73,13 @@ namespace Procure.Models
         public bool HasItems => Items != null && Items.Count > 0;
         public int ItemsCount => Items?.Count ?? 0;
 
+        public bool HasTransportDetails => TransportRatePerUnit.HasValue || TransportTotal.HasValue
+            || !string.IsNullOrWhiteSpace(TransportContractNumber) || !string.IsNullOrWhiteSpace(TransporterName);
+
         public string FormattedValue => Procure.Utilities.MoneyFormat.Format(Currency, Value);
+        public string FormattedTransportRatePerUnit => TransportRatePerUnit.HasValue
+            ? Procure.Utilities.MoneyFormat.Format(Currency, TransportRatePerUnit.Value) : string.Empty;
+        public string FormattedTransportTotal => TransportTotal.HasValue
+            ? Procure.Utilities.MoneyFormat.Format(Currency, TransportTotal.Value) : string.Empty;
     }
 }

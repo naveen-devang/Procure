@@ -1,4 +1,4 @@
-using Procure.PageModels;
+﻿using Procure.PageModels;
 
 namespace Procure.Pages
 {
@@ -17,6 +17,9 @@ namespace Procure.Pages
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+#if WINDOWS
+            Procure.Utilities.NativeTheme.ForceRepaintOnAppear(this);
+#endif
             _viewModel.IsVisible = true;
             await _viewModel.LoadAsync();
         }

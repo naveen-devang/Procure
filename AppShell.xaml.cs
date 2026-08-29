@@ -77,19 +77,44 @@ namespace Procure
             var target = args.Target?.Location?.OriginalString;
             if (string.IsNullOrEmpty(target)) return;
 
+            Page? targetPage = null;
             if (PrBoardContent.Content is null && target.Contains("prboard", StringComparison.Ordinal))
             {
                 Procure.Utilities.BoardTrace.Mark("click-inflate-start");
-                PrBoardContent.Content = _services.GetRequiredService<PrListPage>();
+                PrBoardContent.Content = targetPage = _services.GetRequiredService<PrListPage>();
                 Procure.Utilities.BoardTrace.Mark("click-inflate-done");
             }
+            else if (target.Contains("prboard", StringComparison.Ordinal)) targetPage = PrBoardContent.Content as Page;
             else if (ColumnsContent.Content is null && target.Contains("columns", StringComparison.Ordinal))
-                ColumnsContent.Content = _services.GetRequiredService<ManageColumnsPage>();
+                ColumnsContent.Content = targetPage = _services.GetRequiredService<ManageColumnsPage>();
+            else if (target.Contains("columns", StringComparison.Ordinal)) targetPage = ColumnsContent.Content as Page;
             else if (MaterialsContent.Content is null && target.Contains("materials", StringComparison.Ordinal))
-                MaterialsContent.Content = _services.GetRequiredService<CallOffPage>();
+                MaterialsContent.Content = targetPage = _services.GetRequiredService<CallOffPage>();
+            else if (target.Contains("materials", StringComparison.Ordinal)) targetPage = MaterialsContent.Content as Page;
             else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
-                SettingsContent.Content = _services.GetRequiredService<SettingsPage>();
+                SettingsContent.Content = targetPage = _services.GetRequiredService<SettingsPage>();
+            else if (target.Contains("settings", StringComparison.Ordinal)) targetPage = SettingsContent.Content as Page;
+            else if (target.Contains("main", StringComparison.Ordinal)) targetPage = DashboardContent.Content as Page;
+
+#if WINDOWS
+            // A page whose theme changed while it was NOT the one on screen can show a wrong frame for
+            // an instant when it's shown - every colour underneath is already correct by then (measured
+            // directly), so this is Windows momentarily reusing a stale composited frame, not a data
+            // bug. A repaint hint at OnAppearing (see NativeTheme.ForceRepaintOnAppear) does not clear
+            // it in every case that has been reported, so mask the reveal outright instead: nothing
+            // wrong can be seen under an opaque cover, whatever the exact cause. Only the FIRST reveal
+            // after a theme change needs it - cleared here so a normal tab switch stays instant.
+            if (targetPage != null && _pagesNeedingRevealMask.Remove(targetPage)
+                && Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window native)
+            {
+                _ = Procure.Utilities.ThemeCurtain.MaskPageRevealAsync(native, Procure.Utilities.ThemeHelper.IsDark);
+            }
+#endif
         }
+
+#if WINDOWS
+        private readonly HashSet<Page> _pagesNeedingRevealMask = new();
+#endif
 
         // Subscribe/unsubscribe in matching pairs, tied to the handler lifetime. Subscribing in the
         // constructor instead would leave these dead after any disconnect/reconnect cycle, silently
@@ -389,8 +414,14 @@ namespace Procure
                 // per page. See ThemeCurtain for why it has to be a compositor animation.
                 if (Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window native)
                 {
-                    await Procure.Utilities.ThemeCurtain.RunAsync(native, targetTheme == "Dark",
-                        () => _settingsService.AppTheme = targetTheme);
+                    // "System" resolves to whatever Windows is; deciding with target == "Dark" sent a
+                    // light sheet and a white title bar over a page that then came out dark.
+                    var isDark = Procure.Utilities.NativeTheme.ResolveIsDark(targetTheme);
+                    await Procure.Utilities.ThemeCurtain.RunAsync(native, isDark, () =>
+                    {
+                        _settingsService.AppTheme = targetTheme;
+                        ApplyNativeThemeToPages();
+                    });
                     return;
                 }
 #endif
@@ -405,6 +436,29 @@ namespace Procure
                 _isThemeTransitioning = false;
             }
         }
+
+#if WINDOWS
+        /// <summary>Every page this shell keeps alive - null until first opened.</summary>
+        internal IEnumerable<Page?> KeptAlivePages => new Page?[]
+        {
+            DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page, ColumnsContent.Content as Page, SettingsContent.Content as Page
+        };
+
+        /// <summary>Pushes the current theme into every kept-alive page's native tree - the hidden ones
+        /// would otherwise keep the old native theme until shown. Called under the curtain on a switch,
+        /// and from App when Windows flips theme while the app follows the OS.</summary>
+        internal void ApplyNativeThemeToPages()
+        {
+            Procure.Utilities.NativeTheme.ApplyToPages(KeptAlivePages, Procure.Utilities.ThemeHelper.IsDark);
+
+            // Every page but the current one is about to be shown, at some later point, in a theme it
+            // has never been rendered in. OnNavigating masks exactly that first reveal (see there).
+            foreach (var page in KeptAlivePages)
+            {
+                if (page != null && !ReferenceEquals(page, CurrentPage)) _pagesNeedingRevealMask.Add(page);
+            }
+        }
+#endif
 
         // Test seam for ThemeTransitionSelfCheck: one switch must land here exactly once.
         internal int ThemeHighlightRefreshesForTest { get; private set; }

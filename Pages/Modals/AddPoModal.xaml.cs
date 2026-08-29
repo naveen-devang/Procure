@@ -114,6 +114,25 @@ namespace Procure.Pages.Modals
             }
         }
 
+        private void OnPoTransportRateTextChanged(object? sender, TextChangedEventArgs e)
+        {
+            if (sender is Entry entry && entry.BindingContext is PoRfqSelection selection)
+            {
+                if (string.IsNullOrWhiteSpace(e.NewTextValue))
+                {
+                    selection.TransportRatePerUnit = null;
+                    return;
+                }
+
+                var cleanVal = e.NewTextValue.Replace(",", "").Replace("$", "").Replace("AED", "").Trim();
+                if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var rate) ||
+                    decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out rate))
+                {
+                    selection.TransportRatePerUnit = rate;
+                }
+            }
+        }
+
         private void OnPoOtherChargesTextChanged(object? sender, TextChangedEventArgs e)
         {
             if (sender is Entry entry && entry.BindingContext is PoRfqSelection selection)

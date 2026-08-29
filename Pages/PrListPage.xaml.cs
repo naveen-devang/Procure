@@ -32,6 +32,9 @@ namespace Procure.Pages
         protected override void OnAppearing()
         {
             base.OnAppearing();
+#if WINDOWS
+            Procure.Utilities.NativeTheme.ForceRepaintOnAppear(this);
+#endif
             Procure.Utilities.BoardTrace.Mark("page-appearing");
             _viewModel.BoardAppearing();
 
