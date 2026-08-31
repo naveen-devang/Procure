@@ -201,7 +201,7 @@ namespace Procure.Services.Export
             // even without whitespace - rather than one bare word landing alone on a line while
             // everything else piles onto the next. A chunk with no break point at all (rare: truly
             // no spaces or punctuation) still renders whole on its own line - never split mid-word.
-            List<string> WrapText(string text, string font, double fontSize, double maxWidth, int maxLines)
+            List<string> WrapText(string text, string font, double fontSize, double maxWidth, int maxLines, bool truncate = true)
             {
                 if (string.IsNullOrEmpty(text)) return new List<string> { string.Empty };
 
@@ -228,6 +228,27 @@ namespace Procure.Services.Export
                 }
                 if (current.Length > 0) lines.Add(current.TrimEnd());
                 if (lines.Count == 0) lines.Add(string.Empty);
+
+                // Non-truncating mode (long free text like remarks): keep every line, and hard-split
+                // any single line still wider than the column - a run with no space or punctuation
+                // (e.g. "aaaaaaaa...") has no break opportunity, so it must break mid-run or overrun.
+                if (!truncate)
+                {
+                    var wrapped = new List<string>();
+                    foreach (var raw in lines)
+                    {
+                        var rem = raw;
+                        while (MeasureTextWidth(rem, font, fontSize) > maxWidth && rem.Length > 1)
+                        {
+                            int cut = rem.Length;
+                            while (cut > 1 && MeasureTextWidth(rem[..cut], font, fontSize) > maxWidth) cut--;
+                            wrapped.Add(rem[..cut]);
+                            rem = rem[cut..];
+                        }
+                        wrapped.Add(rem);
+                    }
+                    return wrapped;
+                }
 
                 // Wrapping the whole string needed more lines than the cap allows, or the single
                 // word left on the capped line is itself still wider than the column - either way
@@ -420,8 +441,16 @@ namespace Procure.Services.Export
                 .Select(lines => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight)
                 .ToList();
 
+            // Remarks are free text and can run long - wrap over the full content width with no
+            // truncation, and let the real line count feed the footer budget below so the block
+            // either scales or paginates rather than clipping at the page edge.
+            double remarksLineH = shrink ? 9.5 : 11.0;
+            var remarksBody = string.IsNullOrWhiteSpace(remarks) ? "None" : remarks.Trim();
+            var remarksLines = WrapText($"Remarks : {remarksBody}", "F2", 8.5, contentWidth, int.MaxValue, truncate: false);
+            double remarksBlockH = remarksLines.Count * remarksLineH;
+
             const int summaryRowsCount = 12;
-            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksGap
+            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
             // Shrink-to-fit's tightened row heights above only buy back so much - a long item list
@@ -662,15 +691,31 @@ namespace Procure.Services.Export
 
             curY -= afterTableGap;
 
-            // REMARKS SECTION
-            var remarksDisplay = string.IsNullOrWhiteSpace(remarks) ? "None" : remarks.Trim();
-            DrawText($"Remarks : {remarksDisplay}", marginLeft, curY, font: "F2", fontSize: 8.5);
-            curY -= remarksGap;
+            // REMARKS SECTION — wrapped over the full width (computed above). Each line drops to the
+            // next; if it runs past the page under pagination it continues on a fresh page.
+            foreach (var remarksLine in remarksLines)
+            {
+                if (!useAutoScale && curY - remarksLineH < bottomLimit)
+                {
+                    currentPage.TableBottomY = curY;
+                    StartNewPage(isFirstPage: false);
+                }
+                DrawText(remarksLine, marginLeft, curY, font: "F2", fontSize: 8.5);
+                curY -= remarksLineH;
+            }
+            curY -= (remarksGap - remarksLineH);
 
             // BOTTOM SIGNATURE / APPROVER BOXES — omitted entirely when the export is a quick
             // internal proof that isn't going for wet-ink signoff yet.
             if (options.IncludeSignatureBoxes)
             {
+                // A long remark can end near the page bottom; keep the box row whole on the next page.
+                if (!useAutoScale && curY - signatureBoxHeight - 6 < bottomLimit)
+                {
+                    currentPage.TableBottomY = curY;
+                    StartNewPage(isFirstPage: false);
+                }
+
                 var approverRoles = new List<string> { "Buyer" };
                 if (pcr.Approvals != null && pcr.Approvals.Count > 0)
                 {
