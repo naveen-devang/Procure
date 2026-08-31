@@ -118,6 +118,43 @@ namespace Procure.PageModels
             UpdateSelectionState();
         }
 
+        [RelayCommand]
+        public async Task DeleteSelectedPrsAsync()
+        {
+            if (Shell.Current == null) return;
+
+            var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            if (selected.Count == 0) return;
+
+            var label = selected.Count == 1
+                ? $"{selected[0].PrNo} ({selected[0].Description})"
+                : $"{selected.Count} requisitions";
+
+            var confirm = await Shell.Current.DisplayAlertAsync(
+                "Delete Requisitions",
+                $"Delete {label} and all associated RFQs, PCRs, and POs? This cannot be undone.",
+                "Delete",
+                "Cancel");
+
+            if (!confirm) return;
+
+            try
+            {
+                foreach (var pr in selected)
+                {
+                    await _prRepo.DeleteAsync(pr.Id);
+                    pr.PropertyChanged -= OnPrItemPropertyChanged;
+                    _selectedIds.Remove(pr.Id);
+                }
+                ApplyFilters(resetToTop: true);
+                UpdateSelectionState();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
         /// <summary>Records a checkbox change. The id set is the record that outlives the loaded window;
         /// PurchaseRequisition.IsSelected is the binding, reapplied by MergeLoadedPrs on every page.</summary>
         public void SetSelected(PurchaseRequisition pr, bool isSelected)

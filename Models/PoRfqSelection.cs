@@ -322,6 +322,7 @@ namespace Procure.Models
         public bool HasItems => Items != null && Items.Count > 0;
         public int TotalItemsCount => Items?.Count ?? 0;
         public int SelectedItemsCount => Items?.Count(i => i.IsSelected) ?? 0;
+        public bool AllItemsSelected => Items is { Count: > 0 } && Items.All(i => i.IsSelected);
         public int PricedItemsCount => Items?.Count(i => i.IsSelected && i.QuotedUnitPrice.HasValue && i.QuotedUnitPrice.Value > 0) ?? 0;
         public bool HasOverAllocatedItems => Items != null && Items.Any(i => i.IsSelected && i.IsOverAllocated);
 
@@ -687,6 +688,7 @@ namespace Procure.Models
             OnPropertyChanged(nameof(FormattedBaseAmount));
             OnPropertyChanged(nameof(FormattedVatAmount));
             OnPropertyChanged(nameof(SelectedItemsCount));
+            OnPropertyChanged(nameof(AllItemsSelected));
             OnPropertyChanged(nameof(PricedItemsCount));
             OnPropertyChanged(nameof(SelectedItemsSummary));
             OnPropertyChanged(nameof(SummaryTitle));

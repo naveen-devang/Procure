@@ -431,12 +431,13 @@ namespace Procure.PageModels
                 IsBusy = true;
                 await _prRepo.SaveBatchPrsAsync(validEntries);
 
-                // Nothing to insert in memory: ApplyFilters re-reads the window from SQLite, where the
-                // rows now are, and the merge hands the board the instances it is already bound to.
+                // New rows change the match set, so reset the window (like a filter change): a plain
+                // windowed re-read is bounded to the rows already shown and can miss the fresh row,
+                // leaving "Showing N of N+1" with no new card until a manual refresh.
                 IsBatchCreateModalVisible = false;
                 BatchPrEntries.Clear();
                 SelectedBatchEntry = null;
-                ApplyFilters();
+                ApplyFilters(resetToTop: true);
 
                 ShowToast($"Created {validEntries.Count} purchase requisitions");
             }

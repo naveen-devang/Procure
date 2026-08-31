@@ -334,7 +334,7 @@ namespace Procure.PageModels
                 await _prRepo.DeleteAsync(pr.Id);
                 pr.PropertyChanged -= OnPrItemPropertyChanged;
                 _selectedIds.Remove(pr.Id);
-                ApplyFilters();
+                ApplyFilters(resetToTop: true);
             }
             catch (Exception ex)
             {

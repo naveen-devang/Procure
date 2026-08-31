@@ -4,6 +4,7 @@
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
              x:Class="Procure.Pages.Modals.AddRfqModal"
+             x:Name="RfqModalRoot"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsAddRfqModalVisible}">
 
@@ -135,12 +136,13 @@
                                 </VerticalStackLayout>
 
                                 <HorizontalStackLayout Grid.Column="1" Spacing="8">
-                                    <Button Text="Select All"
-                                            Command="{Binding SelectAllRfqItemsCommand}"
+                                    <Button Text="+ Add Line"
+                                            Command="{Binding AddEditingRfqItemCommand}"
                                             Style="{StaticResource SecondaryButton}"
-                                            FontSize="11" HeightRequest="28" Padding="8,0" />
-                                    <Button Text="Deselect All"
-                                            Command="{Binding DeselectAllRfqItemsCommand}"
+                                            FontSize="11" HeightRequest="28" Padding="8,0"
+                                            ToolTipProperties.Text="Add a line item (e.g. when a vendor splits one PR line into two quoted rows)" />
+                                    <Button Text="{Binding AllRfqItemsSelected, Converter={StaticResource SelectionToggleConverter}}"
+                                            Command="{Binding ToggleAllRfqItemsCommand}"
                                             Style="{StaticResource SecondaryButton}"
                                             FontSize="11" HeightRequest="28" Padding="8,0" />
                                     <Button Text="&#xE8C8; Copy for Email"
@@ -153,7 +155,7 @@
                             </Grid>
 
                             <!-- Table Header -->
-                            <Grid ColumnDefinitions="36, *, 80, 90, 85, 95, 90"
+                            <Grid ColumnDefinitions="36, *, 72, 64, 82, 80, 95, 90, 34"
                                   ColumnSpacing="8"
                                   Padding="6,4"
                                   BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
@@ -161,15 +163,17 @@
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                 <Label Grid.Column="1" Text="Item Description" FontSize="10.5" FontFamily="SegoeSemibold"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                <Label Grid.Column="2" Text="Quantity" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                <Label Grid.Column="2" Text="Qty" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                <Label Grid.Column="3" Text="Unit Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                <Label Grid.Column="3" Text="Unit" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="Center"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                <Label Grid.Column="4" Text="Discount" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                <Label Grid.Column="4" Text="Unit Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                <Label Grid.Column="5" Text="Line Total" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                <Label Grid.Column="5" Text="Discount" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                <Label Grid.Column="6" Text="Historical Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                <Label Grid.Column="6" Text="Line Total" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Label Grid.Column="7" Text="Historical Price" FontSize="10.5" FontFamily="SegoeSemibold" HorizontalOptions="End"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </Grid>
 
@@ -186,7 +190,7 @@
                                 </CollectionView.ItemsLayout>
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="models:RfqItem">
-                                        <Grid ColumnDefinitions="36, *, 80, 90, 85, 95, 90"
+                                        <Grid ColumnDefinitions="36, *, 72, 64, 82, 80, 95, 90, 34"
                                               ColumnSpacing="8"
                                               Padding="4,2"
                                               VerticalOptions="Center">
@@ -197,25 +201,35 @@
                                                       VerticalOptions="Center"
                                                       HorizontalOptions="Center" />
 
-                                            <!-- Item Description -->
-                                            <Label Grid.Column="1"
-                                                   Text="{Binding ItemName}"
+                                            <!-- Item Description (editable: correct a name or fill in a split line) -->
+                                            <Entry Grid.Column="1"
+                                                   Text="{Binding ItemName, Mode=TwoWay}"
+                                                   Placeholder="Item name / spec..."
                                                    FontSize="12"
-                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
-                                                   VerticalOptions="Center"
-                                                   MaxLines="2"
-                                                   LineBreakMode="TailTruncation" />
-
-                                            <!-- Quantity & Unit -->
-                                            <Label Grid.Column="2"
-                                                   Text="{Binding FormattedQuantity}"
-                                                   FontSize="11.5"
-                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                                   HorizontalOptions="End"
+                                                   HeightRequest="32"
                                                    VerticalOptions="Center" />
 
-                                            <!-- Unit Price Input -->
+                                            <!-- Quantity (editable: a vendor may re-pack or split a PR line) -->
+                                            <Entry Grid.Column="2"
+                                                   Text="{Binding Quantity, Mode=TwoWay}"
+                                                   Placeholder="Qty"
+                                                   Keyboard="Numeric"
+                                                   HeightRequest="32"
+                                                   FontSize="12"
+                                                   HorizontalOptions="Fill"
+                                                   HorizontalTextAlignment="End" />
+
+                                            <!-- Unit -->
                                             <Entry Grid.Column="3"
+                                                   Text="{Binding Unit, Mode=TwoWay}"
+                                                   Placeholder="pcs"
+                                                   HeightRequest="32"
+                                                   FontSize="12"
+                                                   HorizontalOptions="Fill"
+                                                   HorizontalTextAlignment="Start" />
+
+                                            <!-- Unit Price Input -->
+                                            <Entry Grid.Column="4"
                                                    Text="{Binding QuotedUnitPrice, Mode=TwoWay}"
                                                    Placeholder="0.00"
                                                    Keyboard="Numeric"
@@ -228,7 +242,7 @@
                                                    TextChanged="OnRfqUnitPriceTextChanged" />
 
                                             <!-- Line Discount Input -->
-                                            <Entry Grid.Column="4"
+                                            <Entry Grid.Column="5"
                                                    Text="{Binding Discount, Mode=TwoWay}"
                                                    Placeholder="0.00"
                                                    Keyboard="Numeric"
@@ -241,7 +255,7 @@
                                                    TextChanged="OnRfqDiscountTextChanged" />
 
                                             <!-- Line Total Display -->
-                                            <Label Grid.Column="5"
+                                            <Label Grid.Column="6"
                                                    Text="{Binding FormattedLineTotal}"
                                                    FontSize="12"
                                                    FontFamily="SegoeSemibold"
@@ -250,7 +264,7 @@
                                                    VerticalOptions="Center" />
 
                                             <!-- Last Price Input -->
-                                            <Entry Grid.Column="6"
+                                            <Entry Grid.Column="7"
                                                    Text="{Binding LastPrice, Mode=TwoWay}"
                                                    Placeholder="0.00"
                                                    Keyboard="Numeric"
@@ -261,6 +275,18 @@
                                                    Loaded="OnRfqLastPriceEntryLoaded"
                                                    Unloaded="OnRfqLastPriceEntryUnloaded"
                                                    TextChanged="OnRfqLastPriceTextChanged" />
+
+                                            <!-- Remove line -->
+                                            <Button Grid.Column="8"
+                                                    Text="&#xE74D;"
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    Command="{Binding Source={x:Reference RfqModalRoot}, Path=BindingContext.RemoveEditingRfqItemCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    BackgroundColor="Transparent"
+                                                    TextColor="{StaticResource FluentCritical}"
+                                                    ToolTipProperties.Text="Remove Item"
+                                                    HeightRequest="28" WidthRequest="28" Padding="0" FontSize="11"
+                                                    VerticalOptions="Center" />
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>

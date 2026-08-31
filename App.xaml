@@ -32,6 +32,7 @@
             <converters:BoolToFilterChipStrokeConverter x:Key="BoolToFilterChipStrokeConverter" />
             <converters:BoolToFilterChipTextConverter x:Key="BoolToFilterChipTextConverter" />
             <converters:BoolToChevronConverter x:Key="BoolToChevronConverter" />
+            <converters:SelectionToggleConverter x:Key="SelectionToggleConverter" />
             <converters:BoolToApprovalStatusColorConverter x:Key="BoolToApprovalStatusColorConverter" />
             <converters:BoolToApprovalInclusionBgConverter x:Key="BoolToApprovalInclusionBgConverter" />
             <converters:BoolToApprovalInclusionStrokeConverter x:Key="BoolToApprovalInclusionStrokeConverter" />

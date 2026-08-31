@@ -257,6 +257,8 @@ namespace Procure.PageModels
                 return;
             }
 
+            OnPropertyChanged(nameof(AllPoRfqsSelected));
+
             var selected = PoRfqSelections.Where(r => r.IsSelected).ToList();
             SelectedPoRfqCount = selected.Count;
             CanGoToPoStep2 = selected.Count > 0;
@@ -350,6 +352,8 @@ namespace Procure.PageModels
             }
         }
 
+        public bool AllPoRfqsSelected => PoRfqSelections is { Count: > 0 } && PoRfqSelections.All(s => s.IsSelected);
+
         [RelayCommand]
         public void SelectAllPoRfqs()
         {
@@ -373,6 +377,17 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
+        public void ToggleAllPoRfqs()
+        {
+            if (AllPoRfqsSelected) DeselectAllPoRfqs();
+            else SelectAllPoRfqs();
+        }
+
+        // Called from the vendor-card checkbox's CheckedChanged so the combined toggle button's
+        // label tracks single-card toggles (card IsSelected has no recalc hook of its own).
+        public void RefreshPoRfqCardSelectionState() => RecalculatePoModalTotals();
+
+        [RelayCommand]
         public void SelectAllPoRfqItems(PoRfqSelection? sel)
         {
             sel?.SelectAllItems();
@@ -383,6 +398,15 @@ namespace Procure.PageModels
         public void DeselectAllPoRfqItems(PoRfqSelection? sel)
         {
             sel?.DeselectAllItems();
+            RecalculatePoModalTotals();
+        }
+
+        [RelayCommand]
+        public void ToggleAllPoRfqItems(PoRfqSelection? sel)
+        {
+            if (sel == null) return;
+            if (sel.AllItemsSelected) sel.DeselectAllItems();
+            else sel.SelectAllItems();
             RecalculatePoModalTotals();
         }
 

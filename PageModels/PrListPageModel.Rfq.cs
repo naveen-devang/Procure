@@ -160,7 +160,10 @@ namespace Procure.PageModels
             FormattedCalculatedRfqGrandTotal = $"{cur} {CalculatedRfqGrandTotal:N2}";
             HasEditingRfqItems = EditingRfqItems != null && EditingRfqItems.Count > 0;
             RfqItemsListHeight = Math.Clamp(EditingRfqItems?.Count ?? 0, 1, 8) * 42;
+            OnPropertyChanged(nameof(AllRfqItemsSelected));
         }
+
+        public bool AllRfqItemsSelected => EditingRfqItems is { Count: > 0 } && EditingRfqItems.All(i => i.IsQuoted);
 
         private void OnEditingRfqItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -193,6 +196,45 @@ namespace Procure.PageModels
                 item.IsQuoted = false;
             }
             RecalculateRfqTotals();
+        }
+
+        [RelayCommand]
+        public void ToggleAllRfqItems()
+        {
+            if (AllRfqItemsSelected) DeselectAllRfqItems();
+            else SelectAllRfqItems();
+        }
+
+        [RelayCommand]
+        public void AddEditingRfqItem()
+        {
+            var item = new RfqItem
+            {
+                Id = Guid.NewGuid(),
+                RfqId = EditingRfq?.Id ?? Guid.Empty,
+                PrItemId = null, // split / extra line, no direct PR origin
+                ItemName = string.Empty,
+                Quantity = 1,
+                Unit = "pcs",
+                IsQuoted = true,
+                SortOrder = EditingRfqItems.Count
+            };
+            item.PropertyChanged += OnEditingRfqItemPropertyChanged;
+            EditingRfqItems.Add(item);
+            RecalculateRfqTotals();
+        }
+
+        [RelayCommand]
+        public void RemoveEditingRfqItem(RfqItem item)
+        {
+            // Keep at least one line: an RFQ item table with zero rows is meaningless (lump-sum
+            // quoting is the separate quote-amount field).
+            if (EditingRfqItems.Count <= 1) return;
+            if (EditingRfqItems.Remove(item))
+            {
+                item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
+                RecalculateRfqTotals();
+            }
         }
 
         [RelayCommand]
@@ -442,6 +484,9 @@ namespace Procure.PageModels
                 return;
             }
 
+            // Drop unused "+ Add Line" rows the user never filled in.
+            var savedRfqItems = EditingRfqItems.Where(i => !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
+
             try
             {
                 if (IsEditingRfq && EditingRfq != null)
@@ -462,7 +507,7 @@ namespace Procure.PageModels
                     EditingRfq.TechnicalApproval = NewRfqTechnicalApproval?.Trim() ?? string.Empty;
 
                     // Update items
-                    EditingRfq.Items = new ObservableCollection<RfqItem>(EditingRfqItems);
+                    EditingRfq.Items = new ObservableCollection<RfqItem>(savedRfqItems);
 
                     if ((EditingRfq.QuoteAmount.HasValue && EditingRfq.QuoteAmount.Value > 0) || (EditingRfq.HasLineItems && EditingRfq.QuotedItemsCount > 0 && EditingRfq.BaseAmount > 0))
                     {
@@ -511,7 +556,7 @@ namespace Procure.PageModels
                     Warranty = NewRfqWarranty?.Trim() ?? string.Empty,
                     TechnicalApproval = NewRfqTechnicalApproval?.Trim() ?? string.Empty,
                     SentDate = DateTime.Today,
-                    Items = new ObservableCollection<RfqItem>(EditingRfqItems)
+                    Items = new ObservableCollection<RfqItem>(savedRfqItems)
                 };
 
                 foreach (var it in rfq.Items)

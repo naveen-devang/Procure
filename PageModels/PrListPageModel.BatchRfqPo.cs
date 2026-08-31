@@ -175,7 +175,10 @@ namespace Procure.PageModels
             FormattedCalculatedBatchRfqGrandTotal = $"{cur} {CalculatedBatchRfqGrandTotal:N2}";
             HasBatchEditingRfqItems = BatchEditingRfqItems != null && BatchEditingRfqItems.Count > 0;
             BatchRfqItemsListHeight = Math.Clamp(BatchEditingRfqItems?.Count ?? 0, 1, 8) * 42;
+            OnPropertyChanged(nameof(AllBatchRfqItemsSelected));
         }
+
+        public bool AllBatchRfqItemsSelected => BatchEditingRfqItems is { Count: > 0 } && BatchEditingRfqItems.All(i => i.IsQuoted);
 
         private void OnBatchEditingRfqItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -208,6 +211,13 @@ namespace Procure.PageModels
                 item.IsQuoted = false;
             }
             RecalculateBatchRfqTotals();
+        }
+
+        [RelayCommand]
+        public void ToggleAllBatchRfqItems()
+        {
+            if (AllBatchRfqItemsSelected) DeselectAllBatchRfqItems();
+            else SelectAllBatchRfqItems();
         }
 
         [RelayCommand]

@@ -123,7 +123,7 @@
                         <!-- ================= PAGE 1: SELECT RFQ QUOTATIONS ================= -->
                         <VerticalStackLayout IsVisible="{Binding IsPoModalStep1}" Spacing="14">
                             <!-- Page 1 Header Bar -->
-                            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" VerticalOptions="Center">
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8" VerticalOptions="Center">
                                 <VerticalStackLayout Grid.Column="0" Spacing="2">
                                     <Label Text="Select Supplier Quotation(s) to Award"
                                            FontSize="13"
@@ -134,13 +134,8 @@
                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                 </VerticalStackLayout>
 
-                                <Button Grid.Column="1" Text="Select All"
-                                        Command="{Binding SelectAllPoRfqsCommand}"
-                                        Style="{StaticResource SecondaryButton}"
-                                        FontSize="11" HeightRequest="28" Padding="10,0" />
-
-                                <Button Grid.Column="2" Text="Deselect All"
-                                        Command="{Binding DeselectAllPoRfqsCommand}"
+                                <Button Grid.Column="1" Text="{Binding AllPoRfqsSelected, Converter={StaticResource SelectionToggleConverter}}"
+                                        Command="{Binding ToggleAllPoRfqsCommand}"
                                         Style="{StaticResource SecondaryButton}"
                                         FontSize="11" HeightRequest="28" Padding="10,0" />
                             </Grid>
@@ -211,6 +206,7 @@
                                                     <!-- CheckBox -->
                                                     <CheckBox Color="{DynamicResource AccentFill}" Grid.Column="0"
                                                               IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              CheckedChanged="OnPoRfqCardCheckedChanged"
                                                               VerticalOptions="Center" />
 
                                                     <!-- Supplier Details -->
@@ -435,26 +431,13 @@
 
                                                 <!-- LINE ITEMS SECTION (When RFQ has line items) -->
                                                 <VerticalStackLayout IsVisible="{Binding HasItems}" Spacing="8">
-                                                    <!-- Items Table Header & Quick Action Buttons -->
-                                                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" VerticalOptions="Center">
-                                                        <Label Grid.Column="0"
-                                                               Text="PR Line Items, Ordered Quantities &amp; Quoted Rates"
-                                                               FontSize="12"
-                                                               FontFamily="SegoeSemibold"
-                                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                                        
-                                                        <Button Grid.Column="1" Text="Select All Items"
-                                                                Command="{Binding SelectAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
-                                                                CommandParameter="{Binding .}"
-                                                                Style="{StaticResource SecondaryButton}"
-                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
-
-                                                        <Button Grid.Column="2" Text="Deselect All Items"
-                                                                Command="{Binding DeselectAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
-                                                                CommandParameter="{Binding .}"
-                                                                Style="{StaticResource SecondaryButton}"
-                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
-                                                    </Grid>
+                                                    <!-- Quick Action Button -->
+                                                    <Button HorizontalOptions="End"
+                                                            Text="{Binding AllItemsSelected, Converter={StaticResource SelectionToggleConverter}, ConverterParameter=Items}"
+                                                            Command="{Binding ToggleAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
+                                                            CommandParameter="{Binding .}"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            FontSize="10.5" HeightRequest="26" Padding="8,0" />
 
                                                     <!-- Table Column Headers -->
                                                     <Border Padding="10,6" StrokeThickness="1"

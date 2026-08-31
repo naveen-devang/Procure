@@ -229,11 +229,11 @@ namespace Procure.Pages.Modals
                     return;
                 }
 
-                var cleanVal = e.NewTextValue.Replace(",", "").Replace("$", "").Replace("AED", "").Replace("%", "").Trim();
-                if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var discount) ||
-                    decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out discount))
+                // "5%" = 5% of this line's unit price; "5" = 5 currency units.
+                var resolved = DiscountInput.Resolve(e.NewTextValue, item.QuotedUnitPrice ?? 0m);
+                if (resolved.HasValue)
                 {
-                    item.Discount = discount;
+                    item.Discount = resolved.Value;
                 }
             }
         }
@@ -359,14 +359,11 @@ namespace Procure.Pages.Modals
                 return;
             }
 
-            var cleanVal = e.NewTextValue.Replace(",", "").Replace("$", "").Replace("AED", "").Replace("%", "").Trim();
-            if (decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var disc) ||
-                decimal.TryParse(cleanVal, NumberStyles.Any, CultureInfo.CurrentCulture, out disc))
+            // "5%" = 5% of the base quote sum (goods subtotal, before freight/charges/VAT); "5" = 5 currency units.
+            var resolved = DiscountInput.Resolve(e.NewTextValue, ViewModel.CalculatedRfqBaseTotal);
+            if (resolved.HasValue && ViewModel.NewRfqDiscount != resolved.Value)
             {
-                if (ViewModel.NewRfqDiscount != disc)
-                {
-                    ViewModel.NewRfqDiscount = disc;
-                }
+                ViewModel.NewRfqDiscount = resolved.Value;
             }
         }
 

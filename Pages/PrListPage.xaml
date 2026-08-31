@@ -224,6 +224,15 @@
                                     HeightRequest="34"
                                     Padding="10,0"
                                     FontSize="12" />
+
+                            <!-- Button 5: Delete Selected PRs -->
+                            <Button Text="Delete"
+                                    Command="{Binding DeleteSelectedPrsCommand}"
+                                    Style="{StaticResource CancelButton}"
+                                    HeightRequest="34"
+                                    Padding="12,0"
+                                    FontSize="12"
+                                    ToolTipProperties.Text="Permanently delete the selected requisitions and all their RFQs, PCRs and POs" />
                         </HorizontalStackLayout>
                     </Grid>
                 </Border>

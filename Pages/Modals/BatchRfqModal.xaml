@@ -140,12 +140,8 @@
                                 </VerticalStackLayout>
 
                                 <HorizontalStackLayout Grid.Column="1" Spacing="8">
-                                    <Button Text="Select All"
-                                            Command="{Binding SelectAllBatchRfqItemsCommand}"
-                                            Style="{StaticResource SecondaryButton}"
-                                            FontSize="11" HeightRequest="28" Padding="8,0" />
-                                    <Button Text="Deselect All"
-                                            Command="{Binding DeselectAllBatchRfqItemsCommand}"
+                                    <Button Text="{Binding AllBatchRfqItemsSelected, Converter={StaticResource SelectionToggleConverter}}"
+                                            Command="{Binding ToggleAllBatchRfqItemsCommand}"
                                             Style="{StaticResource SecondaryButton}"
                                             FontSize="11" HeightRequest="28" Padding="8,0" />
                                     <Button Text="&#xE8C8; Copy for Email"
