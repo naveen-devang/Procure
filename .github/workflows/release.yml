@@ -55,8 +55,14 @@ jobs:
       - name: Publish
         shell: pwsh
         run: |
+          # --self-contained bundles the .NET runtime into the app folder; WindowsAppSDKSelfContained
+          # bundles the WinUI 3 native runtime. Both are required for an install that needs no
+          # prerequisites and no admin rights. A runtime id alone does NOT imply self-contained
+          # since .NET 6 - the flag has to be explicit - and RuntimeIdentifier is the supported
+          # knob (RuntimeIdentifierOverride is internal).
           dotnet publish -f net10.0-windows10.0.19041.0 -c Release `
-            -p:RuntimeIdentifierOverride=win-x64 `
+            -p:RuntimeIdentifier=win-x64 `
+            --self-contained `
             -p:WindowsPackageType=None `
             -p:WindowsAppSDKSelfContained=true
 
