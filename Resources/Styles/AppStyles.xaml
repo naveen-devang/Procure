@@ -45,7 +45,9 @@
                     </VisualState>
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="{StaticResource Tertiary}" />
+                            <!-- Dim, don't recolour: the fill is the live pastel accent, and any
+                                 hardcoded hover colour (Tertiary is #005FB8) overrides it. -->
+                            <Setter Property="Opacity" Value="0.9" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>

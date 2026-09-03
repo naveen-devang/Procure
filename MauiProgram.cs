@@ -51,6 +51,13 @@ namespace Procure
                                 // Fallback to standard window sizing
                             }
                         });
+
+                        // Unpackaged MAUI/WinUI does not tear the process down when the last
+                        // window closes - it lingers in Task Manager with the orphaned render
+                        // thread burning ~8% CPU, and the 24h background update loop still alive.
+                        // Force a full exit. Reopening runs the startup update check anyway, so
+                        // nothing is lost.
+                        windows.OnClosed((window, args) => Environment.Exit(0));
                     });
 #endif
                 })
