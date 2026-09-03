@@ -60,8 +60,28 @@ namespace Procure
             {
                 _ = RunNoteSelfChecksAsync();
             }
+            else
+            {
+                // Sweep any self-check notes a killed run left behind, so a normal Debug launch
+                // never shows nfsc-/nrsc- notes in the list.
+                _ = SweepSelfCheckNotesAsync();
+            }
 #endif
         }
+
+#if DEBUG
+        private async Task SweepSelfCheckNotesAsync()
+        {
+            try
+            {
+                var repo = _services.GetRequiredService<Data.Repositories.INoteRepository>();
+                foreach (var n in (await repo.GetListAsync())
+                             .Where(n => n.Title.StartsWith("nrsc-") || n.Title.StartsWith("nfsc-")))
+                    await repo.DeleteAsync(n.Id);
+            }
+            catch { }
+        }
+#endif
 
 #if DEBUG
         private async Task RunNoteSelfChecksAsync()

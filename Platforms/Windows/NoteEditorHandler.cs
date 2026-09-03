@@ -24,24 +24,50 @@ namespace Procure.Platforms.Windows
         // True while we push a document programmatically, so the resulting TextChanged is ignored.
         private bool _suppress;
 
+        // The colour-stripped RTF last handed to the page model. TextChanged that produces the same
+        // value (theme recolour, load echo that leaked past _suppress) is not a real edit and never
+        // reaches the page model - so opening a note, or toggling the theme, never triggers a save.
+        private string _baseline = string.Empty;
+
+        private string CurrentStrippedRtf()
+        {
+            PlatformView.Document.GetText(TextGetOptions.FormatRtf, out var rtf);
+            return StripColours(rtf);
+        }
+
         protected override RichEditBox CreatePlatformView() => new()
         {
             IsSpellCheckEnabled = true,
             TextWrapping = Mux.TextWrapping.Wrap,
             BorderThickness = new Mux.Thickness(0),
-            Background = new Mux.Media.SolidColorBrush(WinColors.Transparent),
             Padding = new Mux.Thickness(6, 6, 6, 40),
             VerticalContentAlignment = Mux.VerticalAlignment.Top,
-            // Default text follows the theme's brush, so a note written in dark mode is not black on
-            // a light ground later. Colours the user picks explicitly are stripped on save (v1 has
-            // no colour picker anyway).
-            RequestedTheme = Procure.Utilities.ThemeHelper.IsDark ? Mux.ElementTheme.Dark : Mux.ElementTheme.Light,
+            // No RequestedTheme: an explicit value breaks WinUI theme inheritance, so the control
+            // would freeze on its creation-time theme while the rest of the page re-themes on a
+            // toggle. Left to inherit from the page root, which NativeTheme.ApplyToPages drives.
         };
 
         protected override void ConnectHandler(RichEditBox platformView)
         {
             base.ConnectHandler(platformView);
+
+            // Same background and border in every visual state, so the area never changes
+            // appearance on focus / hover. The wrapping MAUI Border is the only visible chrome and
+            // it carries the AppThemeBinding, so this stays theme-correct.
+            var transparent = new Mux.Media.SolidColorBrush(WinColors.Transparent);
+            foreach (var key in new[]
+                     {
+                         "TextControlBackground", "TextControlBackgroundPointerOver",
+                         "TextControlBackgroundFocused", "TextControlBackgroundDisabled",
+                         "TextControlBorderBrush", "TextControlBorderBrushPointerOver",
+                         "TextControlBorderBrushFocused", "TextControlBorderBrushDisabled",
+                     })
+                platformView.Resources[key] = transparent;
+            platformView.Resources["TextControlBorderThemeThickness"] = new Mux.Thickness(0);
+            platformView.Resources["TextControlBorderThemeThicknessFocused"] = new Mux.Thickness(0);
+
             platformView.TextChanged += OnTextChanged;
+            platformView.ActualThemeChanged += OnActualThemeChanged;
             VirtualView.LoadRequested += OnLoadRequested;
             VirtualView.FormatRequested += OnFormatRequested;
         }
@@ -49,6 +75,7 @@ namespace Procure.Platforms.Windows
         protected override void DisconnectHandler(RichEditBox platformView)
         {
             platformView.TextChanged -= OnTextChanged;
+            platformView.ActualThemeChanged -= OnActualThemeChanged;
             if (VirtualView is not null)
             {
                 VirtualView.LoadRequested -= OnLoadRequested;
@@ -66,13 +93,18 @@ namespace Procure.Platforms.Windows
                 if (string.IsNullOrEmpty(rtf))
                     PlatformView.Document.SetText(TextSetOptions.None, string.Empty);
                 else
-                    PlatformView.Document.SetText(TextSetOptions.FormatRtf, rtf);
+                    // Strip colours on load too, not just on save: notes written before the
+                    // save-side strip (or in another theme) still carry a baked foreground.
+                    PlatformView.Document.SetText(TextSetOptions.FormatRtf, StripColours(rtf));
 
                 // Caret at the start; SetText also clears the undo stack, which is what we want on load.
                 PlatformView.Document.Selection.SetRange(0, 0);
             }
             catch { /* malformed RTF - leave the box empty rather than crash */ }
             finally { _suppress = false; }
+
+            ApplyThemeForeground();
+            _baseline = CurrentStrippedRtf();   // the freshly-loaded note is the "no changes" state
         }
 
         // ---- edits out ----
@@ -80,9 +112,12 @@ namespace Procure.Platforms.Windows
         {
             if (_suppress || VirtualView is null) return;
 
-            PlatformView.Document.GetText(TextGetOptions.FormatRtf, out var rtf);
+            var stripped = CurrentStrippedRtf();
+            if (stripped == _baseline) return;   // nothing actually changed
+            _baseline = stripped;
+
             PlatformView.Document.GetText(TextGetOptions.None, out var plain);
-            VirtualView.RaiseContentChanged(StripColours(rtf), plain.TrimEnd('\r', '\n'));
+            VirtualView.RaiseContentChanged(stripped, plain.TrimEnd('\r', '\n'));
         }
 
         // ---- formatting ----
@@ -188,17 +223,45 @@ namespace Procure.Platforms.Windows
             range.SetText(TextSetOptions.None, string.Join('\r', lines));
         }
 
-        // RichEditBox emits a colour table even for "automatic" text; drop it so notes stay
-        // theme-neutral. Safe for v1 (no colour picker); revisit when Phase 2 adds colours.
+        // RichEditBox emits a colour table even for "automatic" text, and once an RTF carries one,
+        // "auto" resolves to the OS window-text colour (black), not the themed control foreground -
+        // so a note loaded from RTF stays black on a dark ground. Drop the table AND every \cf
+        // reference entirely; the control then paints from its own Foreground, which follows the
+        // theme. Safe for v1 (no colour picker); revisit when Phase 2 adds colours.
         private static readonly Regex ColourTable = new(@"\{\\colortbl[^}]*\}", RegexOptions.Compiled);
         private static readonly Regex ColourRun = new(@"\\cf\d+ ?|\\highlight\d+ ?", RegexOptions.Compiled);
 
         private static string StripColours(string rtf)
         {
             if (string.IsNullOrEmpty(rtf)) return rtf;
-            rtf = ColourTable.Replace(rtf, "{\\colortbl ;}");
+            rtf = ColourTable.Replace(rtf, string.Empty);
             rtf = ColourRun.Replace(rtf, string.Empty);
             return rtf;
         }
+
+        // Belt-and-suspenders on top of StripColours: force every run and the document default to
+        // the theme's text colour. Runs on load and on every theme change, so switching notes after
+        // a toggle can't leave a doc painted in the old theme's colour.
+        // ponytail: nukes any per-run colour - fine until a colour picker exists.
+        private void ApplyThemeForeground()
+        {
+            if (PlatformView is null) return;
+            var color = PlatformView.ActualTheme == Mux.ElementTheme.Dark ? WinColors.White : WinColors.Black;
+
+            _suppress = true;
+            try
+            {
+                var all = PlatformView.Document.GetRange(0, int.MaxValue);
+                all.CharacterFormat.ForegroundColor = color;
+
+                var dcf = PlatformView.Document.GetDefaultCharacterFormat();
+                dcf.ForegroundColor = color;
+                PlatformView.Document.SetDefaultCharacterFormat(dcf);
+            }
+            catch { }
+            finally { _suppress = false; }
+        }
+
+        private void OnActualThemeChanged(Mux.FrameworkElement sender, object args) => ApplyThemeForeground();
     }
 }

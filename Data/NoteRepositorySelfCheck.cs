@@ -34,6 +34,22 @@ namespace Procure.Data
                 Assert(row.Snippet == "Hello bold world.", "snippet stored from plain text");
                 Assert(row.Title == marker, "list carries the title");
 
+                // ---- links ----
+                var linkA = Guid.NewGuid();
+                var linkB = Guid.NewGuid();
+                full.Links.Add(new NoteLink { EntityType = "PR", EntityId = linkA, Label = "PR-0001" });
+                full.Links.Add(new NoteLink { EntityType = "RFQ", EntityId = linkB, Label = "RFQ-0007" });
+                await repo.UpsertAsync(full, "Hello bold world.");
+                full = (await repo.GetAsync(id))!;
+                Assert(full.Links.Count == 2 && full.Links.Any(l => l.EntityId == linkA && l.Label == "PR-0001"), "note links round trip");
+
+                full.Links.Remove(full.Links.First(l => l.EntityId == linkB));
+                await repo.SetLinksAsync(id, full.Links.ToList());
+                full = (await repo.GetAsync(id))!;
+                Assert(full.Links.Count == 1 && full.Links[0].EntityId == linkA, "SetLinksAsync replaces the link set");
+
+                _ = await repo.GetLinkTargetsAsync(); // must not throw on an empty target DB
+
                 await repo.SetTitleAsync(id, marker + "-renamed");
                 await repo.SetPinnedAsync(id, true);
                 await repo.ReorderAsync(new[] { (id, 99) });

@@ -21,5 +21,11 @@ namespace Procure.Data.Repositories
         Task SetPinnedAsync(Guid id, bool pinned);
         Task DeleteAsync(Guid id);
         Task ReorderAsync(IReadOnlyList<(Guid Id, int SortOrder)> rows);
+
+        // PR / RFQ / PO link targets for the typeahead, newest first.
+        Task<List<TaskLinkTarget>> GetLinkTargetsAsync();
+
+        // Replace the whole link set for one note (targeted write from the link chips).
+        Task SetLinksAsync(Guid noteId, IReadOnlyList<NoteLink> links);
     }
 }

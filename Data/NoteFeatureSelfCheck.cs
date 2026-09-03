@@ -62,9 +62,29 @@ namespace Procure.Data
                     Assert(vm.Notes.IndexOf(vm.Notes.First(n => n.Id == first.Id)) == idxFirst + 1, "move down shifts the note");
                 }
 
+                // ---- links (only if the test DB has any PR/RFQ/PO) ----
+                await vm.SelectAsync(vm.Notes.First(n => n.Id == first.Id));
+                vm.LinkQuery = "PR";
+                if (vm.LinkResults.Count > 0)
+                {
+                    var target = vm.LinkResults[0];
+                    await vm.PickLinkTargetAsync(target);
+                    Assert(vm.SelectedNote!.HasLinks && vm.SelectedNote.Links.Any(l => l.Label == target.ChipLabel), "pick link adds it");
+                    Assert(vm.LinkQuery == "" && !vm.ShowLinkResults, "picking clears the query");
+
+                    await vm.PickLinkTargetAsync(target);
+                    Assert(vm.SelectedNote.Links.Count == 1, "picking the same target twice does not duplicate");
+
+                    var reopened = await repo.GetAsync(first.Id);
+                    Assert(reopened!.Links.Count == 1, "link persisted");
+
+                    await vm.RemoveLinkAsync(vm.SelectedNote.Links[0]);
+                    Assert(!vm.SelectedNote.HasLinks, "remove link clears it");
+                }
+
                 // ---- delete ----
-                await vm.DeleteAsync(vm.Notes.First(n => n.Id == first.Id));
-                await vm.DeleteAsync(vm.Notes.First(n => n.Id == second.Id));
+                await vm.DeleteInternalAsync(vm.Notes.First(n => n.Id == first.Id), confirm: false);
+                await vm.DeleteInternalAsync(vm.Notes.First(n => n.Id == second.Id), confirm: false);
                 Assert(vm.Notes.All(n => n.Id != first.Id && n.Id != second.Id), "delete removes notes from the list");
 
                 // ---- heap probe: many list rebuilds must not grow unbounded ----

@@ -40,6 +40,18 @@ namespace Procure.PageModels
         public bool HasSelection => SelectedNote is not null;
         public int NoteCount => _all.Count;
 
+        // ---- PR / RFQ / PO link typeahead ----
+        private List<TaskLinkTarget> _linkTargets = new();
+        private readonly Dictionary<Guid, string> _linkChip = new();
+
+        public ObservableCollection<TaskLinkTarget> LinkResults { get; } = new();
+
+        [ObservableProperty]
+        public partial string LinkQuery { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial bool ShowLinkResults { get; set; }
+
         // Raised when a note is opened; the page hands the RTF to the editor control.
         public event Action<string>? EditorLoadRequested;
 
@@ -57,6 +69,7 @@ namespace Procure.PageModels
             try
             {
                 _all = await _repo.GetListAsync();
+                await LoadLinkTargetsAsync();
                 _loaded = true;
                 RebuildList();
             }
@@ -109,15 +122,93 @@ namespace Procure.PageModels
                 if (note is null) return;
 
                 _bodyCache[note.Id] = note;
+                ResolveLinkLabels(note);
                 HookNote(note);
                 SelectedNote = note;
                 EditorLoadRequested?.Invoke(note.Body);
                 SaveState = string.Empty;
+                LinkQuery = string.Empty;
+                ShowLinkResults = false;
             }
             catch (Exception ex)
             {
                 _errorHandler.HandleError(ex);
             }
+        }
+
+        // ---- links ----
+        private async Task LoadLinkTargetsAsync()
+        {
+            try
+            {
+                _linkTargets = await _repo.GetLinkTargetsAsync();
+                _linkChip.Clear();
+                foreach (var t in _linkTargets) _linkChip[t.Id] = t.ChipLabel;
+            }
+            catch (Exception ex) { _errorHandler.HandleError(ex); }
+        }
+
+        private void ResolveLinkLabels(Note note)
+        {
+            for (var i = 0; i < note.Links.Count; i++)
+            {
+                var link = note.Links[i];
+                if (_linkChip.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
+                    note.Links[i] = new NoteLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
+            }
+        }
+
+        partial void OnLinkQueryChanged(string value)
+        {
+            var term = value?.Trim();
+            LinkResults.Clear();
+            if (string.IsNullOrEmpty(term) || term.Length < 2)
+            {
+                ShowLinkResults = false;
+                return;
+            }
+
+            foreach (var t in _linkTargets.Where(t => t.Label.Contains(term, StringComparison.OrdinalIgnoreCase)).Take(12))
+                LinkResults.Add(t);
+            ShowLinkResults = LinkResults.Count > 0;
+        }
+
+        [RelayCommand]
+        public async Task PickLinkTargetAsync(TaskLinkTarget? target)
+        {
+            if (SelectedNote is null || target is null) return;
+            var note = SelectedNote;
+            LinkQuery = string.Empty;
+            ShowLinkResults = false;
+            if (note.Links.Any(l => l.EntityId == target.Id)) return;
+
+            note.Links.Add(new NoteLink { EntityType = target.Type, EntityId = target.Id, Label = target.ChipLabel });
+            try { await _repo.SetLinksAsync(note.Id, note.Links.ToList()); }
+            catch (Exception ex) { _errorHandler.HandleError(ex); }
+        }
+
+        [RelayCommand]
+        public async Task RemoveLinkAsync(NoteLink? link)
+        {
+            if (SelectedNote is null || link is null) return;
+            var note = SelectedNote;
+            var existing = note.Links.FirstOrDefault(l => l.EntityId == link.EntityId);
+            if (existing is null) return;
+
+            note.Links.Remove(existing);
+            try { await _repo.SetLinksAsync(note.Id, note.Links.ToList()); }
+            catch (Exception ex) { _errorHandler.HandleError(ex); }
+        }
+
+        [RelayCommand]
+        public async Task OpenLinkAsync()
+        {
+            if (SelectedNote is null || SelectedNote.Links.Count == 0) return;
+            var terms = string.Join(' ', SelectedNote.Links.Select(l => l.Label).Where(l => l.Length > 0).Distinct());
+            if (terms.Length == 0 || Shell.Current is null) return;
+
+            await Shell.Current.GoToAsync("//prboard");
+            if (PrListPageModel.Current is { } board) board.SearchText = terms;
         }
 
         // ---- new / delete / pin / duplicate ----
@@ -148,12 +239,15 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public async Task DeleteAsync(NoteListItem? item)
+        public Task DeleteAsync(NoteListItem? item) => DeleteInternalAsync(item, confirm: true);
+
+        // confirm: false is the self-check path - it must never raise a dialog.
+        public async Task DeleteInternalAsync(NoteListItem? item, bool confirm)
         {
             item ??= _all.FirstOrDefault(n => n.Id == SelectedNote?.Id);
             if (item is null) return;
 
-            if (Shell.Current is not null)
+            if (confirm && Shell.Current is not null)
             {
                 var ok = await Shell.Current.DisplayAlertAsync("Delete note",
                     $"Delete “{item.DisplayTitle}”?", "Delete", "Cancel");
@@ -215,6 +309,8 @@ namespace Procure.PageModels
                     UpdatedAt = DateTime.UtcNow,
                     SortOrder = source.SortOrder,
                 };
+                foreach (var l in source.Links)
+                    copy.Links.Add(new NoteLink { EntityType = l.EntityType, EntityId = l.EntityId, Label = l.Label });
                 await _repo.UpsertAsync(copy, source.Snippet ?? string.Empty);
 
                 _bodyCache[copy.Id] = copy;
@@ -266,8 +362,7 @@ namespace Procure.PageModels
             var row = _all.FirstOrDefault(n => n.Id == SelectedNote.Id);
             if (row is not null)
             {
-                row.Snippet = string.IsNullOrWhiteSpace(plainText) ? null
-                    : (plainText.Length <= 120 ? plainText : plainText[..120]);
+                row.Snippet = Note.BuildSnippet(plainText);
                 row.UpdatedAt = DateTime.UtcNow;
             }
 
@@ -297,11 +392,13 @@ namespace Procure.PageModels
         private readonly Dictionary<Guid, int> _saveGeneration = new();
         private readonly Dictionary<Guid, (Note note, string plain)> _pending = new();
 
+        // Trailing debounce: a write happens only ~800 ms after the user stops typing. Every edit
+        // supersedes the previous timer, so a burst of keystrokes is a single write.
         private void ScheduleSave(Note note, string plainText)
         {
             _pending[note.Id] = (note, plainText);
             var generation = _saveGeneration[note.Id] = _saveGeneration.GetValueOrDefault(note.Id) + 1;
-            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(600), async () =>
+            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(800), async () =>
             {
                 if (_saveGeneration.GetValueOrDefault(note.Id) != generation) return;
                 await SaveNoteAsync(note.Id);

@@ -30,36 +30,35 @@
         </Style>
 
         <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
-            <Grid Padding="12,9" ColumnDefinitions="6,*" ColumnSpacing="6" RowDefinitions="Auto,Auto,Auto"
-                  MinimumHeightRequest="58">
-                <Grid.GestureRecognizers>
+            <Border Margin="6,1" Padding="0" StrokeThickness="0" BackgroundColor="Transparent">
+                <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                <Border.Triggers>
+                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="BackgroundColor"
+                                Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}" />
+                    </DataTrigger>
+                </Border.Triggers>
+                <Border.GestureRecognizers>
                     <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectCommand}"
                                           CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
+                </Border.GestureRecognizers>
 
-                <Border Grid.RowSpan="3" Grid.ColumnSpan="2" StrokeThickness="0" Opacity="0" Margin="4,1"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
-                    <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
-                    <Border.Triggers>
-                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                            <Setter Property="Opacity" Value="1" />
-                        </DataTrigger>
-                    </Border.Triggers>
-                </Border>
-
-                <BoxView Grid.RowSpan="3" Grid.Column="0" WidthRequest="6" HeightRequest="6" CornerRadius="3"
-                         VerticalOptions="Center" HorizontalOptions="Start" IsVisible="{Binding Pinned}"
-                         Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
-
-                <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayTitle}" FontFamily="SegoeSemibold" FontSize="13"
-                       LineBreakMode="TailTruncation"
-                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                <Label Grid.Row="1" Grid.Column="1" Text="{Binding Snippet}" FontSize="11.5" LineBreakMode="TailTruncation"
-                       IsVisible="{Binding HasSnippet}"
-                       TextColor="{StaticResource Gray400}" />
-                <Label Grid.Row="2" Grid.Column="1" Text="{Binding WhenLabel}" FontSize="10.5" Margin="0,2,0,0"
-                       TextColor="{StaticResource Gray400}" />
-            </Grid>
+                <VerticalStackLayout Padding="11,8" Spacing="1">
+                    <HorizontalStackLayout Spacing="6">
+                        <BoxView WidthRequest="5" HeightRequest="5" CornerRadius="2.5" VerticalOptions="Center"
+                                 IsVisible="{Binding Pinned}"
+                                 Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                        <Label Text="{Binding DisplayTitle}" FontFamily="SegoeSemibold" FontSize="12.5"
+                               LineBreakMode="TailTruncation" MaxLines="1"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Snippet}" FontSize="11" LineBreakMode="TailTruncation" MaxLines="1"
+                           IsVisible="{Binding HasSnippet}"
+                           TextColor="{StaticResource Gray400}" />
+                    <Label Text="{Binding WhenLabel}" FontSize="10" Margin="0,1,0,0"
+                           TextColor="{StaticResource Gray400}" />
+                </VerticalStackLayout>
+            </Border>
         </DataTemplate>
     </ContentPage.Resources>
 
@@ -109,7 +108,7 @@
         <Border Grid.Column="2" Style="{StaticResource Pane}" IsVisible="{Binding HasSelection}" Padding="0">
             <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
 
-            <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
                 <Grid Grid.Row="0" Padding="16,12,12,8" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
                     <Entry Grid.Column="0" Placeholder="Note title" FontFamily="SegoeSemibold" FontSize="15"
                            BackgroundColor="Transparent"
@@ -154,7 +153,74 @@
                     <controls:NoteEditor x:Name="Editor" />
                 </Border>
 
-                <Label Grid.Row="3" Padding="16,0,16,12" FontSize="11" Text="{Binding SaveState}"
+                <!-- Linked records -->
+                <VerticalStackLayout Grid.Row="3" Margin="12,0,12,6" Spacing="6">
+                    <FlexLayout Wrap="Wrap" BindableLayout.ItemsSource="{Binding SelectedNote.Links}"
+                                IsVisible="{Binding SelectedNote.HasLinks}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:NoteLink">
+                                <Border Margin="0,0,6,4" Padding="8,3" StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                                        BackgroundColor="Transparent">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="9" /></Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                                        <Label Grid.Column="0" Text="{Binding Label}" FontSize="10.5" VerticalTextAlignment="Center"
+                                               LineBreakMode="NoWrap"
+                                               TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}">
+                                            <Label.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenLinkCommand}" />
+                                            </Label.GestureRecognizers>
+                                        </Label>
+                                        <Label Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="9"
+                                               VerticalTextAlignment="Center" TextColor="{StaticResource Gray400}">
+                                            <Label.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.RemoveLinkCommand}"
+                                                                      CommandParameter="{Binding .}" />
+                                            </Label.GestureRecognizers>
+                                        </Label>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                        <Label Grid.Column="0" Text="&#xE71B;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                               VerticalOptions="Center" TextColor="{StaticResource Gray400}" />
+                        <Entry Grid.Column="1" Placeholder="Link a PR / RFQ / PO number" FontSize="12" HeightRequest="32"
+                               Text="{Binding LinkQuery, Mode=TwoWay}" />
+                    </Grid>
+
+                    <Border IsVisible="{Binding ShowLinkResults}" StrokeThickness="1" Padding="0"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                        <ScrollView MaximumHeightRequest="150">
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding LinkResults}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:TaskLinkTarget">
+                                        <Grid Padding="10,7" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.PickLinkTargetCommand}"
+                                                                      CommandParameter="{Binding .}" />
+                                            </Grid.GestureRecognizers>
+                                            <Border Grid.Column="0" Padding="5,1" StrokeThickness="0" VerticalOptions="Center"
+                                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                                                <Border.StrokeShape><RoundRectangle CornerRadius="4" /></Border.StrokeShape>
+                                                <Label Text="{Binding Type}" FontSize="9" TextColor="{StaticResource Gray400}" />
+                                            </Border>
+                                            <Label Grid.Column="1" Text="{Binding Label}" FontSize="11.5" LineBreakMode="TailTruncation"
+                                                   VerticalOptions="Center"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </ScrollView>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Label Grid.Row="4" Padding="16,0,16,12" FontSize="11" Text="{Binding SaveState}"
                        TextColor="{StaticResource Gray400}" />
             </Grid>
         </Border>

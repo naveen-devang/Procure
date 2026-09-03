@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 10;
+        public const int SchemaVersion = 11;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -317,6 +317,31 @@ CREATE TABLE IF NOT EXISTS Note (
     UpdatedAt  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS IX_Note_Order ON Note(Pinned, SortOrder);
+
+-- v11: a note can link many PRs / RFQs / POs, same shape as TodoTaskLink.
+CREATE TABLE IF NOT EXISTS NoteLink (
+    NoteId TEXT NOT NULL REFERENCES Note(Id) ON DELETE CASCADE,
+    EntityType TEXT NOT NULL,
+    EntityId TEXT NOT NULL,
+    EntityLabel TEXT,
+    PRIMARY KEY (NoteId, EntityId)
+);
+CREATE INDEX IF NOT EXISTS IX_NoteLink_Entity ON NoteLink(EntityId);
 ";
+
+        // The PR / RFQ / PO rows a task or a note can link to, newest first. Shared verbatim by
+        // TodoRepository.GetLinkTargetsAsync and NoteRepository.GetLinkTargetsAsync.
+        public const string SqlLinkTargets = @"
+SELECT 'PR' AS T, Id, PrNo || ' — ' || COALESCE(NULLIF(Description,''), 'PR') AS L, CreatedAt AS Ord
+FROM PurchaseRequisition WHERE ParentPrId IS NULL
+UNION ALL
+SELECT 'RFQ', r.Id, COALESCE(NULLIF(r.RfqNo,''), 'RFQ') || ' — ' || COALESCE(NULLIF(r.Vendor,''), 'vendor'),
+       (SELECT CreatedAt FROM PurchaseRequisition WHERE Id = r.PrId)
+FROM RequestForQuotation r
+UNION ALL
+SELECT 'PO', p.Id, COALESCE(NULLIF(p.PoNo,''), 'PO') || ' — ' || COALESCE(NULLIF(p.Vendor,''), 'vendor'),
+       (SELECT CreatedAt FROM PurchaseRequisition WHERE Id = p.PrId)
+FROM PurchaseOrder p
+ORDER BY Ord DESC;";
     }
 }

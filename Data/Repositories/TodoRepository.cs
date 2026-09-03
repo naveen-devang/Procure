@@ -274,18 +274,7 @@ ON CONFLICT(Id) DO UPDATE SET
             await connection.OpenAsync().ConfigureAwait(false);
 
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
-SELECT 'PR' AS T, Id, PrNo || ' — ' || COALESCE(NULLIF(Description,''), 'PR') AS L, CreatedAt AS Ord
-FROM PurchaseRequisition WHERE ParentPrId IS NULL
-UNION ALL
-SELECT 'RFQ', r.Id, COALESCE(NULLIF(r.RfqNo,''), 'RFQ') || ' — ' || COALESCE(NULLIF(r.Vendor,''), 'vendor'),
-       (SELECT CreatedAt FROM PurchaseRequisition WHERE Id = r.PrId)
-FROM RequestForQuotation r
-UNION ALL
-SELECT 'PO', p.Id, COALESCE(NULLIF(p.PoNo,''), 'PO') || ' — ' || COALESCE(NULLIF(p.Vendor,''), 'vendor'),
-       (SELECT CreatedAt FROM PurchaseRequisition WHERE Id = p.PrId)
-FROM PurchaseOrder p
-ORDER BY Ord DESC;";
+            cmd.CommandText = DatabaseConstants.SqlLinkTargets;
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))
