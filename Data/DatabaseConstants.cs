@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 8;
+        public const int SchemaVersion = 9;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -271,7 +271,8 @@ CREATE INDEX IF NOT EXISTS IX_PoItemCallOff_PoItemId ON PoItemCallOff(PoItemId);
 
 -- Personal task list (schema v7). New table only - the whole CREATE script re-runs on a
 -- version bump, so existing databases pick this up with no MigrateSchemaAsync branch needed.
--- Columns past SortOrder are reserved for later phases (sub-tasks, recurrence, PR/RFQ/PO links).
+-- LinkedEntity* are legacy single-link columns (v7-v8); v9 moved links to TodoTaskLink. They stay
+-- for the one-time backfill in MigrateSchemaAsync and are no longer read or written.
 CREATE TABLE IF NOT EXISTS TodoTask (
     Id TEXT PRIMARY KEY,
     Title TEXT NOT NULL,
@@ -291,6 +292,16 @@ CREATE TABLE IF NOT EXISTS TodoTask (
     LinkedEntityLabel TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_TodoTask_Done_Due ON TodoTask(IsDone, DueDate);
+
+-- v9: a task can link many PRs / RFQs / POs. One row per link; cascades when the task is deleted.
+CREATE TABLE IF NOT EXISTS TodoTaskLink (
+    TaskId TEXT NOT NULL REFERENCES TodoTask(Id) ON DELETE CASCADE,
+    EntityType TEXT NOT NULL,
+    EntityId TEXT NOT NULL,
+    EntityLabel TEXT,
+    PRIMARY KEY (TaskId, EntityId)
+);
+CREATE INDEX IF NOT EXISTS IX_TodoTaskLink_Entity ON TodoTaskLink(EntityId);
 ";
     }
 }

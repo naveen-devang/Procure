@@ -132,6 +132,19 @@ namespace Procure.Data
             // have the table already, so the CREATE script skips it; add the column explicitly.
             await EnsureColumnExistsAsync(connection, "TodoTask", "LinkedEntityLabel", "TEXT").ConfigureAwait(false);
 
+            // v9: the single LinkedEntity* columns became the TodoTaskLink table (many links per task).
+            // Backfill once, from the pre-v9 single link. INSERT OR IGNORE keeps a re-run harmless.
+            if (fromVersion is >= 7 and < 9)
+            using (var backfillLinks = connection.CreateCommand())
+            {
+                backfillLinks.CommandText = @"
+INSERT OR IGNORE INTO TodoTaskLink (TaskId, EntityType, EntityId, EntityLabel)
+SELECT Id, COALESCE(NULLIF(LinkedEntityType, ''), 'PR'), LinkedEntityId, LinkedEntityLabel
+FROM TodoTask
+WHERE LinkedEntityId IS NOT NULL AND LinkedEntityId <> '';";
+                await backfillLinks.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
             // One-time repair: the PO wizard's VAT-picker bug saved Value without VAT while the
             // row still records a VatType, leaving Value inconsistent with its own breakdown.
             // Recompute Value from the stored components wherever it deviates; rows without a

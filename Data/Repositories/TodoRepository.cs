@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Procure.Models;
@@ -17,7 +18,7 @@ namespace Procure.Data.Repositories
         private const string DateFmt = "yyyy-MM-dd";
         private const string AllColumns =
             "Id, Title, Notes, Priority, IsDone, DueDate, CompletedAt, SortOrder, CreatedAt, UpdatedAt, " +
-            "ParentId, RecurrenceRule, PlannedForDate, LinkedEntityType, LinkedEntityId, LinkedEntityLabel";
+            "ParentId, RecurrenceRule, PlannedForDate";
 
         public TodoRepository(SqliteDatabase db)
         {
@@ -36,32 +37,70 @@ namespace Procure.Data.Repositories
             // Newest first as the stable base order; the page model re-sorts within each group.
             cmd.CommandText = $"SELECT {AllColumns} FROM TodoTask ORDER BY CreatedAt DESC;";
 
+            using (var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false))
+                while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(ReadRow(reader));
+
+            await LoadLinksAsync(connection, list).ConfigureAwait(false);
+            return list;
+        }
+
+        public async Task<List<TodoTask>> GetLinkedAsync(Guid entityId)
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            var list = new List<TodoTask>();
+
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"SELECT {AllColumns} FROM TodoTask
+WHERE Id IN (SELECT TaskId FROM TodoTaskLink WHERE EntityId = @E) AND ParentId IS NULL
+ORDER BY IsDone, CreatedAt DESC;";
+            cmd.Parameters.AddWithValue("@E", entityId.ToString());
+
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                list.Add(new TodoTask
-                {
-                    Id = Guid.Parse(reader.GetString(0)),
-                    Title = reader.GetString(1),
-                    Notes = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    Priority = (TodoPriority)reader.GetInt32(3),
-                    IsDone = reader.GetInt32(4) != 0,
-                    DueDate = ParseDate(reader, 5),
-                    CompletedAt = ParseDateTime(reader, 6),
-                    SortOrder = reader.GetInt32(7),
-                    CreatedAt = ParseDateTime(reader, 8) ?? DateTime.UtcNow,
-                    UpdatedAt = ParseDateTime(reader, 9) ?? DateTime.UtcNow,
-                    ParentId = reader.IsDBNull(10) ? null : Guid.Parse(reader.GetString(10)),
-                    RecurrenceRule = reader.IsDBNull(11) ? null : reader.GetString(11),
-                    PlannedForDate = ParseDate(reader, 12),
-                    LinkedEntityType = reader.IsDBNull(13) ? null : reader.GetString(13),
-                    LinkedEntityId = reader.IsDBNull(14) ? null : Guid.Parse(reader.GetString(14)),
-                    LinkedEntityLabel = reader.IsDBNull(15) ? null : reader.GetString(15),
-                });
-            }
+            while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(ReadRow(reader));
 
             return list;
         }
+
+        // One query for every link row, matched back to the tasks already loaded.
+        private static async Task LoadLinksAsync(SqliteConnection connection, List<TodoTask> tasks)
+        {
+            if (tasks.Count == 0) return;
+            var byId = tasks.ToDictionary(t => t.Id);
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT TaskId, EntityType, EntityId, EntityLabel FROM TodoTaskLink;";
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                if (Guid.TryParse(reader.GetString(0), out var taskId) && byId.TryGetValue(taskId, out var task))
+                    task.Links.Add(new TaskLink
+                    {
+                        EntityType = reader.GetString(1),
+                        EntityId = Guid.Parse(reader.GetString(2)),
+                        Label = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    });
+            }
+        }
+
+        private static TodoTask ReadRow(SqliteDataReader reader) => new()
+        {
+            Id = Guid.Parse(reader.GetString(0)),
+            Title = reader.GetString(1),
+            Notes = reader.IsDBNull(2) ? null : reader.GetString(2),
+            Priority = (TodoPriority)reader.GetInt32(3),
+            IsDone = reader.GetInt32(4) != 0,
+            DueDate = ParseDate(reader, 5),
+            CompletedAt = ParseDateTime(reader, 6),
+            SortOrder = reader.GetInt32(7),
+            CreatedAt = ParseDateTime(reader, 8) ?? DateTime.UtcNow,
+            UpdatedAt = ParseDateTime(reader, 9) ?? DateTime.UtcNow,
+            ParentId = reader.IsDBNull(10) ? null : Guid.Parse(reader.GetString(10)),
+            RecurrenceRule = reader.IsDBNull(11) ? null : reader.GetString(11),
+            PlannedForDate = ParseDate(reader, 12),
+        };
 
         public Task UpsertAsync(TodoTask task) => Task.Run(() => UpsertCoreAsync(task));
 
@@ -71,12 +110,13 @@ namespace Procure.Data.Repositories
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
 
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
 INSERT INTO TodoTask (Id, Title, Notes, Priority, IsDone, DueDate, CompletedAt, SortOrder, CreatedAt, UpdatedAt,
-                      ParentId, RecurrenceRule, PlannedForDate, LinkedEntityType, LinkedEntityId, LinkedEntityLabel)
+                      ParentId, RecurrenceRule, PlannedForDate)
 VALUES (@Id, @Title, @Notes, @Priority, @IsDone, @DueDate, @CompletedAt, @SortOrder, @CreatedAt, @UpdatedAt,
-        @ParentId, @RecurrenceRule, @PlannedForDate, @LinkedEntityType, @LinkedEntityId, @LinkedEntityLabel)
+        @ParentId, @RecurrenceRule, @PlannedForDate)
 ON CONFLICT(Id) DO UPDATE SET
     Title = excluded.Title,
     Notes = excluded.Notes,
@@ -88,29 +128,67 @@ ON CONFLICT(Id) DO UPDATE SET
     UpdatedAt = excluded.UpdatedAt,
     ParentId = excluded.ParentId,
     RecurrenceRule = excluded.RecurrenceRule,
-    PlannedForDate = excluded.PlannedForDate,
-    LinkedEntityType = excluded.LinkedEntityType,
-    LinkedEntityId = excluded.LinkedEntityId,
-    LinkedEntityLabel = excluded.LinkedEntityLabel;";
+    PlannedForDate = excluded.PlannedForDate;";
 
-            cmd.Parameters.AddWithValue("@Id", task.Id.ToString());
-            cmd.Parameters.AddWithValue("@Title", task.Title);
-            cmd.Parameters.AddWithValue("@Notes", (object?)task.Notes ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@Priority", (int)task.Priority);
-            cmd.Parameters.AddWithValue("@IsDone", task.IsDone ? 1 : 0);
-            cmd.Parameters.AddWithValue("@DueDate", DateOrNull(task.DueDate));
-            cmd.Parameters.AddWithValue("@CompletedAt", DateTimeOrNull(task.CompletedAt));
-            cmd.Parameters.AddWithValue("@SortOrder", task.SortOrder);
-            cmd.Parameters.AddWithValue("@CreatedAt", (task.CreatedAt == default ? DateTime.UtcNow : task.CreatedAt).ToString("o", CultureInfo.InvariantCulture));
-            cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-            cmd.Parameters.AddWithValue("@ParentId", (object?)task.ParentId?.ToString() ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@RecurrenceRule", (object?)task.RecurrenceRule ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@PlannedForDate", DateOrNull(task.PlannedForDate));
-            cmd.Parameters.AddWithValue("@LinkedEntityType", (object?)task.LinkedEntityType ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@LinkedEntityId", (object?)task.LinkedEntityId?.ToString() ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@LinkedEntityLabel", (object?)task.LinkedEntityLabel ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Id", task.Id.ToString());
+                cmd.Parameters.AddWithValue("@Title", task.Title);
+                cmd.Parameters.AddWithValue("@Notes", (object?)task.Notes ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Priority", (int)task.Priority);
+                cmd.Parameters.AddWithValue("@IsDone", task.IsDone ? 1 : 0);
+                cmd.Parameters.AddWithValue("@DueDate", DateOrNull(task.DueDate));
+                cmd.Parameters.AddWithValue("@CompletedAt", DateTimeOrNull(task.CompletedAt));
+                cmd.Parameters.AddWithValue("@SortOrder", task.SortOrder);
+                cmd.Parameters.AddWithValue("@CreatedAt", (task.CreatedAt == default ? DateTime.UtcNow : task.CreatedAt).ToString("o", CultureInfo.InvariantCulture));
+                cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                cmd.Parameters.AddWithValue("@ParentId", (object?)task.ParentId?.ToString() ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@RecurrenceRule", (object?)task.RecurrenceRule ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@PlannedForDate", DateOrNull(task.PlannedForDate));
 
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            // Task row exists now; (re)write its link set (FK TaskId -> TodoTask). Snapshot the
+            // collection - it lives on the UI thread.
+            await ReplaceLinksAsync(connection, task.Id, task.Links.ToArray()).ConfigureAwait(false);
+        }
+
+        public Task SetLinksAsync(Guid taskId, IReadOnlyList<TaskLink> links) =>
+            Task.Run(() => SetLinksCoreAsync(taskId, links));
+
+        private async Task SetLinksCoreAsync(Guid taskId, IReadOnlyList<TaskLink> links)
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+            await ReplaceLinksAsync(connection, taskId, links).ConfigureAwait(false);
+        }
+
+        private static async Task ReplaceLinksAsync(SqliteConnection connection, Guid taskId, IEnumerable<TaskLink> links)
+        {
+            using var tx = connection.BeginTransaction();
+
+            using (var del = connection.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM TodoTaskLink WHERE TaskId = @T;";
+                del.Parameters.AddWithValue("@T", taskId.ToString());
+                await del.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            foreach (var link in links)
+            {
+                using var ins = connection.CreateCommand();
+                ins.Transaction = tx;
+                ins.CommandText =
+                    "INSERT OR IGNORE INTO TodoTaskLink (TaskId, EntityType, EntityId, EntityLabel) VALUES (@T, @Ty, @E, @L);";
+                ins.Parameters.AddWithValue("@T", taskId.ToString());
+                ins.Parameters.AddWithValue("@Ty", link.EntityType);
+                ins.Parameters.AddWithValue("@E", link.EntityId.ToString());
+                ins.Parameters.AddWithValue("@L", (object?)link.Label ?? DBNull.Value);
+                await ins.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            tx.Commit();
         }
 
         public Task SetDoneAsync(Guid id, bool done, DateTime? completedAt) =>

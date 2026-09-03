@@ -517,8 +517,17 @@ ORDER BY CreatedAt DESC;";
 
             if (hasSearch)
             {
-                clauses.Add("SearchBlob LIKE @Search");
-                cmd.Parameters.AddWithValue("@Search", "%" + query.Search!.Trim().ToLowerInvariant() + "%");
+                // Whitespace splits the term into an OR set: one word behaves exactly as before,
+                // while several (e.g. the numbers behind a task's multiple PR/RFQ/PO links) match
+                // any row carrying one of them. Capped so a pasted paragraph can't explode the SQL.
+                var terms = query.Search!.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                var likes = new List<string>();
+                for (var i = 0; i < terms.Length && i < 12; i++)
+                {
+                    likes.Add($"SearchBlob LIKE @Search{i}");
+                    cmd.Parameters.AddWithValue($"@Search{i}", "%" + terms[i].ToLowerInvariant() + "%");
+                }
+                clauses.Add(likes.Count == 1 ? likes[0] : "(" + string.Join(" OR ", likes) + ")");
             }
 
             if (hasStatus)

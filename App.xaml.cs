@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
@@ -51,11 +52,45 @@ namespace Procure
             // Opt-in only: PROCURE_TODO_SELFCHECK=1.
             if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") == "1")
             {
-                _ = Data.TodoRepositorySelfCheck.RunAsync(
-                    _services.GetRequiredService<Data.Repositories.ITodoRepository>());
+                _ = RunTodoSelfChecksAsync();
             }
 #endif
         }
+
+#if DEBUG
+        private async Task RunTodoSelfChecksAsync()
+        {
+            Data.SelfCheckLog.Reset();
+            var repo = _services.GetRequiredService<Data.Repositories.ITodoRepository>();
+            var errorHandler = _services.GetRequiredService<Services.IErrorHandler>();
+
+            // Sweep any self-check tasks a previous run left behind (e.g. after a crash).
+            try
+            {
+                foreach (var t in (await repo.GetAllAsync())
+                             .Where(t => t.Title.StartsWith("tfsc-") || t.Title.StartsWith("todo-selfcheck-")))
+                    await repo.DeleteAsync(t.Id);
+            }
+            catch { }
+
+            try
+            {
+                await Data.TodoRepositorySelfCheck.RunAsync(repo);
+                await Data.TodoFeatureSelfCheck.RunAsync(repo, errorHandler);
+                Data.SelfCheckLog.Write("ALL TODO SELF-CHECKS PASSED");
+            }
+            catch (Exception ex)
+            {
+                Data.SelfCheckLog.Write("TODO SELF-CHECKS FAILED: " + ex);
+            }
+            finally
+            {
+                // The checks wrote and removed marker tasks through their own repo; make the real
+                // page model drop any it happened to cache mid-run.
+                await _services.GetRequiredService<PageModels.TodoPageModel>().LoadAsync(force: true);
+            }
+        }
+#endif
 
         private static void OnRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
         {

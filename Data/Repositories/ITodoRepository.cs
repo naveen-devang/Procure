@@ -25,8 +25,15 @@ namespace Procure.Data.Repositories
         // Phase 2 manual reorder - persists SortOrder for a batch of rows.
         Task ReorderAsync(IReadOnlyList<(Guid Id, int SortOrder)> rows);
 
+        // Replace the whole link set for one task - the targeted write behind the detail panel's
+        // link chips, so adding/removing a link never rewrites a title/notes being edited.
+        Task SetLinksAsync(Guid taskId, IReadOnlyList<TaskLink> links);
+
         // PRs / RFQs / POs a task can be linked to, newest first. Read straight from the shared
         // database - no dependency on the PR repository.
         Task<List<TaskLinkTarget>> GetLinkTargetsAsync();
+
+        // Tasks linked to one PR / RFQ / PO, for the reverse strip on the PR detail panel.
+        Task<List<TodoTask>> GetLinkedAsync(Guid entityId);
     }
 }

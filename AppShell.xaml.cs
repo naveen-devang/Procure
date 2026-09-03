@@ -60,6 +60,16 @@ namespace Procure
 
             Procure.Utilities.BoardTrace.Mark("shell-ctor-done");
             Procure.Utilities.BoardTrace.StartPulse(Dispatcher);
+
+            if (Environment.GetEnvironmentVariable("PROCURE_OPEN_CALENDAR") == "1")
+            {
+                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(2500), async () =>
+                {
+                    await GoToAsync("//todos");
+                    await Task.Delay(400);
+                    _services.GetRequiredService<TodoPageModel>().SetViewCommand.Execute("Calendar");
+                });
+            }
             if (Procure.Utilities.BoardTrace.IsEnabled
                 && int.TryParse(Environment.GetEnvironmentVariable("PROCURE_TRACE_NAV"), out var navMs))
             {

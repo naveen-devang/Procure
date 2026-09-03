@@ -29,6 +29,7 @@ namespace Procure.PageModels
         private readonly IPcrExportService _pcrExportService;
         private readonly ISettingsService _settingsService;
         private readonly IErrorHandler _errorHandler;
+        private readonly ITodoRepository _todoRepo;
 
         // The PRs currently loaded - one page, not the table. Everything else lives in SQLite and is
         // reached through _prRepo. Loading the lot cost 3.1s and 231MB at 20,000 PRs; a page costs ~10ms.
@@ -150,7 +151,8 @@ namespace Procure.PageModels
             ICsvExportService csvExportService,
             IPcrExportService pcrExportService,
             ISettingsService settingsService,
-            IErrorHandler errorHandler)
+            IErrorHandler errorHandler,
+            ITodoRepository todoRepo)
         {
             _prRepo = prRepo;
             _customColumnRepo = customColumnRepo;
@@ -158,6 +160,7 @@ namespace Procure.PageModels
             _pcrExportService = pcrExportService;
             _settingsService = settingsService;
             _errorHandler = errorHandler;
+            _todoRepo = todoRepo;
 
             _settingsService.SettingsChanged += OnSettingsChanged;
             if (Application.Current != null)

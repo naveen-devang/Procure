@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Procure.Models;
 using Procure.PageModels;
@@ -26,6 +27,57 @@ namespace Procure.Pages.Controls
         public PrDetailPanel()
         {
             InitializeComponent();
+            Loaded += OnPanelLoaded;
+            Unloaded += OnPanelUnloaded;
+        }
+
+        private void OnPanelLoaded(object? sender, EventArgs e)
+        {
+            Procure.Utilities.TodoChangeNotifier.Changed -= OnTodoChanged;
+            Procure.Utilities.TodoChangeNotifier.Changed += OnTodoChanged;
+            _ = LoadLinkedTasksAsync();
+        }
+
+        private void OnPanelUnloaded(object? sender, EventArgs e) =>
+            Procure.Utilities.TodoChangeNotifier.Changed -= OnTodoChanged;
+
+        // A linked task changed somewhere (this panel, another panel, or the Tasks page) - reload
+        // this PR's strip from the database so it stays in sync in real time.
+        private void OnTodoChanged() =>
+            MainThread.BeginInvokeOnMainThread(() => _ = LoadLinkedTasksAsync(force: true));
+
+        protected override void OnBindingContextChanged()
+        {
+            base.OnBindingContextChanged();
+            _ = LoadLinkedTasksAsync();
+        }
+
+        private Task LoadLinkedTasksAsync(bool force = false) =>
+            PageModel is { } pm && BindingContext is PurchaseRequisition pr
+                ? pm.LoadLinkedTasksAsync(pr, force)
+                : Task.CompletedTask;
+
+        private async void OnAddTaskEntryCompleted(object? sender, EventArgs e)
+        {
+            if (PageModel is null || BindingContext is not PurchaseRequisition pr) return;
+            if (sender is Entry entry)
+            {
+                await PageModel.AddLinkedTaskAsync(pr, entry.Text);
+                entry.Text = string.Empty;
+            }
+        }
+
+        private async void OnLinkedTaskToggle(object? sender, EventArgs e)
+        {
+            if (PageModel is not null && sender is Button b && b.BindingContext is TodoTask t)
+                await PageModel.ToggleLinkedTaskAsync(t);
+        }
+
+        private async void OnLinkedTaskDelete(object? sender, EventArgs e)
+        {
+            if (PageModel is { } pm && BindingContext is PurchaseRequisition pr
+                && sender is Button b && b.BindingContext is TodoTask t)
+                await pm.DeleteLinkedTaskAsync(pr, t);
         }
 
         private async void OnApprovalDateSelected(object? sender, DateChangedEventArgs e)

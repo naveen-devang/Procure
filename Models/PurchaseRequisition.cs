@@ -83,6 +83,20 @@ namespace Procure.Models
         [ObservableProperty]
         public partial ObservableCollection<CustomFieldValue> CustomValues { get; set; } = new();
 
+        // Not loaded with the PR - filled on demand by PrListPageModel.LoadLinkedTasksAsync when
+        // the detail panel is expanded. Tasks the user linked to this PR from the Tasks page.
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LinkedTaskCountLabel))]
+        public partial ObservableCollection<TodoTask> LinkedTasks { get; set; } = new();
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(LinkedTaskCountLabel))]
+        public partial bool LinkedTasksLoaded { get; set; }
+
+        public string LinkedTaskCountLabel => $"Tasks ({LinkedTasks?.Count ?? 0})";
+
+        public void RefreshLinkedTaskCount() => OnPropertyChanged(nameof(LinkedTaskCountLabel));
+
         [ObservableProperty]
         public partial Guid? ParentPrId { get; set; }
 

@@ -17,10 +17,10 @@ namespace Procure.Utilities
             var isDark = ThemeHelper.IsDark;
             return value switch
             {
-                TodoPriority.High => isDark ? Hex("#E0796D") : Hex("#B5493F"),
-                TodoPriority.Medium => isDark ? Hex("#D5A24E") : Hex("#A9741C"),
-                TodoPriority.Low => isDark ? Hex("#6FB58C") : Hex("#3F7D5C"),
-                _ => isDark ? Hex("#3D3B39") : Hex("#D8D8D8"),
+                TodoPriority.High => isDark ? Hex("#FF9385") : Hex("#F2604E"),
+                TodoPriority.Medium => isDark ? Hex("#FFC062") : Hex("#F0A526"),
+                TodoPriority.Low => isDark ? Hex("#7FDCAB") : Hex("#39B87A"),
+                _ => isDark ? Hex("#9A9A9A") : Hex("#CFCFCF"),
             };
         }
 

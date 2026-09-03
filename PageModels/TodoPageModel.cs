@@ -26,10 +26,13 @@ namespace Procure.PageModels
         private List<TodoTask> _all = new();
         private bool _loaded;
 
-        // PR/RFQ/PO link targets, loaded alongside the tasks. _linkChip maps a target id to its
-        // short chip label so a renamed target still shows correctly after a reload.
+        // PR/RFQ/PO link targets, loaded once alongside the tasks and kept in memory (the typeahead
+        // filters this list - no query per keystroke). _linkChip maps a target id to its short chip
+        // label so a renamed target still shows correctly after a reload.
+        private List<TaskLinkTarget> _linkTargets = new();
         private readonly Dictionary<Guid, string> _linkChip = new();
-        public ObservableCollection<TaskLinkTarget> LinkTargets { get; } = new();
+
+        public ObservableCollection<TaskLinkTarget> LinkResults { get; } = new();
 
         public string[] RecurrenceOptions { get; } = { "None", "Daily", "Weekly", "Monthly" };
 
@@ -41,8 +44,12 @@ namespace Procure.PageModels
         [NotifyPropertyChangedFor(nameof(IsListView))]
         [NotifyPropertyChangedFor(nameof(IsBoardView))]
         [NotifyPropertyChangedFor(nameof(IsFinishedView))]
+        [NotifyPropertyChangedFor(nameof(IsCalendarView))]
+        [NotifyPropertyChangedFor(nameof(ShowListOrFinished))]
         [NotifyPropertyChangedFor(nameof(ShowQuickAdd))]
         public partial string CurrentView { get; set; } = "List";
+
+        public bool ShowListOrFinished => CurrentView is "List" or "Finished";
 
         // "Date" | "Priority"
         [ObservableProperty]
@@ -97,9 +104,38 @@ namespace Procure.PageModels
         [NotifyPropertyChangedFor(nameof(HasSelection))]
         [NotifyPropertyChangedFor(nameof(SelectedHasDueDate))]
         [NotifyPropertyChangedFor(nameof(SelectedDueDate))]
-        [NotifyPropertyChangedFor(nameof(SelectedLinkTarget))]
         [NotifyPropertyChangedFor(nameof(SelectedRecurrence))]
         public partial TodoTask? SelectedTask { get; set; }
+
+        // ---- link typeahead (detail panel) ----
+        [ObservableProperty]
+        public partial string LinkQuery { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial bool ShowLinkResults { get; set; }
+
+        // ---- sub-tasks (detail panel) ----
+        public ObservableCollection<TodoTask> SelectedSubtasks { get; } = new();
+
+        [ObservableProperty]
+        public partial string NewSubtaskTitle { get; set; } = string.Empty;
+
+        public string SelectedSubtaskSummary =>
+            SelectedSubtasks.Count == 0 ? "Subtasks"
+            : $"Subtasks · {SelectedSubtasks.Count(s => s.IsDone)}/{SelectedSubtasks.Count}";
+
+        // ---- calendar view: a 7-day week of columns ----
+        public ObservableCollection<WeekDayColumn> WeekColumns { get; } = new();
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(WeekRangeLabel))]
+        public partial DateTime WeekStart { get; set; } = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+
+        public string WeekRangeLabel => $"{WeekStart:d MMM} – {WeekStart.AddDays(6):d MMM}";
+
+        // MAUI BindableLayout won't honour Grid.Column bound on a template root, so the page builds
+        // the 7-column week grid in code-behind and listens for this.
+        public event Action? WeekRebuilt;
 
         [ObservableProperty]
         public partial int OpenCount { get; set; }
@@ -112,20 +148,6 @@ namespace Procure.PageModels
         public partial int OverdueCount { get; set; }
 
         public bool HasOverdue => OverdueCount > 0;
-
-        // Picker bridges for the detail panel.
-        public TaskLinkTarget? SelectedLinkTarget
-        {
-            get => SelectedTask?.LinkedEntityId is { } id ? LinkTargets.FirstOrDefault(t => t.Id == id) : null;
-            set
-            {
-                if (SelectedTask is null) return;
-                SelectedTask.LinkedEntityType = value?.Type;
-                SelectedTask.LinkedEntityId = value?.Id;
-                SelectedTask.LinkedEntityLabel = value?.ChipLabel;
-                OnPropertyChanged(nameof(SelectedLinkTarget));
-            }
-        }
 
         public string SelectedRecurrence
         {
@@ -156,7 +178,8 @@ namespace Procure.PageModels
         public bool IsListView => CurrentView == "List";
         public bool IsBoardView => CurrentView == "Board";
         public bool IsFinishedView => CurrentView == "Finished";
-        public bool ShowQuickAdd => CurrentView != "Finished";
+        public bool IsCalendarView => CurrentView == "Calendar";
+        public bool ShowQuickAdd => CurrentView is "List" or "Calendar";
 
         public Array PriorityOptions { get; } = Enum.GetValues(typeof(TodoPriority));
 
@@ -164,7 +187,29 @@ namespace Procure.PageModels
         {
             _repo = repo;
             _errorHandler = errorHandler;
+
+            // DI singleton - lives for the process, so this is never unsubscribed. Fires when the
+            // PR detail panel's task strip changes a linked task.
+            Utilities.TodoChangeNotifier.Changed += OnExternalTodoChange;
         }
+
+        private bool _selfRaised;
+
+        private void RaiseChanged()
+        {
+            _selfRaised = true;
+            Utilities.TodoChangeNotifier.NotifyChanged();
+            _selfRaised = false;
+        }
+
+        private void OnExternalTodoChange()
+        {
+            if (_selfRaised) return;               // our own edit - already applied in memory
+            if (IsVisible) _ = LoadAsync(force: true);
+            else _loaded = false;                  // reload lazily on next visit
+        }
+
+        internal void UnsubscribeForTest() => Utilities.TodoChangeNotifier.Changed -= OnExternalTodoChange;
 
         // Warmed from AppShell like the PR board: fills _all before the first visit so opening
         // the tab is instant. Safe to call repeatedly.
@@ -233,14 +278,9 @@ namespace Procure.PageModels
         {
             try
             {
-                var targets = await _repo.GetLinkTargetsAsync();
-                LinkTargets.Clear();
+                _linkTargets = await _repo.GetLinkTargetsAsync();
                 _linkChip.Clear();
-                foreach (var t in targets)
-                {
-                    LinkTargets.Add(t);
-                    _linkChip[t.Id] = t.ChipLabel;
-                }
+                foreach (var t in _linkTargets) _linkChip[t.Id] = t.ChipLabel;
             }
             catch (Exception ex)
             {
@@ -250,30 +290,82 @@ namespace Procure.PageModels
 
         private void ResolveLinkLabel(TodoTask t)
         {
-            if (t.LinkedEntityId is { } id && _linkChip.TryGetValue(id, out var chip))
-                t.LinkedEntityLabel = chip;
+            for (var i = 0; i < t.Links.Count; i++)
+            {
+                var link = t.Links[i];
+                if (_linkChip.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
+                    // Replace (not mutate) so the collection raises CollectionChanged -> LinksBadge refreshes.
+                    t.Links[i] = new TaskLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
+            }
         }
+
+        // Top-level tasks only - sub-tasks live inside their parent's checklist, never in the
+        // main list / board / calendar.
+        private IEnumerable<TodoTask> TopLevel => _all.Where(t => t.ParentId is null);
 
         private void Rebuild()
         {
-            OpenCount = _all.Count(t => !t.IsDone);
-            TodayCount = _all.Count(t => !t.IsDone && t.DueDate is { } d && d.Date == DateTime.Today);
-            OverdueCount = _all.Count(t => t.IsOverdue);
+            OpenCount = TopLevel.Count(t => !t.IsDone);
+            TodayCount = TopLevel.Count(t => !t.IsDone && t.DueDate is { } d && d.Date == DateTime.Today);
+            OverdueCount = TopLevel.Count(t => t.IsOverdue);
+            RefreshSubtaskBadges();
 
-            if (CurrentView == "Board")
+            switch (CurrentView)
             {
-                BuildBoard();
-                Groups = new ObservableCollection<TodoTaskGroup>();
+                case "Board":
+                    BuildBoard();
+                    Groups = new ObservableCollection<TodoTaskGroup>();
+                    break;
+                case "Calendar":
+                    Groups = new ObservableCollection<TodoTaskGroup>();
+                    BuildWeek(DueByDay());
+                    break;
+                case "Finished":
+                    Groups = BuildFinished();
+                    break;
+                default:
+                    Groups = BuildList();
+                    break;
             }
-            else
+        }
+
+        private void RefreshSubtaskBadges()
+        {
+            var byParent = _all.Where(t => t.ParentId is { } p && p != Guid.Empty)
+                               .GroupBy(t => t.ParentId!.Value)
+                               .ToDictionary(g => g.Key, g => (done: g.Count(x => x.IsDone), total: g.Count()));
+            foreach (var t in TopLevel)
+                t.SubtaskBadge = byParent.TryGetValue(t.Id, out var c) ? $"{c.done}/{c.total}" : null;
+        }
+
+        // In-memory task->day index, computed once per Rebuild.
+        private Dictionary<DateTime, List<TodoTask>> DueByDay() =>
+            Filtered(TopLevel.Where(t => t.DueDate is not null))
+                .GroupBy(t => t.DueDate!.Value.Date)
+                .ToDictionary(g => g.Key,
+                    g => g.OrderBy(t => t.IsDone).ThenBy(t => t.PriorityRank).ThenBy(t => t.Title).ToList());
+
+        private void BuildWeek(Dictionary<DateTime, List<TodoTask>> byDay)
+        {
+            var cols = new List<WeekDayColumn>(7);
+            for (var i = 0; i < 7; i++)
             {
-                Groups = CurrentView == "Finished" ? BuildFinished() : BuildList();
+                var d = WeekStart.Date.AddDays(i);
+                cols.Add(new WeekDayColumn(d, i, byDay.GetValueOrDefault(d) ?? new List<TodoTask>()));
             }
+            ReplaceAll(WeekColumns, cols);
+            WeekRebuilt?.Invoke();
+        }
+
+        private static void ReplaceAll<T>(ObservableCollection<T> target, IReadOnlyList<T> items)
+        {
+            target.Clear();
+            foreach (var it in items) target.Add(it);
         }
 
         private ObservableCollection<TodoTaskGroup> BuildList()
         {
-            var open = Filtered(_all.Where(t => !t.IsDone)).ToList();
+            var open = Filtered(TopLevel.Where(t => !t.IsDone)).ToList();
             var groups = new List<TodoTaskGroup>();
 
             if (GroupMode == "Priority")
@@ -304,7 +396,7 @@ namespace Procure.PageModels
 
         private void BuildBoard()
         {
-            var open = Filtered(_all.Where(t => !t.IsDone)).ToList();
+            var open = Filtered(TopLevel.Where(t => !t.IsDone)).ToList();
 
             TodoTaskGroup Col(TodoPriority p) => new(PriorityHeader(p),
                 open.Where(t => t.Priority == p)
@@ -319,7 +411,7 @@ namespace Procure.PageModels
 
         private ObservableCollection<TodoTaskGroup> BuildFinished()
         {
-            var done = Filtered(_all.Where(t => t.IsDone)).ToList();
+            var done = Filtered(TopLevel.Where(t => t.IsDone)).ToList();
             var groups = new List<TodoTaskGroup>();
             var today = DateTime.Today;
             var weekStart = today.AddDays(-(int)today.DayOfWeek);
@@ -370,7 +462,7 @@ namespace Procure.PageModels
                 Title = title,
                 Notes = string.IsNullOrWhiteSpace(NewTaskNotes) ? null : NewTaskNotes.Trim(),
                 Priority = NewTaskPriority,
-                DueDate = NewTaskDueDate?.Date,
+                DueDate = NewTaskDueDate?.Date ?? DateTime.Today,   // no date picked -> due today
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 SortOrder = _all.Count
@@ -440,6 +532,7 @@ namespace Procure.PageModels
 
                 if (SelectedTask == task && done) SelectedTask = null;
                 Rebuild();
+                if (task.HasLinks) RaiseChanged();
             }
             catch (Exception ex)
             {
@@ -466,13 +559,12 @@ namespace Procure.PageModels
                 Priority = done.Priority,
                 DueDate = next.Value.Date,
                 RecurrenceRule = done.RecurrenceRule,
-                LinkedEntityType = done.LinkedEntityType,
-                LinkedEntityId = done.LinkedEntityId,
-                LinkedEntityLabel = done.LinkedEntityLabel,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 SortOrder = done.SortOrder,
             };
+            foreach (var l in done.Links)
+                copy.Links.Add(new TaskLink { EntityType = l.EntityType, EntityId = l.EntityId, Label = l.Label });
             HookTask(copy);
             await _repo.UpsertAsync(copy);
             _all.Insert(0, copy);
@@ -484,6 +576,10 @@ namespace Procure.PageModels
             if (SelectedTask != null) SelectedTask.IsSelected = false;
             SelectedTask = task;
             if (task != null) task.IsSelected = true;
+            LinkQuery = string.Empty;
+            ShowLinkResults = false;
+            NewSubtaskTitle = string.Empty;
+            RefreshSelectedSubtasks();
         }
 
         [RelayCommand]
@@ -513,28 +609,181 @@ namespace Procure.PageModels
             }
         }
 
-        [RelayCommand]
-        public void Unlink()
+        // ---- link typeahead ----
+        partial void OnLinkQueryChanged(string value)
         {
+            var term = value?.Trim();
+            LinkResults.Clear();
+            if (string.IsNullOrEmpty(term) || term.Length < 2)
+            {
+                ShowLinkResults = false;
+                return;
+            }
+
+            foreach (var t in _linkTargets
+                         .Where(t => t.Label.Contains(term, StringComparison.OrdinalIgnoreCase))
+                         .Take(12))
+                LinkResults.Add(t);
+
+            ShowLinkResults = LinkResults.Count > 0;
+        }
+
+        [RelayCommand]
+        public async Task PickLinkTargetAsync(TaskLinkTarget? target)
+        {
+            if (SelectedTask is null || target is null) return;
+            var task = SelectedTask;
+            LinkQuery = string.Empty;
+            ShowLinkResults = false;
+
+            if (task.Links.Any(l => l.EntityId == target.Id)) return;   // already linked
+            task.Links.Add(new TaskLink { EntityType = target.Type, EntityId = target.Id, Label = target.ChipLabel });
+            await PersistLinksAsync(task);
+        }
+
+        [RelayCommand]
+        public async Task RemoveLinkAsync(TaskLink? link)
+        {
+            if (SelectedTask is null || link is null) return;
+            var task = SelectedTask;
+            var existing = task.Links.FirstOrDefault(l => l.EntityId == link.EntityId);
+            if (existing is null) return;
+            task.Links.Remove(existing);
+            await PersistLinksAsync(task);
+        }
+
+        private async Task PersistLinksAsync(TodoTask task)
+        {
+            try { await _repo.SetLinksAsync(task.Id, task.Links.ToList()); RaiseChanged(); }
+            catch (Exception ex) { _errorHandler.HandleError(ex); }
+        }
+
+        // ---- calendar (week view) ----
+        [RelayCommand] public void CalendarToday() { WeekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek); BuildWeek(DueByDay()); }
+
+        [RelayCommand] public void WeekPrev() { WeekStart = WeekStart.AddDays(-7); BuildWeek(DueByDay()); }
+        [RelayCommand] public void WeekNext() { WeekStart = WeekStart.AddDays(7); BuildWeek(DueByDay()); }
+
+        public async Task AddWeekColumnTaskAsync(WeekDayColumn? col)
+        {
+            var title = col?.NewTaskTitle?.Trim();
+            if (col is null || string.IsNullOrEmpty(title)) return;
+
+            var task = new TodoTask
+            {
+                Title = title,
+                DueDate = col.Date.Date,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                SortOrder = _all.Count,
+            };
+            HookTask(task);
+            col.NewTaskTitle = string.Empty;
+            try
+            {
+                await _repo.UpsertAsync(task);
+                _all.Insert(0, task);
+                col.Tasks.Add(task);
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        // ---- sub-tasks ----
+        private void RefreshSelectedSubtasks()
+        {
+            SelectedSubtasks.Clear();
             if (SelectedTask is null) return;
-            SelectedTask.LinkedEntityType = null;
-            SelectedTask.LinkedEntityId = null;
-            SelectedTask.LinkedEntityLabel = null;
-            OnPropertyChanged(nameof(SelectedLinkTarget));
+            foreach (var s in _all.Where(t => t.ParentId == SelectedTask.Id)
+                                  .OrderBy(t => t.SortOrder).ThenBy(t => t.CreatedAt))
+                SelectedSubtasks.Add(s);
+            OnPropertyChanged(nameof(SelectedSubtaskSummary));
+        }
+
+        [RelayCommand]
+        public async Task AddSubtaskAsync()
+        {
+            var title = NewSubtaskTitle?.Trim();
+            if (string.IsNullOrEmpty(title) || SelectedTask is null) return;
+
+            var sub = new TodoTask
+            {
+                ParentId = SelectedTask.Id,
+                Title = title,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                SortOrder = SelectedSubtasks.Count,
+            };
+            HookTask(sub);
+            NewSubtaskTitle = string.Empty;
+
+            try
+            {
+                await _repo.UpsertAsync(sub);
+                _all.Add(sub);
+                RefreshSelectedSubtasks();
+                RefreshSubtaskBadges();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        [RelayCommand]
+        public async Task ToggleSubtaskAsync(TodoTask? sub)
+        {
+            if (sub is null) return;
+            var done = !sub.IsDone;
+            sub.IsDone = done;
+            sub.CompletedAt = done ? DateTime.UtcNow : null;
+            try
+            {
+                await _repo.SetDoneAsync(sub.Id, done, sub.CompletedAt);
+                OnPropertyChanged(nameof(SelectedSubtaskSummary));
+                RefreshSubtaskBadges();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        [RelayCommand]
+        public async Task DeleteSubtaskAsync(TodoTask? sub)
+        {
+            if (sub is null) return;
+            try
+            {
+                await _repo.DeleteAsync(sub.Id);
+                UnhookTask(sub);
+                _all.Remove(sub);
+                RefreshSelectedSubtasks();
+                RefreshSubtaskBadges();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
         }
 
         [RelayCommand]
         public async Task OpenLinkAsync(TodoTask? task)
         {
             task ??= SelectedTask;
-            if (task?.LinkedEntityLabel is not { Length: > 0 } chip) return;
+            if (task is null || task.Links.Count == 0) return;
 
-            // The board's search matches PR / RFQ / PO numbers, so navigating there with the chip
-            // as the search term surfaces the linked record.
+            // The board's search splits on whitespace and ORs the terms, so every linked
+            // PR / RFQ / PO number together surfaces all of them at once.
+            var terms = string.Join(' ', task.Links.Select(l => l.Label).Where(l => l.Length > 0).Distinct());
+            if (terms.Length == 0) return;
+
             if (Shell.Current != null)
             {
                 await Shell.Current.GoToAsync("//prboard");
-                if (PrListPageModel.Current is { } board) board.SearchText = chip;
+                if (PrListPageModel.Current is { } board) board.SearchText = terms;
             }
         }
 
@@ -556,8 +805,15 @@ namespace Procure.PageModels
                 await _repo.DeleteAsync(task.Id);
                 UnhookTask(task);
                 _all.Remove(task);
+                // FK ON DELETE CASCADE removed the sub-tasks in the DB; drop them from memory too.
+                foreach (var child in _all.Where(t => t.ParentId == task.Id).ToList())
+                {
+                    UnhookTask(child);
+                    _all.Remove(child);
+                }
                 if (SelectedTask == task) SelectedTask = null;
                 Rebuild();
+                if (task.HasLinks) RaiseChanged();
             }
             catch (Exception ex)
             {
@@ -648,7 +904,6 @@ namespace Procure.PageModels
                 case nameof(TodoTask.Title):
                 case nameof(TodoTask.Notes):
                 case nameof(TodoTask.RecurrenceRule):
-                case nameof(TodoTask.LinkedEntityId):
                     ScheduleSave(task);
                     break;
             }
@@ -661,7 +916,11 @@ namespace Procure.PageModels
             {
                 if (_saveGeneration.GetValueOrDefault(task.Id) != generation) return;
                 if (string.IsNullOrWhiteSpace(task.Title)) return; // don't persist a blank new task yet
-                try { await _repo.UpsertAsync(task); }
+                try
+                {
+                    await _repo.UpsertAsync(task);
+                    if (task.HasLinks || task.ParentId is not null) RaiseChanged();
+                }
                 catch (Exception ex) { _errorHandler.HandleError(ex); }
             });
         }

@@ -851,6 +851,59 @@
                 </Grid>
             </Border>
 
+            <!-- LINKED TASKS - the reverse of task linking; loaded on demand by the code-behind -->
+            <Border StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                    Padding="14,12">
+                <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{Binding LinkedTaskCountLabel}" FontFamily="SegoeSemibold" FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <VerticalStackLayout Spacing="3" BindableLayout.ItemsSource="{Binding LinkedTasks}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:TodoTask">
+                                <Grid ColumnDefinitions="26,*,Auto" ColumnSpacing="2">
+                                    <Button Grid.Column="0" Text="&#xE739;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                            Padding="0" WidthRequest="22" HeightRequest="22" BackgroundColor="Transparent"
+                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                            Clicked="OnLinkedTaskToggle">
+                                        <Button.Triggers>
+                                            <DataTrigger TargetType="Button" Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="Text" Value="&#xE73A;" />
+                                                <Setter Property="TextColor" Value="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                                            </DataTrigger>
+                                        </Button.Triggers>
+                                    </Button>
+                                    <Label Grid.Column="1" Text="{Binding Title}" FontSize="12" VerticalOptions="Center"
+                                           LineBreakMode="TailTruncation"
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                <Setter Property="TextColor" Value="{StaticResource Gray400}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Button Grid.Column="2" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="10"
+                                            Padding="0" WidthRequest="22" HeightRequest="22" BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Gray400}"
+                                            Clicked="OnLinkedTaskDelete" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Grid.Column="0" Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                               VerticalOptions="Center" Margin="2,0,4,0" TextColor="{StaticResource Gray400}" />
+                        <Entry Grid.Column="1" Placeholder="Add a task for this PR" FontSize="12"
+                               Completed="OnAddTaskEntryCompleted" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
         </VerticalStackLayout>
     </Border>
 </ContentView>

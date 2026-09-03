@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
@@ -55,26 +56,42 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(HasRecurrence))]
         public partial string? RecurrenceRule { get; set; }
 
-        // Optional link to a PR / RFQ / PO. Label is denormalised for the row chip; it is
-        // re-resolved on load so a renamed target still shows correctly.
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasLink))]
-        public partial string? LinkedEntityType { get; set; }
+        // Links to PRs / RFQs / POs - a task can carry several. Labels are denormalised for the
+        // chips and re-resolved on load (TodoPageModel.ResolveLinkLabel).
+        public ObservableCollection<TaskLink> Links { get; } = new();
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(HasLink))]
-        public partial Guid? LinkedEntityId { get; set; }
+        public TodoTask()
+        {
+            Links.CollectionChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(HasLinks));
+                OnPropertyChanged(nameof(LinksBadge));
+            };
+        }
 
-        [ObservableProperty]
-        public partial string? LinkedEntityLabel { get; set; }
+        public bool HasLinks => Links.Count > 0;
 
-        public bool HasLink => LinkedEntityId is not null;
+        // Row-chip text: the first link, plus "+N" when there are more.
+        public string LinksBadge => Links.Count switch
+        {
+            0 => string.Empty,
+            1 => Links[0].Label,
+            _ => $"{Links[0].Label}  +{Links.Count - 1}",
+        };
+
         public bool HasRecurrence => !string.IsNullOrEmpty(RecurrenceRule);
 
         // Selection highlight, mirrors CallOffLine.IsSelected - the row's fill opacity is
         // toggled off this, not off a Setter, to keep AppThemeBinding live-reactive.
         [ObservableProperty]
         public partial bool IsSelected { get; set; }
+
+        // "2/5" when this task has sub-tasks; null otherwise. Populated by TodoPageModel.
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSubtasks))]
+        public partial string? SubtaskBadge { get; set; }
+
+        public bool HasSubtasks => !string.IsNullOrEmpty(SubtaskBadge);
 
         // High first when sorting within a group.
         public int PriorityRank => 3 - (int)Priority;

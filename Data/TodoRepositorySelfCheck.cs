@@ -49,21 +49,45 @@ namespace Procure.Data
                 back = (await repo.GetAllAsync()).First(t => t.Id == id);
                 Assert(back.IsDone && back.CompletedAt != null, "SetDoneAsync marks done with a timestamp");
 
+                var linkA = Guid.NewGuid();
+                var linkB = Guid.NewGuid();
                 back.Title = marker + "-edited";
                 back.IsDone = false;
                 back.CompletedAt = null;
                 back.RecurrenceRule = "Weekly";
-                back.LinkedEntityType = "PR";
-                back.LinkedEntityId = Guid.NewGuid();
-                back.LinkedEntityLabel = "PR-0001";
+                back.Links.Add(new TaskLink { EntityType = "PR", EntityId = linkA, Label = "PR-0001" });
+                back.Links.Add(new TaskLink { EntityType = "RFQ", EntityId = linkB, Label = "RFQ-0007" });
                 await repo.UpsertAsync(back);
                 back = (await repo.GetAllAsync()).First(t => t.Id == id);
                 Assert(back.Title == marker + "-edited" && !back.IsDone, "edit round trip");
                 Assert(back.RecurrenceRule == "Weekly", "recurrence round trip");
-                Assert(back.LinkedEntityLabel == "PR-0001" && back.LinkedEntityId != null, "link round trip");
+                Assert(back.Links.Count == 2
+                       && back.Links.Any(l => l.EntityId == linkA && l.Label == "PR-0001")
+                       && back.Links.Any(l => l.EntityId == linkB && l.EntityType == "RFQ"), "multi-link round trip");
+
+                // Targeted link write drops one, keeps the other.
+                back.Links.Remove(back.Links.First(l => l.EntityId == linkB));
+                await repo.SetLinksAsync(back.Id, back.Links.ToList());
+                back = (await repo.GetAllAsync()).First(t => t.Id == id);
+                Assert(back.Links.Count == 1 && back.Links[0].EntityId == linkA, "SetLinksAsync replaces the link set");
+
+                // Sub-task + reverse-link lookup.
+                var childId = Guid.NewGuid();
+                await repo.UpsertAsync(new TodoTask
+                {
+                    Id = childId, ParentId = id, Title = marker + "-child",
+                    CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+                });
+                var child = (await repo.GetAllAsync()).First(t => t.Id == childId);
+                Assert(child.ParentId == id, "sub-task ParentId round trip");
+
+                var linked = await repo.GetLinkedAsync(linkA);
+                Assert(linked.Any(t => t.Id == id) && linked.All(t => t.ParentId is null), "GetLinkedAsync returns the parent, not sub-tasks");
 
                 await repo.DeleteAsync(id);
-                Assert((await repo.GetAllAsync()).All(t => t.Id != id), "DeleteAsync removes the task");
+                var after = await repo.GetAllAsync();
+                Assert(after.All(t => t.Id != id), "DeleteAsync removes the task");
+                Assert(after.All(t => t.Id != childId), "deleting a parent cascades to sub-tasks");
 
                 Report("PASS");
             }
@@ -80,6 +104,6 @@ namespace Procure.Data
             if (!condition) throw new InvalidOperationException("failed: " + what);
         }
 
-        private static void Report(string result) => Debug.WriteLine("TodoRepositorySelfCheck: " + result);
+        private static void Report(string result) => SelfCheckLog.Write("TodoRepositorySelfCheck: " + result);
     }
 }
