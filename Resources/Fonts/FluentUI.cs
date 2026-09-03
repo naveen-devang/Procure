@@ -21,5 +21,6 @@ namespace Fonts
         public const string document_24_regular = "\uf379";
         public const string settings_24_regular = "\uf6aa";
         public const string table_settings_24_regular = "\uf777";
+        public const string task_list_ltr_24_regular = "\uec93";
     }
 }
