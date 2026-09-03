@@ -47,6 +47,13 @@ namespace Procure
                 Utilities.UpdateCheckSchedulerSelfCheck.Run();
                 Utilities.UpdateStateStoreSelfCheck.Run();
             }
+
+            // Opt-in only: PROCURE_TODO_SELFCHECK=1.
+            if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") == "1")
+            {
+                _ = Data.TodoRepositorySelfCheck.RunAsync(
+                    _services.GetRequiredService<Data.Repositories.ITodoRepository>());
+            }
 #endif
         }
 

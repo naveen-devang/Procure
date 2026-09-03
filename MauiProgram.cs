@@ -125,6 +125,7 @@ namespace Procure
             builder.Services.AddSingleton<SqliteDatabase>();
             builder.Services.AddSingleton<ICustomColumnRepository, CustomColumnRepository>();
             builder.Services.AddSingleton<ICallOffRepository, CallOffRepository>();
+            builder.Services.AddSingleton<ITodoRepository, TodoRepository>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
             // Services
@@ -153,6 +154,9 @@ namespace Procure
 
             builder.Services.AddSingleton<CallOffPageModel>();
             builder.Services.AddSingleton<CallOffPage>();
+
+            builder.Services.AddSingleton<TodoPageModel>();
+            builder.Services.AddSingleton<TodoPage>();
 
             builder.Services.AddSingleton<SettingsPageModel>();
             builder.Services.AddSingleton<SettingsPage>();

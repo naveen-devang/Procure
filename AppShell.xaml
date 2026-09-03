@@ -60,6 +60,13 @@
         Route="materials" />
 
     <ShellContent
+        x:Name="TasksContent"
+        Title="Tasks"
+        ToolTipProperties.Text="Tasks"
+        Icon="{StaticResource IconTasks}"
+        Route="todos" />
+
+    <ShellContent
         x:Name="SettingsContent"
         Title="Settings"
         ToolTipProperties.Text="Settings"

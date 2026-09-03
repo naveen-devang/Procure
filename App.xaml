@@ -43,6 +43,10 @@
             <converters:PrTypeColorConverter x:Key="PrTypeColorConverter" />
             <converters:PrTypeBgConverter x:Key="PrTypeBgConverter" />
             <converters:PrTypeBorderConverter x:Key="PrTypeBorderConverter" />
+            <converters:TodoPriorityColorConverter x:Key="TodoPriorityColorConverter" />
+            <converters:TodoOverdueColorConverter x:Key="TodoOverdueColorConverter" />
+            <converters:TodoSegmentBgConverter x:Key="TodoSegmentBgConverter" />
+            <converters:TodoSegmentTextConverter x:Key="TodoSegmentTextConverter" />
 
             <!-- Additional Fluent Icons -->
             <FontImageSource x:Key="IconRefresh"
@@ -84,6 +88,14 @@
             <FontImageSource x:Key="IconMaterials"
                              Glyph="{x:Static f:FluentUI.building_factory_24_regular}"
                              FontFamily="{x:Static f:FluentUI.FontFamily}"
+                             Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
+                             Size="{StaticResource IconSize}" />
+
+            <!-- Segoe Fluent Icons (not the FluentUI font) - "List" (E8FD) is a stable glyph across
+                 every Windows build; the FluentUI subset in FluentUI.cs has no checklist entry. -->
+            <FontImageSource x:Key="IconTasks"
+                             Glyph="&#xE8FD;"
+                             FontFamily="Segoe Fluent Icons"
                              Color="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                              Size="{StaticResource IconSize}" />
         </ResourceDictionary>

@@ -41,6 +41,10 @@ namespace Procure
             // Fire and forget: PrListPageModel handles its own errors and guards re-entry.
             _ = services.GetRequiredService<PrListPageModel>().PreloadDataAsync();
 
+            // Same treatment for the task list - one small query, no visual tree, so the tab opens
+            // with data already in hand.
+            _ = services.GetRequiredService<TodoPageModel>().PreloadDataAsync();
+
             // Warm the board's visual tree too. 1.2s clears the startup busy stretch (~1.1s measured
             // on the trace heartbeat) so the prewarm never delays first paint, while still beating any
             // humanly-plausible click; OnNavigating's null check makes it race-free if one lands first.
@@ -88,6 +92,9 @@ namespace Procure
             else if (MaterialsContent.Content is null && target.Contains("materials", StringComparison.Ordinal))
                 MaterialsContent.Content = targetPage = _services.GetRequiredService<CallOffPage>();
             else if (target.Contains("materials", StringComparison.Ordinal)) targetPage = MaterialsContent.Content as Page;
+            else if (TasksContent.Content is null && target.Contains("todos", StringComparison.Ordinal))
+                TasksContent.Content = targetPage = _services.GetRequiredService<TodoPage>();
+            else if (target.Contains("todos", StringComparison.Ordinal)) targetPage = TasksContent.Content as Page;
             else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
                 SettingsContent.Content = targetPage = _services.GetRequiredService<SettingsPage>();
             else if (target.Contains("settings", StringComparison.Ordinal)) targetPage = SettingsContent.Content as Page;
@@ -255,6 +262,7 @@ namespace Procure
             if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoDashboard), e.Key)) route = "main";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoPrBoard), e.Key)) route = "prboard";
             else if (_settingsService.IsRawPackingTabEnabled && Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoMaterials), e.Key)) route = "materials";
+            else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoTasks), e.Key)) route = "todos";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoSettings), e.Key)) route = "settings";
 
             if (route != null)
@@ -479,7 +487,8 @@ namespace Procure
         /// <summary>Every page this shell keeps alive - null until first opened.</summary>
         internal IEnumerable<Page?> KeptAlivePages => new Page?[]
         {
-            DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page, SettingsContent.Content as Page
+            DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page,
+            TasksContent.Content as Page, SettingsContent.Content as Page
         };
 
         /// <summary>Pushes the current theme into every kept-alive page's native tree - the hidden ones

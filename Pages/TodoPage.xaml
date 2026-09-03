@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             x:Class="Procure.Pages.TodoPage"
+             x:Name="ThisPage"
+             x:DataType="pageModels:TodoPageModel"
+             Shell.NavBarIsVisible="False"
+             Title="Tasks"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <ContentPage.Resources>
+
+        <!-- Card surface shared by the list pane and the detail pane -->
+        <Style TargetType="Border" x:Key="Pane">
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+            <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}" />
+        </Style>
+
+        <Style TargetType="Label" x:Key="FieldLabel">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontFamily" Value="SegoeSemibold" />
+            <Setter Property="CharacterSpacing" Value="0.8" />
+            <Setter Property="TextTransform" Value="Uppercase" />
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+        </Style>
+
+        <!-- One board card, reused by all four priority columns -->
+        <DataTemplate x:Key="BoardCardTemplate" x:DataType="models:TodoTask">
+            <Border Padding="9,7" Margin="0,0,0,6" StrokeThickness="1"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                    Background="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectCommand}"
+                                          CommandParameter="{Binding .}" />
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="24,*,Auto" ColumnSpacing="4">
+                    <Button Grid.Column="0" Text="&#xE739;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                            Padding="0" WidthRequest="22" HeightRequest="22" BackgroundColor="Transparent"
+                            VerticalOptions="Center"
+                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleDoneCommand}"
+                            CommandParameter="{Binding .}" />
+                    <Label Grid.Column="1" Text="{Binding Title}" FontSize="12" LineBreakMode="TailTruncation"
+                           VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Label Grid.Column="2" Text="{Binding DueLabel}" FontSize="10" VerticalOptions="Center"
+                           IsVisible="{Binding HasDueDate}"
+                           TextColor="{Binding IsOverdue, Converter={StaticResource TodoOverdueColorConverter}}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid Padding="20" ColumnDefinitions="*,16,332" RowSpacing="0">
+
+        <!-- ==================== LEFT: list / board / finished ==================== -->
+        <Border Grid.Column="0" Style="{StaticResource Pane}" Padding="0">
+            <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+                <!-- Header row -->
+                <Grid Grid.Row="0" Padding="16,14,16,12" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="Tasks" FontFamily="SegoeSemibold" FontSize="18" VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <!-- Segmented view toggle -->
+                    <Border Grid.Column="1" HorizontalOptions="Start" VerticalOptions="Center" Padding="3"
+                            StrokeThickness="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <HorizontalStackLayout Spacing="2">
+                            <Border Padding="14,5" StrokeThickness="0"
+                                    BackgroundColor="{Binding IsListView, Converter={StaticResource TodoSegmentBgConverter}}">
+                                <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SetViewCommand}" CommandParameter="List" />
+                                </Border.GestureRecognizers>
+                                <Label Text="List" FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsListView, Converter={StaticResource TodoSegmentTextConverter}}" />
+                            </Border>
+                            <Border Padding="14,5" StrokeThickness="0"
+                                    BackgroundColor="{Binding IsBoardView, Converter={StaticResource TodoSegmentBgConverter}}">
+                                <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SetViewCommand}" CommandParameter="Board" />
+                                </Border.GestureRecognizers>
+                                <Label Text="Board" FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsBoardView, Converter={StaticResource TodoSegmentTextConverter}}" />
+                            </Border>
+                            <Border Padding="14,5" StrokeThickness="0"
+                                    BackgroundColor="{Binding IsFinishedView, Converter={StaticResource TodoSegmentBgConverter}}">
+                                <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SetViewCommand}" CommandParameter="Finished" />
+                                </Border.GestureRecognizers>
+                                <Label Text="Finished" FontSize="11.5" FontFamily="SegoeSemibold"
+                                       TextColor="{Binding IsFinishedView, Converter={StaticResource TodoSegmentTextConverter}}" />
+                            </Border>
+                        </HorizontalStackLayout>
+                    </Border>
+
+                    <HorizontalStackLayout Grid.Column="2" Spacing="5" VerticalOptions="Center">
+                        <Label FontSize="11.5" Text="{Binding OpenCount, StringFormat='{0} open'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                        <Label FontSize="11.5" Text="{Binding TodayCount, StringFormat='· {0} today'}"
+                               TextColor="{StaticResource Gray400}" />
+                        <Label FontSize="11.5" FontFamily="SegoeSemibold" IsVisible="{Binding HasOverdue}"
+                               Text="{Binding OverdueCount, StringFormat='· {0} overdue'}"
+                               TextColor="{Binding HasOverdue, Converter={StaticResource TodoOverdueColorConverter}}" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Toolbar row: group toggle + filter + clear-finished -->
+                <Grid Grid.Row="1" Padding="16,0,16,12" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Button Grid.Column="0" FontSize="11.5" HeightRequest="34" Padding="12,0" CornerRadius="7"
+                            IsVisible="{Binding IsListView}"
+                            Text="{Binding GroupMode, StringFormat='Grouped by {0}'}"
+                            Command="{Binding ToggleGroupModeCommand}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+
+                    <Border Grid.Column="1" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto,*" Padding="10,0">
+                            <Label Grid.Column="0" Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                   VerticalOptions="Center" Margin="0,0,6,0"
+                                   TextColor="{StaticResource Gray400}" />
+                            <Entry Grid.Column="1" x:Name="FilterEntry" Placeholder="Filter tasks" FontSize="12.5"
+                                   BackgroundColor="Transparent" HeightRequest="34"
+                                   Text="{Binding FilterText, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+
+                    <Button Grid.Column="2" Text="Clear finished" FontSize="11.5" HeightRequest="34" Padding="12,0"
+                            IsVisible="{Binding IsFinishedView}"
+                            Command="{Binding ClearFinishedCommand}"
+                            Style="{StaticResource CancelButton}" />
+                </Grid>
+
+                <!-- Quick-add composer -->
+                <Border Grid.Row="2" Margin="16,0,16,10" Padding="0" StrokeThickness="1"
+                        IsVisible="{Binding ShowQuickAdd}"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="9" /></Border.StrokeShape>
+
+                    <VerticalStackLayout Spacing="0">
+                        <!-- Title row -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" Padding="12,8">
+                            <Label Grid.Column="0" Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                   VerticalOptions="Center" Margin="0,0,10,0"
+                                   TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                            <Entry Grid.Column="1" x:Name="NewTaskEntry" Placeholder="Add a task" FontSize="13.5"
+                                   BackgroundColor="Transparent"
+                                   Text="{Binding NewTaskTitle, Mode=TwoWay}"
+                                   Focused="OnComposerFocused"
+                                   ReturnCommand="{Binding QuickAddCommand}" />
+                            <Button Grid.Column="2" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                    Padding="0" WidthRequest="28" HeightRequest="28" BackgroundColor="Transparent"
+                                    Command="{Binding NewTaskCommand}"
+                                    IsVisible="{Binding ComposerOpen, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                    ToolTipProperties.Text="More options"
+                                    TextColor="{StaticResource Gray400}" />
+                        </Grid>
+
+                        <!-- Expanded options -->
+                        <VerticalStackLayout IsVisible="{Binding ComposerOpen}" Spacing="10" Padding="12,4,12,12">
+                            <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+
+                            <!-- Priority -->
+                            <Grid ColumnDefinitions="64,*" ColumnSpacing="10" VerticalOptions="Center">
+                                <Label Grid.Column="0" Text="Priority" Style="{StaticResource FieldLabel}" VerticalOptions="Center" />
+                                <Border Grid.Column="1" HorizontalOptions="Start" Padding="3" StrokeThickness="0"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                    <HorizontalStackLayout Spacing="2">
+                                        <Border Padding="12,4" StrokeThickness="0"
+                                                BackgroundColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentBgConverter}, ConverterParameter=None}">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SetNewPriorityCommand}" CommandParameter="None" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="None" FontSize="11" FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentTextConverter}, ConverterParameter=None}" />
+                                        </Border>
+                                        <Border Padding="12,4" StrokeThickness="0"
+                                                BackgroundColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentBgConverter}, ConverterParameter=Low}">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SetNewPriorityCommand}" CommandParameter="Low" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="Low" FontSize="11" FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentTextConverter}, ConverterParameter=Low}" />
+                                        </Border>
+                                        <Border Padding="12,4" StrokeThickness="0"
+                                                BackgroundColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentBgConverter}, ConverterParameter=Medium}">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SetNewPriorityCommand}" CommandParameter="Medium" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="Medium" FontSize="11" FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentTextConverter}, ConverterParameter=Medium}" />
+                                        </Border>
+                                        <Border Padding="12,4" StrokeThickness="0"
+                                                BackgroundColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentBgConverter}, ConverterParameter=High}">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="6" /></Border.StrokeShape>
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer Command="{Binding SetNewPriorityCommand}" CommandParameter="High" />
+                                            </Border.GestureRecognizers>
+                                            <Label Text="High" FontSize="11" FontFamily="SegoeSemibold"
+                                                   TextColor="{Binding NewTaskPriority, Converter={StaticResource TodoSegmentTextConverter}, ConverterParameter=High}" />
+                                        </Border>
+                                    </HorizontalStackLayout>
+                                </Border>
+                            </Grid>
+
+                            <!-- Due date -->
+                            <Grid ColumnDefinitions="64,*" ColumnSpacing="10" VerticalOptions="Center">
+                                <Label Grid.Column="0" Text="Due" Style="{StaticResource FieldLabel}" VerticalOptions="Center" />
+                                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                    <Button Text="Today" FontSize="11" HeightRequest="30" Padding="10,0" CornerRadius="6"
+                                            Command="{Binding SetNewDueCommand}" CommandParameter="Today"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Button Text="Tomorrow" FontSize="11" HeightRequest="30" Padding="10,0" CornerRadius="6"
+                                            Command="{Binding SetNewDueCommand}" CommandParameter="Tomorrow"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <Button Text="+1 week" FontSize="11" HeightRequest="30" Padding="10,0" CornerRadius="6"
+                                            Command="{Binding SetNewDueCommand}" CommandParameter="Week"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                    <DatePicker Date="{Binding NewDuePickerDate, Mode=TwoWay}" FontSize="11.5" />
+                                    <Button Text="Clear" FontSize="11" HeightRequest="30" Padding="8,0" CornerRadius="6"
+                                            IsVisible="{Binding NewHasDueDate}"
+                                            Command="{Binding SetNewDueCommand}" CommandParameter="Clear"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Gray400}" />
+                                </HorizontalStackLayout>
+                            </Grid>
+
+                            <!-- Notes -->
+                            <Grid ColumnDefinitions="64,*" ColumnSpacing="10">
+                                <Label Grid.Column="0" Text="Notes" Style="{StaticResource FieldLabel}" Margin="0,6,0,0" />
+                                <Entry Grid.Column="1" Placeholder="Optional notes" FontSize="12.5"
+                                       Text="{Binding NewTaskNotes, Mode=TwoWay}" />
+                            </Grid>
+
+                            <!-- Actions -->
+                            <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                                <Button Text="Cancel" FontSize="12" HeightRequest="34" Padding="14,0" CornerRadius="7"
+                                        Command="{Binding CancelComposerCommand}"
+                                        BackgroundColor="Transparent"
+                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Button Text="Add task" Style="{StaticResource PrimaryButton}"
+                                        FontSize="12" HeightRequest="34" Padding="18,0"
+                                        IsEnabled="{Binding CanAddTask}"
+                                        Command="{Binding QuickAddCommand}" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- List / Finished -->
+                <CollectionView Grid.Row="3" x:Name="TaskList"
+                                ItemsSource="{Binding Groups}" IsGrouped="True" SelectionMode="None"
+                                Margin="8,0,8,8"
+                                IsVisible="{Binding IsBoardView, Converter={StaticResource BoolToInvertedBoolConverter}}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
+                    </CollectionView.ItemsLayout>
+
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout Padding="24" Spacing="4" VerticalOptions="Center" HorizontalOptions="Center">
+                            <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="26" HorizontalOptions="Center"
+                                   TextColor="{StaticResource Gray400}" />
+                            <Label Text="Nothing here yet" FontSize="13" HorizontalOptions="Center"
+                                   TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+
+                    <CollectionView.GroupHeaderTemplate>
+                        <DataTemplate x:DataType="models:TodoTaskGroup">
+                            <HorizontalStackLayout Padding="10,16,10,6" Spacing="8">
+                                <Label Text="{Binding Header}" FontFamily="SegoeSemibold" FontSize="10.5"
+                                       CharacterSpacing="0.9" TextTransform="Uppercase" VerticalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                <Border Padding="6,1" StrokeThickness="0" VerticalOptions="Center"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                                    <Label Text="{Binding CountLabel}" FontSize="10" TextColor="{StaticResource Gray400}" />
+                                </Border>
+                            </HorizontalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.GroupHeaderTemplate>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:TodoTask">
+                            <Grid ColumnDefinitions="4,36,*,Auto" Padding="6,0" MinimumHeightRequest="42">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectCommand}"
+                                                          CommandParameter="{Binding .}" />
+                                </Grid.GestureRecognizers>
+
+                                <!-- selection fill (opacity toggled so AppThemeBinding stays live) -->
+                                <Border Grid.ColumnSpan="4" StrokeThickness="0" Opacity="0" Margin="0,1"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                </Border>
+
+                                <BoxView Grid.Column="0" WidthRequest="4" Margin="0,9" HorizontalOptions="Start"
+                                         CornerRadius="2"
+                                         Color="{Binding Priority, Converter={StaticResource TodoPriorityColorConverter}}" />
+
+                                <Button Grid.Column="1" Text="&#xE739;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                        Padding="0" WidthRequest="28" HeightRequest="28" BackgroundColor="Transparent"
+                                        VerticalOptions="Center"
+                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                        Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.ToggleDoneCommand}"
+                                        CommandParameter="{Binding .}">
+                                    <Button.Triggers>
+                                        <DataTrigger TargetType="Button" Binding="{Binding IsDone}" Value="True">
+                                            <Setter Property="Text" Value="&#xE73A;" />
+                                            <Setter Property="TextColor" Value="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                                        </DataTrigger>
+                                    </Button.Triggers>
+                                </Button>
+
+                                <Label Grid.Column="2" Text="{Binding Title}" FontSize="13" VerticalOptions="Center"
+                                       LineBreakMode="TailTruncation"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsDone}" Value="True">
+                                            <Setter Property="TextDecorations" Value="Strikethrough" />
+                                            <Setter Property="TextColor" Value="{StaticResource Gray400}" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+
+                                <HorizontalStackLayout Grid.Column="3" Spacing="5" VerticalOptions="Center" Margin="8,0,6,0">
+                                    <Label Text="&#xE895;" FontFamily="Segoe Fluent Icons" FontSize="10" VerticalOptions="Center"
+                                           IsVisible="{Binding HasRecurrence}"
+                                           TextColor="{StaticResource Gray400}" />
+                                    <Border IsVisible="{Binding HasLink}" VerticalOptions="Center"
+                                            Padding="7,3" StrokeThickness="1"
+                                            Stroke="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}"
+                                            BackgroundColor="Transparent">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="9" /></Border.StrokeShape>
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.OpenLinkCommand}"
+                                                                  CommandParameter="{Binding .}" />
+                                        </Border.GestureRecognizers>
+                                        <Label Text="{Binding LinkedEntityLabel}" FontSize="10"
+                                               TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+                                    </Border>
+                                    <Border IsVisible="{Binding HasDueDate}" VerticalOptions="Center"
+                                            Padding="8,3" StrokeThickness="1"
+                                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                            BackgroundColor="Transparent">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="9" /></Border.StrokeShape>
+                                        <Label Text="{Binding DueLabel}" FontSize="10.5"
+                                               TextColor="{Binding IsOverdue, Converter={StaticResource TodoOverdueColorConverter}}" />
+                                    </Border>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Board -->
+                <Grid Grid.Row="3" ColumnDefinitions="*,*,*,*" ColumnSpacing="10" Padding="12"
+                      IsVisible="{Binding IsBoardView}">
+                    <Border Grid.Column="0" Padding="10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="{Binding BoardHigh.Header}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" />
+                            <ScrollView Grid.Row="1">
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding BoardHigh}"
+                                                     BindableLayout.ItemTemplate="{StaticResource BoardCardTemplate}" />
+                            </ScrollView>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Column="1" Padding="10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="{Binding BoardMedium.Header}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" />
+                            <ScrollView Grid.Row="1">
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding BoardMedium}"
+                                                     BindableLayout.ItemTemplate="{StaticResource BoardCardTemplate}" />
+                            </ScrollView>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Column="2" Padding="10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="{Binding BoardLow.Header}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" />
+                            <ScrollView Grid.Row="1">
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding BoardLow}"
+                                                     BindableLayout.ItemTemplate="{StaticResource BoardCardTemplate}" />
+                            </ScrollView>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Column="3" Padding="10" StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="{Binding BoardNone.Header}" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" />
+                            <ScrollView Grid.Row="1">
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding BoardNone}"
+                                                     BindableLayout.ItemTemplate="{StaticResource BoardCardTemplate}" />
+                            </ScrollView>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ==================== RIGHT: detail ==================== -->
+        <Border Grid.Column="2" Style="{StaticResource Pane}" IsVisible="{Binding HasSelection}"
+                VerticalOptions="Start" Padding="18">
+            <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Task" Style="{StaticResource FieldLabel}" />
+                <Entry Text="{Binding SelectedTask.Title, Mode=TwoWay}" Placeholder="Task title" FontSize="14" />
+
+                <Label Text="Priority" Style="{StaticResource FieldLabel}" Margin="0,2,0,0" />
+                <Picker ItemsSource="{Binding PriorityOptions}"
+                        SelectedItem="{Binding SelectedTask.Priority, Mode=TwoWay}" FontSize="13" />
+
+                <Label Text="Due date" Style="{StaticResource FieldLabel}" Margin="0,2,0,0" />
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                    <DatePicker Grid.Column="0" Date="{Binding SelectedDueDate, Mode=TwoWay}" FontSize="12.5" />
+                    <Button Grid.Column="1" Text="Today" FontSize="11" HeightRequest="32" Padding="10,0" CornerRadius="6"
+                            Command="{Binding SetDueTodayCommand}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Button Grid.Column="2" Text="Clear" FontSize="11" HeightRequest="32" Padding="8,0" CornerRadius="6"
+                            IsVisible="{Binding SelectedHasDueDate}"
+                            Command="{Binding ClearDueDateCommand}"
+                            BackgroundColor="Transparent"
+                            TextColor="{StaticResource Gray400}" />
+                </Grid>
+                <Label Text="No due date" FontSize="11" Margin="0,-6,0,0"
+                       IsVisible="{Binding SelectedHasDueDate, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                       TextColor="{StaticResource Gray400}" />
+
+                <Label Text="Notes" Style="{StaticResource FieldLabel}" Margin="0,2,0,0" />
+                <Editor Text="{Binding SelectedTask.Notes, Mode=TwoWay}" AutoSize="TextChanges"
+                        MinimumHeightRequest="90" FontSize="12.5" Placeholder="Optional notes" />
+
+                <Label Text="Repeats" Style="{StaticResource FieldLabel}" Margin="0,2,0,0" />
+                <Picker ItemsSource="{Binding RecurrenceOptions}"
+                        SelectedItem="{Binding SelectedRecurrence, Mode=TwoWay}" FontSize="13" />
+
+                <Label Text="Linked record" Style="{StaticResource FieldLabel}" Margin="0,2,0,0" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <Picker Grid.Column="0" Title="Not linked" ItemsSource="{Binding LinkTargets}"
+                            ItemDisplayBinding="{Binding Label}"
+                            SelectedItem="{Binding SelectedLinkTarget, Mode=TwoWay}" FontSize="12.5" />
+                    <Button Grid.Column="1" Text="Unlink" FontSize="11" HeightRequest="32" Padding="10,0" CornerRadius="6"
+                            IsVisible="{Binding SelectedTask.HasLink}"
+                            Command="{Binding UnlinkCommand}"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Gray400}" />
+                </Grid>
+
+                <BoxView HeightRequest="1" Margin="0,4"
+                         Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                    <Label Grid.Column="0" Text="Reorder" Style="{StaticResource FieldLabel}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                            WidthRequest="34" HeightRequest="30" Padding="0" CornerRadius="6"
+                            Command="{Binding MoveSelectedCommand}" CommandParameter="Up"
+                            ToolTipProperties.Text="Move up"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                    <Button Grid.Column="2" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                            WidthRequest="34" HeightRequest="30" Padding="0" CornerRadius="6"
+                            Command="{Binding MoveSelectedCommand}" CommandParameter="Down"
+                            ToolTipProperties.Text="Move down"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                </Grid>
+
+                <BoxView HeightRequest="1" Margin="0,4"
+                         Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="Mark done" Style="{StaticResource PrimaryButton}"
+                            HeightRequest="36" FontSize="12.5"
+                            Command="{Binding ToggleDoneCommand}" CommandParameter="{Binding SelectedTask}">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding SelectedTask.IsDone}" Value="True">
+                                <Setter Property="Text" Value="Reopen" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button Grid.Column="1" Text="Delete" Style="{StaticResource CancelButton}"
+                            HeightRequest="36" FontSize="12.5" Padding="16,0"
+                            Command="{Binding DeleteCommand}" CommandParameter="{Binding SelectedTask}" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <VerticalStackLayout Grid.Column="2" IsVisible="{Binding HasSelection, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                             VerticalOptions="Center" HorizontalOptions="Center" Spacing="6">
+            <Label Text="&#xE7C3;" FontFamily="Segoe Fluent Icons" FontSize="24" HorizontalOptions="Center"
+                   TextColor="{StaticResource Gray400}" />
+            <Label Text="Select a task to see details" HorizontalTextAlignment="Center" FontSize="12.5"
+                   TextColor="{StaticResource Gray400}" />
+            <Label Text="or press Ctrl+N to add one" HorizontalTextAlignment="Center" FontSize="11"
+                   TextColor="{StaticResource Gray400}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

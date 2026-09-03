@@ -12,8 +12,12 @@ namespace Procure.Utilities
         public const string GoDashboard = "Global.GoDashboard";
         public const string GoPrBoard = "Global.GoPrBoard";
         public const string GoMaterials = "Global.GoMaterials";
+        public const string GoTasks = "Global.GoTasks";
         public const string GoSettings = "Global.GoSettings";
         public const string ToggleSidebar = "Global.ToggleSidebar";
+
+        public const string TasksNew = "Tasks.New";
+        public const string TasksRefresh = "Tasks.Refresh";
 
         public const string FocusSearch = "PrBoard.FocusSearch";
         public const string NewPr = "PrBoard.NewPr";
@@ -43,8 +47,12 @@ namespace Procure.Utilities
             new(KeyboardShortcutIds.GoDashboard, "Go to Dashboard", "Global", "Ctrl+Number1"),
             new(KeyboardShortcutIds.GoPrBoard, "Go to PR Board", "Global", "Ctrl+Number2"),
             new(KeyboardShortcutIds.GoMaterials, "Go to Raw & Packing", "Global", "Ctrl+Number3"),
+            new(KeyboardShortcutIds.GoTasks, "Go to Tasks", "Global", "Ctrl+Number4"),
             new(KeyboardShortcutIds.GoSettings, "Go to Settings", "Global", "Ctrl+Comma"),
             new(KeyboardShortcutIds.ToggleSidebar, "Toggle Sidebar", "Global", "Ctrl+B"),
+
+            new(KeyboardShortcutIds.TasksNew, "Add Task", "Tasks", "Ctrl+N"),
+            new(KeyboardShortcutIds.TasksRefresh, "Refresh Tasks", "Tasks", "F5"),
 
             new(KeyboardShortcutIds.FocusSearch, "Focus Search", "PR Board", "Ctrl+F"),
             new(KeyboardShortcutIds.NewPr, "Add PR", "PR Board", "Ctrl+N"),

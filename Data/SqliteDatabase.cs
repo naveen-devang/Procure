@@ -128,6 +128,9 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportTotal", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
+            // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases
+            // have the table already, so the CREATE script skips it; add the column explicitly.
+            await EnsureColumnExistsAsync(connection, "TodoTask", "LinkedEntityLabel", "TEXT").ConfigureAwait(false);
 
             // One-time repair: the PO wizard's VAT-picker bug saved Value without VAT while the
             // row still records a VatType, leaving Value inconsistent with its own breakdown.

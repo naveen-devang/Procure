@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 6;
+        public const int SchemaVersion = 8;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -268,6 +268,29 @@ CREATE TABLE IF NOT EXISTS PoItemCallOff (
     Note TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_PoItemCallOff_PoItemId ON PoItemCallOff(PoItemId);
+
+-- Personal task list (schema v7). New table only - the whole CREATE script re-runs on a
+-- version bump, so existing databases pick this up with no MigrateSchemaAsync branch needed.
+-- Columns past SortOrder are reserved for later phases (sub-tasks, recurrence, PR/RFQ/PO links).
+CREATE TABLE IF NOT EXISTS TodoTask (
+    Id TEXT PRIMARY KEY,
+    Title TEXT NOT NULL,
+    Notes TEXT,
+    Priority INTEGER NOT NULL DEFAULT 0,
+    IsDone INTEGER NOT NULL DEFAULT 0,
+    DueDate TEXT,
+    CompletedAt TEXT,
+    SortOrder INTEGER NOT NULL DEFAULT 0,
+    CreatedAt TEXT NOT NULL,
+    UpdatedAt TEXT NOT NULL,
+    ParentId TEXT REFERENCES TodoTask(Id) ON DELETE CASCADE,
+    RecurrenceRule TEXT,
+    PlannedForDate TEXT,
+    LinkedEntityType TEXT,
+    LinkedEntityId TEXT,
+    LinkedEntityLabel TEXT
+);
+CREATE INDEX IF NOT EXISTS IX_TodoTask_Done_Due ON TodoTask(IsDone, DueDate);
 ";
     }
 }
