@@ -105,6 +105,9 @@ namespace Procure
             else if (TasksContent.Content is null && target.Contains("todos", StringComparison.Ordinal))
                 TasksContent.Content = targetPage = _services.GetRequiredService<TodoPage>();
             else if (target.Contains("todos", StringComparison.Ordinal)) targetPage = TasksContent.Content as Page;
+            else if (NotesContent.Content is null && target.Contains("notes", StringComparison.Ordinal))
+                NotesContent.Content = targetPage = _services.GetRequiredService<NotesPage>();
+            else if (target.Contains("notes", StringComparison.Ordinal)) targetPage = NotesContent.Content as Page;
             else if (SettingsContent.Content is null && target.Contains("settings", StringComparison.Ordinal))
                 SettingsContent.Content = targetPage = _services.GetRequiredService<SettingsPage>();
             else if (target.Contains("settings", StringComparison.Ordinal)) targetPage = SettingsContent.Content as Page;
@@ -273,6 +276,7 @@ namespace Procure
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoPrBoard), e.Key)) route = "prboard";
             else if (_settingsService.IsRawPackingTabEnabled && Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoMaterials), e.Key)) route = "materials";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoTasks), e.Key)) route = "todos";
+            else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoNotes), e.Key)) route = "notes";
             else if (Procure.Utilities.ShortcutInput.Matches(_shortcuts.GetCombo(Procure.Utilities.KeyboardShortcutIds.GoSettings), e.Key)) route = "settings";
 
             if (route != null)
@@ -498,7 +502,7 @@ namespace Procure
         internal IEnumerable<Page?> KeptAlivePages => new Page?[]
         {
             DashboardContent.Content as Page, PrBoardContent.Content as Page, MaterialsContent.Content as Page,
-            TasksContent.Content as Page, SettingsContent.Content as Page
+            TasksContent.Content as Page, NotesContent.Content as Page, SettingsContent.Content as Page
         };
 
         /// <summary>Pushes the current theme into every kept-alive page's native tree - the hidden ones

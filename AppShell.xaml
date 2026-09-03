@@ -67,6 +67,13 @@
         Route="todos" />
 
     <ShellContent
+        x:Name="NotesContent"
+        Title="Notes"
+        ToolTipProperties.Text="Notes"
+        Icon="{StaticResource IconNotes}"
+        Route="notes" />
+
+    <ShellContent
         x:Name="SettingsContent"
         Title="Settings"
         ToolTipProperties.Text="Settings"

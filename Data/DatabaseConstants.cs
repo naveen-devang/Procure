@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 9;
+        public const int SchemaVersion = 10;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -302,6 +302,21 @@ CREATE TABLE IF NOT EXISTS TodoTaskLink (
     PRIMARY KEY (TaskId, EntityId)
 );
 CREATE INDEX IF NOT EXISTS IX_TodoTaskLink_Entity ON TodoTaskLink(EntityId);
+
+-- v10: freeform notes. Body is RTF (see NoteEditorHandler); Snippet is the first plain-text chars,
+-- kept for the list so bodies never load until a note is opened. New table only - no migration.
+CREATE TABLE IF NOT EXISTS Note (
+    Id         TEXT PRIMARY KEY,
+    Title      TEXT NOT NULL DEFAULT '',
+    Body       TEXT NOT NULL DEFAULT '',
+    Format     TEXT NOT NULL DEFAULT 'rtf',
+    Snippet    TEXT,
+    Pinned     INTEGER NOT NULL DEFAULT 0,
+    SortOrder  INTEGER NOT NULL DEFAULT 0,
+    CreatedAt  TEXT NOT NULL,
+    UpdatedAt  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_Note_Order ON Note(Pinned, SortOrder);
 ";
     }
 }

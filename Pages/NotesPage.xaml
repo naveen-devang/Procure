@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Procure.PageModels"
+             xmlns:models="clr-namespace:Procure.Models"
+             xmlns:controls="clr-namespace:Procure.Controls"
+             x:Class="Procure.Pages.NotesPage"
+             x:Name="ThisPage"
+             x:DataType="pageModels:NotePageModel"
+             Shell.NavBarIsVisible="False"
+             Title="Notes"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
+
+    <ContentPage.Resources>
+        <Style TargetType="Border" x:Key="Pane">
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+            <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}" />
+        </Style>
+
+        <Style TargetType="Button" x:Key="ToolBtn">
+            <Setter Property="ClassId" Value="toolbtn" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="WidthRequest" Value="34" />
+            <Setter Property="HeightRequest" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+        </Style>
+
+        <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
+            <Grid Padding="12,9" ColumnDefinitions="6,*" ColumnSpacing="6" RowDefinitions="Auto,Auto,Auto"
+                  MinimumHeightRequest="58">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectCommand}"
+                                          CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <Border Grid.RowSpan="3" Grid.ColumnSpan="2" StrokeThickness="0" Opacity="0" Margin="4,1"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="7" /></Border.StrokeShape>
+                    <Border.Triggers>
+                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                            <Setter Property="Opacity" Value="1" />
+                        </DataTrigger>
+                    </Border.Triggers>
+                </Border>
+
+                <BoxView Grid.RowSpan="3" Grid.Column="0" WidthRequest="6" HeightRequest="6" CornerRadius="3"
+                         VerticalOptions="Center" HorizontalOptions="Start" IsVisible="{Binding Pinned}"
+                         Color="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
+
+                <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayTitle}" FontFamily="SegoeSemibold" FontSize="13"
+                       LineBreakMode="TailTruncation"
+                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                <Label Grid.Row="1" Grid.Column="1" Text="{Binding Snippet}" FontSize="11.5" LineBreakMode="TailTruncation"
+                       IsVisible="{Binding HasSnippet}"
+                       TextColor="{StaticResource Gray400}" />
+                <Label Grid.Row="2" Grid.Column="1" Text="{Binding WhenLabel}" FontSize="10.5" Margin="0,2,0,0"
+                       TextColor="{StaticResource Gray400}" />
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid Padding="20" ColumnDefinitions="292,16,*">
+
+        <!-- ==================== LEFT: note index ==================== -->
+        <Border Grid.Column="0" Style="{StaticResource Pane}" Padding="0">
+            <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+
+            <Grid RowDefinitions="Auto,Auto,*">
+                <Grid Grid.Row="0" Padding="14,14,14,10" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                        <Label Text="Notes" FontFamily="SegoeSemibold" FontSize="16"
+                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                        <Label Text="{Binding NoteCount, StringFormat='{0} notes'}" FontSize="11"
+                               TextColor="{StaticResource Gray400}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="+ New" FontSize="11.5" HeightRequest="30" Padding="12,0" CornerRadius="7"
+                            Command="{Binding NewNoteCommand}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                </Grid>
+
+                <Entry Grid.Row="1" Placeholder="Search notes" FontSize="12.5" Margin="14,0,14,10" HeightRequest="34"
+                       Text="{Binding FilterText, Mode=TwoWay}" />
+
+                <CollectionView Grid.Row="2" x:Name="NoteList" ItemsSource="{Binding Notes}" SelectionMode="None"
+                                Margin="6,0,6,8" ItemTemplate="{StaticResource NoteRow}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout Padding="24" Spacing="4" VerticalOptions="Center" HorizontalOptions="Center">
+                            <Label Text="&#xE70B;" FontFamily="Segoe Fluent Icons" FontSize="24" HorizontalOptions="Center"
+                                   TextColor="{StaticResource Gray400}" />
+                            <Label Text="No notes yet" FontSize="13" HorizontalOptions="Center"
+                                   TextColor="{StaticResource Gray400}" />
+                            <Label Text="press Ctrl+N" FontSize="11" HorizontalOptions="Center"
+                                   TextColor="{StaticResource Gray400}" />
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <!-- ==================== RIGHT: editor ==================== -->
+        <Border Grid.Column="2" Style="{StaticResource Pane}" IsVisible="{Binding HasSelection}" Padding="0">
+            <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+
+            <Grid RowDefinitions="Auto,Auto,*,Auto">
+                <Grid Grid.Row="0" Padding="16,12,12,8" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                    <Entry Grid.Column="0" Placeholder="Note title" FontFamily="SegoeSemibold" FontSize="15"
+                           BackgroundColor="Transparent"
+                           Text="{Binding SelectedNote.Title, Mode=TwoWay}" />
+                    <Button Grid.Column="1" Text="Pin" FontSize="11" HeightRequest="28" Padding="10,0" CornerRadius="6"
+                            Command="{Binding TogglePinCommand}"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Gray400}" />
+                    <Button Grid.Column="2" Text="Duplicate" FontSize="11" HeightRequest="28" Padding="10,0" CornerRadius="6"
+                            Command="{Binding DuplicateCommand}"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Gray400}" />
+                    <Button Grid.Column="3" Text="Delete" FontSize="11" HeightRequest="28" Padding="10,0" CornerRadius="6"
+                            Command="{Binding DeleteCommand}"
+                            BackgroundColor="Transparent" TextColor="{StaticResource Gray400}" />
+                </Grid>
+
+                <Border Grid.Row="1" Margin="12,0,12,8" Padding="4" StrokeThickness="0"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                    <FlexLayout Wrap="Wrap" AlignItems="Center">
+                        <Button Style="{StaticResource ToolBtn}" FontFamily="SegoeSemibold" Text="B" Clicked="OnBold" />
+                        <Button Style="{StaticResource ToolBtn}" FontAttributes="Italic" Text="I" Clicked="OnItalic" />
+                        <Button Style="{StaticResource ToolBtn}" Text="U" Clicked="OnUnderline" />
+                        <Button Style="{StaticResource ToolBtn}" Text="S" Clicked="OnStrike" />
+                        <BoxView WidthRequest="1" HeightRequest="18" Margin="4,0" Color="{StaticResource Gray400}" />
+                        <Button Style="{StaticResource ToolBtn}" Text="&#8226;" Clicked="OnBullet" ToolTipProperties.Text="Bulleted list" />
+                        <Button Style="{StaticResource ToolBtn}" Text="1." Clicked="OnNumber" ToolTipProperties.Text="Numbered list" />
+                        <Button Style="{StaticResource ToolBtn}" Text="&#9744;" Clicked="OnChecklist" ToolTipProperties.Text="Checklist" />
+                        <BoxView WidthRequest="1" HeightRequest="18" Margin="4,0" Color="{StaticResource Gray400}" />
+                        <Button Style="{StaticResource ToolBtn}" WidthRequest="38" Text="H1" Clicked="OnH1" />
+                        <Button Style="{StaticResource ToolBtn}" WidthRequest="38" Text="H2" Clicked="OnH2" />
+                        <Button Style="{StaticResource ToolBtn}" WidthRequest="44" FontSize="11" Text="Body" Clicked="OnBody" />
+                        <BoxView WidthRequest="1" HeightRequest="18" Margin="4,0" Color="{StaticResource Gray400}" />
+                        <Button Style="{StaticResource ToolBtn}" Text="&#8630;" Clicked="OnUndo" ToolTipProperties.Text="Undo" />
+                        <Button Style="{StaticResource ToolBtn}" Text="&#8631;" Clicked="OnRedo" ToolTipProperties.Text="Redo" />
+                    </FlexLayout>
+                </Border>
+
+                <Border Grid.Row="2" Margin="12,0,12,8" Padding="0" StrokeThickness="1"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkTertiaryBackground}}">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                    <controls:NoteEditor x:Name="Editor" />
+                </Border>
+
+                <Label Grid.Row="3" Padding="16,0,16,12" FontSize="11" Text="{Binding SaveState}"
+                       TextColor="{StaticResource Gray400}" />
+            </Grid>
+        </Border>
+
+        <VerticalStackLayout Grid.Column="2" IsVisible="{Binding HasSelection, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                             VerticalOptions="Center" HorizontalOptions="Center" Spacing="6">
+            <Label Text="&#xE70B;" FontFamily="Segoe Fluent Icons" FontSize="24" HorizontalOptions="Center"
+                   TextColor="{StaticResource Gray400}" />
+            <Label Text="Select a note to edit it" HorizontalTextAlignment="Center" FontSize="12.5"
+                   TextColor="{StaticResource Gray400}" />
+            <Label Text="or press Ctrl+N for a new one" HorizontalTextAlignment="Center" FontSize="11"
+                   TextColor="{StaticResource Gray400}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

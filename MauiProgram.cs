@@ -64,6 +64,17 @@ namespace Procure
                 .ConfigureMauiHandlers(handlers =>
                 {
 #if WINDOWS
+                    handlers.AddHandler<Procure.Controls.NoteEditor, Procure.Platforms.Windows.NoteEditorHandler>();
+
+                    // Notes toolbar buttons (ClassId "toolbtn"): clicking one must not pull keyboard
+                    // focus off the RichEditBox, or its selection highlight flips focused->unfocused
+                    // and back on every press - a visible blink.
+                    Microsoft.Maui.Handlers.ButtonHandler.Mapper.AppendToMapping("NoteToolbarNoFocusSteal", (handler, view) =>
+                    {
+                        if (view is Microsoft.Maui.Controls.Button b && b.ClassId == "toolbtn")
+                            handler.PlatformView.AllowFocusOnInteraction = false;
+                    });
+
                     Microsoft.Maui.Controls.Handlers.Items.CollectionViewHandler.Mapper.AppendToMapping("KeyboardAccessibleCollectionView", (handler, view) =>
                     {
                         handler.PlatformView.SingleSelectionFollowsFocus = false;
@@ -126,6 +137,7 @@ namespace Procure
             builder.Services.AddSingleton<ICustomColumnRepository, CustomColumnRepository>();
             builder.Services.AddSingleton<ICallOffRepository, CallOffRepository>();
             builder.Services.AddSingleton<ITodoRepository, TodoRepository>();
+            builder.Services.AddSingleton<INoteRepository, NoteRepository>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
             // Services
@@ -157,6 +169,9 @@ namespace Procure
 
             builder.Services.AddSingleton<TodoPageModel>();
             builder.Services.AddSingleton<TodoPage>();
+
+            builder.Services.AddSingleton<NotePageModel>();
+            builder.Services.AddSingleton<NotesPage>();
 
             builder.Services.AddSingleton<SettingsPageModel>();
             builder.Services.AddSingleton<SettingsPage>();

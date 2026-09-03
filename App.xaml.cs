@@ -54,8 +54,42 @@ namespace Procure
             {
                 _ = RunTodoSelfChecksAsync();
             }
+
+            // Opt-in only: PROCURE_NOTE_SELFCHECK=1.
+            if (Environment.GetEnvironmentVariable("PROCURE_NOTE_SELFCHECK") == "1")
+            {
+                _ = RunNoteSelfChecksAsync();
+            }
 #endif
         }
+
+#if DEBUG
+        private async Task RunNoteSelfChecksAsync()
+        {
+            Data.NoteSelfCheckLog.Reset();
+            var repo = _services.GetRequiredService<Data.Repositories.INoteRepository>();
+            var errorHandler = _services.GetRequiredService<Services.IErrorHandler>();
+
+            try
+            {
+                foreach (var n in (await repo.GetListAsync())
+                             .Where(n => n.Title.StartsWith("nrsc-") || n.Title.StartsWith("nfsc-")))
+                    await repo.DeleteAsync(n.Id);
+            }
+            catch { }
+
+            try
+            {
+                await Data.NoteRepositorySelfCheck.RunAsync(repo);
+                await Data.NoteFeatureSelfCheck.RunAsync(repo, errorHandler);
+                Data.NoteSelfCheckLog.Write("ALL NOTE SELF-CHECKS PASSED");
+            }
+            catch (Exception ex)
+            {
+                Data.NoteSelfCheckLog.Write("NOTE SELF-CHECKS FAILED: " + ex);
+            }
+        }
+#endif
 
 #if DEBUG
         private async Task RunTodoSelfChecksAsync()
