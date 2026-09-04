@@ -108,16 +108,30 @@ namespace Procure.Platforms.Windows
         }
 
         // ---- edits out ----
+        // CurrentStrippedRtf() pulls the FULL document's RTF and runs it through two regex passes -
+        // cost scales with document size. Running that on every single keystroke measurably costs
+        // CPU on a long note, for no benefit: the actual save is already debounced 800ms downstream
+        // (NotePageModel.ScheduleSave), so nothing needs this synchronously. Same generation-counter
+        // debounce idiom used for search/filter elsewhere in the app.
+        private int _textChangedGeneration;
+
         private void OnTextChanged(object? sender, Mux.RoutedEventArgs e)
         {
             if (_suppress || VirtualView is null) return;
 
-            var stripped = CurrentStrippedRtf();
-            if (stripped == _baseline) return;   // nothing actually changed
-            _baseline = stripped;
+            var generation = ++_textChangedGeneration;
+            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                ?.DispatchDelayed(TimeSpan.FromMilliseconds(150), () =>
+                {
+                    if (generation != _textChangedGeneration || _suppress || VirtualView is null) return;
 
-            PlatformView.Document.GetText(TextGetOptions.None, out var plain);
-            VirtualView.RaiseContentChanged(stripped, plain.TrimEnd('\r', '\n'));
+                    var stripped = CurrentStrippedRtf();
+                    if (stripped == _baseline) return;   // nothing actually changed
+                    _baseline = stripped;
+
+                    PlatformView.Document.GetText(TextGetOptions.None, out var plain);
+                    VirtualView.RaiseContentChanged(stripped, plain.TrimEnd('\r', '\n'));
+                });
         }
 
         // ---- formatting ----

@@ -16,6 +16,14 @@ namespace Procure
             InitializeComponent();
             _services = services;
 
+            // Diagnostic only - there was no crash trail anywhere in the app before this, so a real
+            // hard crash left nothing to confirm what happened. Neither hook changes behavior: the
+            // process still ends the same way, this just records why first.
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+                Utilities.CrashLog.Write("AppDomain.UnhandledException", e.ExceptionObject as Exception);
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+                Utilities.CrashLog.Write("TaskScheduler.UnobservedTaskException", e.Exception);
+
             // OS theme flips must drop ThemeHelper's cached value. App lives for the process lifetime.
             RequestedThemeChanged += OnRequestedThemeChanged;
 

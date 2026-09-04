@@ -66,9 +66,13 @@ namespace Procure.Data
         }.ToString();
 
         /// <summary>Per-connection settings with no connection-string equivalent, applied on every open
-        /// by <see cref="SqliteDatabase.CreateConnection"/>. Both are pure configuration writes - no I/O.
-        /// synchronous=NORMAL is the documented pairing for WAL; the default FULL fsyncs every commit.</summary>
-        public const string SqlConnectionPragmas = "PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY;";
+        /// by <see cref="SqliteDatabase.CreateConnection"/>. synchronous=NORMAL is the documented
+        /// pairing for WAL; the default FULL fsyncs every commit. busy_timeout defaults to 0 - with
+        /// nothing set, a connection that finds the file locked (most commonly a second Procure
+        /// process, now blocked by the single-instance guard, but any external contention counts)
+        /// throws "database is locked" immediately instead of waiting a moment for the lock to
+        /// clear.</summary>
+        public const string SqlConnectionPragmas = "PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY; PRAGMA busy_timeout=5000;";
 
         /// <summary>
         /// Recomputes the denormalised search text for one PR. Search has to match item names, vendor
