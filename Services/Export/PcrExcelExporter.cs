@@ -183,9 +183,13 @@ namespace Procure.Services.Export
             using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
 
             int supplierCount = selectedRfqs.Count;
-            // Columns: A (Sl No), B (Item Description), C (Quantity), D.. (Suppliers), Last (Last Price)
-            int totalCols = 3 + supplierCount + 1; // e.g. 3 + 5 + 1 = 9 cols (A through I)
+            // Columns: A (Sl No), B (Item Description), C (PR Quantity), then a Qty + Unit Price pair
+            // per supplier (that vendor's own quoted quantity can differ from the PR's - it's a real,
+            // independently-editable RfqItem field, not just a copy of column C), then Last Price.
+            int totalCols = 3 + (supplierCount * 2) + 1; // e.g. 3 + 10 + 1 = 14 cols (A through N)
             string lastColLetter = GetColumnLetter(totalCols);
+            int VendorQtyCol(int i) => 4 + (i * 2);
+            int VendorPriceCol(int i) => 4 + (i * 2) + 1;
 
             // Description column only widens as far as its own longest item name actually needs -
             // not simply however many (or few) vendor columns there are, which used to hand a short
@@ -196,7 +200,8 @@ namespace Procure.Services.Export
             // vendor/price columns below a floor that would force a long vendor name into 5-6 wrapped lines.
             const int descColWidthFloor = 42;
             const int descColWidthCap = 70;
-            const int vendorColWidth = 18;
+            const int vendorQtyColWidth = 10;
+            const int vendorPriceColWidth = 18;
             var widestItemNameLength = pr.Items?.Count > 0 ? pr.Items.Max(i => i.ItemName?.Length ?? 0) : 0;
             int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
 
@@ -212,11 +217,14 @@ namespace Procure.Services.Export
         <col min=""2"" max=""2"" width=""{descColWidth}"" customWidth=""1""/>
         <col min=""3"" max=""3"" width=""12"" customWidth=""1""/>");
 
-            for (int i = 4; i <= totalCols; i++)
+            for (int i = 0; i < supplierCount; i++)
             {
                 sb.Append($@"
-        <col min=""{i}"" max=""{i}"" width=""{vendorColWidth}"" customWidth=""1""/>");
+        <col min=""{VendorQtyCol(i)}"" max=""{VendorQtyCol(i)}"" width=""{vendorQtyColWidth}"" customWidth=""1""/>
+        <col min=""{VendorPriceCol(i)}"" max=""{VendorPriceCol(i)}"" width=""{vendorPriceColWidth}"" customWidth=""1""/>");
             }
+            sb.Append($@"
+        <col min=""{totalCols}"" max=""{totalCols}"" width=""{vendorPriceColWidth}"" customWidth=""1""/>");
 
             sb.Append(@"
     </cols>
@@ -236,7 +244,7 @@ namespace Procure.Services.Export
             r += 2;
 
             // 2. Metadata Header Rows (3 structured rows matching PDF layout)
-            var collectiveNo = string.IsNullOrWhiteSpace(pcr.PcrNo) ? $"PCR-{pr.PrNo}" : pcr.PcrNo;
+            var collectiveNo = string.IsNullOrWhiteSpace(pcr.PcrNo) ? "-" : pcr.PcrNo;
             var dateStr = DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             // Raw string here — EscapeXml at the point of use escapes it exactly once.
             var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&I" : pr.Description.Trim();
@@ -303,13 +311,18 @@ namespace Procure.Services.Export
         <row r=""{r}"" ht=""{headerRowHeight}"">
             <c r=""A{r}"" s=""3"" t=""inlineStr""><is><t>Sl No.</t></is></c>
             <c r=""B{r}"" s=""3"" t=""inlineStr""><is><t>Item Description</t></is></c>
-            <c r=""C{r}"" s=""3"" t=""inlineStr""><is><t>Quantity</t></is></c>");
+            <c r=""C{r}"" s=""3"" t=""inlineStr""><is><t>PR Quantity</t></is></c>");
 
             for (int i = 0; i < supplierCount; i++)
             {
-                string colLetter = GetColumnLetter(4 + i);
+                string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                string priceColLetter = GetColumnLetter(VendorPriceCol(i));
+                // Vendor name spans both of that vendor's columns - same merged-header treatment
+                // the title row already uses, just narrower.
                 sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(vendorHeaderTexts[i])}</t></is></c>");
+            <c r=""{qtyColLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml(vendorHeaderTexts[i])}</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""3"" t=""inlineStr""><is><t></t></is></c>");
+                merges.Add($"{qtyColLetter}{r}:{priceColLetter}{r}");
             }
 
             string lastPriceColLetter = GetColumnLetter(totalCols);
@@ -329,9 +342,11 @@ namespace Procure.Services.Export
 
             for (int i = 0; i < supplierCount; i++)
             {
-                string colLetter = GetColumnLetter(4 + i);
+                string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                string priceColLetter = GetColumnLetter(VendorPriceCol(i));
                 sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""4"" t=""inlineStr""><is><t>Unit Price</t></is></c>");
+            <c r=""{qtyColLetter}{r}"" s=""4"" t=""inlineStr""><is><t>Qty</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""4"" t=""inlineStr""><is><t>Unit Price</t></is></c>");
             }
 
             sb.Append($@"
@@ -358,11 +373,15 @@ namespace Procure.Services.Export
 
                 for (int i = 0; i < supplierCount; i++)
                 {
-                    string colLetter = GetColumnLetter(4 + i);
+                    string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                    string priceColLetter = GetColumnLetter(VendorPriceCol(i));
                     var rfq = selectedRfqs[i];
                     var quoteAmt = rfq.BaseAmount > 0 ? rfq.BaseAmount : (rfq.QuoteAmount ?? 0);
+                    // No PrItem row exists in this fallback, so there's no matched RfqItem to read a
+                    // quantity from - nothing invented here, just "-".
                     sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""7""><v>{quoteAmt.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""7""><v>{quoteAmt.ToString(CultureInfo.InvariantCulture)}</v></c>");
                 }
 
                 sb.Append($@"
@@ -392,7 +411,8 @@ namespace Procure.Services.Export
 
                     for (int i = 0; i < supplierCount; i++)
                     {
-                        string colLetter = GetColumnLetter(4 + i);
+                        string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                        string priceColLetter = GetColumnLetter(VendorPriceCol(i));
                         var rfq = selectedRfqs[i];
                         // Exact PrItemId link wins; name matching is only a fallback for unlinked
                         // lines — a flat OR let a name collision beat the correct link.
@@ -405,17 +425,25 @@ namespace Procure.Services.Export
                             // the Total Price Excl. VAT row (which sums discounted line totals).
                             var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
                             sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""7""><v>{netUnitPrice.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(rfqItem.FormattedQuantity)}</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""7""><v>{netUnitPrice.ToString(CultureInfo.InvariantCulture)}</v></c>");
                         }
                         else if (rfq.BaseAmount > 0 && prItems.Count == 1)
                         {
+                            // Single-item PR, vendor's total covers this one line but no per-item
+                            // quantity was ever recorded against it - the matched RfqItem's own
+                            // quantity if there is one, else assume it was quoted against the PR's
+                            // own quantity rather than inventing a number.
+                            var qtyStr = rfqItem?.FormattedQuantity ?? $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}";
                             sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""7""><v>{rfq.BaseAmount.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(qtyStr)}</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""7""><v>{rfq.BaseAmount.ToString(CultureInfo.InvariantCulture)}</v></c>");
                         }
                         else
                         {
                             sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>");
                         }
 
                         // First supplier (in fixed pr.Rfqs order) with a historical price wins;
@@ -459,17 +487,24 @@ namespace Procure.Services.Export
 
                 for (int i = 0; i < supplierCount; i++)
                 {
-                    string colLetter = GetColumnLetter(4 + i);
+                    string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                    string priceColLetter = GetColumnLetter(VendorPriceCol(i));
+                    // Totals aren't split by quantity - they already come straight off the RFQ's own
+                    // stored amount fields, independent of any one line's quantity. The value sits
+                    // merged across both of the vendor's columns, same width as the header above it.
+                    merges.Add($"{qtyColLetter}{r}:{priceColLetter}{r}");
                     var val = valSelector(selectedRfqs[i]);
                     if (val.isNum)
                     {
                         sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""9""><v>{val.numVal.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""9""><v>{val.numVal.ToString(CultureInfo.InvariantCulture)}</v></c>
+            <c r=""{priceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
                     }
                     else
                     {
                         sb.Append($@"
-            <c r=""{colLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(val.strVal)}</t></is></c>");
+            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(val.strVal)}</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
                     }
                 }
 
