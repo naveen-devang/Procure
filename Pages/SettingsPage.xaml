@@ -780,31 +780,6 @@
                                     </VerticalStackLayout>
                                 </Border>
 
-                                <Border StrokeThickness="1"
-                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
-                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
-                                        Padding="20">
-                                    <Border.StrokeShape>
-                                        <RoundRectangle CornerRadius="8" />
-                                    </Border.StrokeShape>
-
-                                    <VerticalStackLayout Spacing="12">
-                                        <Label Text="Database Reset &amp; Demo Data"
-                                               FontFamily="SegoeSemibold" FontSize="15"
-                                               TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                        <Label Text="Reset the local database and populate with realistic sample requisitions, RFQs, PCR approvals, POs, and custom fields."
-                                               FontSize="12"
-                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-
-                                        <Button Text="Reset &amp; Re-Seed Sample Data"
-                                                Command="{Binding ResetDatabaseCommand}"
-                                                BackgroundColor="{StaticResource FluentCriticalBg}"
-                                                TextColor="{StaticResource FluentCritical}"
-                                                HorizontalOptions="Start"
-                                                HeightRequest="36" Padding="16,0" />
-                                    </VerticalStackLayout>
-                                </Border>
-
                             </VerticalStackLayout>
                         </DataTemplate>
                     </converters:LazyExpander.ContentTemplate>

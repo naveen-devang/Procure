@@ -601,19 +601,6 @@ ORDER BY CreatedAt DESC;";
             return string.Join(",", names);
         }
 
-        public async Task<int> GetCountAsync()
-        {
-            await _db.InitializeAsync().ConfigureAwait(false);
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync().ConfigureAwait(false);
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM PurchaseRequisition;";
-            var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
-            return Convert.ToInt32(result);
-        }
-
-
         public async Task<(int TotalPrs, decimal TotalPoValue, int PosRaised, int RfqsAwaitingQuote, int PcrsAwaitingSignature, int UrgentCount, int OverdueCount)> GetDashboardAggregatesAsync(int normalOverdueDays, int urgentOverdueDays)
         {
             await _db.InitializeAsync().ConfigureAwait(false);

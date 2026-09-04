@@ -20,8 +20,6 @@ namespace Procure.PageModels
     {
         private readonly ISettingsService _settingsService;
         private readonly IUpdateService _updateService;
-        private readonly SeedDataService _seedDataService;
-        private readonly SqliteDatabase _sqliteDb;
         private readonly IErrorHandler _errorHandler;
         private readonly IKeyboardShortcutService _keyboardShortcutService;
 
@@ -142,16 +140,12 @@ namespace Procure.PageModels
         public SettingsPageModel(
             ISettingsService settingsService,
             IUpdateService updateService,
-            SeedDataService seedDataService,
-            SqliteDatabase sqliteDb,
             IErrorHandler errorHandler,
             IKeyboardShortcutService keyboardShortcutService,
             ManageColumnsPageModel columnsModel)
         {
             _settingsService = settingsService;
             _updateService = updateService;
-            _seedDataService = seedDataService;
-            _sqliteDb = sqliteDb;
             _errorHandler = errorHandler;
             _keyboardShortcutService = keyboardShortcutService;
             ColumnsModel = columnsModel;
@@ -507,43 +501,6 @@ namespace Procure.PageModels
 
         private static Microsoft.UI.Xaml.Window GetActiveWindow()
             => (Microsoft.UI.Xaml.Window)Microsoft.Maui.Controls.Application.Current!.Windows[0].Handler!.PlatformView!;
-
-        [RelayCommand]
-        public async Task ResetDatabaseAsync()
-        {
-            if (Shell.Current == null) return;
-
-            var confirm = await Shell.Current.DisplayAlertAsync(
-                "Reset & Re-Seed Database",
-                "This will clear the current database and repopulate it with fresh sample procurement data. Are you sure?",
-                "Yes, Reset",
-                "Cancel");
-
-            if (!confirm) return;
-
-            try
-            {
-                var dbPath = DatabaseConstants.DatabaseFilePath;
-                _sqliteDb.ResetInitialization();
-
-                if (File.Exists(dbPath))
-                {
-                    File.Delete(dbPath);
-                }
-
-                await _sqliteDb.InitializeAsync();
-                await _seedDataService.EnsureDataSeededAsync();
-
-                await Shell.Current.DisplayAlertAsync(
-                    "Database Reset",
-                    "Database reset and re-seeded successfully with realistic demo data.",
-                    "OK");
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
-        }
 
         [RelayCommand]
         public void AddNewDefaultStage()

@@ -14,7 +14,6 @@ namespace Procure.PageModels
     public partial class DashboardPageModel : ObservableObject, IDisposable
     {
         private readonly IDashboardMetricsService _metricsService;
-        private readonly SeedDataService _seedDataService;
         private readonly ISettingsService _settingsService;
         private readonly IErrorHandler _errorHandler;
 
@@ -26,12 +25,10 @@ namespace Procure.PageModels
 
         public DashboardPageModel(
             IDashboardMetricsService metricsService,
-            SeedDataService seedDataService,
             ISettingsService settingsService,
             IErrorHandler errorHandler)
         {
             _metricsService = metricsService;
-            _seedDataService = seedDataService;
             _settingsService = settingsService;
             _errorHandler = errorHandler;
 
@@ -102,15 +99,6 @@ namespace Procure.PageModels
             {
                 IsBusy = true;
 
-                // Off the UI thread: Microsoft.Data.Sqlite's "async" calls are not true async I/O for
-                // SQLite (the C API is synchronous), so without Task.Run this runs the seed check and
-                // the dashboard aggregate queries directly on the UI thread. Invisible on a small
-                // database; measured at ~600ms combined against the 20,000-row capacity test database
-                // - and DashboardPage.OnAppearing re-runs this on every visit, so it blocked every
-                // return to the Dashboard, not just the first. Same Task.Run wrap every repository
-                // call elsewhere in the app already uses (see PrListPageModel.LoadCoreAsync).
-                await Task.Run(() => _seedDataService.EnsureDataSeededAsync());
-
                 // Copy onto the bound instance instead of replacing it: assigning a new Metrics
                 // object made the BindableLayout tear down and rebuild every widget row and re-bind
                 // all five metric cards on every tab switch, changed or not.
@@ -137,6 +125,10 @@ namespace Procure.PageModels
             }
             catch (Exception ex)
             {
+                // Was silent otherwise: the dashboard just stayed at its all-zero construction
+                // defaults with nothing anywhere recording why - indistinguishable from "reset to
+                // defaults" to anyone watching. See Data.CrashLog.
+                Procure.Utilities.CrashLog.Write("DashboardPageModel.LoadDataAsync failed", ex);
                 _errorHandler.HandleError(ex);
             }
             finally

@@ -37,7 +37,6 @@ namespace Procure.Data.Repositories
         Task<List<PurchaseRequisition>> GetChildPrsAsync(Guid masterPrId, IReadOnlyCollection<string> fallbackPrNos);
 
         Task<List<PurchaseRequisition>> GetAllAsync();
-        Task<int> GetCountAsync();
         Task SaveAsync(PurchaseRequisition pr);
         /// <summary>UPSERTs the PurchaseRequisition row only - no PrItem, no CustomFieldValue writes.</summary>
         Task SavePrFieldsAsync(PurchaseRequisition pr);

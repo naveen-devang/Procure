@@ -272,18 +272,41 @@
                             RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}"
                             Scrolled="OnBoardScrolled">
                 <CollectionView.EmptyView>
-                    <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center">
-                        <Label Text="No purchase requisitions match your criteria."
-                               FontSize="15"
-                               FontFamily="SegoeSemibold"
-                               TextColor="{StaticResource Gray400}"
-                               HorizontalOptions="Center" />
-                        <Button Text="Reset Filters"
-                                Command="{Binding ResetFiltersCommand}"
-                                Style="{StaticResource SecondaryButton}"
-                                HeightRequest="36"
-                                HorizontalOptions="Center" />
-                    </VerticalStackLayout>
+                    <Grid>
+                        <!-- The database itself has nothing in it yet - not a filter hiding results. -->
+                        <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center"
+                                             IsVisible="{Binding IsGenuinelyEmpty}">
+                            <Label Text="No PR entries yet"
+                                   FontSize="15"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{StaticResource Gray400}"
+                                   HorizontalOptions="Center" />
+                            <Label Text="Create your first purchase requisition to get started."
+                                   FontSize="12.5"
+                                   TextColor="{StaticResource Gray400}"
+                                   HorizontalOptions="Center" />
+                            <Button Text="+ Add PR"
+                                    Command="{Binding OpenBatchCreateModalCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HeightRequest="36"
+                                    HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+
+                        <!-- PRs exist, but the current search/status/filter chip excludes all of them. -->
+                        <VerticalStackLayout Padding="60,40" Spacing="14" HorizontalOptions="Center"
+                                             IsVisible="{Binding IsGenuinelyEmpty, Converter={StaticResource BoolToInvertedBoolConverter}}">
+                            <Label Text="No purchase requisitions match your criteria."
+                                   FontSize="15"
+                                   FontFamily="SegoeSemibold"
+                                   TextColor="{StaticResource Gray400}"
+                                   HorizontalOptions="Center" />
+                            <Button Text="Reset Filters"
+                                    Command="{Binding ResetFiltersCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HeightRequest="36"
+                                    HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Grid>
                 </CollectionView.EmptyView>
 
                 <CollectionView.ItemTemplate>

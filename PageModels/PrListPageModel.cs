@@ -111,6 +111,14 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string ListSummaryPill { get; set; } = string.Empty;
 
+        /// <summary>True once a real load has settled on zero PRs total, with no search/status/chip
+        /// filter narrowing the result - i.e. the database itself is empty, not just "nothing matches
+        /// right now". Distinguishes the board's two empty states: "create your first PR" vs "nothing
+        /// matches your filter". Guarded by <see cref="_hasEverLoaded"/> so it never reads true during
+        /// the skeleton's first pass, before a real count has come back.</summary>
+        [ObservableProperty]
+        public partial bool IsGenuinelyEmpty { get; set; }
+
 
         public List<string> StatusFilterOptions { get; } = new()
         {
@@ -375,6 +383,7 @@ namespace Procure.PageModels
             }
             catch (Exception ex)
             {
+                Procure.Utilities.CrashLog.Write("PrListPageModel.LoadCoreAsync failed", ex);
                 _errorHandler.HandleError(ex);
             }
             finally
@@ -619,6 +628,7 @@ namespace Procure.PageModels
                 : $"Showing {FilteredPrs.Count} of {TotalFilteredCount} requisitions";
             // Compact form for the header pill; the full sentence above becomes its tooltip.
             ListSummaryPill = $"{FilteredPrs.Count} of {TotalFilteredCount}";
+            IsGenuinelyEmpty = _hasEverLoaded && TotalFilteredCount == 0 && !RowFilterActive;
         }
 
         /// <summary>Merge for appended rows: reuses any instance already loaded, subscribes the rest, and
@@ -729,6 +739,7 @@ namespace Procure.PageModels
             }
             catch (Exception ex)
             {
+                Procure.Utilities.CrashLog.Write("PrListPageModel.ReloadWindowAsync failed", ex);
                 _errorHandler.HandleError(ex);
             }
             finally

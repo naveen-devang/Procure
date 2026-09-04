@@ -147,7 +147,6 @@ namespace Procure
             builder.Services.AddSingleton<ICsvExportService, CsvExportService>();
             builder.Services.AddSingleton<IPcrExportService, PcrExportService>();
             builder.Services.AddSingleton<IUpdateService, UpdateService>();
-            builder.Services.AddSingleton<SeedDataService>();
             builder.Services.AddSingleton<IErrorHandler, ModalErrorHandler>();
 
             // ViewModels & Pages
