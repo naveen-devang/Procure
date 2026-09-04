@@ -130,7 +130,7 @@
                             </VerticalStackLayout>
                         </Border>
 
-                        <!-- SECTION 2: Remarks (Multiline) -->
+                        <!-- SECTION 2: Collective Number (optional) -->
                         <Border StrokeThickness="1"
                                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                                 BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
@@ -140,7 +140,34 @@
                             </Border.StrokeShape>
 
                             <VerticalStackLayout Spacing="8">
-                                <Label Text="2. Remarks / Justification"
+                                <Label Text="2. Collective Number"
+                                       FontSize="13"
+                                       FontFamily="SegoeSemibold"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                <Label Text="Optional. Printed on the comparison sheet as-is; leave blank to show “-”."
+                                       FontSize="11.5"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                <Entry Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay}"
+                                       Placeholder="e.g. PCR-2026-014"
+                                       FontSize="12"
+                                       HeightRequest="36"
+                                       BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- SECTION 3: Remarks (Multiline) -->
+                        <Border StrokeThickness="1"
+                                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}"
+                                Padding="14">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="6" />
+                            </Border.StrokeShape>
+
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="3. Remarks / Justification"
                                        FontSize="13"
                                        FontFamily="SegoeSemibold"
                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />

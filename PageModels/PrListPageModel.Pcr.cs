@@ -370,6 +370,13 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string ExportPcrRemarks { get; set; } = string.Empty;
 
+        /// <summary>The PCR's <see cref="PriceComparisonRequest.PcrNo"/>, editable from the export
+        /// modal under the label "Collective Number" - the value people actually recognize; PcrNo is
+        /// just the column it happens to live in. Optional: blank prints as "-" on the sheet (see
+        /// PcrExcelExporter/PcrPdfExporter) instead of the old auto "PCR-{PrNo}" value nobody asked for.</summary>
+        [ObservableProperty]
+        public partial string ExportPcrCollectiveNumber { get; set; } = string.Empty;
+
         [ObservableProperty]
         public partial string ExportPcrSubtitle { get; set; } = string.Empty;
 
@@ -396,6 +403,11 @@ namespace Procure.PageModels
             {
                 ExportPcrRemarks = string.Empty;
             }
+
+            // Whatever was saved last time, verbatim - including an old auto-generated "PCR-xxx"
+            // value from before this field was editable. The user can clear it themselves if they
+            // don't want it; nothing here re-derives or auto-fills a value on their behalf.
+            ExportPcrCollectiveNumber = pr.Pcr?.PcrNo ?? string.Empty;
 
             foreach (var sel in ExportRfqSelections)
             {
@@ -480,9 +492,12 @@ namespace Procure.PageModels
         // remarks (and the generated PcrNo) silently vanished after every export.
         private async Task<PriceComparisonRequest> GetOrCreateSavedPcrAsync(PurchaseRequisition pr)
         {
+            var collectiveNo = ExportPcrCollectiveNumber?.Trim() ?? string.Empty;
+
             if (pr.Pcr != null)
             {
                 pr.Pcr.Remarks = ExportPcrRemarks;
+                pr.Pcr.PcrNo = collectiveNo;
                 await _prRepo.SavePcrAsync(pr.Pcr);
                 return pr.Pcr;
             }
@@ -491,7 +506,7 @@ namespace Procure.PageModels
             {
                 Id = Guid.NewGuid(),
                 PrId = pr.Id,
-                PcrNo = $"PCR-{pr.PrNo.Replace("PR-", "")}",
+                PcrNo = collectiveNo,
                 Remarks = ExportPcrRemarks
             };
             await _prRepo.SavePcrAsync(pcr);
