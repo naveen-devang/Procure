@@ -11,10 +11,10 @@ namespace Procure.Data
     // plus a rebuild heap probe.
     internal static class NoteFeatureSelfCheck
     {
-        public static async Task RunAsync(INoteRepository repo, IErrorHandler errorHandler)
+        public static async Task RunAsync(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             var marker = "nfsc-" + Guid.NewGuid().ToString("N")[..6] + "-";
-            var vm = new NotePageModel(repo, errorHandler);
+            var vm = new NotePageModel(repo, errorHandler, linkTargets);
 
             try
             {
@@ -40,11 +40,11 @@ namespace Procure.Data
 
                 // ---- filter ----
                 vm.FilterText = marker + "alpha";
-                await Task.Delay(320);
+                await Task.Delay(900); // 250ms debounce plus room for a loaded UI thread - 320ms lost the race when the todo checks ran alongside
                 Assert(vm.Notes.Count(n => n.Id == first.Id || n.Id == second.Id) == 1
                        && vm.Notes.Any(n => n.Id == first.Id), "filter narrows to the matching note");
                 vm.FilterText = "";
-                await Task.Delay(320);
+                await Task.Delay(900); // 250ms debounce plus room for a loaded UI thread - 320ms lost the race when the todo checks ran alongside
 
                 // ---- pin sorts to the top ----
                 var betaRow = vm.Notes.First(n => n.Id == second.Id);

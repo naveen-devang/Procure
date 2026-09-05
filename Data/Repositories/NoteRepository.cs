@@ -91,24 +91,6 @@ namespace Procure.Data.Repositories
             return note;
         }
 
-        public async Task<List<TaskLinkTarget>> GetLinkTargetsAsync()
-        {
-            await _db.InitializeAsync().ConfigureAwait(false);
-            var list = new List<TaskLinkTarget>();
-
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync().ConfigureAwait(false);
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = DatabaseConstants.SqlLinkTargets;
-
-            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-                list.Add(new TaskLinkTarget(reader.GetString(0), Guid.Parse(reader.GetString(1)), reader.GetString(2)));
-
-            return list;
-        }
-
         public Task SetLinksAsync(Guid noteId, IReadOnlyList<NoteLink> links) => Task.Run(async () =>
         {
             await _db.InitializeAsync().ConfigureAwait(false);

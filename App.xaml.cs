@@ -109,7 +109,10 @@ namespace Procure
             try
             {
                 await Data.NoteRepositorySelfCheck.RunAsync(repo);
-                await Data.NoteFeatureSelfCheck.RunAsync(repo, errorHandler);
+                await Data.NoteFeatureSelfCheck.RunAsync(repo, errorHandler, _services.GetRequiredService<Services.ILinkTargetService>());
+                await Data.LinkTargetSelfCheck.RunAsync(
+                    _services.GetRequiredService<Services.ILinkTargetService>(),
+                    _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>());
                 Data.NoteSelfCheckLog.Write("ALL NOTE SELF-CHECKS PASSED");
             }
             catch (Exception ex)
@@ -138,7 +141,7 @@ namespace Procure
             try
             {
                 await Data.TodoRepositorySelfCheck.RunAsync(repo);
-                await Data.TodoFeatureSelfCheck.RunAsync(repo, errorHandler);
+                await Data.TodoFeatureSelfCheck.RunAsync(repo, errorHandler, _services.GetRequiredService<Services.ILinkTargetService>());
                 Data.SelfCheckLog.Write("ALL TODO SELF-CHECKS PASSED");
             }
             catch (Exception ex)

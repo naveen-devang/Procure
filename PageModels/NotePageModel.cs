@@ -19,6 +19,7 @@ namespace Procure.PageModels
     public partial class NotePageModel : ObservableObject
     {
         private readonly INoteRepository _repo;
+        private readonly ILinkTargetService _linkTargets;
         private readonly IErrorHandler _errorHandler;
 
         private List<NoteListItem> _all = new();
@@ -41,8 +42,9 @@ namespace Procure.PageModels
         public int NoteCount => _all.Count;
 
         // ---- PR / RFQ / PO link typeahead ----
-        private List<TaskLinkTarget> _linkTargets = new();
-        private readonly Dictionary<Guid, string> _linkChip = new();
+        // Queried per keystroke against a bounded search rather than held in full - see
+        // LinkTargetService for why the whole-table copy this replaced had to go.
+        private int _linkSearchGeneration;
 
         public ObservableCollection<TaskLinkTarget> LinkResults { get; } = new();
 
@@ -55,10 +57,11 @@ namespace Procure.PageModels
         // Raised when a note is opened; the page hands the RTF to the editor control.
         public event Action<string>? EditorLoadRequested;
 
-        public NotePageModel(INoteRepository repo, IErrorHandler errorHandler)
+        public NotePageModel(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             _repo = repo;
             _errorHandler = errorHandler;
+            _linkTargets = linkTargets;
         }
 
         public Task PreloadDataAsync() => LoadListAsync();
@@ -69,7 +72,6 @@ namespace Procure.PageModels
             try
             {
                 _all = await _repo.GetListAsync();
-                await LoadLinkTargetsAsync();
                 _loaded = true;
                 RebuildList();
             }
@@ -122,7 +124,7 @@ namespace Procure.PageModels
                 if (note is null) return;
 
                 _bodyCache[note.Id] = note;
-                ResolveLinkLabels(note);
+                await ResolveLinkLabelsAsync(note);
                 HookNote(note);
                 SelectedNote = note;
                 EditorLoadRequested?.Invoke(note.Body);
@@ -137,40 +139,51 @@ namespace Procure.PageModels
         }
 
         // ---- links ----
-        private async Task LoadLinkTargetsAsync()
+        // Only the labels this note actually links, not every linkable entity in the database.
+        private async Task ResolveLinkLabelsAsync(Note note)
         {
+            if (note.Links.Count == 0) return;
             try
             {
-                _linkTargets = await _repo.GetLinkTargetsAsync();
-                _linkChip.Clear();
-                foreach (var t in _linkTargets) _linkChip[t.Id] = t.ChipLabel;
+                var chips = await _linkTargets.GetChipLabelsAsync(note.Links.Select(l => l.EntityId).ToList());
+                for (var i = 0; i < note.Links.Count; i++)
+                {
+                    var link = note.Links[i];
+                    if (chips.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
+                        note.Links[i] = new NoteLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
+                }
             }
             catch (Exception ex) { _errorHandler.HandleError(ex); }
-        }
-
-        private void ResolveLinkLabels(Note note)
-        {
-            for (var i = 0; i < note.Links.Count; i++)
-            {
-                var link = note.Links[i];
-                if (_linkChip.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
-                    note.Links[i] = new NoteLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
-            }
         }
 
         partial void OnLinkQueryChanged(string value)
         {
             var term = value?.Trim();
-            LinkResults.Clear();
             if (string.IsNullOrEmpty(term) || term.Length < 2)
             {
+                LinkResults.Clear();
                 ShowLinkResults = false;
                 return;
             }
 
-            foreach (var t in _linkTargets.Where(t => t.Label.Contains(term, StringComparison.OrdinalIgnoreCase)).Take(12))
-                LinkResults.Add(t);
-            ShowLinkResults = LinkResults.Count > 0;
+            // Generation counter, matching the board's search debounce: the query is a round trip
+            // now, so a superseded keystroke's results must not land.
+            var generation = unchecked(++_linkSearchGeneration);
+            _ = SearchLinkTargetsAsync(term, generation);
+        }
+
+        private async Task SearchLinkTargetsAsync(string term, int generation)
+        {
+            try
+            {
+                var results = await _linkTargets.SearchAsync(term);
+                if (generation != _linkSearchGeneration) return;
+
+                LinkResults.Clear();
+                foreach (var t in results) LinkResults.Add(t);
+                ShowLinkResults = LinkResults.Count > 0;
+            }
+            catch (Exception ex) { _errorHandler.HandleError(ex); }
         }
 
         [RelayCommand]

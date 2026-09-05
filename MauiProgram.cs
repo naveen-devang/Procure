@@ -138,6 +138,8 @@ namespace Procure
             builder.Services.AddSingleton<ICallOffRepository, CallOffRepository>();
             builder.Services.AddSingleton<ITodoRepository, TodoRepository>();
             builder.Services.AddSingleton<INoteRepository, NoteRepository>();
+            // Shared by Tasks and Notes, which used to hold a full copy of this each.
+            builder.Services.AddSingleton<ILinkTargetService, LinkTargetService>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
             // Services

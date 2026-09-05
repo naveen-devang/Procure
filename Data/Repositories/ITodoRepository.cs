@@ -31,7 +31,6 @@ namespace Procure.Data.Repositories
 
         // PRs / RFQs / POs a task can be linked to, newest first. Read straight from the shared
         // database - no dependency on the PR repository.
-        Task<List<TaskLinkTarget>> GetLinkTargetsAsync();
 
         // Tasks linked to one PR / RFQ / PO, for the reverse strip on the PR detail panel.
         Task<List<TodoTask>> GetLinkedAsync(Guid entityId);

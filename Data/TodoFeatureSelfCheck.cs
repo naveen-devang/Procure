@@ -18,10 +18,10 @@ namespace Procure.Data
     /// </summary>
     internal static class TodoFeatureSelfCheck
     {
-        public static async Task RunAsync(ITodoRepository repo, IErrorHandler errorHandler)
+        public static async Task RunAsync(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             var marker = "tfsc-" + Guid.NewGuid().ToString("N")[..6] + "-";
-            var vm = new TodoPageModel(repo, errorHandler);
+            var vm = new TodoPageModel(repo, errorHandler, linkTargets);
 
             try
             {

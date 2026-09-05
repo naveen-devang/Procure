@@ -48,8 +48,6 @@ namespace Procure.Data
                 full = (await repo.GetAsync(id))!;
                 Assert(full.Links.Count == 1 && full.Links[0].EntityId == linkA, "SetLinksAsync replaces the link set");
 
-                _ = await repo.GetLinkTargetsAsync(); // must not throw on an empty target DB
-
                 await repo.SetTitleAsync(id, marker + "-renamed");
                 await repo.SetPinnedAsync(id, true);
                 await repo.ReorderAsync(new[] { (id, 99) });

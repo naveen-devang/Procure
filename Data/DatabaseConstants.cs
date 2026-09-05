@@ -333,9 +333,12 @@ CREATE TABLE IF NOT EXISTS NoteLink (
 CREATE INDEX IF NOT EXISTS IX_NoteLink_Entity ON NoteLink(EntityId);
 ";
 
-        // The PR / RFQ / PO rows a task or a note can link to, newest first. Shared verbatim by
-        // TodoRepository.GetLinkTargetsAsync and NoteRepository.GetLinkTargetsAsync.
-        public const string SqlLinkTargets = @"
+        // Every linkable entity - the PR / RFQ / PO rows a task or a note can point at - unordered
+        // and unfiltered. Never run on its own: the two queries below wrap it, and both bound their
+        // result. Tasks and Notes each used to materialise this whole union and hold it for the
+        // app's lifetime - measured at ~48MB per copy on a 20,000-PR database, for a picker that
+        // shows a dozen rows at a time.
+        private const string SqlLinkTargetUnion = @"
 SELECT 'PR' AS T, Id, PrNo || ' — ' || COALESCE(NULLIF(Description,''), 'PR') AS L, CreatedAt AS Ord
 FROM PurchaseRequisition WHERE ParentPrId IS NULL
 UNION ALL
@@ -345,7 +348,19 @@ FROM RequestForQuotation r
 UNION ALL
 SELECT 'PO', p.Id, COALESCE(NULLIF(p.PoNo,''), 'PO') || ' — ' || COALESCE(NULLIF(p.Vendor,''), 'vendor'),
        (SELECT CreatedAt FROM PurchaseRequisition WHERE Id = p.PrId)
-FROM PurchaseOrder p
-ORDER BY Ord DESC;";
+FROM PurchaseOrder p";
+
+        /// <summary>What the link picker types against: matches on the label, newest first, capped.</summary>
+        public const string SqlLinkTargetSearch = @"
+SELECT T, Id, L FROM (" + SqlLinkTargetUnion + @")
+WHERE L LIKE @q ESCAPE '\'
+ORDER BY Ord DESC
+LIMIT @limit;";
+
+        /// <summary>Labels for links a task or note already holds. The id parameters are built by the
+        /// caller; never inlined as literals.</summary>
+        public const string SqlLinkTargetsByIdsTemplate = @"
+SELECT T, Id, L FROM (" + SqlLinkTargetUnion + @")
+WHERE Id IN ({0});";
     }
 }

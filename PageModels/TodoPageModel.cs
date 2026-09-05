@@ -21,16 +21,18 @@ namespace Procure.PageModels
     public partial class TodoPageModel : ObservableObject
     {
         private readonly ITodoRepository _repo;
+        private readonly ILinkTargetService _linkTargets;
         private readonly IErrorHandler _errorHandler;
 
         private List<TodoTask> _all = new();
         private bool _loaded;
 
-        // PR/RFQ/PO link targets, loaded once alongside the tasks and kept in memory (the typeahead
-        // filters this list - no query per keystroke). _linkChip maps a target id to its short chip
-        // label so a renamed target still shows correctly after a reload.
-        private List<TaskLinkTarget> _linkTargets = new();
-        private readonly Dictionary<Guid, string> _linkChip = new();
+        // Link targets used to be loaded in full alongside the tasks and kept in memory so the
+        // typeahead could filter without a query per keystroke. That traded one query for an
+        // unbounded resident copy of every PR, RFQ and PO - ~48MB on a 20,000-PR database, and a
+        // second copy of the same rows next to the Notes page's. Both are bounded queries now; see
+        // LinkTargetService.
+        private int _linkSearchGeneration;
 
         public ObservableCollection<TaskLinkTarget> LinkResults { get; } = new();
 
@@ -183,10 +185,11 @@ namespace Procure.PageModels
 
         public Array PriorityOptions { get; } = Enum.GetValues(typeof(TodoPriority));
 
-        public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler)
+        public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             _repo = repo;
             _errorHandler = errorHandler;
+            _linkTargets = linkTargets;
 
             // DI singleton - lives for the process, so this is never unsubscribed. Fires when the
             // PR detail panel's task strip changes a linked task.
@@ -226,12 +229,9 @@ namespace Procure.PageModels
             try
             {
                 var loaded = await _repo.GetAllAsync();
-                await LoadLinkTargetsAsync();
-                foreach (var t in loaded)
-                {
-                    HookTask(t);
-                    ResolveLinkLabel(t);
-                }
+                foreach (var t in loaded) HookTask(t);
+                // One query for every link every task holds, rather than a full table load.
+                await ResolveLinkLabelsAsync(loaded);
                 _all = loaded;
                 _loaded = true;
                 Rebuild();
@@ -274,28 +274,29 @@ namespace Procure.PageModels
                 (t.Notes?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
         }
 
-        private async Task LoadLinkTargetsAsync()
+        // Refreshes every task's chip labels in one round trip, so a target renamed since the
+        // task was written still shows correctly.
+        private async Task ResolveLinkLabelsAsync(List<TodoTask> tasks)
         {
+            var ids = tasks.SelectMany(t => t.Links.Select(l => l.EntityId)).ToList();
+            if (ids.Count == 0) return;
             try
             {
-                _linkTargets = await _repo.GetLinkTargetsAsync();
-                _linkChip.Clear();
-                foreach (var t in _linkTargets) _linkChip[t.Id] = t.ChipLabel;
+                var chips = await _linkTargets.GetChipLabelsAsync(ids);
+                foreach (var t in tasks)
+                {
+                    for (var i = 0; i < t.Links.Count; i++)
+                    {
+                        var link = t.Links[i];
+                        if (chips.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
+                            // Replace (not mutate) so the collection raises CollectionChanged -> LinksBadge refreshes.
+                            t.Links[i] = new TaskLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _errorHandler.HandleError(ex);
-            }
-        }
-
-        private void ResolveLinkLabel(TodoTask t)
-        {
-            for (var i = 0; i < t.Links.Count; i++)
-            {
-                var link = t.Links[i];
-                if (_linkChip.TryGetValue(link.EntityId, out var chip) && chip != link.Label)
-                    // Replace (not mutate) so the collection raises CollectionChanged -> LinksBadge refreshes.
-                    t.Links[i] = new TaskLink { EntityType = link.EntityType, EntityId = link.EntityId, Label = chip };
             }
         }
 
@@ -613,19 +614,34 @@ namespace Procure.PageModels
         partial void OnLinkQueryChanged(string value)
         {
             var term = value?.Trim();
-            LinkResults.Clear();
             if (string.IsNullOrEmpty(term) || term.Length < 2)
             {
+                LinkResults.Clear();
                 ShowLinkResults = false;
                 return;
             }
 
-            foreach (var t in _linkTargets
-                         .Where(t => t.Label.Contains(term, StringComparison.OrdinalIgnoreCase))
-                         .Take(12))
-                LinkResults.Add(t);
+            // Generation counter: the query is a round trip now, so a superseded keystroke's
+            // results must not land.
+            var generation = unchecked(++_linkSearchGeneration);
+            _ = SearchLinkTargetsAsync(term, generation);
+        }
 
-            ShowLinkResults = LinkResults.Count > 0;
+        private async Task SearchLinkTargetsAsync(string term, int generation)
+        {
+            try
+            {
+                var results = await _linkTargets.SearchAsync(term);
+                if (generation != _linkSearchGeneration) return;
+
+                LinkResults.Clear();
+                foreach (var t in results) LinkResults.Add(t);
+                ShowLinkResults = LinkResults.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
         }
 
         [RelayCommand]
@@ -869,13 +885,6 @@ namespace Procure.PageModels
 
         [RelayCommand]
         public void ToggleGroupMode() => GroupMode = GroupMode == "Date" ? "Priority" : "Date";
-
-        [RelayCommand]
-        public void SetSelectedPriority(string priority)
-        {
-            if (SelectedTask is null) return;
-            if (Enum.TryParse<TodoPriority>(priority, out var p)) SelectedTask.Priority = p;
-        }
 
         // ---- autosave on the selected task's edits ----
         // Per-task generation: a debounced save for one task is never cancelled by an edit to a
