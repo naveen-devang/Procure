@@ -102,29 +102,29 @@ namespace Procure.Data
 
                 // ---- MaterialGroup: collapsing must release the rows, not keep them ----
                 var group = new MaterialGroup(afterLog);
-                Assert(group.Count == 0 && !group.LinesLoaded, "a new group starts empty and unloaded");
+                Assert(group.VisibleLines.Count == 0 && !group.LinesLoaded, "a new group starts empty and unloaded");
                 Assert(group.TotalOrdered == afterLog.TotalOrdered && group.VendorCountText == "2 vendors",
                     "a collapsed group's header reads from the summary, with no lines loaded");
 
                 var fetched = 0;
-                group.LinesRequested = async g =>
+                group.PageRequested = async (g, skip, take) =>
                 {
                     fetched++;
-                    g.SetLines(await callOffs.GetLinesForMaterialAsync(g.MaterialName));
+                    g.AddPage(await callOffs.GetLinesForMaterialAsync(g.MaterialName), isFirstPage: true);
                 };
                 group.IsExpanded = true;
                 for (var i = 0; i < 60 && !group.LinesLoaded; i++) await Task.Delay(50);
-                Assert(group.LinesLoaded && group.Count == 2, $"expanding fills the group; got {group.Count} rows");
+                Assert(group.LinesLoaded && group.VisibleLines.Count == 2, $"expanding fills the group; got {group.VisibleLines.Count} rows");
 
                 group.IsExpanded = false;
-                Assert(group.Count == 0 && !group.LinesLoaded,
+                Assert(group.VisibleLines.Count == 0 && !group.LinesLoaded,
                     "collapsing drops the rows - a closed group must cost nothing but its header");
                 Assert(group.TotalOrdered == afterLog.TotalOrdered,
                     "and the header totals survive the collapse, because they never came from the rows");
 
                 group.IsExpanded = true;
                 for (var i = 0; i < 60 && !group.LinesLoaded; i++) await Task.Delay(50);
-                Assert(group.Count == 2 && fetched == 2, "re-expanding refetches rather than serving stale rows");
+                Assert(group.VisibleLines.Count == 2 && fetched == 2, "re-expanding refetches rather than serving stale rows");
 
                 group.ApplyCalledOffDelta(10m);
                 Assert(group.TotalCalledOff == 35m, $"a logged call-off adjusts the header in place; got {group.TotalCalledOff}");

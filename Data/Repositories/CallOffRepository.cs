@@ -69,9 +69,13 @@ ORDER BY M COLLATE NOCASE ASC;";
             return list;
         }
 
-        /// <summary>One expanded material's lines. The search term is passed back in so an expanded
-        /// group lists exactly the lines the search counted, not every line of that material.</summary>
-        public async Task<List<CallOffLine>> GetLinesForMaterialAsync(string materialName, string? searchTerm = null)
+        /// <summary>One page of an expanded material's lines, ordered by how far behind on delivery
+        /// each one is, so the first page is the page worth reading. The search term is passed back in
+        /// so an expanded group lists exactly the lines the search counted.
+        ///
+        /// Paged because a material can hold hundreds of PO lines - ~480 in the 20,000-PR database -
+        /// and the card used to build every one of them the moment it opened.</summary>
+        public async Task<List<CallOffLine>> GetLinesForMaterialAsync(string materialName, string? searchTerm = null, int skip = 0, int take = int.MaxValue)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             var list = new List<CallOffLine>();
@@ -92,9 +96,15 @@ SELECT poi.Id, poi.ItemName, poi.Quantity, poi.Unit, po.Vendor, po.PoNo,
                 ? @"
   AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')"
                 : string.Empty) + @"
-ORDER BY po.Vendor ASC;";
+ORDER BY (CASE WHEN poi.Quantity > 0
+               THEN MIN(1.0, COALESCE((SELECT SUM(Quantity) FROM PoItemCallOff WHERE PoItemId = poi.Id), 0) / poi.Quantity)
+               ELSE 0 END) ASC,
+         po.Vendor ASC
+LIMIT @take OFFSET @skip;";
 
             cmd.Parameters.AddWithValue("@material", materialName.Trim());
+            cmd.Parameters.AddWithValue("@take", take);
+            cmd.Parameters.AddWithValue("@skip", skip);
             if (filtered) cmd.Parameters.AddWithValue("@q", "%" + EscapeLike(term!) + "%");
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);

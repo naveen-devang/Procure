@@ -12,7 +12,7 @@ namespace Procure.Data.Repositories
         Task<List<MaterialGroupSummary>> GetMaterialSummariesAsync(string? searchTerm = null);
 
         /// <summary>One expanded material's lines, under the same search filter the summaries used.</summary>
-        Task<List<CallOffLine>> GetLinesForMaterialAsync(string materialName, string? searchTerm = null);
+        Task<List<CallOffLine>> GetLinesForMaterialAsync(string materialName, string? searchTerm = null, int skip = 0, int take = int.MaxValue);
         Task<List<PoItemCallOff>> GetHistoryAsync(Guid poItemId);
         Task LogCallOffAsync(PoItemCallOff entry);
         Task DeleteCallOffAsync(Guid id);

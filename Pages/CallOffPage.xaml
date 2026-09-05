@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:converters="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.CallOffPage"
              x:Name="ThisPage"
              x:DataType="pageModels:CallOffPageModel"
@@ -36,18 +37,9 @@
                             ToolTipProperties.Text="Refresh" />
                 </Grid>
 
-                <!-- One grouped CollectionView: the group headers AND the vendor rows are both
-                     virtualized by it. The rows used to live in a BindableLayout nested inside each
-                     group template, which realises every bound item up front - at ~480 vendor lines
-                     per material that was thousands of native views built synchronously the moment
-                     a group was opened. Expanding now just fills the group (see MaterialGroup), and
-                     only what fits on screen is ever realised. -->
-                <CollectionView Grid.Row="1" Margin="8"
-                                ItemsSource="{Binding Groups}"
-                                IsGrouped="True"
-                                SelectionMode="None">
+                <CollectionView Grid.Row="1" ItemsSource="{Binding Groups}" Margin="8">
                     <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="2" />
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
                     </CollectionView.ItemsLayout>
 
                     <CollectionView.EmptyView>
@@ -56,9 +48,9 @@
                                TextColor="{StaticResource Gray400}" />
                     </CollectionView.EmptyView>
 
-                    <CollectionView.GroupHeaderTemplate>
+                    <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="models:MaterialGroup">
-                            <Border Padding="12,10" Margin="0,6,0,0"
+                            <Border Padding="12,10"
                                     StrokeThickness="1"
                                     Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                                     Background="{AppThemeBinding Light={StaticResource LightTertiaryBackground}, Dark={StaticResource DarkTertiaryBackground}}">
@@ -71,7 +63,9 @@
                                 </Border.GestureRecognizers>
 
                                 <VerticalStackLayout Spacing="8">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+
+                                    <!-- Group header -->
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                         <Label Grid.Column="0"
                                                Text="{Binding IsExpanded, Converter={StaticResource BoolToChevronConverter}}"
                                                FontFamily="Segoe Fluent Icons"
@@ -83,13 +77,7 @@
                                                LineBreakMode="TailTruncation" VerticalOptions="Center"
                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
 
-                                        <!-- A group's rows are fetched on first expand, so the gap between
-                                             the chevron turning and the rows landing needs to say something. -->
-                                        <ActivityIndicator Grid.Column="2" IsVisible="{Binding IsLoadingLines}" IsRunning="{Binding IsLoadingLines}"
-                                                           HeightRequest="14" WidthRequest="14" VerticalOptions="Center"
-                                                           Color="{DynamicResource AccentFill}" />
-
-                                        <Label Grid.Column="3" VerticalOptions="Center"
+                                        <Label Grid.Column="2" VerticalOptions="Center"
                                                Text="{Binding PercentComplete, StringFormat='{0:F0}%'}"
                                                FontSize="13.5" FontFamily="SegoeSemibold"
                                                TextColor="{AppThemeBinding Light={DynamicResource Primary}, Dark={DynamicResource PrimaryDark}}" />
@@ -100,49 +88,96 @@
 
                                     <Label Text="{Binding VendorCountText}" FontSize="10.5"
                                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+
+                                    <!-- Vendor sub-rows. LazyExpander, matching the PR board's card:
+                                         a skeleton is committed to the screen first and the real rows
+                                         are built in a later frame, so a click never reads as a hang;
+                                         AutoReleaseDelay drops the built content (and disconnects its
+                                         native handlers) once the card has been closed for 10s. The
+                                         rows themselves are paged - see MaterialGroup.PageSize -
+                                         because a material can hold hundreds of PO lines and building
+                                         them all at once cost 5.6 seconds and ~200MB. -->
+                                    <converters:LazyExpander IsExpanded="{Binding IsExpanded}" AutoReleaseDelay="0:0:10">
+                                        <converters:LazyExpander.PlaceholderTemplate>
+                                            <DataTemplate>
+                                                <VerticalStackLayout Spacing="6" Padding="0,6,0,0">
+                                                    <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                                    <BoxView HeightRequest="10" WidthRequest="120" CornerRadius="3" HorizontalOptions="Start"
+                                                             Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                                                    <BoxView HeightRequest="34" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                    <BoxView HeightRequest="34" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                    <BoxView HeightRequest="34" CornerRadius="6" Color="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}" />
+                                                </VerticalStackLayout>
+                                            </DataTemplate>
+                                        </converters:LazyExpander.PlaceholderTemplate>
+
+                                        <converters:LazyExpander.ContentTemplate>
+                                            <DataTemplate x:DataType="models:MaterialGroup">
+                                                <VerticalStackLayout Spacing="6" Padding="0,6,0,0">
+                                                    <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+
+                                                    <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding VisibleLines}">
+                                                        <BindableLayout.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:CallOffLine">
+                                                                <Grid Margin="0,0,2,0">
+                                                                    <!-- Selection fill: a plain AppThemeBinding assigned directly to a property is
+                                                                         live-reactive to theme changes; toggling Opacity via a trigger (both static
+                                                                         doubles) avoids the known MAUI issue where an AppThemeBinding placed inside
+                                                                         a Setter/DataTrigger only resolves once and never updates again. -->
+                                                                    <Border StrokeThickness="0" Opacity="0"
+                                                                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
+                                                                        <Border.StrokeShape>
+                                                                            <RoundRectangle CornerRadius="6" />
+                                                                        </Border.StrokeShape>
+                                                                        <Border.Triggers>
+                                                                            <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Opacity" Value="1" />
+                                                                            </DataTrigger>
+                                                                        </Border.Triggers>
+                                                                    </Border>
+
+                                                                    <Border Padding="8,6" StrokeThickness="0" BackgroundColor="Transparent">
+                                                                        <Border.GestureRecognizers>
+                                                                            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectLineCommand}"
+                                                                                                   CommandParameter="{Binding .}" />
+                                                                        </Border.GestureRecognizers>
+
+                                                                        <VerticalStackLayout Spacing="4">
+                                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                                <Label Grid.Column="0" Text="{Binding Vendor}" FontFamily="SegoeSemibold" FontSize="11.5"
+                                                                                       LineBreakMode="TailTruncation"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                                                <Label Grid.Column="1" Text="{Binding PercentComplete, StringFormat='{0:F0}%'}" FontFamily="SegoeSemibold" FontSize="10.5"
+                                                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+                                                                            </Grid>
+                                                                            <ProgressBar Progress="{Binding Percent01}" HeightRequest="4"
+                                                                                         ProgressColor="{DynamicResource AccentFill}" />
+                                                                        </VerticalStackLayout>
+                                                                    </Border>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </BindableLayout.ItemTemplate>
+                                                    </VerticalStackLayout>
+
+                                                    <!-- Appends the next page, the same way the PR board appends PRs as you reach
+                                                         its tail. A Button rather than a tap gesture so the press does not also
+                                                         bubble to the card's own collapse handler. -->
+                                                    <Button Text="{Binding ShowMoreText}"
+                                                            IsVisible="{Binding HasMoreLines}"
+                                                            Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.LoadMoreLinesCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            FontSize="11" FontFamily="SegoeSemibold"
+                                                            HeightRequest="30" Padding="10,0" CornerRadius="6"
+                                                            BackgroundColor="Transparent"
+                                                            BorderWidth="1"
+                                                            BorderColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                                                            TextColor="{DynamicResource AccentFill}" />
+                                                </VerticalStackLayout>
+                                            </DataTemplate>
+                                        </converters:LazyExpander.ContentTemplate>
+                                    </converters:LazyExpander>
                                 </VerticalStackLayout>
                             </Border>
-                        </DataTemplate>
-                    </CollectionView.GroupHeaderTemplate>
-
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:CallOffLine">
-                            <Grid Margin="10,0,2,0">
-                                <!-- Selection fill: a plain AppThemeBinding assigned directly to a property is
-                                     live-reactive to theme changes; toggling Opacity via a trigger (both static
-                                     doubles) avoids the known MAUI issue where an AppThemeBinding placed inside
-                                     a Setter/DataTrigger only resolves once and never updates again. -->
-                                <Border StrokeThickness="0" Opacity="0"
-                                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}">
-                                    <Border.StrokeShape>
-                                        <RoundRectangle CornerRadius="6" />
-                                    </Border.StrokeShape>
-                                    <Border.Triggers>
-                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="Opacity" Value="1" />
-                                        </DataTrigger>
-                                    </Border.Triggers>
-                                </Border>
-
-                                <Border Padding="8,6" StrokeThickness="0" BackgroundColor="Transparent">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={x:Reference ThisPage}, Path=BindingContext.SelectLineCommand}"
-                                                               CommandParameter="{Binding .}" />
-                                    </Border.GestureRecognizers>
-
-                                    <VerticalStackLayout Spacing="4">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <Label Grid.Column="0" Text="{Binding Vendor}" FontFamily="SegoeSemibold" FontSize="11.5"
-                                                   LineBreakMode="TailTruncation"
-                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                                            <Label Grid.Column="1" Text="{Binding PercentComplete, StringFormat='{0:F0}%'}" FontFamily="SegoeSemibold" FontSize="10.5"
-                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                        </Grid>
-                                        <ProgressBar Progress="{Binding Percent01}" HeightRequest="4"
-                                                     ProgressColor="{DynamicResource AccentFill}" />
-                                    </VerticalStackLayout>
-                                </Border>
-                            </Grid>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>

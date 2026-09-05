@@ -116,8 +116,9 @@ namespace Procure.PageModels
 
                 if (selectedPoItemId.HasValue)
                 {
-                    await Task.WhenAll(Groups.Where(g => g.IsExpanded && !g.LinesLoaded).Select(LoadGroupLinesAsync));
-                    var stillThere = Groups.SelectMany(g => g).FirstOrDefault(l => l.PoItemId == selectedPoItemId.Value);
+                    await Task.WhenAll(Groups.Where(g => g.IsExpanded && !g.LinesLoaded)
+                        .Select(g => LoadGroupPageAsync(g, 0, MaterialGroup.PageSize)));
+                    var stillThere = Groups.SelectMany(g => g.VisibleLines).FirstOrDefault(l => l.PoItemId == selectedPoItemId.Value);
                     if (stillThere != null) await SelectLineAsync(stillThere);
                     else
                     {
@@ -173,7 +174,7 @@ namespace Procure.PageModels
                 if (generation.HasValue && generation.Value != _searchGeneration) return;
 
                 var groups = summaries
-                    .Select(s => new MaterialGroup(s) { LinesRequested = LoadGroupLinesAsync })
+                    .Select(s => new MaterialGroup(s) { PageRequested = LoadGroupPageAsync })
                     .OrderBy(g => g.PercentComplete)
                     .ToList();
 
@@ -185,21 +186,27 @@ namespace Procure.PageModels
             }
         }
 
-        // The one place a group's lines are fetched. Guarded by LinesLoaded so an expand while a
-        // load is already in flight does not issue a second query.
-        private async Task LoadGroupLinesAsync(MaterialGroup group)
+        // The one place a group's lines are fetched, one page at a time. Guarded so an expand
+        // arriving while a page is already in flight does not issue a second query for it.
+        private async Task LoadGroupPageAsync(MaterialGroup group, int skip, int take)
         {
-            if (group.LinesLoaded) return;
+            if (skip == 0 && group.LinesLoaded) return;
             try
             {
-                var lines = await _repo.GetLinesForMaterialAsync(group.MaterialName, SearchText?.Trim()).ConfigureAwait(true);
-                group.SetLines(lines.OrderBy(l => l.PercentComplete));
+                var lines = await _repo
+                    .GetLinesForMaterialAsync(group.MaterialName, SearchText?.Trim(), skip, take)
+                    .ConfigureAwait(true);
+                group.AddPage(lines, isFirstPage: skip == 0);
             }
             catch (Exception ex)
             {
                 _errorHandler.HandleError(ex);
             }
         }
+
+        /// <summary>Bound to the card's "Show more" row.</summary>
+        [RelayCommand]
+        public Task LoadMoreLinesAsync(MaterialGroup? group) => group?.LoadMoreAsync() ?? Task.CompletedTask;
 
         [RelayCommand]
         public void ToggleExpand(MaterialGroup group) => group.IsExpanded = !group.IsExpanded;
@@ -213,7 +220,7 @@ namespace Procure.PageModels
             // Remembered here so logging a call-off does not scan every group's lines to find the
             // one that owns the selection.
             _selectedGroupKey = line.PoItemId;
-            _selectedGroup = Groups.FirstOrDefault(g => g.Contains(line));
+            _selectedGroup = Groups.FirstOrDefault(g => g.VisibleLines.Contains(line));
             NewCallOffDate = DateTime.Today;
             NewCallOffQuantity = string.Empty;
             NewCallOffNote = string.Empty;
