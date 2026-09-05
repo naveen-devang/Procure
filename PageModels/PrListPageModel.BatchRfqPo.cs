@@ -285,15 +285,6 @@ namespace Procure.PageModels
             RecalculateBatchRfqTotals();
         }
 
-        public void HandleBatchRfqUnitPricePaste(RfqItem startItem, string rawText) =>
-            HandleBatchRfqPricingPaste(startItem, rawText, RfqPricingColumn.UnitPrice);
-
-        public void HandleBatchRfqDiscountPaste(RfqItem startItem, string rawText) =>
-            HandleBatchRfqPricingPaste(startItem, rawText, RfqPricingColumn.Discount);
-
-        public void HandleBatchRfqLastPricePaste(RfqItem startItem, string rawText) =>
-            HandleBatchRfqPricingPaste(startItem, rawText, RfqPricingColumn.LastPrice);
-
         [RelayCommand]
         public async Task OpenBatchRfqModalAsync()
         {

@@ -388,20 +388,6 @@ namespace Procure.PageModels
         public void RefreshPoRfqCardSelectionState() => RecalculatePoModalTotals();
 
         [RelayCommand]
-        public void SelectAllPoRfqItems(PoRfqSelection? sel)
-        {
-            sel?.SelectAllItems();
-            RecalculatePoModalTotals();
-        }
-
-        [RelayCommand]
-        public void DeselectAllPoRfqItems(PoRfqSelection? sel)
-        {
-            sel?.DeselectAllItems();
-            RecalculatePoModalTotals();
-        }
-
-        [RelayCommand]
         public void ToggleAllPoRfqItems(PoRfqSelection? sel)
         {
             if (sel == null) return;

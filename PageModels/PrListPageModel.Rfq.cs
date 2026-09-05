@@ -316,15 +316,6 @@ namespace Procure.PageModels
             return unitPrice.HasValue ? Math.Round(unitPrice.Value * row.Discount.Value / 100m, 2) : null;
         }
 
-        public void HandleRfqUnitPricePaste(RfqItem startItem, string rawText) =>
-            HandleRfqPricingPaste(startItem, rawText, RfqPricingColumn.UnitPrice);
-
-        public void HandleRfqDiscountPaste(RfqItem startItem, string rawText) =>
-            HandleRfqPricingPaste(startItem, rawText, RfqPricingColumn.Discount);
-
-        public void HandleRfqLastPricePaste(RfqItem startItem, string rawText) =>
-            HandleRfqPricingPaste(startItem, rawText, RfqPricingColumn.LastPrice);
-
         [RelayCommand]
         public void OpenAddRfqModal(PurchaseRequisition pr)
         {

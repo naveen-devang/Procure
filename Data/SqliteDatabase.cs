@@ -195,10 +195,5 @@ WHERE COALESCE(BaseAmount, 0) > 0
                 await alterCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
-
-        public void ResetInitialization()
-        {
-            _initialized = false;
-        }
     }
 }

@@ -180,86 +180,6 @@ namespace Procure.PageModels
             UpdateBatchEntriesSummary();
         }
 
-        [RelayCommand]
-        public void RemoveBatchPrRow(BatchPrEntry row)
-        {
-            if (BatchPrEntries.Count <= 1) return;
-            var removedIndex = BatchPrEntries.IndexOf(row);
-            if (removedIndex < 0) return;
-
-            BatchPrEntries.Remove(row);
-
-            // Land on whichever row took the removed one's place - the row after it, or the new
-            // last row if it was the last - rather than jumping back to row 1 mid-edit of a
-            // faraway row.
-            if (SelectedBatchEntry == row)
-            {
-                var landingIndex = Math.Min(removedIndex, BatchPrEntries.Count - 1);
-                SelectedBatchEntry = BatchPrEntries[landingIndex];
-            }
-
-            UpdateBatchEntriesSummary();
-        }
-
-        [RelayCommand]
-        public void DuplicateBatchPrRow(BatchPrEntry source)
-        {
-            var newEntryId = Guid.NewGuid();
-
-            var dupCustomVals = new ObservableCollection<CustomFieldValue>();
-            foreach (var cv in source.CustomValues)
-            {
-                dupCustomVals.Add(new CustomFieldValue
-                {
-                    Id = Guid.NewGuid(),
-                    PrId = newEntryId,
-                    ColumnId = cv.ColumnId,
-                    ColumnName = cv.ColumnName,
-                    ColumnDataType = cv.ColumnDataType,
-                    SelectOptions = cv.SelectOptions,
-                    Value = cv.Value
-                });
-            }
-
-            var dupItems = new ObservableCollection<PrItem>();
-            int s = 0;
-            foreach (var item in source.Items)
-            {
-                dupItems.Add(new PrItem
-                {
-                    Id = Guid.NewGuid(),
-                    PrId = newEntryId,
-                    ItemName = item.ItemName,
-                    Quantity = item.Quantity,
-                    Unit = item.Unit,
-                    EstimatedUnitPrice = item.EstimatedUnitPrice,
-                    Notes = item.Notes,
-                    SortOrder = s++
-                });
-            }
-
-            var duplicate = new BatchPrEntry
-            {
-                Id = newEntryId,
-                // Blank, not the source's number: duplicating a row copies its content, and two PRs
-                // must never share a number.
-                PrNo = string.Empty,
-                Description = source.Description,
-                Requestor = source.Requestor,
-                Plant = source.Plant,
-                PrType = source.PrType,
-                Priority = source.Priority,
-                Status = source.Status,
-                Notes = source.Notes,
-                CustomValues = dupCustomVals,
-                Items = dupItems
-            };
-
-            BatchPrEntries.Add(duplicate);
-            SelectedBatchEntry = duplicate;
-            UpdateBatchEntriesSummary();
-        }
-
         // Copies the source row's custom-field values onto every other row, but only into a
         // field that row hasn't already got a value for - it never overwrites a tag someone
         // already typed on another PR. Lives on each row's Custom Fields section, not as one
@@ -457,49 +377,6 @@ namespace Procure.PageModels
             IsBatchCreateModalVisible = false;
             BatchPrEntries.Clear();
             SelectedBatchEntry = null;
-        }
-
-        [RelayCommand]
-        public async Task PasteBatchPrItemsFromClipboardAsync(BatchPrEntry? entry)
-        {
-            if (entry == null) return;
-            try
-            {
-                if (!Clipboard.Default.HasText)
-                {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Please copy items from Excel first.", "OK");
-                    return;
-                }
-
-                var text = await Clipboard.Default.GetTextAsync();
-                if (string.IsNullOrWhiteSpace(text)) return;
-
-                var parsedItems = ClipboardItemParser.ParsePrItems(text, entry.Id, entry.Items.Count);
-                if (parsedItems.Count == 0) return;
-
-                // If only 1 placeholder blank row exists, replace it
-                if (entry.Items.Count == 1 && string.IsNullOrWhiteSpace(entry.Items[0].ItemName))
-                {
-                    entry.Items.Clear();
-                }
-
-                foreach (var item in parsedItems)
-                {
-                    entry.Items.Add(item);
-                }
-
-                entry.NotifyItemsChanged();
-
-                if (string.IsNullOrWhiteSpace(entry.Description) && entry.Items.Count > 0)
-                {
-                    entry.Description = entry.Items[0].ItemName;
-                }
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
         }
 
         [RelayCommand]
