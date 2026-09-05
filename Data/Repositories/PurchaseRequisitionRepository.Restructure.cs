@@ -227,7 +227,7 @@ WHERE Id = @Id;";
 
             // These move rows between several PRs at once, so rebuild every PR's search text rather
             // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await RebuildAllDerivedDataAsync(connection).ConfigureAwait(false);
         }
 
         public Task CreateBatchPoAsync(List<PurchaseRequisition> targetPrs, PurchaseOrder poTemplate) => Task.Run(() => CreateBatchPoCoreAsync(targetPrs, poTemplate));
@@ -363,7 +363,7 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
 
             // These move rows between several PRs at once, so rebuild every PR's search text rather
             // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await RebuildAllDerivedDataAsync(connection).ConfigureAwait(false);
 
             foreach (var pr in targetPrs)
             {
@@ -565,7 +565,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
 
             // These move rows between several PRs at once, so rebuild every PR's search text rather
             // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await RebuildAllDerivedDataAsync(connection).ConfigureAwait(false);
 
             foreach (var pr in targetPrs)
             {
@@ -725,7 +725,7 @@ DELETE FROM PriceComparisonRequest WHERE PrId = @PrId;";
 
             // These move rows between several PRs at once, so rebuild every PR's search text rather
             // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await RebuildAllDerivedDataAsync(connection).ConfigureAwait(false);
         }
 
         public Task PartialSplitMergedPrAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs) => Task.Run(() => PartialSplitMergedPrCoreAsync(masterPrId, splitPrs, keptPrs));
@@ -984,7 +984,7 @@ WHERE Id IN ({string.Join(", ", rfqParams)});";
 
             // These move rows between several PRs at once, so rebuild every PR's search text rather
             // than each operation maintaining its own list of which ones it touched.
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await RebuildAllDerivedDataAsync(connection).ConfigureAwait(false);
         }
 
         public Task SplitSharedRfqAsync(Guid rfqId) => Task.Run(() => SplitSharedRfqCoreAsync(rfqId));

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using Microsoft.Maui.Storage;
@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 12;
+        public const int SchemaVersion = 13;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -250,6 +250,21 @@ CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
 -- v12: Raw & Packing groups by material name and fetches one material's lines on expand; both
 -- want the name ordered rather than scanned and sorted into a temp B-tree.
 CREATE INDEX IF NOT EXISTS IX_PoItem_ItemName ON PurchaseOrderItem(ItemName);
+
+-- v13: the Raw & Packing tab's collapsed rows, denormalised. Computing them live meant one
+-- GROUP BY over every eligible PO item on every open - 244ms at 20,000 PRs and linear from
+-- there, so roughly 12 seconds at a million. Reading them from here is O(materials).
+-- Kept in sync by MaterialAggregateMaintenance, alongside the SearchBlob refresh that every
+-- PR/PO write path already performs, and asserted never to drift by DatabaseSelfCheck.
+CREATE TABLE IF NOT EXISTS MaterialAggregate (
+    MaterialKey    TEXT PRIMARY KEY,
+    MaterialName   TEXT NOT NULL,
+    LineCount      INTEGER NOT NULL,
+    TotalOrdered   REAL NOT NULL,
+    TotalCalledOff REAL NOT NULL,
+    Unit           TEXT NOT NULL DEFAULT 'pcs'
+);
+CREATE INDEX IF NOT EXISTS IX_MaterialAggregate_Name ON MaterialAggregate(MaterialName COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS IX_PoItem_PrItemId ON PurchaseOrderItem(PrItemId);
 CREATE INDEX IF NOT EXISTS IX_PoItem_RfqItemId ON PurchaseOrderItem(RfqItemId);
 
@@ -368,5 +383,69 @@ LIMIT @limit;";
         public const string SqlLinkTargetsByIdsTemplate = @"
 SELECT T, Id, L FROM (" + SqlLinkTargetUnion + @")
 WHERE Id IN ({0});";
+        /// <summary>The eligible-line join every material figure is computed from. Raw and Packing
+        /// Material PRs only, matching what the tab shows.</summary>
+        private const string SqlEligibleMaterialLines = @"
+FROM PurchaseOrderItem poi
+JOIN PurchaseOrder po ON poi.PoId = po.Id
+JOIN PurchaseRequisition pr ON po.PrId = pr.Id
+WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
+
+        /// <summary>One aggregate row per material, computed fresh. Append a key filter to scope it.</summary>
+        private const string SqlComputeMaterialAggregates = @"
+SELECT lower(TRIM(poi.ItemName)) AS K,
+       TRIM(poi.ItemName) AS N,
+       COUNT(*) AS C,
+       COALESCE(SUM(poi.Quantity), 0) AS O,
+       COALESCE(SUM((SELECT COALESCE(SUM(Quantity), 0) FROM PoItemCallOff WHERE PoItemId = poi.Id)), 0) AS CO,
+       MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')) AS U
+" + SqlEligibleMaterialLines;
+
+        /// <summary>Rebuilds every material's aggregate. Used on first migration and by the
+        /// restructure operations, which move POs between PRs in bulk.</summary>
+        public const string SqlRebuildAllMaterialAggregates = @"
+DELETE FROM MaterialAggregate;
+INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
+" + SqlComputeMaterialAggregates + @"
+GROUP BY K;";
+
+        /// <summary>Recomputes only the given material keys - `{0}` is the caller's parameter list.
+        /// A key with no eligible lines left simply loses its row, which is what the DELETE is for.</summary>
+        public const string SqlRefreshMaterialAggregatesTemplate = @"
+DELETE FROM MaterialAggregate WHERE MaterialKey IN ({0});
+INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
+" + SqlComputeMaterialAggregates + @"
+  AND lower(TRIM(poi.ItemName)) IN ({0})
+GROUP BY K;";
+
+        /// <summary>The material keys a PR's PO items currently name. Captured before a write so the
+        /// materials a rename or delete moves rows *away from* are recomputed too.</summary>
+        public const string SqlMaterialKeysForPr = @"
+SELECT DISTINCT lower(TRIM(poi.ItemName))
+FROM PurchaseOrderItem poi
+JOIN PurchaseOrder po ON poi.PoId = po.Id
+WHERE po.PrId = @PrId;";
+
+        /// <summary>The material key one PO item names.</summary>
+        public const string SqlMaterialKeyForPoItem =
+            "SELECT lower(TRIM(ItemName)) FROM PurchaseOrderItem WHERE Id = @PoItemId;";
+
+        /// <summary>Rows where the stored aggregate disagrees with a fresh computation, in either
+        /// direction - a stale row, a missing one, or one that should no longer exist. Must always be
+        /// 0; see DatabaseSelfCheck. This is the same guard SqlStaleSearchBlobCount provides for the
+        /// search column, and for the same reason: a missed write path is otherwise silent.</summary>
+        public const string SqlStaleMaterialAggregateCount = @"
+SELECT
+    (SELECT COUNT(*) FROM (
+        SELECT K, N, C, O, CO FROM (" + SqlComputeMaterialAggregates + @" GROUP BY K)
+        EXCEPT
+        SELECT MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff FROM MaterialAggregate
+    ))
+    +
+    (SELECT COUNT(*) FROM (
+        SELECT MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff FROM MaterialAggregate
+        EXCEPT
+        SELECT K, N, C, O, CO FROM (" + SqlComputeMaterialAggregates + @" GROUP BY K)
+    ));";
     }
 }

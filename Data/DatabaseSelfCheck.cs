@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -101,6 +101,19 @@ namespace Procure.Data
                 throw new InvalidOperationException(
                     $"{stale} PR(s) have a stale SearchBlob {step}. A write path changed a PR, item, " +
                     "RFQ or PO without calling RefreshSearchBlobAsync, so search will not find it.");
+
+            // The material aggregates are derived the same way and carry the same hazard: a write
+            // path that changes a PO item, a call-off or a PR's type without refreshing them leaves
+            // the Raw & Packing tab showing a stale count or balance, with nothing else going wrong.
+            using var aggCmd = connection.CreateCommand();
+            aggCmd.CommandText = DatabaseConstants.SqlStaleMaterialAggregateCount;
+            var staleMaterials = Convert.ToInt32(await aggCmd.ExecuteScalarAsync());
+
+            if (staleMaterials != 0)
+                throw new InvalidOperationException(
+                    $"{staleMaterials} material aggregate row(s) disagree with the live data {step}. " +
+                    "A write path changed a PO item, a call-off or a PR's type without going through " +
+                    "MaterialAggregateMaintenance, so Raw & Packing will show stale figures.");
         }
 
         private static async Task AssertFindsAsync(IPurchaseRequisitionRepository repo, string term, string what)

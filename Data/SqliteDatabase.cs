@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,6 +67,16 @@ namespace Procure.Data
 
                     // Run safe incremental migrations for existing tables
                     await MigrateSchemaAsync(connection, storedVersion).ConfigureAwait(false);
+
+                    // v13 introduced MaterialAggregate. It is derived, so an existing database has to
+                    // have it filled once here; from then on the write paths keep it in step.
+                    if (storedVersion < 13)
+                    {
+                        using var aggCmd = connection.CreateCommand();
+                        aggCmd.CommandText = DatabaseConstants.SqlRebuildAllMaterialAggregates;
+                        await aggCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
                 }
 

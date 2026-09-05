@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -64,8 +64,12 @@ ON CONFLICT(Id) DO UPDATE SET
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
 
+            // Before the upsert: PrType may be changing, and that moves every material this PR
+            // names in or out of the Raw & Packing tab.
+            var materialKeys = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, pr.Id).ConfigureAwait(false);
             await UpsertPrRowAsync(connection, null, pr).ConfigureAwait(false);
             await RefreshSearchBlobAsync(connection, null, pr.Id).ConfigureAwait(false);
+            await MaterialAggregateMaintenance.RefreshForPrAsync(connection, null, pr.Id, materialKeys).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -89,6 +93,15 @@ ON CONFLICT(Id) DO UPDATE SET
         /// exactly which PRs it touched - the kind of list that goes stale silently.
         /// ponytail: whole-table rebuild, ~240ms at 20,000 PRs. These are deliberate operations behind a
         /// confirmation dialog, so the simpler form wins; narrow it to the affected ids if that bites.</summary>
+        /// <summary>Also rebuilds the material aggregates. The restructure operations move POs
+        /// between PRs in bulk, so both derived stores are rebuilt wholesale rather than each
+        /// operation listing the PRs and materials it touched.</summary>
+        private static async Task RebuildAllDerivedDataAsync(SqliteConnection connection)
+        {
+            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await MaterialAggregateMaintenance.RebuildAllAsync(connection).ConfigureAwait(false);
+        }
+
         private static async Task RebuildAllSearchBlobsAsync(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();
@@ -156,6 +169,11 @@ ON CONFLICT(Id) DO UPDATE SET
 
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
+
+            // Before the write: PrType may be changing, which moves every material this PR names in
+            // or out of the Raw & Packing tab.
+            var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, pr.Id).ConfigureAwait(false);
+
             using var tx = connection.BeginTransaction();
 
             await UpsertPrRowAsync(connection, tx, pr).ConfigureAwait(false);
@@ -166,6 +184,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
             }
             await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
+            await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, pr.Id, materialKeysBefore).ConfigureAwait(false);
 
             await tx.CommitAsync().ConfigureAwait(false);
         }
@@ -184,6 +203,7 @@ ON CONFLICT(Id) DO UPDATE SET
             foreach (var pr in prs)
             {
                 pr.UpdatedAt = DateTime.Now;
+                var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, tx, pr.Id).ConfigureAwait(false);
                 await UpsertPrRowAsync(connection, tx, pr).ConfigureAwait(false);
                 await SyncPrItemsAsync(connection, tx, pr).ConfigureAwait(false);
                 if (pr.CustomValues.Count > 0)
@@ -191,6 +211,7 @@ ON CONFLICT(Id) DO UPDATE SET
                     await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
                 }
                 await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
+                await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, pr.Id, materialKeysBefore).ConfigureAwait(false);
             }
 
             await tx.CommitAsync().ConfigureAwait(false);
@@ -204,11 +225,19 @@ ON CONFLICT(Id) DO UPDATE SET
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
 
+            // Before the delete: the PR's POs and their items go with it by cascade, so once the row
+            // is gone nothing points at the materials those lines counted towards. Deleting a PR was
+            // the one path this was originally missing, and the staleness guard in DatabaseSelfCheck
+            // is what caught it.
+            var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, id).ConfigureAwait(false);
+
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "DELETE FROM PurchaseRequisition WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            await MaterialAggregateMaintenance.RefreshKeysAsync(connection, null, materialKeysBefore).ConfigureAwait(false);
         }
 
         // Deletes only the child rows that are gone from memory, so an unchanged child set writes nothing.
@@ -475,6 +504,11 @@ ON CONFLICT(Id) DO UPDATE SET
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
+
+            // Before the write: saving a PO rewrites its item rows, so a renamed or removed line
+            // changes the totals of the material it moved away from as well as the one it lands on.
+            var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, po.PrId).ConfigureAwait(false);
+
             using var tx = connection.BeginTransaction();
 
             try
@@ -571,6 +605,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 }
 
                 await RefreshSearchBlobAsync(connection, tx, po.PrId).ConfigureAwait(false);
+                await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, po.PrId, materialKeysBefore).ConfigureAwait(false);
                 await tx.CommitAsync().ConfigureAwait(false);
             }
             catch
@@ -598,6 +633,10 @@ ON CONFLICT(Id) DO UPDATE SET
                 prId = Guid.Parse((string)found);
             }
 
+            // Before the delete: once the PO's items are gone there is nothing left pointing at the
+            // materials they counted towards.
+            var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, prId).ConfigureAwait(false);
+
             using var tx = connection.BeginTransaction();
             using (var cmd = connection.CreateCommand())
             {
@@ -608,6 +647,7 @@ ON CONFLICT(Id) DO UPDATE SET
             }
 
             await RefreshSearchBlobAsync(connection, tx, prId).ConfigureAwait(false);
+            await MaterialAggregateMaintenance.RefreshKeysAsync(connection, tx, materialKeysBefore).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -40,20 +40,33 @@ WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
             var filtered = !string.IsNullOrEmpty(term);
 
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
+            if (!filtered)
+            {
+                // Unfiltered, this is a straight read of the denormalised table - O(materials),
+                // independent of how many PO lines exist. Computing it live was one GROUP BY over
+                // every eligible line: 244ms at 20,000 PRs, and linear from there.
+                cmd.CommandText = @"
+SELECT MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit
+FROM MaterialAggregate
+ORDER BY MaterialName COLLATE NOCASE ASC;";
+            }
+            else
+            {
+                // A search matches vendor and PO number as well as the material name, which the
+                // aggregate cannot answer - those live on the lines. So a filtered view is computed,
+                // but only over the lines the term matches rather than all of them.
+                cmd.CommandText = @"
 SELECT TRIM(poi.ItemName) AS M,
        COUNT(*),
        COALESCE(SUM(poi.Quantity), 0),
        COALESCE(SUM((SELECT COALESCE(SUM(Quantity), 0) FROM PoItemCallOff WHERE PoItemId = poi.Id)), 0),
        MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs'))
-" + EligibleLines + (filtered
-                ? @"
-  AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')"
-                : string.Empty) + @"
+" + EligibleLines + @"
+  AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')
 GROUP BY M COLLATE NOCASE
 ORDER BY M COLLATE NOCASE ASC;";
-
-            if (filtered) cmd.Parameters.AddWithValue("@q", "%" + EscapeLike(term!) + "%");
+                cmd.Parameters.AddWithValue("@q", "%" + EscapeLike(term!) + "%");
+            }
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))
@@ -185,6 +198,12 @@ LIMIT @take OFFSET @skip;";
             cmd.Parameters.AddWithValue("@Note", (object?)entry.Note ?? DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            // The material's called-off total is denormalised into MaterialAggregate; without this
+            // the collapsed card keeps showing the balance from before this call-off.
+            var key = await MaterialAggregateMaintenance.KeyForPoItemAsync(connection, null, entry.PoItemId).ConfigureAwait(false);
+            if (key != null)
+                await MaterialAggregateMaintenance.RefreshKeysAsync(connection, null, new[] { key }).ConfigureAwait(false);
         }
 
         public Task DeleteCallOffAsync(Guid id) => Task.Run(() => DeleteCallOffCoreAsync(id));
@@ -195,11 +214,27 @@ LIMIT @take OFFSET @skip;";
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
 
+            // The owning PO item has to be read before the row goes, or there is nothing left to
+            // resolve the material from.
+            string? key;
+            using (var lookup = connection.CreateCommand())
+            {
+                lookup.CommandText = @"
+SELECT lower(TRIM(poi.ItemName))
+FROM PoItemCallOff co JOIN PurchaseOrderItem poi ON poi.Id = co.PoItemId
+WHERE co.Id = @Id;";
+                lookup.Parameters.AddWithValue("@Id", id.ToString());
+                key = await lookup.ExecuteScalarAsync().ConfigureAwait(false) as string;
+            }
+
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "DELETE FROM PoItemCallOff WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            if (key != null)
+                await MaterialAggregateMaintenance.RefreshKeysAsync(connection, null, new[] { key }).ConfigureAwait(false);
         }
     }
 }
