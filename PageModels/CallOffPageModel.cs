@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -18,10 +18,13 @@ namespace Procure.PageModels
         private readonly ICallOffRepository _repo;
         private readonly IErrorHandler _errorHandler;
 
-        // Full flat load, kept in memory - see the artifact's scale argument (a few hundred rows,
-        // total, ever). Groups is rebuilt from this whenever search text changes.
-        private List<CallOffLine> _allLines = new();
+        // Only the collapsed material rows load; a group's lines arrive when it is expanded, and
+        // go again when it is closed. This used to be a full flat load of every eligible PO item,
+        // kept for the app's lifetime: 47,976 rows on a 20,000-PR database, 506ms of query plus the
+        // object graph, none of it released on leaving the tab.
         private bool _loaded;
+        private Guid _selectedGroupKey;
+        private MaterialGroup? _selectedGroup;
 
         // Set by the page's OnAppearing/OnDisappearing. A PO change while this tab isn't the one
         // on screen just marks the cache stale (below) - the reload happens lazily on next visit
@@ -102,10 +105,10 @@ namespace Procure.PageModels
             try
             {
                 IsBusy = true;
-                _allLines = await _repo.GetAllCallOffLinesAsync();
+                await RebuildGroupsAsync();
                 _loaded = true;
-                RebuildGroups();
 
+                // Only the groups the user actually had open are refilled.
                 foreach (var group in Groups)
                 {
                     if (expandedNames.Contains(group.MaterialName)) group.IsExpanded = true;
@@ -113,7 +116,8 @@ namespace Procure.PageModels
 
                 if (selectedPoItemId.HasValue)
                 {
-                    var stillThere = Groups.SelectMany(g => g.Lines).FirstOrDefault(l => l.PoItemId == selectedPoItemId.Value);
+                    await Task.WhenAll(Groups.Where(g => g.IsExpanded && !g.LinesLoaded).Select(LoadGroupLinesAsync));
+                    var stillThere = Groups.SelectMany(g => g).FirstOrDefault(l => l.PoItemId == selectedPoItemId.Value);
                     if (stillThere != null) await SelectLineAsync(stillThere);
                     else
                     {
@@ -132,6 +136,14 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>Called from the page's OnDisappearing. Every expanded group drops its rows, so
+        /// leaving the tab cannot leave thousands of CallOffLine objects and their native views
+        /// resident - the old full load was never released at all.</summary>
+        public void ReleaseLines()
+        {
+            foreach (var group in Groups) group.IsExpanded = false;
+        }
+
         private int _searchGeneration;
 
         // Debounce, matching the PR board. Every keystroke used to re-filter every line, re-group
@@ -142,45 +154,51 @@ namespace Procure.PageModels
         {
             var generation = ++_searchGeneration;
             Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), async () =>
                 {
-                    if (generation == _searchGeneration) RebuildGroups();
+                    if (generation != _searchGeneration) return;
+                    await RebuildGroupsAsync(generation);
                 });
         }
 
-        // Lowest balance % first (3B): the lines most behind on delivery surface at the top,
-        // same call as the earlier design pass. Search matches material, vendor, or PO number,
-        // from any starting point, in one pass over the in-memory list.
-        private void RebuildGroups()
+        // Search matches material, vendor or PO number, applied in SQL. Groups stay collapsed:
+        // auto-expanding every match used to build every matching material's full vendor list at
+        // once - on a common term that was ~48,000 rows in one pass, which never finished.
+        private async Task RebuildGroupsAsync(int? generation = null)
         {
             var term = SearchText?.Trim();
-            IEnumerable<CallOffLine> lines = _allLines;
-            if (!string.IsNullOrEmpty(term))
+            try
             {
-                lines = lines.Where(l =>
-                    l.MaterialName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    l.Vendor.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    l.PoNo.Contains(term, StringComparison.OrdinalIgnoreCase));
+                var summaries = await _repo.GetMaterialSummariesAsync(term).ConfigureAwait(true);
+                if (generation.HasValue && generation.Value != _searchGeneration) return;
+
+                var groups = summaries
+                    .Select(s => new MaterialGroup(s) { LinesRequested = LoadGroupLinesAsync })
+                    .OrderBy(g => g.PercentComplete)
+                    .ToList();
+
+                Groups = new ObservableCollection<MaterialGroup>(groups);
             }
-
-            var groups = lines
-                .GroupBy(l => l.MaterialName.Trim(), StringComparer.OrdinalIgnoreCase)
-                .Select(g => new MaterialGroup
-                {
-                    MaterialName = g.Key,
-                    Lines = new ObservableCollection<CallOffLine>(g.OrderBy(l => l.PercentComplete))
-                })
-                .OrderBy(g => g.PercentComplete)
-                .ToList();
-
-            // Auto-expand when actively searching, so a vendor-name match doesn't hide behind a
-            // collapsed group; collapsed by default otherwise.
-            if (!string.IsNullOrEmpty(term))
+            catch (Exception ex)
             {
-                foreach (var g in groups) g.IsExpanded = true;
+                _errorHandler.HandleError(ex);
             }
+        }
 
-            Groups = new ObservableCollection<MaterialGroup>(groups);
+        // The one place a group's lines are fetched. Guarded by LinesLoaded so an expand while a
+        // load is already in flight does not issue a second query.
+        private async Task LoadGroupLinesAsync(MaterialGroup group)
+        {
+            if (group.LinesLoaded) return;
+            try
+            {
+                var lines = await _repo.GetLinesForMaterialAsync(group.MaterialName, SearchText?.Trim()).ConfigureAwait(true);
+                group.SetLines(lines.OrderBy(l => l.PercentComplete));
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
         }
 
         [RelayCommand]
@@ -192,6 +210,10 @@ namespace Procure.PageModels
             if (SelectedLine != null) SelectedLine.IsSelected = false;
             SelectedLine = line;
             line.IsSelected = true;
+            // Remembered here so logging a call-off does not scan every group's lines to find the
+            // one that owns the selection.
+            _selectedGroupKey = line.PoItemId;
+            _selectedGroup = Groups.FirstOrDefault(g => g.Contains(line));
             NewCallOffDate = DateTime.Today;
             NewCallOffQuantity = string.Empty;
             NewCallOffNote = string.Empty;
@@ -255,7 +277,7 @@ namespace Procure.PageModels
                 ApplyHistorySort();
                 SelectedLine.CalledOffQuantity += qty;
 
-                Groups.FirstOrDefault(g => g.Lines.Contains(SelectedLine))?.RefreshAggregates();
+                _selectedGroup?.ApplyCalledOffDelta(qty);
 
                 NewCallOffQuantity = string.Empty;
                 NewCallOffNote = string.Empty;
@@ -278,7 +300,7 @@ namespace Procure.PageModels
                 SelectedLineHistory.Remove(entry);
                 SelectedLine.CalledOffQuantity = Math.Max(0, SelectedLine.CalledOffQuantity - entry.Quantity);
 
-                Groups.FirstOrDefault(g => g.Lines.Contains(SelectedLine))?.RefreshAggregates();
+                _selectedGroup?.ApplyCalledOffDelta(-entry.Quantity);
             }
             catch (Exception ex)
             {

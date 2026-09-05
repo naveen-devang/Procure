@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 11;
+        public const int SchemaVersion = 12;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -129,6 +129,9 @@ CREATE INDEX IF NOT EXISTS IX_PR_Status ON PurchaseRequisition(Status);
 CREATE INDEX IF NOT EXISTS IX_PR_ParentPrId ON PurchaseRequisition(ParentPrId);
 -- The board's only sort order. Without it every page pays a full scan plus a temp B-tree.
 CREATE INDEX IF NOT EXISTS IX_PR_CreatedAt ON PurchaseRequisition(CreatedAt DESC);
+-- v12: the Raw & Packing tab filters PrType across two joins. Without this the planner had to
+-- scan every PurchaseOrderItem and test the type through the joins on the far side.
+CREATE INDEX IF NOT EXISTS IX_PR_PrType ON PurchaseRequisition(PrType);
 
 CREATE TABLE IF NOT EXISTS PrItem (
     Id TEXT PRIMARY KEY,
@@ -244,6 +247,9 @@ CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
     SortOrder INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
+-- v12: Raw & Packing groups by material name and fetches one material's lines on expand; both
+-- want the name ordered rather than scanned and sorted into a temp B-tree.
+CREATE INDEX IF NOT EXISTS IX_PoItem_ItemName ON PurchaseOrderItem(ItemName);
 CREATE INDEX IF NOT EXISTS IX_PoItem_PrItemId ON PurchaseOrderItem(PrItemId);
 CREATE INDEX IF NOT EXISTS IX_PoItem_RfqItemId ON PurchaseOrderItem(RfqItemId);
 

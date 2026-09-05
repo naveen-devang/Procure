@@ -28,6 +28,8 @@ namespace Procure.Pages
         {
             base.OnDisappearing();
             _viewModel.IsVisible = false;
+            // Drops every expanded group's rows; see CallOffPageModel.ReleaseLines.
+            _viewModel.ReleaseLines();
         }
 
 #if WINDOWS

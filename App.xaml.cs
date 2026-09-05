@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,9 +45,7 @@ namespace Procure
             // Opt-in only: PROCURE_SELFCHECK=1. One environment read on a Debug launch, nothing in Release.
             if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
             {
-                _ = Data.DatabaseSelfCheck.RunAsync(
-                    _services.GetRequiredService<Data.SqliteDatabase>(),
-                    _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>());
+                _ = RunDatabaseSelfChecksAsync();
             }
 
             // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.
@@ -76,6 +74,15 @@ namespace Procure
             }
 #endif
         }
+
+#if DEBUG
+        private async Task RunDatabaseSelfChecksAsync()
+        {
+            var prRepo = _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>();
+            await Data.DatabaseSelfCheck.RunAsync(_services.GetRequiredService<Data.SqliteDatabase>(), prRepo);
+            await Data.CallOffSelfCheck.RunAsync(_services.GetRequiredService<Data.Repositories.ICallOffRepository>(), prRepo);
+        }
+#endif
 
 #if DEBUG
         private async Task SweepSelfCheckNotesAsync()
