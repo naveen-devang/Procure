@@ -15,7 +15,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0 # full history - needed to diff commits since the previous tag
@@ -48,7 +48,7 @@ jobs:
             Write-Host "Microsoft.WindowsAppSDK is already current ($current)."
           }
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 

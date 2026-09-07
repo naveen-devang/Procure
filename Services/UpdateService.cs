@@ -149,8 +149,24 @@ namespace Procure.Services
                 throw new InvalidOperationException("No pending update to download - call CheckForUpdatesAsync first.");
             }
 
+            var deltaCount = _pendingUpdate.DeltasToTarget?.Length ?? 0;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             await _manager.DownloadUpdatesAsync(_pendingUpdate, p => progress?.Report(p / 100.0), ct);
+            sw.Stop();
             progress?.Report(1.0);
+
+            // One durable line so "did the delta path actually run?" is answerable after the fact -
+            // Velopack's own logging isn't persisted here. deltaCount>0 means a delta chain was
+            // offered; whether it was used vs a full fallback shows in how long/large the download
+            // was (a code-only delta is ~2 MB and finishes in a second or two).
+            try
+            {
+                var expected = update.IsDeltaDownload
+                    ? $"delta x{deltaCount}, ~{update.SizeBytes / 1048576.0:F1} MB"
+                    : $"full, ~{update.SizeBytes / 1048576.0:F1} MB";
+                Utilities.CrashLog.Write($"UPDATE DOWNLOAD {update.TagName}: {expected}, took {sw.Elapsed.TotalSeconds:F1}s");
+            }
+            catch { /* logging must never break the update */ }
 
             // Velopack tracks the downloaded package itself; there's no installer file path for
             // the caller to do anything with. This return value only exists so LaunchInstaller
