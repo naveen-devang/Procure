@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class RfqItem : ObservableObject
+    public partial class RfqItem : ObservableObject, Procure.Utilities.IPrLine
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid RfqId { get; set; }

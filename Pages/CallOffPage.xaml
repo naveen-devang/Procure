@@ -145,11 +145,14 @@
                                                                         <VerticalStackLayout Spacing="4">
                                                                             <Grid ColumnDefinitions="*,Auto">
                                                                                 <Label Grid.Column="0" Text="{Binding Vendor}" FontFamily="SegoeSemibold" FontSize="11.5"
-                                                                                       LineBreakMode="TailTruncation"
+                                                                                       LineBreakMode="TailTruncation" MaxLines="1"
                                                                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                                                                 <Label Grid.Column="1" Text="{Binding PercentComplete, StringFormat='{0:F0}%'}" FontFamily="SegoeSemibold" FontSize="10.5"
                                                                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                                                             </Grid>
+                                                                            <Label Text="{Binding PoNo, StringFormat='PO {0}'}" FontSize="10" LineBreakMode="TailTruncation" MaxLines="1"
+                                                                                   IsVisible="{Binding PoNo, Converter={StaticResource NullToBoolConverter}}"
+                                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                                                             <ProgressBar Progress="{Binding Percent01}" HeightRequest="4"
                                                                                          ProgressColor="{DynamicResource AccentFill}" />
                                                                         </VerticalStackLayout>

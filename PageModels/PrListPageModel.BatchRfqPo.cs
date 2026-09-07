@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -437,6 +437,7 @@ namespace Procure.PageModels
                 IsBatchRfqModalVisible = false;
                 UpdateSelectionState();
                 ApplyFilters();
+                DataChangeNotifier.Notify(ProcurementChange.Rfq);
 
                 if (Shell.Current != null)
                 {
@@ -540,6 +541,10 @@ namespace Procure.PageModels
                     _selectedIds.Remove(pr.Id);
                     pr.NotifyHierarchyChanged();
                 }
+
+                // Same signal the single-PO wizard sends. Without it the Raw & Packing tab kept
+                // showing pre-PO balances until the app was restarted.
+                Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
 
                 IsBatchPoModalVisible = false;
                 UpdateSelectionState();

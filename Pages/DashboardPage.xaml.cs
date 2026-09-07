@@ -21,10 +21,19 @@ namespace Procure.Pages
             // singleton, so a first-run latch would leave them stale for the whole session.
             // LoadDataAsync self-guards on IsBusy; the seed check is a no-op after the first call.
             base.OnAppearing();
+            _viewModel.IsVisible = true;
 #if WINDOWS
             Procure.Utilities.NativeTheme.ForceRepaintOnAppear(this);
 #endif
             await _viewModel.LoadDataAsync();
+        }
+
+        protected override void OnDisappearing()
+        {
+            // Stops the live-refresh subscription doing a full metrics sweep for a page nobody is
+            // looking at; OnAppearing above reloads whatever it missed.
+            _viewModel.IsVisible = false;
+            base.OnDisappearing();
         }
     }
 }

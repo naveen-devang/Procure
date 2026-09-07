@@ -49,6 +49,13 @@ VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes
             }
 
             // 1b. Consolidate line items from source PRs into master PR
+            //
+            // Every source line becomes a NEW master line with a new Id, so the quote lines copied in
+            // step 2 have to be re-pointed at those new Ids. Skipping that (this insert was the only
+            // RfqItem write in the app that left PrItemId out) orphaned every quote line on every
+            // merged PR, after which the PO wizard could only match them by name - and a merged PR is
+            // exactly where two lines share a name.
+            var masterItemIdBySourceItemId = new Dictionary<Guid, Guid>();
             int itemSort = 0;
             foreach (var sourcePr in sourcePrs)
             {
@@ -68,6 +75,7 @@ VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes
                             SortOrder = itemSort++
                         };
                         masterPr.Items.Add(masterItem);
+                        masterItemIdBySourceItemId[srcItem.Id] = masterItem.Id;
 
                         using var itemCmd = connection.CreateCommand();
                         itemCmd.Transaction = tx;
@@ -150,13 +158,26 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
 
                         if (rfq.Items != null)
                         {
+                            // Resolve each quote line against its OWN PR's lines first (saved link
+                            // wins, names handed out one-to-one), then translate to the master line
+                            // the merge just created for it.
+                            var srcLineFor = Procure.Utilities.PrLineMatcher.Map(rfq.Items, sourcePr.Items);
+
                             int rfqItemSort = 0;
                             foreach (var srcRfqItem in rfq.Items)
                             {
+                                Guid? masterPrItemId = null;
+                                if (srcLineFor.TryGetValue(srcRfqItem, out var srcPrItem)
+                                    && masterItemIdBySourceItemId.TryGetValue(srcPrItem.Id, out var mappedId))
+                                {
+                                    masterPrItemId = mappedId;
+                                }
+
                                 var newRfqItem = new RfqItem
                                 {
                                     Id = Guid.NewGuid(),
                                     RfqId = newRfq.Id,
+                                    PrItemId = masterPrItemId,
                                     ItemName = srcRfqItem.ItemName,
                                     Quantity = srcRfqItem.Quantity,
                                     Unit = srcRfqItem.Unit,
@@ -172,11 +193,12 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                                 using var rfqItemCmd = connection.CreateCommand();
                                 rfqItemCmd.Transaction = tx;
                                 rfqItemCmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, Notes, SortOrder)
-VALUES (@Id, @RfqId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @Notes, @SortOrder);";
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, Notes, SortOrder)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @Notes, @SortOrder);";
 
                                 rfqItemCmd.Parameters.AddWithValue("@Id", newRfqItem.Id.ToString());
                                 rfqItemCmd.Parameters.AddWithValue("@RfqId", newRfq.Id.ToString());
+                                rfqItemCmd.Parameters.AddWithValue("@PrItemId", newRfqItem.PrItemId.HasValue ? newRfqItem.PrItemId.Value.ToString() : (object)DBNull.Value);
                                 rfqItemCmd.Parameters.AddWithValue("@ItemName", newRfqItem.ItemName);
                                 rfqItemCmd.Parameters.AddWithValue("@Quantity", (double)newRfqItem.Quantity);
                                 rfqItemCmd.Parameters.AddWithValue("@Unit", newRfqItem.Unit ?? "pcs");
@@ -357,6 +379,60 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                 cmd.Parameters.AddWithValue("@UpdatedAt", DateTime.Now.ToString("o"));
 
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+                // A combined PO used to store money and nothing else — no line items at all. Its PRs
+                // then read "Unordered / Pending" for ever, the Raw & Packing tab never saw the
+                // quantity, and call-off had nothing to track. The lines come from this PR's own
+                // quote, resolved through the shared matcher so duplicate item names still land on
+                // distinct PR lines.
+                //
+                // Quantities are NOT scaled by the value apportionment above: money is split
+                // pro-rata across PRs, but a PR ordered the quantity its quote says it ordered.
+                if (quote?.Items != null && quote.Items.Count > 0)
+                {
+                    var lineFor = Procure.Utilities.PrLineMatcher.Map(quote.Items, pr.Items);
+                    int lineSort = 0;
+                    foreach (var quoteItem in quote.Items)
+                    {
+                        if (!quoteItem.IsQuoted || string.IsNullOrWhiteSpace(quoteItem.ItemName)) continue;
+
+                        lineFor.TryGetValue(quoteItem, out var prLine);
+                        var poItem = new PurchaseOrderItem
+                        {
+                            Id = Guid.NewGuid(),
+                            PoId = po.Id,
+                            PrItemId = quoteItem.PrItemId ?? prLine?.Id,
+                            RfqItemId = quoteItem.Id,
+                            ItemName = quoteItem.ItemName,
+                            Quantity = quoteItem.Quantity,
+                            Unit = quoteItem.Unit,
+                            UnitPrice = quoteItem.QuotedUnitPrice,
+                            Discount = quoteItem.Discount,
+                            SortOrder = lineSort++
+                        };
+                        po.Items.Add(poItem);
+
+                        using var lineCmd = connection.CreateCommand();
+                        lineCmd.Transaction = tx;
+                        lineCmd.CommandText = @"
+INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal, SortOrder)
+VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal, @SortOrder);";
+
+                        lineCmd.Parameters.AddWithValue("@Id", poItem.Id.ToString());
+                        lineCmd.Parameters.AddWithValue("@PoId", po.Id.ToString());
+                        lineCmd.Parameters.AddWithValue("@PrItemId", poItem.PrItemId.HasValue ? poItem.PrItemId.Value.ToString() : (object)DBNull.Value);
+                        lineCmd.Parameters.AddWithValue("@RfqItemId", poItem.RfqItemId.HasValue ? poItem.RfqItemId.Value.ToString() : (object)DBNull.Value);
+                        lineCmd.Parameters.AddWithValue("@ItemName", poItem.ItemName);
+                        lineCmd.Parameters.AddWithValue("@Quantity", (double)poItem.Quantity);
+                        lineCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(poItem.Unit) ? "pcs" : poItem.Unit);
+                        lineCmd.Parameters.AddWithValue("@UnitPrice", poItem.UnitPrice.HasValue ? (double)poItem.UnitPrice.Value : (object)DBNull.Value);
+                        lineCmd.Parameters.AddWithValue("@Discount", poItem.Discount.HasValue ? (double)poItem.Discount.Value : (object)DBNull.Value);
+                        lineCmd.Parameters.AddWithValue("@LineTotal", (double)poItem.LineTotal);
+                        lineCmd.Parameters.AddWithValue("@SortOrder", poItem.SortOrder);
+
+                        await lineCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+                }
             }
 
             await tx.CommitAsync().ConfigureAwait(false);

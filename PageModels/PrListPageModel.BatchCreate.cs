@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -358,6 +358,7 @@ namespace Procure.PageModels
                 BatchPrEntries.Clear();
                 SelectedBatchEntry = null;
                 ApplyFilters(resetToTop: true);
+                DataChangeNotifier.Notify(ProcurementChange.Pr);
 
                 ShowToast($"Created {validEntries.Count} purchase requisitions");
             }

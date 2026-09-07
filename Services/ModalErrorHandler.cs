@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.ApplicationModel;
@@ -12,6 +12,12 @@ namespace Procure.Services
 
         public void HandleError(Exception ex)
         {
+            // Written down first, always - before any decision about showing it. The dialog carries
+            // only ex.Message, so an error a user reports arrives as one sentence with no stack and
+            // no way to tell which code path raised it; a UNIQUE-constraint failure took a
+            // reproduction from first principles to place. Logging costs a file append.
+            Procure.Utilities.CrashLog.Write("Error shown to the user", ex);
+
             MainThread.BeginInvokeOnMainThread(async () =>
             {
                 try
@@ -31,7 +37,7 @@ namespace Procure.Services
                     }
                     else
                     {
-                        Procure.Utilities.CrashLog.Write("ModalErrorHandler: no Shell to show error on", ex);
+                        Procure.Utilities.CrashLog.Write("...and there was no Shell to show it on", ex: null);
                     }
                 }
                 finally

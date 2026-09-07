@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -392,6 +392,16 @@ namespace Procure.Services.Export
             else
             {
                 var descCharsPerLine = descColWidth - 2; // tracks the column's own (now variable) width
+
+                // One resolution pass per vendor, keyed by PR line. Saved link wins, unlinked lines
+                // are handed out one-to-one - taking the first name match printed one vendor price
+                // against two same-named PR lines and dropped the second line's real quote.
+                var quoteByVendorAndLine = selectedRfqs
+                    .Select(rq => Procure.Utilities.PrLineMatcher.Map(rq.Items, prItems)
+                        .GroupBy(kv => kv.Value.Id)
+                        .ToDictionary(g => g.Key, g => g.First().Key))
+                    .ToList();
+
                 foreach (var item in prItems)
                 {
                     // Sized per-row from this item's own name only, not uniformly across every
@@ -414,10 +424,7 @@ namespace Procure.Services.Export
                         string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
                         string priceColLetter = GetColumnLetter(VendorPriceCol(i));
                         var rfq = selectedRfqs[i];
-                        // Exact PrItemId link wins; name matching is only a fallback for unlinked
-                        // lines — a flat OR let a name collision beat the correct link.
-                        var rfqItem = rfq.Items?.FirstOrDefault(ri => ri.PrItemId.HasValue && ri.PrItemId.Value == item.Id)
-                                   ?? rfq.Items?.FirstOrDefault(ri => !ri.PrItemId.HasValue && string.Equals(ri.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase));
+                        var rfqItem = quoteByVendorAndLine[i].TryGetValue(item.Id, out var matched) ? matched : null;
 
                         if (rfqItem?.QuotedUnitPrice != null && rfqItem.QuotedUnitPrice.Value > 0)
                         {

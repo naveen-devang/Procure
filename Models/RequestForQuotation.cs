@@ -123,8 +123,52 @@ namespace Procure.Models
 
         public bool HasLineItems => Items != null && Items.Count > 0;
 
-        public bool IsFullQuote => HasLineItems && TotalItemsCount > 0 && PricedItemsCount == TotalItemsCount;
-        public bool IsPartialQuote => HasLineItems && PricedItemsCount > 0 && PricedItemsCount < TotalItemsCount;
+        // ---- Coverage against the requisition ------------------------------------------------
+        // Plain fields, not observable properties: they are recomputed in one pass by
+        // PurchaseRequisition.RecalculateDerived() (an RFQ has no reference back to its PR, and
+        // recomputing them per binding read would walk the PR's lines on every card repaint).
+        // PrLineCount 0 means "never computed" - the badge then falls back to counting the quote
+        // against itself, which is all a detached RFQ can honestly say.
+
+        /// <summary>How many lines the parent PR has.</summary>
+        public int PrLineCount { get; internal set; }
+
+        /// <summary>How many of them this quote actually lists.</summary>
+        public int PrLinesCovered { get; internal set; }
+
+        /// <summary>How many of them this quote has put a price against.</summary>
+        public int PrLinesPriced { get; internal set; }
+
+        /// <summary>A PR line whose quantity has moved since this quote was priced. The quote keeps
+        /// the number the vendor gave; this is the flag that says to go back and re-ask.</summary>
+        public int PrLinesQuantityDrifted { get; internal set; }
+
+        public bool HasQuantityDrift => PrLinesQuantityDrifted > 0;
+
+        public string QuantityDriftBadge => PrLinesQuantityDrifted switch
+        {
+            0 => string.Empty,
+            1 => "Qty changed since quote (1 item)",
+            _ => $"Qty changed since quote ({PrLinesQuantityDrifted} items)"
+        };
+
+        public int PrLinesMissing => Math.Max(0, PrLineCount - PrLinesCovered);
+        public bool HasMissingPrLines => PrLinesMissing > 0;
+
+        public string MissingPrLinesBadge => PrLinesMissing switch
+        {
+            0 => string.Empty,
+            1 => "Missing 1 item",
+            _ => $"Missing {PrLinesMissing} items"
+        };
+
+        public bool IsFullQuote => PrLineCount > 0
+            ? PrLinesPriced == PrLineCount
+            : HasLineItems && TotalItemsCount > 0 && PricedItemsCount == TotalItemsCount;
+
+        public bool IsPartialQuote => PrLineCount > 0
+            ? PrLinesPriced > 0 && PrLinesPriced < PrLineCount
+            : HasLineItems && PricedItemsCount > 0 && PricedItemsCount < TotalItemsCount;
 
         public bool HasQuoteCompletenessBadge => HasLineItems && IsQuoteReceived && PricedItemsCount > 0;
 
@@ -133,6 +177,14 @@ namespace Procure.Models
             get
             {
                 if (!HasLineItems || !IsQuoteReceived || PricedItemsCount == 0) return string.Empty;
+                // Against the requisition where we know it. The old text compared the quote with
+                // itself, so a quote covering one of two PR items still read "Full Quote (1 items)".
+                if (PrLineCount > 0)
+                {
+                    return IsFullQuote
+                        ? $"Full Quote ({PrLinesPriced} of {PrLineCount})"
+                        : $"Partial ({PrLinesPriced} of {PrLineCount})";
+                }
                 if (IsPartialQuote) return $"Partial ({PricedItemsCount}/{TotalItemsCount} items)";
                 return $"Full Quote ({PricedItemsCount} items)";
             }
@@ -365,6 +417,11 @@ namespace Procure.Models
             OnPropertyChanged(nameof(IsFullQuote));
             OnPropertyChanged(nameof(QuoteCompletenessBadge));
             OnPropertyChanged(nameof(HasQuoteCompletenessBadge));
+            OnPropertyChanged(nameof(PrLinesMissing));
+            OnPropertyChanged(nameof(HasMissingPrLines));
+            OnPropertyChanged(nameof(MissingPrLinesBadge));
+            OnPropertyChanged(nameof(HasQuantityDrift));
+            OnPropertyChanged(nameof(QuantityDriftBadge));
             OnPropertyChanged(nameof(IsQuoteReceived));
             OnPropertyChanged(nameof(Warranty));
             OnPropertyChanged(nameof(TechnicalApproval));

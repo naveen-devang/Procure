@@ -1,13 +1,15 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using Procure.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class PoRfqItemSelection : ObservableObject
+    public partial class PoRfqItemSelection : ObservableObject, Procure.Utilities.IPrLine, Procure.Utilities.IQuantified
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid? RfqItemId { get; set; }
@@ -83,9 +85,30 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(AllocationStatusText))]
         public partial decimal OtherPosOrderedQuantity { get; set; } = 0;
 
-        public decimal TotalAllocated => OtherPosOrderedQuantity + (IsSelected ? Quantity : 0m);
+        /// <summary>What the OTHER rows open in this same PO window already allocate to this row's PR
+        /// line - sibling rows on this card and every row on every other selected vendor card.
+        ///
+        /// Without it a row only ever compared itself against saved POs, so a merged PR quoted on two
+        /// lines showed "12/12 Fully Allocated" on both rows while the banner above them said 24
+        /// against a target of 12. Kept separate from <see cref="OtherPosOrderedQuantity"/> so the
+        /// status text can still say which quantity came from where. Maintained live by
+        /// PrListPageModel.RecalculatePoModalTotals.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(MaxAllowedQuantity))]
+        [NotifyPropertyChangedFor(nameof(TotalAllocated))]
+        [NotifyPropertyChangedFor(nameof(PendingQuantity))]
+        [NotifyPropertyChangedFor(nameof(IsFullyAllocated))]
+        [NotifyPropertyChangedFor(nameof(IsPendingAllocation))]
+        [NotifyPropertyChangedFor(nameof(IsOverAllocated))]
+        [NotifyPropertyChangedFor(nameof(OverAllocatedQuantity))]
+        [NotifyPropertyChangedFor(nameof(AllocationStatusText))]
+        public partial decimal OtherRowsQuantity { get; set; } = 0;
 
-        public decimal MaxAllowedQuantity => Math.Max(0m, PrTargetQuantity - OtherPosOrderedQuantity);
+        public decimal AlreadyAllocatedElsewhere => OtherPosOrderedQuantity + OtherRowsQuantity;
+
+        public decimal TotalAllocated => AlreadyAllocatedElsewhere + (IsSelected ? Quantity : 0m);
+
+        public decimal MaxAllowedQuantity => Math.Max(0m, PrTargetQuantity - AlreadyAllocatedElsewhere);
 
         public bool IsOverAllocated => TotalAllocated > PrTargetQuantity && PrTargetQuantity > 0;
 
@@ -97,45 +120,51 @@ namespace Procure.Models
 
         public decimal PendingQuantity => Math.Max(0m, PrTargetQuantity - TotalAllocated);
 
+        /// <summary>This row prices something the requisition does not list - a line typed straight
+        /// into the quote and kept as an extra. It has no PR target to be measured against, so
+        /// saying "Fully Allocated" about it would be inventing one.</summary>
+        public bool IsUnbudgeted { get; set; }
+
         public string AllocationStatusText
         {
             get
             {
                 var unitStr = string.IsNullOrWhiteSpace(Unit) ? "pcs" : Unit;
-                var totalAllocated = TotalAllocated;
+
+                if (IsUnbudgeted)
+                {
+                    return $"Not on the requisition • extra line ({Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr})";
+                }
+
                 var thisPoQty = IsSelected ? Quantity : 0m;
+                var target = $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr}";
+
+                // One breakdown, built once, so every branch below reports the same three sources.
+                // The branches used to spell out their own subsets and quietly omitted whatever the
+                // rest of the window had already allocated.
+                var parts = new List<string>(3);
+                if (OtherPosOrderedQuantity > 0) parts.Add($"Other POs: {OtherPosOrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}");
+                if (OtherRowsQuantity > 0) parts.Add($"Other lines here: {OtherRowsQuantity.ToString("G29", CultureInfo.InvariantCulture)}");
+                if (thisPoQty > 0) parts.Add($"This PO: {thisPoQty.ToString("G29", CultureInfo.InvariantCulture)}");
+                var breakdown = parts.Count > 0 ? $" ({string.Join(", ", parts)})" : string.Empty;
 
                 if (IsOverAllocated)
                 {
-                    return $"Exceeds PR target by {OverAllocatedQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (PR Target: {PrTargetQuantity:G29} {unitStr})";
+                    return $"Exceeds PR target by {OverAllocatedQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {target}{breakdown}";
                 }
 
                 if (IsFullyAllocated)
                 {
-                    if (thisPoQty > 0 && OtherPosOrderedQuantity > 0)
-                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • Fully Allocated";
-                    if (thisPoQty == 0 && OtherPosOrderedQuantity > 0)
-                        return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • Fully Allocated";
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • Fully Allocated";
+                    return $"{target}{breakdown} • Fully Allocated";
                 }
 
                 var pending = PendingQuantity;
-                if (thisPoQty > 0 && OtherPosOrderedQuantity > 0)
+                if (parts.Count == 0)
                 {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}, This PO: {thisPoQty:G29}) • {pending:G29} {unitStr} Pending";
+                    return $"{target} • {pending.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending (Unallocated)";
                 }
 
-                if (thisPoQty > 0)
-                {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (This PO: {thisPoQty:G29}) • {pending:G29} {unitStr} Pending";
-                }
-
-                if (OtherPosOrderedQuantity > 0)
-                {
-                    return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Other POs: {OtherPosOrderedQuantity:G29}) • {pending:G29} {unitStr} Pending";
-                }
-
-                return $"PR Target: {PrTargetQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} • {pending:G29} {unitStr} Pending (Unallocated)";
+                return $"{target}{breakdown} • {pending.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} Pending";
             }
         }
 
@@ -421,19 +450,24 @@ namespace Procure.Models
             OverallDiscount = rfq.Discount;
             IsRawMaterial = string.Equals(pr?.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
 
+            // One resolution pass for the whole quote, so two lines naming the same item claim two
+            // different PR lines instead of both latching onto the first.
+            var prMap = PrLineMatcher.Map(rfq.Items, pr?.Items);
+            var alreadyOrdered = PrLineMatcher.OrderedQuantities(pr?.Items, pr?.Pos);
+            // Rows resolved earlier in this loop have already spoken for part of their PR line.
+            var takenHere = new Dictionary<Guid, decimal>();
+
             if (rfq.Items != null && rfq.Items.Count > 0)
             {
                 foreach (var rfqItem in rfq.Items)
                 {
-                    var prItem = pr?.Items?.FirstOrDefault(pi => (rfqItem.PrItemId.HasValue && pi.Id == rfqItem.PrItemId.Value) || string.Equals(pi.ItemName, rfqItem.ItemName, StringComparison.OrdinalIgnoreCase));
+                    prMap.TryGetValue(rfqItem, out var prItem);
                     var prTarget = prItem?.Quantity ?? rfqItem.Quantity;
 
-                    var otherPoOrdered = pr?.Pos?
-                        .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                        .Where(pi => (prItem != null && pi.PrItemId == prItem.Id) || string.Equals(pi.ItemName, rfqItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                        .Sum(pi => pi.Quantity) ?? 0m;
+                    var otherPoOrdered = prItem != null && alreadyOrdered.TryGetValue(prItem.Id, out var ord) ? ord : 0m;
+                    var claimedHere = prItem != null && takenHere.TryGetValue(prItem.Id, out var t) ? t : 0m;
 
-                    var remainingAvail = Math.Max(0m, prTarget - otherPoOrdered);
+                    var remainingAvail = Math.Max(0m, prTarget - otherPoOrdered - claimedHere);
 
                     var itemSelection = new PoRfqItemSelection
                     {
@@ -454,20 +488,21 @@ namespace Procure.Models
                         OnPriceOrSelectionChanged = OnItemSelectionOrPriceChanged
                     };
                     Items.Add(itemSelection);
+                    if (prItem != null) takenHere[prItem.Id] = claimedHere + itemSelection.Quantity;
                 }
             }
 
-            // Also add any other PR items not in RFQ so the user can select and price them if desired
+            // Also add any other PR items not in RFQ so the user can select and price them if desired.
+            // Covered-ness is decided by which PR line each row actually resolved to, not by name: two
+            // PR lines sharing a name used to look "already covered" the moment one of them was.
             if (pr?.Items != null)
             {
+                var covered = new HashSet<Guid>(prMap.Values.Select(p => p.Id));
                 foreach (var prItem in pr.Items)
                 {
-                    if (!Items.Any(i => (prItem.Id != Guid.Empty && i.PrItemId == prItem.Id) || string.Equals(i.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase)))
+                    if (!covered.Contains(prItem.Id))
                     {
-                        var otherPoOrdered = pr.Pos?
-                            .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                            .Where(pi => pi.PrItemId == prItem.Id || string.Equals(pi.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                            .Sum(pi => pi.Quantity) ?? 0m;
+                        var otherPoOrdered = alreadyOrdered.TryGetValue(prItem.Id, out var ord2) ? ord2 : 0m;
 
                         var remainingAvail = Math.Max(0m, prItem.Quantity - otherPoOrdered);
 
@@ -519,25 +554,29 @@ namespace Procure.Models
             OtherCharges = existingPo.OtherCharges ?? linkedRfq?.OtherCharges;
             OverallDiscount = existingPo.Discount ?? linkedRfq?.Discount;
             CustomBaseAmount = existingPo.BaseAmount;
-            IsRawMaterial = string.Equals(pr?.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+            // pr is a required argument here (unlike the RFQ constructor's optional one) and the
+            // body below indexes into it, so the null-conditional was only ever confusing the
+            // compiler's flow analysis.
+            IsRawMaterial = string.Equals(pr.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
             TransportContractNumber = existingPo.TransportContractNumber;
             TransporterName = existingPo.TransporterName;
             TransportRatePerUnit = existingPo.TransportRatePerUnit;
+
+            // Resolved once for the whole PO, and once for what every OTHER PO has ordered, so a
+            // duplicate item name cannot make two of this PO's lines share one PR line's target.
+            var poMap = PrLineMatcher.Map(existingPo.Items, pr.Items);
+            var orderedElsewhere = PrLineMatcher.OrderedQuantities(pr.Items, pr.Pos, p => p.Id != existingPo.Id);
 
             // If PO already has saved PurchaseOrderItems, populate from them
             if (existingPo.Items != null && existingPo.Items.Count > 0)
             {
                 foreach (var poItem in existingPo.Items)
                 {
-                    var prItem = pr.Items?.FirstOrDefault(pi => (poItem.PrItemId.HasValue && pi.Id == poItem.PrItemId.Value) || string.Equals(pi.ItemName, poItem.ItemName, StringComparison.OrdinalIgnoreCase));
+                    poMap.TryGetValue(poItem, out var prItem);
                     var prTarget = prItem?.Quantity ?? poItem.Quantity;
 
                     // Other POs ordered qty (excluding this PO)
-                    var otherPoOrdered = pr.Pos?
-                        .Where(p => p.Id != existingPo.Id)
-                        .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                        .Where(pi => (prItem != null && pi.PrItemId == prItem.Id) || string.Equals(pi.ItemName, poItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                        .Sum(pi => pi.Quantity) ?? 0m;
+                    var otherPoOrdered = prItem != null && orderedElsewhere.TryGetValue(prItem.Id, out var oe) ? oe : 0m;
 
                     var itemSelection = new PoRfqItemSelection
                     {
@@ -560,17 +599,15 @@ namespace Procure.Models
                 // Also add any other PR items not in this PO as unselected so user can add them if needed
                 if (pr.Items != null)
                 {
+                    var covered = new HashSet<Guid>(poMap.Values.Select(p => p.Id));
+                    var rfqMap = PrLineMatcher.Map(linkedRfq?.Items, pr.Items);
                     foreach (var prItem in pr.Items)
                     {
-                        if (!Items.Any(i => (prItem.Id != Guid.Empty && i.PrItemId == prItem.Id) || string.Equals(i.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase)))
+                        if (!covered.Contains(prItem.Id))
                         {
-                            var rfqItem = linkedRfq?.Items?.FirstOrDefault(ri => (prItem.Id != Guid.Empty && ri.PrItemId == prItem.Id) || string.Equals(ri.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase));
+                            var rfqItem = rfqMap.FirstOrDefault(kv => kv.Value.Id == prItem.Id).Key;
 
-                            var otherPoOrdered = pr.Pos?
-                                .Where(p => p.Id != existingPo.Id)
-                                .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                                .Where(pi => pi.PrItemId == prItem.Id || string.Equals(pi.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                                .Sum(pi => pi.Quantity) ?? 0m;
+                            var otherPoOrdered = orderedElsewhere.TryGetValue(prItem.Id, out var oe2) ? oe2 : 0m;
 
                             var remainingAvail = Math.Max(0m, prItem.Quantity - otherPoOrdered);
 
@@ -603,16 +640,13 @@ namespace Procure.Models
             else if (linkedRfq?.Items != null && linkedRfq.Items.Count > 0)
             {
                 // Fallback to linked RFQ items if existing PO didn't have items saved yet
+                var fallbackMap = PrLineMatcher.Map(linkedRfq.Items, pr.Items);
                 foreach (var rfqItem in linkedRfq.Items)
                 {
-                    var prItem = pr.Items?.FirstOrDefault(pi => (rfqItem.PrItemId.HasValue && pi.Id == rfqItem.PrItemId.Value) || string.Equals(pi.ItemName, rfqItem.ItemName, StringComparison.OrdinalIgnoreCase));
+                    fallbackMap.TryGetValue(rfqItem, out var prItem);
                     var prTarget = prItem?.Quantity ?? rfqItem.Quantity;
 
-                    var otherPoOrdered = pr.Pos?
-                        .Where(p => p.Id != existingPo.Id)
-                        .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                        .Where(pi => (prItem != null && pi.PrItemId == prItem.Id) || string.Equals(pi.ItemName, rfqItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                        .Sum(pi => pi.Quantity) ?? 0m;
+                    var otherPoOrdered = prItem != null && orderedElsewhere.TryGetValue(prItem.Id, out var oe3) ? oe3 : 0m;
 
                     var itemSelection = new PoRfqItemSelection
                     {

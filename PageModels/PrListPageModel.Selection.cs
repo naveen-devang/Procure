@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -337,7 +337,12 @@ namespace Procure.PageModels
                 IsMergePrModalVisible = false;
                 SelectedPrsForMerge.Clear();
                 UpdateSelectionState();
-                ApplyFilters();
+                // Rows come and go here - a new combined PR appears and the sources drop off the
+                // board - so the window has to be rebuilt from the top. A plain ApplyFilters() keeps
+                // the current scroll position, which often left the new PR off screen and made a
+                // successful merge look like nothing happened.
+                ApplyFilters(resetToTop: true);
+                DataChangeNotifier.Notify(ProcurementChange.All);
 
                 ShowToast($"Combined {selected.Count} requisitions into {masterPr.PrNo}");
             }
@@ -553,7 +558,10 @@ namespace Procure.PageModels
 
                 CloseSplitPrModal();
                 UpdateSelectionState();
-                ApplyFilters();
+                // Split puts the original PRs back on the board - same reason as the merge above.
+                ApplyFilters(resetToTop: true);
+                // PR line Ids move during a split, which moves the PO items hanging off them.
+                Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
 
                 if (Shell.Current != null)
                 {

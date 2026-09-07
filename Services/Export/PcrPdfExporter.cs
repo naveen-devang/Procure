@@ -161,15 +161,18 @@ namespace Procure.Services.Export
             // Which RfqItem backs each (item, vendor) cell. Resolved once here for the measuring
             // pass and reused by the render loop, rather than matching twice with the same rules.
             var matchedRfqItems = new RfqItem?[Math.Max(prItems.Count, 1), Math.Max(supplierCount, 1)];
-            for (int p = 0; p < prItems.Count; p++)
+            for (int i = 0; i < supplierCount; i++)
             {
-                for (int i = 0; i < supplierCount; i++)
+                // Saved link wins, unlinked lines are handed out one-to-one. Picking the first
+                // name match per PR line printed one vendor's single price against two same-named
+                // PR lines and left the second line's real quote off the comparison entirely.
+                var byLine = Procure.Utilities.PrLineMatcher.Map(selectedRfqs[i].Items, prItems)
+                    .GroupBy(kv => kv.Value.Id)
+                    .ToDictionary(g => g.Key, g => g.First().Key);
+
+                for (int p = 0; p < prItems.Count; p++)
                 {
-                    var rf = selectedRfqs[i];
-                    // Exact PrItemId link wins; name matching only covers unlinked lines.
-                    matchedRfqItems[p, i] =
-                        rf.Items?.FirstOrDefault(ri => ri.PrItemId.HasValue && ri.PrItemId.Value == prItems[p].Id)
-                        ?? rf.Items?.FirstOrDefault(ri => !ri.PrItemId.HasValue && string.Equals(ri.ItemName, prItems[p].ItemName, StringComparison.OrdinalIgnoreCase));
+                    matchedRfqItems[p, i] = byLine.TryGetValue(prItems[p].Id, out var hit) ? hit : null;
                 }
             }
 

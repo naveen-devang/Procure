@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -282,11 +282,9 @@ namespace Procure.PageModels
 
             if (TargetPrForPo != null && TargetPrForPo.Items != null && TargetPrForPo.Items.Count > 0)
             {
-                var allSelectedModalItems = selected.SelectMany(s => s.Items?.Where(i => i.IsSelected) ?? Enumerable.Empty<PoRfqItemSelection>()).ToList();
                 int balancedItemsCount = 0;
                 int pendingItemsCount = 0;
                 int overAllocatedItemsCount = 0;
-                var pendingItemsList = new List<string>();
 
                 // A selected card that updates an existing PO replaces that PO's quantities, so
                 // they must not also be counted as "other PO" — counting both double-allocated
@@ -295,17 +293,24 @@ namespace Procure.PageModels
                     ? new HashSet<Guid> { EditingPo.Id }
                     : new HashSet<Guid>(selected.Where(s => s.EditingPoId.HasValue).Select(s => s.EditingPoId!.Value));
 
+                // Both halves go through the shared matcher: PR lines sharing a name are handed out
+                // one-to-one instead of every quote line piling onto the first.
+                var savedByPrItem = Procure.Utilities.PrLineMatcher.OrderedQuantities(
+                    TargetPrForPo.Items, TargetPrForPo.Pos, p => !updatingPoIds.Contains(p.Id));
+
+                // Ticked rows on every selected card, resolved card by card.
+                var modalByPrItem = Procure.Utilities.PrLineMatcher.PendingQuantities(
+                    TargetPrForPo.Items,
+                    selected.Select(s => (IEnumerable<PoRfqItemSelection>?)(s.Items?.Where(i => i.IsSelected))));
+
+                // Feed every row - including rows on unselected cards - what the rest of this window
+                // has already allocated, so the green row badges cannot contradict the red banner.
+                RefreshRowAllocations(savedByPrItem, modalByPrItem);
+
                 foreach (var prItem in TargetPrForPo.Items)
                 {
-                    var otherPoOrdered = TargetPrForPo.Pos
-                        .Where(p => !updatingPoIds.Contains(p.Id))
-                        .SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>())
-                        .Where(pi => (pi.PrItemId.HasValue && pi.PrItemId.Value == prItem.Id) || string.Equals(pi.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                        .Sum(pi => pi.Quantity);
-
-                    var totalInModalForItem = allSelectedModalItems
-                        .Where(mi => (mi.PrItemId.HasValue && mi.PrItemId.Value == prItem.Id) || string.Equals(mi.ItemName, prItem.ItemName, StringComparison.OrdinalIgnoreCase))
-                        .Sum(mi => mi.Quantity);
+                    var otherPoOrdered = savedByPrItem.TryGetValue(prItem.Id, out var saved) ? saved : 0m;
+                    var totalInModalForItem = modalByPrItem.TryGetValue(prItem.Id, out var inModal) ? inModal : 0m;
 
                     var totalAllocated = otherPoOrdered + totalInModalForItem;
 
@@ -322,10 +327,7 @@ namespace Procure.PageModels
                     }
                     else
                     {
-                        var pending = Math.Max(0m, prItem.Quantity - totalAllocated);
                         pendingItemsCount++;
-                        var unitStr = string.IsNullOrWhiteSpace(prItem.Unit) ? "pcs" : prItem.Unit;
-                        pendingItemsList.Add($"{prItem.ItemName} ({pending:G29} {unitStr} pending)");
                     }
                 }
 
@@ -349,6 +351,53 @@ namespace Procure.PageModels
             else
             {
                 PoAllocationSummaryText = string.Empty;
+            }
+        }
+
+        /// <summary>Pushes the window's live allocation picture down onto every row's badge.
+        ///
+        /// A row used to compute its own "Fully Allocated / Pending" from a figure captured when the
+        /// window opened, counting only saved POs. Nothing told it about the other rows sitting in
+        /// front of the user, so two rows quoting one PR line could both claim to be complete while
+        /// the banner above them reported double the target. Rows on unselected cards are refreshed
+        /// too, so ticking a card shows the truth immediately rather than one edit later.</summary>
+        private void RefreshRowAllocations(
+            Dictionary<Guid, decimal> savedByPrItem,
+            Dictionary<Guid, decimal> modalByPrItem)
+        {
+            if (PoRfqSelections == null || TargetPrForPo?.Items == null) return;
+
+            foreach (var card in PoRfqSelections)
+            {
+                if (card.Items == null) continue;
+
+                var map = Procure.Utilities.PrLineMatcher.Map(card.Items, TargetPrForPo.Items);
+                foreach (var row in card.Items)
+                {
+                    if (!map.TryGetValue(row, out var prItem))
+                    {
+                        // Nothing on the requisition to measure it against - show it as an extra
+                        // rather than letting it read "Fully Allocated" against its own quantity.
+                        row.IsUnbudgeted = true;
+                        row.OtherPosOrderedQuantity = 0m;
+                        row.OtherRowsQuantity = 0m;
+                        continue;
+                    }
+
+                    row.IsUnbudgeted = false;
+
+                    // Keep the row pointed at the PR line it actually resolved to, so a line the
+                    // merge left unlinked still saves with the right link (see ApplySelectionToPo).
+                    row.PrItemId = prItem.Id;
+                    row.PrTargetQuantity = prItem.Quantity;
+
+                    var saved = savedByPrItem.TryGetValue(prItem.Id, out var s) ? s : 0m;
+                    var inModal = modalByPrItem.TryGetValue(prItem.Id, out var m) ? m : 0m;
+                    var own = card.IsSelected && row.IsSelected ? row.Quantity : 0m;
+
+                    row.OtherPosOrderedQuantity = saved;
+                    row.OtherRowsQuantity = Math.Max(0m, inModal - own);
+                }
             }
         }
 
@@ -393,6 +442,62 @@ namespace Procure.PageModels
             if (sel == null) return;
             if (sel.AllItemsSelected) sel.DeselectAllItems();
             else sel.SelectAllItems();
+            RecalculatePoModalTotals();
+        }
+
+        // Adds another PO line for a PR item that still has quantity to allocate. The row carries
+        // PrItemId, so it flows through the same PrLineMatcher allocation sum as every other row -
+        // the soft over-allocation banner and the save block cover it with no extra wiring.
+        [RelayCommand]
+        public async Task AddPoItemLineAsync(PoRfqSelection? card)
+        {
+            if (card == null || Shell.Current == null) return;
+            var prItems = TargetPrForPo?.Items;
+            if (prItems == null || prItems.Count == 0) return;
+
+            var names = prItems.Select(i => i.ItemName).ToArray();
+            var pick = await Shell.Current.DisplayActionSheetAsync("Add line for item", "Cancel", null, names);
+            if (string.IsNullOrWhiteSpace(pick) || pick == "Cancel") return;
+
+            var prItem = prItems.FirstOrDefault(i => i.ItemName == pick) ?? prItems.First();
+            var rfqItem = card.Rfq?.Items?.FirstOrDefault(ri =>
+                (ri.PrItemId.HasValue && ri.PrItemId.Value == prItem.Id) ||
+                Procure.Utilities.PrLineMatcher.NameEquals(ri.ItemName, prItem.ItemName));
+
+            var row = new PoRfqItemSelection
+            {
+                Id = Guid.NewGuid(),
+                PrItemId = prItem.Id,
+                RfqItemId = rfqItem?.Id,
+                ItemName = prItem.ItemName,
+                Unit = prItem.Unit,
+                PrTargetQuantity = prItem.Quantity,
+                Quantity = 0m,
+                IsSelected = true,
+                QuotedUnitPrice = rfqItem?.QuotedUnitPrice,
+                Discount = rfqItem?.Discount,
+                LastPrice = rfqItem?.LastPrice,
+                OnPriceOrSelectionChanged = card.OnItemSelectionOrPriceChanged
+            };
+            card.Items.Add(row);
+            card.NotifyCalculationsChanged();
+            RecalculatePoModalTotals();
+
+            // Default the new line to whatever is still unallocated on that PR item.
+            row.Quantity = Math.Max(0m, row.PendingQuantity);
+            card.NotifyCalculationsChanged();
+            RecalculatePoModalTotals();
+        }
+
+        [RelayCommand]
+        public void RemovePoItemLine(PoRfqItemSelection? row)
+        {
+            if (row == null || PoRfqSelections == null) return;
+            var card = PoRfqSelections.FirstOrDefault(c => c.Items != null && c.Items.Contains(row));
+            if (card == null) return;
+            row.OnPriceOrSelectionChanged = null;
+            card.Items.Remove(row);
+            card.NotifyCalculationsChanged();
             RecalculatePoModalTotals();
         }
 
@@ -538,7 +643,7 @@ namespace Procure.PageModels
                 }
 
                 TargetPrForPo.NotifyHierarchyChanged();
-                Procure.Utilities.PoChangeNotifier.NotifyChanged();
+                Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
                 CloseAddPoModal();
             }
             catch (Exception ex)
@@ -632,6 +737,7 @@ namespace Procure.PageModels
             {
                 po.Status = action;
                 await _prRepo.SavePoAsync(po);
+                DataChangeNotifier.NotifyPoChanged();
 
                 var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId);
                 if (parentPr != null)
@@ -667,7 +773,7 @@ namespace Procure.PageModels
                     parentPr.Pos.Remove(po);
                     parentPr.NotifyHierarchyChanged();
                 }
-                Procure.Utilities.PoChangeNotifier.NotifyChanged();
+                Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
             }
             catch (Exception ex)
             {

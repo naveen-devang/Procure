@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -77,6 +77,20 @@ namespace Procure.Models
             || !string.IsNullOrWhiteSpace(TransportContractNumber) || !string.IsNullOrWhiteSpace(TransporterName);
 
         public string FormattedValue => Procure.Utilities.MoneyFormat.Format(Currency, Value);
+
+        /// <summary>Re-raises the computed labels on this order. The scalar fields notify themselves,
+        /// but the ones derived from Items do not - so a PR edit that changed the order's lines left
+        /// the card showing the old item count until the board was rebuilt.</summary>
+        public void NotifyCalculationsChanged()
+        {
+            OnPropertyChanged(nameof(HasItems));
+            OnPropertyChanged(nameof(ItemsCount));
+            OnPropertyChanged(nameof(FormattedValue));
+            OnPropertyChanged(nameof(IsCombinedPo));
+            OnPropertyChanged(nameof(HasTransportDetails));
+            OnPropertyChanged(nameof(FormattedTransportRatePerUnit));
+            OnPropertyChanged(nameof(FormattedTransportTotal));
+        }
         public string FormattedTransportRatePerUnit => TransportRatePerUnit.HasValue
             ? Procure.Utilities.MoneyFormat.Format(Currency, TransportRatePerUnit.Value) : string.Empty;
         public string FormattedTransportTotal => TransportTotal.HasValue

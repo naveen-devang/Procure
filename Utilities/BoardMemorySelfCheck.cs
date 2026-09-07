@@ -27,6 +27,22 @@ namespace Procure.Utilities
     {
         public static async Task RunAsync()
         {
+            // Half of what this checks is a delay firing on time: the card eviction, the two search
+            // debounces. The Tasks and Notes checks force a full blocking collection four times over
+            // (GC.Collect, WaitForPendingFinalizers, GC.Collect - twice each), which stops every
+            // thread in the process for long enough that those delays land late. Run together, this
+            // reported a FAIL against an app that was behaving perfectly - so refuse to run rather
+            // than publish a result that means nothing. Everything else may share the process: the
+            // procurement flow check passes alongside this one in three runs out of three.
+            if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") == "1"
+                || Environment.GetEnvironmentVariable("PROCURE_NOTE_SELFCHECK") == "1")
+            {
+                Report("SKIPPED - these checks time delayed callbacks, and PROCURE_TODO_SELFCHECK / "
+                     + "PROCURE_NOTE_SELFCHECK force blocking collections that make those delays miss. "
+                     + "Run PROCURE_BOARD_SELFCHECK without them.");
+                return;
+            }
+
             try
             {
                 await CheckReleaseThresholdAsync();

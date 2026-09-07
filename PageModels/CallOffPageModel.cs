@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -82,11 +82,15 @@ namespace Procure.PageModels
 
             // This page model is a DI singleton that outlives every visit to the tab, so this
             // subscription is never unsubscribed - same lifetime as the event source itself.
-            Utilities.PoChangeNotifier.Changed += OnPoDataChanged;
+            Utilities.DataChangeNotifier.Changed += OnDataChanged;
         }
 
-        private void OnPoDataChanged()
+        private void OnDataChanged(Utilities.ProcurementChange what)
         {
+            // Only PO writes can move what this tab reads (it summarises PO items and their
+            // call-offs), so a PR rename or a quote edit costs nothing here.
+            if ((what & Utilities.ProcurementChange.Po) == 0) return;
+
             _loaded = false;
             if (IsVisible) _ = LoadAsync(force: true);
         }

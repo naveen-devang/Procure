@@ -431,13 +431,19 @@
 
                                                 <!-- LINE ITEMS SECTION (When RFQ has line items) -->
                                                 <VerticalStackLayout IsVisible="{Binding HasItems}" Spacing="8">
-                                                    <!-- Quick Action Button -->
-                                                    <Button HorizontalOptions="End"
-                                                            Text="{Binding AllItemsSelected, Converter={StaticResource SelectionToggleConverter}, ConverterParameter=Items}"
-                                                            Command="{Binding ToggleAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
-                                                            CommandParameter="{Binding .}"
-                                                            Style="{StaticResource SecondaryButton}"
-                                                            FontSize="10.5" HeightRequest="26" Padding="8,0" />
+                                                    <!-- Quick Action Buttons -->
+                                                    <HorizontalStackLayout HorizontalOptions="End" Spacing="6">
+                                                        <Button Text="＋ Add line"
+                                                                Command="{Binding AddPoItemLineCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
+                                                                CommandParameter="{Binding .}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
+                                                        <Button Text="{Binding AllItemsSelected, Converter={StaticResource SelectionToggleConverter}, ConverterParameter=Items}"
+                                                                Command="{Binding ToggleAllPoRfqItemsCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
+                                                                CommandParameter="{Binding .}"
+                                                                Style="{StaticResource SecondaryButton}"
+                                                                FontSize="10.5" HeightRequest="26" Padding="8,0" />
+                                                    </HorizontalStackLayout>
 
                                                     <!-- Table Column Headers -->
                                                     <Border Padding="10,6" StrokeThickness="1"
@@ -446,7 +452,7 @@
                                                         <Border.StrokeShape>
                                                             <RoundRectangle CornerRadius="4" />
                                                         </Border.StrokeShape>
-                                                        <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105" ColumnSpacing="8" VerticalOptions="Center">
+                                                        <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105, 30" ColumnSpacing="8" VerticalOptions="Center">
                                                             <Label Grid.Column="0" Text="Inc." FontSize="11" FontFamily="SegoeSemibold" HorizontalTextAlignment="Center" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                                             <Label Grid.Column="1" Text="Item &amp; PR Allocation" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                                             <Label Grid.Column="2" Text="PO Qty" FontSize="11" FontFamily="SegoeSemibold" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
@@ -467,7 +473,7 @@
                                                                     <Border.StrokeShape>
                                                                         <RoundRectangle CornerRadius="4" />
                                                                     </Border.StrokeShape>
-                                                                    <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105" ColumnSpacing="8" VerticalOptions="Center">
+                                                                    <Grid ColumnDefinitions="36, *, 75, 45, 100, 85, 105, 30" ColumnSpacing="8" VerticalOptions="Center">
                                                                         <!-- Checkbox -->
                                                                         <CheckBox Color="{DynamicResource AccentFill}" Grid.Column="0"
                                                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -532,6 +538,18 @@
                                                                                HorizontalTextAlignment="End"
                                                                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                                                                VerticalOptions="Center" />
+
+                                                                        <!-- Remove Line -->
+                                                                        <Button Grid.Column="7"
+                                                                                Text="✕"
+                                                                                Command="{Binding RemovePoItemLineCommand, Source={x:Static pageModels:PrListPageModel.Current}, x:DataType={x:Type pageModels:PrListPageModel}}"
+                                                                                CommandParameter="{Binding .}"
+                                                                                FontSize="12"
+                                                                                WidthRequest="28" HeightRequest="28" Padding="0"
+                                                                                BackgroundColor="Transparent" BorderWidth="0"
+                                                                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                                                ToolTipProperties.Text="Remove this line"
+                                                                                VerticalOptions="Center" />
                                                                     </Grid>
                                                                 </Border>
                                                             </DataTemplate>

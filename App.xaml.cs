@@ -45,7 +45,7 @@ namespace Procure
             // Opt-in only: PROCURE_SELFCHECK=1. One environment read on a Debug launch, nothing in Release.
             if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
             {
-                _ = RunDatabaseSelfChecksAsync();
+                Utilities.PrLineMatcherSelfCheck.Run();
             }
 
             // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.
@@ -54,6 +54,14 @@ namespace Procure
                 Utilities.UpdateCheckSchedulerSelfCheck.Run();
                 Utilities.UpdateStateStoreSelfCheck.Run();
             }
+
+            // The two database suites run one after the other, never at once. Both assert invariants
+            // that are global - "no PR anywhere has stale search text", "no material aggregate
+            // anywhere disagrees with its rows" - and a global invariant cannot hold while another
+            // writer is mid-flight. Started in parallel, the flow check read the database in the
+            // middle of the call-off check creating its Raw Material orders and reported 6 stale
+            // aggregate rows against an app that was behaving correctly.
+            _databaseSuites = RunDatabaseSuitesAsync();
 
             // Opt-in only: PROCURE_TODO_SELFCHECK=1.
             if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") == "1")
@@ -72,15 +80,93 @@ namespace Procure
                 // never shows nfsc-/nrsc- notes in the list.
                 _ = SweepSelfCheckNotesAsync();
             }
+
+            // The same sweep for tasks. Notes had one and tasks did not, so a self-check run that was
+            // killed before its cleanup left a "tfsc-..." task sitting in the real to-do list for
+            // good - one from 3 September was still there when this was written.
+            if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") != "1")
+            {
+                _ = SweepSelfCheckTasksAsync();
+            }
 #endif
         }
 
 #if DEBUG
+        /// <summary>The database suites, so the board check can wait for them.</summary>
+        private Task? _databaseSuites;
+
+        private async Task RunBoardSelfCheckAfterDatabaseSuitesAsync()
+        {
+            if (_databaseSuites != null)
+            {
+                try { await _databaseSuites; } catch { /* their own logs carry their failures */ }
+            }
+            await Utilities.BoardMemorySelfCheck.RunAsync();
+        }
+#endif
+
+#if DEBUG
+        /// <summary>Runs whichever database suites were asked for, strictly in sequence.</summary>
+        private async Task RunDatabaseSuitesAsync()
+        {
+            if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
+            {
+                await RunDatabaseSelfChecksAsync();
+            }
+
+            // Opt-in only: PROCURE_FLOW_SELFCHECK=1. The end-to-end pass over PR / RFQ / PO / merge /
+            // split / shared / combined, with resource metrics. Writes to whatever database it is
+            // pointed at and cleans up after itself - run it against the 20k test database.
+            if (Environment.GetEnvironmentVariable("PROCURE_FLOW_SELFCHECK") == "1")
+            {
+                await RunProcurementFlowSelfCheckAsync();
+            }
+        }
+#endif
+
+#if DEBUG
         private async Task RunDatabaseSelfChecksAsync()
         {
-            var prRepo = _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>();
-            await Data.DatabaseSelfCheck.RunAsync(_services.GetRequiredService<Data.SqliteDatabase>(), prRepo);
-            await Data.CallOffSelfCheck.RunAsync(_services.GetRequiredService<Data.Repositories.ICallOffRepository>(), prRepo);
+            // Caught and written down rather than left to escape. A fire-and-forget task that throws
+            // here surfaced as an unrelated "element does not have a XamlRoot" crash - the error
+            // handler trying to raise a dialog before the window exists - which says nothing about
+            // what actually failed and takes the process with it. An unattended run has to report.
+            try
+            {
+                var prRepo = _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>();
+                await Data.DatabaseSelfCheck.RunAsync(_services.GetRequiredService<Data.SqliteDatabase>(), prRepo);
+                await Data.CallOffSelfCheck.RunAsync(_services.GetRequiredService<Data.Repositories.ICallOffRepository>(), prRepo);
+                Utilities.CrashLog.Write("DATABASE SELF-CHECKS PASSED");
+            }
+            catch (Exception ex)
+            {
+                Utilities.CrashLog.Write("DATABASE SELF-CHECKS FAILED", ex);
+            }
+        }
+#endif
+
+#if DEBUG
+        private Task RunProcurementFlowSelfCheckAsync()
+        {
+            // Task.Run, deliberately. Started bare, this runs on the UI thread and every await inside
+            // it resumes there too, so forty seconds of database work sat on the dispatcher queue -
+            // long enough that the board's own delayed callbacks (card eviction, search debounce)
+            // fired late and its self-check failed against a perfectly healthy app. A diagnostic that
+            // freezes the thread other diagnostics are timing against is worse than no diagnostic.
+            // Nothing it touches is bound to the UI, so there is nothing to marshal back.
+            return Task.Run(async () =>
+            {
+                try
+                {
+                    await Data.ProcurementFlowSelfCheck.RunAsync(
+                        _services.GetRequiredService<Data.SqliteDatabase>(),
+                        _services.GetRequiredService<Data.Repositories.IPurchaseRequisitionRepository>());
+                }
+                catch (Exception ex)
+                {
+                    Utilities.CrashLog.Write("PROCUREMENT FLOW SELF-CHECK THREW", ex);
+                }
+            });
         }
 #endif
 
@@ -93,6 +179,21 @@ namespace Procure
                 foreach (var n in (await repo.GetListAsync())
                              .Where(n => n.Title.StartsWith("nrsc-") || n.Title.StartsWith("nfsc-")))
                     await repo.DeleteAsync(n.Id);
+            }
+            catch { }
+        }
+#endif
+
+#if DEBUG
+        private async Task SweepSelfCheckTasksAsync()
+        {
+            try
+            {
+                var repo = _services.GetRequiredService<Data.Repositories.ITodoRepository>();
+                foreach (var t in (await repo.GetAllAsync())
+                             .Where(t => t.Title.StartsWith("tfsc-", StringComparison.Ordinal)
+                                      || t.Title.StartsWith("todo-selfcheck-", StringComparison.Ordinal)))
+                    await repo.DeleteAsync(t.Id);
             }
             catch { }
         }
@@ -256,7 +357,8 @@ namespace Procure
                     ? null
                     : await updateService.GetReleaseNotesForVersionAsync(AppConstants.GitHubRepository, currentVersion);
 
-                if (Current?.Windows.Count > 0 && Current.Windows[0].Page is Shell shell)
+                var shell = await WaitForAttachedShellAsync();
+                if (shell != null)
                 {
                     var message = string.IsNullOrWhiteSpace(notes)
                         ? "Procure has been updated. Check Settings for release details."
@@ -268,6 +370,40 @@ namespace Procure
             {
                 // Silently ignore - this is a nice-to-have, never worth blocking startup over.
             }
+        }
+
+        /// <summary>Waits until the shell has a live platform view, or gives up.
+        ///
+        /// A fixed 1.5s head start was not a guarantee: on a slow first launch the Shell exists as an
+        /// object while its native view does not, and WinUI answers a dialog raised against it with
+        /// "This element does not have a XamlRoot" - thrown on the dispatcher queue, where the calling
+        /// method's own try/catch cannot see it, so it took the whole process down. Reproduced on the
+        /// launch right after an update, which is the only launch this dialog runs on.</summary>
+        private static async Task<Shell?> WaitForAttachedShellAsync()
+        {
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                if (Current?.Windows.Count > 0 && Current.Windows[0].Page is Shell shell && IsAttached(shell))
+                {
+                    return shell;
+                }
+                await Task.Delay(250);
+            }
+            return null;
+        }
+
+        /// <summary>Ready means the native element has a XamlRoot, not merely that a handler exists.
+        /// A handler is set well before the view is in the tree, and that gap is exactly where the
+        /// dialog throws.</summary>
+        private static bool IsAttached(Shell shell)
+        {
+#if WINDOWS
+            return shell.Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement fe
+                   && fe.IsLoaded
+                   && fe.XamlRoot != null;
+#else
+            return shell.Handler?.MauiContext != null;
+#endif
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
@@ -288,7 +424,11 @@ namespace Procure
             // needs, and the constructor runs before AppShell exists.
             if (Environment.GetEnvironmentVariable("PROCURE_BOARD_SELFCHECK") == "1")
             {
-                _ = Utilities.BoardMemorySelfCheck.RunAsync();
+                // After the database suites, never beside them. Half of what it checks is whether a
+                // delayed callback arrives on time, and a machine busy writing to a 20,000-row
+                // database makes those callbacks late - it failed on one run and passed on the next
+                // with identical flags. Waiting costs nothing and removes the false alarm.
+                _ = RunBoardSelfCheckAfterDatabaseSuitesAsync();
             }
 
             // Opt-in only: PROCURE_ACCENT_SELFCHECK=1. Cycles every accent in both modes, then restores.

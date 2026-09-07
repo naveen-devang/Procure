@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -21,6 +21,8 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(IsFullyOrdered))]
         [NotifyPropertyChangedFor(nameof(IsPartiallyOrdered))]
         [NotifyPropertyChangedFor(nameof(IsUnordered))]
+        [NotifyPropertyChangedFor(nameof(IsOverOrdered))]
+        [NotifyPropertyChangedFor(nameof(OverOrderedQuantity))]
         [NotifyPropertyChangedFor(nameof(FulfillmentBadgeText))]
         public partial decimal Quantity { get; set; } = 1;
 
@@ -40,6 +42,8 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(IsFullyOrdered))]
         [NotifyPropertyChangedFor(nameof(IsPartiallyOrdered))]
         [NotifyPropertyChangedFor(nameof(IsUnordered))]
+        [NotifyPropertyChangedFor(nameof(IsOverOrdered))]
+        [NotifyPropertyChangedFor(nameof(OverOrderedQuantity))]
         [NotifyPropertyChangedFor(nameof(FulfillmentBadgeText))]
         public partial decimal OrderedQuantity { get; set; }
 
@@ -56,11 +60,21 @@ namespace Procure.Models
         public bool IsPartiallyOrdered => OrderedQuantity > 0 && OrderedQuantity < Quantity;
         public bool IsUnordered => OrderedQuantity == 0;
 
+        /// <summary>More has been ordered than the line now asks for - almost always because the
+        /// requisition was cut back after the PO went out. Pending floors at zero, so without this
+        /// the line reported a cheerful "Ordered 40/25 (Complete)" and the surplus was invisible.</summary>
+        public bool IsOverOrdered => Quantity > 0 && OrderedQuantity > Quantity;
+        public decimal OverOrderedQuantity => Math.Max(0m, OrderedQuantity - Quantity);
+
         public string FulfillmentBadgeText
         {
             get
             {
                 var unitStr = string.IsNullOrWhiteSpace(Unit) ? "pcs" : Unit;
+                if (IsOverOrdered)
+                {
+                    return $"Over-ordered by {OverOrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}, PR asks for {Quantity.ToString("G29", CultureInfo.InvariantCulture)})";
+                }
                 if (IsFullyOrdered)
                 {
                     return $"Ordered: {OrderedQuantity.ToString("G29", CultureInfo.InvariantCulture)}/{Quantity.ToString("G29", CultureInfo.InvariantCulture)} {unitStr} (Complete)";

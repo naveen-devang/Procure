@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -205,6 +205,11 @@ namespace Procure.PageModels
             else SelectAllRfqItems();
         }
 
+        /// <summary>Quote lines the user typed in during THIS editing session. Only these get the
+        /// "this isn't on the requisition - add it?" question at save; asking about every unlinked
+        /// line would re-ask on every save for a line already declined once.</summary>
+        private readonly HashSet<Guid> _rfqLinesAddedThisSession = new();
+
         [RelayCommand]
         public void AddEditingRfqItem()
         {
@@ -220,16 +225,39 @@ namespace Procure.PageModels
                 SortOrder = EditingRfqItems.Count
             };
             item.PropertyChanged += OnEditingRfqItemPropertyChanged;
+            _rfqLinesAddedThisSession.Add(item.Id);
             EditingRfqItems.Add(item);
             RecalculateRfqTotals();
         }
 
         [RelayCommand]
-        public void RemoveEditingRfqItem(RfqItem item)
+        public async Task RemoveEditingRfqItemAsync(RfqItem item)
         {
             // Keep at least one line: an RFQ item table with zero rows is meaningless (lump-sum
             // quoting is the separate quote-amount field).
             if (EditingRfqItems.Count <= 1) return;
+
+            // A PO line points back at the quote line it was priced from. Dropping the quote line
+            // silently cut that reference, so the order could no longer show what it was based on.
+            var orderedBy = TargetPrForRfq?.Pos?
+                .Where(po => po.Items != null && po.Items.Any(pi => pi.RfqItemId.HasValue && pi.RfqItemId.Value == item.Id))
+                .Select(po => po.PoNo)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct()
+                .ToList();
+
+            if (orderedBy is { Count: > 0 })
+            {
+                if (Shell.Current != null)
+                {
+                    await Shell.Current.DisplayAlertAsync(
+                        "Line Already Ordered",
+                        $"'{item.ItemName}' was ordered on {string.Join(", ", orderedBy)}. Edit or cancel that PO first, then remove the line.",
+                        "OK");
+                }
+                return;
+            }
+
             if (EditingRfqItems.Remove(item))
             {
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
@@ -342,6 +370,7 @@ namespace Procure.PageModels
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
 
             EditingRfqItems.Clear();
+            _rfqLinesAddedThisSession.Clear();
 
             // Automatically clone all line items from the PR into the RFQ
             if (pr.Items != null && pr.Items.Count > 0)
@@ -398,6 +427,7 @@ namespace Procure.PageModels
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
 
             EditingRfqItems.Clear();
+            _rfqLinesAddedThisSession.Clear();
 
             if (rfq.Items != null && rfq.Items.Count > 0)
             {
@@ -478,6 +508,11 @@ namespace Procure.PageModels
             // Drop unused "+ Add Line" rows the user never filled in.
             var savedRfqItems = EditingRfqItems.Where(i => !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
 
+            // A line typed straight into the quote used to reach nowhere: it priced, it ordered, and
+            // the requisition never learned it existed, so the PR's pending figure stayed short by
+            // that quantity for ever. Offer to put it on the PR before anything is written.
+            await ReconcileNewQuoteLinesToPrAsync(savedRfqItems);
+
             try
             {
                 if (IsEditingRfq && EditingRfq != null)
@@ -519,6 +554,7 @@ namespace Procure.PageModels
                     await _prRepo.SaveRfqAsync(EditingRfq);
                     EditingRfq.NotifyCalculationsChanged();
                     TargetPrForRfq.NotifyHierarchyChanged();
+                    DataChangeNotifier.Notify(ProcurementChange.Rfq);
 
                     foreach (var item in EditingRfqItems)
                         item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
@@ -575,6 +611,7 @@ namespace Procure.PageModels
 
                 rfq.NotifyCalculationsChanged();
                 TargetPrForRfq.NotifyHierarchyChanged();
+                DataChangeNotifier.Notify(ProcurementChange.Rfq);
 
                 foreach (var item in EditingRfqItems)
                     item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
@@ -588,6 +625,60 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>Offers to put quote lines the requisition does not have onto the requisition.
+        /// Only asks about lines added in this session, and only once - decline and the line simply
+        /// stays unlinked, which the PO window then shows as an extra rather than inventing a
+        /// requisition target for it.</summary>
+        private async Task ReconcileNewQuoteLinesToPrAsync(List<RfqItem> lines)
+        {
+            var pr = TargetPrForRfq;
+            if (pr == null || Shell.Current == null || _rfqLinesAddedThisSession.Count == 0) return;
+
+            var matched = PrLineMatcher.Map(lines, pr.Items);
+            var strays = lines
+                .Where(l => _rfqLinesAddedThisSession.Contains(l.Id) && !matched.ContainsKey(l))
+                .ToList();
+
+            if (strays.Count == 0) return;
+
+            var listing = string.Join("\n", strays.Take(5).Select(l => $"• {l.ItemName} ({l.FormattedQuantity})"));
+            if (strays.Count > 5) listing += $"\n• …and {strays.Count - 5} more";
+
+            var add = await Shell.Current.DisplayAlertAsync(
+                strays.Count == 1 ? "Line Not On The Requisition" : "Lines Not On The Requisition",
+                $"{listing}\n\nAdd to requisition {pr.PrNo}? Without this the quantity is quoted and ordered but never counted against the PR.",
+                "Add to PR",
+                "Keep as extra");
+
+            // Answered either way, so stop asking about these on the next save.
+            foreach (var stray in strays) _rfqLinesAddedThisSession.Remove(stray.Id);
+
+            if (!add) return;
+
+            var sortOrder = pr.Items.Count == 0 ? 0 : pr.Items.Max(i => i.SortOrder) + 1;
+            foreach (var stray in strays)
+            {
+                var prItem = new PrItem
+                {
+                    Id = Guid.NewGuid(),
+                    PrId = pr.Id,
+                    ItemName = stray.ItemName,
+                    Quantity = stray.Quantity,
+                    Unit = stray.Unit,
+                    EstimatedUnitPrice = stray.LastPrice,
+                    SortOrder = sortOrder++
+                };
+                pr.Items.Add(prItem);
+                stray.PrItemId = prItem.Id;
+            }
+
+            await _prRepo.SaveAsync(pr);
+            DataChangeNotifier.Notify(ProcurementChange.Pr);
+            ShowToast(strays.Count == 1
+                ? $"Added 1 item to {pr.PrNo}"
+                : $"Added {strays.Count} items to {pr.PrNo}");
+        }
+
         [RelayCommand]
         public void CloseAddRfqModal()
         {
@@ -595,6 +686,7 @@ namespace Procure.PageModels
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
 
             EditingRfqItems.Clear();
+            _rfqLinesAddedThisSession.Clear();
             IsAddRfqModalVisible = false;
             EditingRfq = null;
             IsEditingRfq = false;
@@ -642,7 +734,25 @@ namespace Procure.PageModels
         {
             if (Shell.Current == null) return;
 
-            var confirm = await Shell.Current.DisplayAlertAsync("Delete RFQ", $"Delete RFQ for {rfq.Vendor}?", "Delete", "Cancel");
+            // A PO raised from this quote keeps its money but loses its provenance when the quote
+            // goes: its Edit screen can no longer show the terms it was built on, and the price
+            // comparison loses that column. Allowed, but not without saying so.
+            var parent = LoadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+            var dependentPos = parent?.Pos?
+                .Where(p => p.LinkedRfqId.HasValue && p.LinkedRfqId.Value == rfq.Id)
+                .Select(p => p.PoNo)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct()
+                .ToList();
+
+            var confirm = dependentPos is { Count: > 0 }
+                ? await Shell.Current.DisplayAlertAsync(
+                    "Delete Quoted RFQ",
+                    $"Purchase order {string.Join(", ", dependentPos)} was raised from this quote.\n\nDeleting it keeps the order and its value, but the order loses the commercial terms it was built on and drops out of the price comparison.",
+                    "Delete anyway",
+                    "Cancel")
+                : await Shell.Current.DisplayAlertAsync("Delete RFQ", $"Delete RFQ for {rfq.Vendor}?", "Delete", "Cancel");
+
             if (!confirm) return;
 
             try
@@ -654,6 +764,7 @@ namespace Procure.PageModels
                     parentPr.Rfqs.Remove(rfq);
                     parentPr.NotifyHierarchyChanged();
                 }
+                DataChangeNotifier.Notify(ProcurementChange.Rfq);
             }
             catch (Exception ex)
             {

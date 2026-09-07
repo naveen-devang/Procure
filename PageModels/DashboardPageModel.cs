@@ -33,17 +33,53 @@ namespace Procure.PageModels
             _errorHandler = errorHandler;
 
             _settingsService.SettingsChanged += OnSettingsChanged;
+            Utilities.DataChangeNotifier.Changed += OnDataChanged;
             if (Application.Current != null)
             {
                 Application.Current.RequestedThemeChanged += OnAppRequestedThemeChanged;
             }
         }
 
+        /// <summary>Set by the page as it appears and disappears. The metrics query is a full sweep
+        /// of the database, so a hidden Dashboard must not run it on every write - OnAppearing
+        /// already reloads, which covers everything that happened while it was away.</summary>
+        public bool IsVisible { get; set; }
+
+        private int _refreshGeneration;
+
+        private void OnDataChanged(Utilities.ProcurementChange what)
+        {
+            if (!IsVisible) return;
+
+            // Debounced, for two reasons. The metrics are a full sweep of the database, and a burst of
+            // writes - a merge, a split, saving a PR that syncs into three quotes - fires this several
+            // times in a second; unthrottled, that was one whole-table sweep per write, which at
+            // 20,000 PRs starved the rest of the app. And LoadDataAsync drops a call outright while
+            // one is already running, so the LAST write of a burst was the one most likely to be
+            // discarded, leaving the figures stale exactly when they had just changed.
+            //
+            // Same generation-counter idiom as the board's search box: a superseded pass is retired by
+            // the counter rather than by cancelling anything, and the callback is already on the UI
+            // thread. 400ms because these are discrete saves, not keystrokes - long enough to collapse
+            // a burst, short enough to feel immediate.
+            var generation = ++_refreshGeneration;
+            MainThread.BeginInvokeOnMainThread(() =>
+                Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
+                    ?.DispatchDelayed(TimeSpan.FromMilliseconds(400), () =>
+                    {
+                        if (generation == _refreshGeneration && IsVisible) _ = LoadDataAsync();
+                    }));
+        }
+
+        /// <summary>Test seam: how many refreshes the debounce has actually let through.</summary>
+        internal int RefreshGenerationForTest => _refreshGeneration;
+
         // Registered as a DI singleton, so the container disposes it at shutdown - matches
         // PrListPageModel's identical pattern for the same two subscriptions.
         public void Dispose()
         {
             _settingsService.SettingsChanged -= OnSettingsChanged;
+            Utilities.DataChangeNotifier.Changed -= OnDataChanged;
             if (Application.Current != null)
             {
                 Application.Current.RequestedThemeChanged -= OnAppRequestedThemeChanged;

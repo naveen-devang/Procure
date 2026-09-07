@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<!-- Windows only. The UI is WinUI 3 throughout - Mica backdrop, Segoe Fluent Icons, native
@@ -13,10 +13,16 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
-		<!-- Memory & Garbage Collection Optimization -->
+		<!-- Memory & Garbage Collection.
+		     Workstation + concurrent is the right pairing for a desktop app: one heap rather than one
+		     per core, and gen2 collections run in the background instead of stopping the UI.
+		     GarbageCollectionAdaptationMode (DATAS) used to be set here. It only does anything under
+		     Server GC, so with ServerGarbageCollection=false it was dead configuration that read as if
+		     something were being tuned. Measured both ways on the 20,000-PR database over an identical
+		     146-check run: 7/5/4 collections either way, 0.34% vs 0.36% of time paused, peak memory
+		     within 5 MB. Removed rather than left to mislead the next person. -->
 		<ServerGarbageCollection>false</ServerGarbageCollection>
 		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
-		<GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
 		<TieredCompilation>true</TieredCompilation>
 		<TieredPGO>true</TieredPGO>
 

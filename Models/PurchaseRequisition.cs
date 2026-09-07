@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -237,22 +237,40 @@ namespace Procure.Models
         public bool HasAnyBadge => IsConsolidatedMaster || IsMergedChild || HasSharedRfqs || HasCombinedPos;
         public string CombinedPosBadgeText => string.Join(", ", Pos.Where(p => p.IsCombinedPo).Select(p => p.CombinedPrs).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
 
+        /// <summary>One pass over this PR's children that refreshes everything derived from them:
+        /// how much of each line is on order, and how completely each quote covers the requisition.
+        ///
+        /// Deliberately one pass, called from one place. Coverage used to be computed per binding
+        /// read on the RFQ itself, which meant walking the PR's lines every time a card repainted;
+        /// fulfilment was a second walk of the same data. This runs on the board's reload path, so
+        /// it reuses buffers rather than allocating per quote.</summary>
         public void CalculateItemFulfillments()
         {
-            if (Items == null || Items.Count == 0) return;
+            if (Items == null || Items.Count == 0)
+            {
+                if (Rfqs != null)
+                {
+                    // A PR with no lines can still hold quotes; clear the coverage rather than
+                    // leaving whatever the last requisition state put there.
+                    foreach (var rfq in Rfqs) rfq.PrLineCount = rfq.PrLinesCovered = rfq.PrLinesPriced = rfq.PrLinesQuantityDrifted = 0;
+                }
+                return;
+            }
 
-            var allPoItems = Pos?.SelectMany(p => p.Items ?? Enumerable.Empty<PurchaseOrderItem>()).ToList() ?? new List<PurchaseOrderItem>();
+            // Each PO line counts once, against one line. Summing "same id OR same name" credited a
+            // PO raised for one line to every same-named sibling too, so a merged PR with 12 and 33
+            // of one item read "Complete" as soon as the 12 was ordered.
+            var ordered = Procure.Utilities.PrLineMatcher.OrderedQuantities(Items, Pos);
 
             foreach (var item in Items)
             {
-                var orderedQty = allPoItems
-                    .Where(pi => (pi.PrItemId.HasValue && pi.PrItemId.Value == item.Id) || string.Equals(pi.ItemName, item.ItemName, StringComparison.OrdinalIgnoreCase))
-                    .Sum(pi => pi.Quantity);
-
-                item.OrderedQuantity = orderedQty;
+                item.OrderedQuantity = ordered.TryGetValue(item.Id, out var qty) ? qty : 0m;
             }
 
+            RecalculateQuoteCoverage();
+
             OnPropertyChanged(nameof(PoFulfillmentBadgeText));
+            OnPropertyChanged(nameof(HasOverOrderedItems));
             OnPropertyChanged(nameof(IsPoFullyOrdered));
             OnPropertyChanged(nameof(IsPoPartiallyOrdered));
             OnPropertyChanged(nameof(TotalOrderedItemQuantity));
@@ -261,9 +279,56 @@ namespace Procure.Models
             OnPropertyChanged(nameof(HasPendingItemsSummary));
         }
 
+        /// <summary>Fills in each quote's "how much of this requisition do you actually cover"
+        /// counters. Buffers are shared across every quote - a PR with five vendors used to mean
+        /// five throwaway dictionaries per refresh.</summary>
+        private void RecalculateQuoteCoverage()
+        {
+            if (Rfqs == null || Rfqs.Count == 0 || Items == null || Items.Count == 0) return;
+
+            var buffer = new Dictionary<RfqItem, PrItem>();
+            var claimed = new bool[Items.Count];
+
+            foreach (var rfq in Rfqs)
+            {
+                rfq.PrLineCount = Items.Count;
+
+                if (rfq.Items == null || rfq.Items.Count == 0)
+                {
+                    rfq.PrLinesCovered = 0;
+                    rfq.PrLinesPriced = 0;
+                    rfq.PrLinesQuantityDrifted = 0;
+                    continue;
+                }
+
+                Procure.Utilities.PrLineMatcher.MapInto(rfq.Items, Items, buffer, claimed);
+
+                int covered = 0, priced = 0, drifted = 0;
+                foreach (var pair in buffer)
+                {
+                    var line = pair.Key;
+                    covered++;
+
+                    var isPriced = line.IsQuoted && ((line.QuotedUnitPrice ?? 0m) > 0m || line.LineTotal > 0m);
+                    if (isPriced)
+                    {
+                        priced++;
+                        // Only a priced line can drift: an unpriced one is about to be re-synced
+                        // to the requisition anyway (see PrListPageModel's PR save).
+                        if (line.Quantity != pair.Value.Quantity) drifted++;
+                    }
+                }
+
+                rfq.PrLinesCovered = covered;
+                rfq.PrLinesPriced = priced;
+                rfq.PrLinesQuantityDrifted = drifted;
+            }
+        }
+
         public decimal TotalOrderedItemQuantity => Items?.Sum(i => i.OrderedQuantity) ?? 0m;
         public decimal TotalPendingItemQuantity => Items?.Sum(i => i.PendingQuantity) ?? 0m;
 
+        public bool HasOverOrderedItems => HasItems && Items.Any(i => i.IsOverOrdered);
         public bool IsPoFullyOrdered => HasItems && Items.All(i => i.IsFullyOrdered);
         public bool IsPoPartiallyOrdered => HasItems && Pos.Count > 0 && !IsPoFullyOrdered;
 
@@ -289,6 +354,15 @@ namespace Procure.Models
                 if (!HasItems) return string.Empty;
                 int fullyOrderedCount = Items.Count(i => i.IsFullyOrdered);
                 int totalCount = Items.Count;
+
+                // Checked before "Complete": an over-ordered line satisfies IsFullyOrdered, so a PR
+                // cut back below what was already ordered used to read Complete and hide the surplus.
+                if (HasOverOrderedItems)
+                {
+                    var overQty = Items.Sum(i => i.OverOrderedQuantity);
+                    var overCount = Items.Count(i => i.IsOverOrdered);
+                    return $"PO: Over-ordered ({overCount} of {totalCount} items • {overQty:G29} more than the PR asks for)";
+                }
 
                 if (IsPoFullyOrdered)
                 {
@@ -350,6 +424,20 @@ namespace Procure.Models
             OnPropertyChanged(nameof(HasAnyBadge));
             // PoFulfillmentBadgeText, IsPoFullyOrdered, IsPoPartiallyOrdered, TotalOrderedItemQuantity
             // and TotalPendingItemQuantity are already raised by CalculateItemFulfillments() above.
+
+            // Down into the children. Their computed labels - a quote's coverage chip, an order's
+            // item count - are derived from data this PR owns, and nothing else tells them it moved,
+            // so a PR edit used to leave the quote and order cards below it showing pre-edit values
+            // until the whole board was rebuilt. Only reached when something actually changed:
+            // MergeFrom gates this call, and the save paths call it once per save.
+            if (Rfqs != null)
+            {
+                foreach (var rfq in Rfqs) rfq.NotifyCalculationsChanged();
+            }
+            if (Pos != null)
+            {
+                foreach (var po in Pos) po.NotifyCalculationsChanged();
+            }
         }
 
         /// <summary>Copies a freshly loaded row and its children onto this live instance, so a reload can

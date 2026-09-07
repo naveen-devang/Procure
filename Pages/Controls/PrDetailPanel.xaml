@@ -215,6 +215,40 @@
                                                            TextColor="{AppThemeBinding Light={StaticResource BadgeSharedRfqTextLight}, Dark={StaticResource BadgeSharedRfqTextDark}}" />
                                                 </Border>
 
+                                                <!-- Coverage warnings: lines this quote does not
+                                                     list at all, and lines whose PR quantity moved
+                                                     after the vendor priced them. Both use the
+                                                     amber "not settled yet" palette. -->
+                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                        IsVisible="{Binding HasMissingPrLines}"
+                                                        Stroke="{Binding MissingPrLinesBadge, Converter={StaticResource PoFulfillmentStrokeConverter}}"
+                                                        BackgroundColor="{Binding MissingPrLinesBadge, Converter={StaticResource PoFulfillmentBgConverter}}"
+                                                        VerticalOptions="Center">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="{Binding MissingPrLinesBadge}" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                           LineBreakMode="NoWrap"
+                                                           TextColor="{Binding MissingPrLinesBadge, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                                                </Border>
+
+                                                <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
+                                                        IsVisible="{Binding HasQuantityDrift}"
+                                                        Stroke="{Binding QuantityDriftBadge, Converter={StaticResource PoFulfillmentStrokeConverter}}"
+                                                        BackgroundColor="{Binding QuantityDriftBadge, Converter={StaticResource PoFulfillmentBgConverter}}"
+                                                        VerticalOptions="Center">
+                                                    <Border.StrokeShape>
+                                                        <RoundRectangle CornerRadius="4" />
+                                                    </Border.StrokeShape>
+                                                    <Label Text="{Binding QuantityDriftBadge}" FontSize="9.5" FontFamily="SegoeSemibold"
+                                                           VerticalOptions="Center" HorizontalOptions="Center"
+                                                           VerticalTextAlignment="Center" HorizontalTextAlignment="Center"
+                                                           LineBreakMode="NoWrap"
+                                                           TextColor="{Binding QuantityDriftBadge, Converter={StaticResource PoFulfillmentColorConverter}}" />
+                                                </Border>
+
                                                 <!-- Incoterms Micro-Chip -->
                                                 <Border Margin="0,2,6,2" Padding="7,2.5" StrokeThickness="1"
                                                         Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray700}}"

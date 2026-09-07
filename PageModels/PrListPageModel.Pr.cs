@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -80,12 +80,15 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public void RemoveEditingPrItem(PrItem item)
+        public async Task RemoveEditingPrItemAsync(PrItem item)
         {
-            if (EditingPrItems.Contains(item))
-            {
-                EditingPrItems.Remove(item);
-            }
+            if (!EditingPrItems.Contains(item)) return;
+
+            // Refuses if the line is already on a PO, and offers to take the quote lines with it if
+            // vendors have priced it. See PrListPageModel.PrSync.
+            if (!await ConfirmRemovePrItemAsync(item)) return;
+
+            EditingPrItems.Remove(item);
         }
 
         [RelayCommand]
@@ -216,6 +219,7 @@ namespace Procure.PageModels
                     SortOrder = i.SortOrder
                 }).ToList();
                 EditingPrItems = new ObservableCollection<PrItem>(copied);
+                CapturePrItemsSnapshot(pr);
             }
             else
             {
@@ -266,6 +270,16 @@ namespace Procure.PageModels
             }
 
             var validItems = EditingPrItems.Where(i => !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
+
+            // Cutting a line below what is already ordered is allowed, but not silently: the PR then
+            // carries a visible Over-ordered state instead of the old "Complete".
+            if (!await ConfirmQuantityCutsAsync(CurrentEditingPr, validItems)) return;
+
+            // The pre-edit lines, kept back before the new list replaces them: the quote sync below
+            // resolves against these, which is the only way it can tell a rename from a deletion
+            // plus an unrelated addition. The modal edits copies, so these still hold the old values.
+            var preEditItems = CurrentEditingPr.Items?.ToList() ?? new List<PrItem>();
+
             CurrentEditingPr.Items = new ObservableCollection<PrItem>(validItems);
 
             if (string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && validItems.Count > 0)
@@ -284,11 +298,20 @@ namespace Procure.PageModels
             {
                 CurrentEditingPr.CustomValues = new ObservableCollection<CustomFieldValue>(EditingCustomValues);
                 await _prRepo.SaveAsync(CurrentEditingPr);
+
+                // Only now: a quote line references a PR line by foreign key, so a line added to the
+                // requisition has to be in the database before a quote can point at it.
+                var syncSummary = await SyncQuotesToPrAsync(CurrentEditingPr, preEditItems, validItems);
+
                 CurrentEditingPr.NotifyHierarchyChanged();
                 ApplyFilters();
+                DataChangeNotifier.Notify(ProcurementChange.Pr | ProcurementChange.Rfq);
 
                 _editSnapshot = null;
+                _prItemsToPurgeFromQuotes.Clear();
                 IsEditModalVisible = false;
+
+                if (!string.IsNullOrEmpty(syncSummary)) ShowToast(syncSummary);
             }
             catch (Exception ex)
             {
@@ -321,9 +344,21 @@ namespace Procure.PageModels
         {
             if (Shell.Current == null) return;
 
+            // Naming the orders is the whole point of the warning - "and all associated POs" gave no
+            // clue that a raised order was about to go with it. Deleting is still allowed: a
+            // requisition raised by mistake has to be removable, orders and all.
+            var poCount = pr.Pos?.Count ?? 0;
+            var poNos = poCount == 0
+                ? string.Empty
+                : string.Join(", ", pr.Pos!.Select(p => p.PoNo).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct());
+
+            var message = string.IsNullOrEmpty(poNos)
+                ? $"Are you sure you want to delete {pr.PrNo} ({pr.Description}) and all associated RFQs, PCRs, and POs?"
+                : $"{pr.PrNo} has {poCount} purchase order(s) raised against it: {poNos}.\n\nDeleting the requisition deletes those orders and their call-off history too. This cannot be undone.";
+
             var confirm = await Shell.Current.DisplayAlertAsync(
-                "Delete PR",
-                $"Are you sure you want to delete {pr.PrNo} ({pr.Description}) and all associated RFQs, PCRs, and POs?",
+                string.IsNullOrEmpty(poNos) ? "Delete PR" : "Delete PR With Orders",
+                message,
                 "Delete",
                 "Cancel");
 
@@ -335,6 +370,7 @@ namespace Procure.PageModels
                 pr.PropertyChanged -= OnPrItemPropertyChanged;
                 _selectedIds.Remove(pr.Id);
                 ApplyFilters(resetToTop: true);
+                DataChangeNotifier.Notify(ProcurementChange.All);
             }
             catch (Exception ex)
             {

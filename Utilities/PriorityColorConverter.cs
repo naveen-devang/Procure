@@ -311,9 +311,14 @@ namespace Procure.Utilities
         internal static int Classify(object? value)
         {
             var text = value as string ?? string.Empty;
-            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase))
+            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("Over-ordered", StringComparison.OrdinalIgnoreCase))
                 return Over;
-            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase))
+            // "Missing" and "Qty changed" are the coverage warnings: same amber as a pending
+            // quantity, since both mean "this quote does not yet match the requisition".
+            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("Missing", StringComparison.OrdinalIgnoreCase) || text.Contains("Qty changed", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("Not on the requisition", StringComparison.OrdinalIgnoreCase))
                 return Pending;
             if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
                 return Complete;

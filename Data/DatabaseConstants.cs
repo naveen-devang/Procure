@@ -15,7 +15,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 13;
+        public const int SchemaVersion = 14;
         private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
         public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
@@ -407,16 +407,148 @@ SELECT lower(TRIM(poi.ItemName)) AS K,
 DELETE FROM MaterialAggregate;
 INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
 " + SqlComputeMaterialAggregates + @"
-GROUP BY K;";
+GROUP BY K
+" + SqlMaterialAggregateUpsert + ";";
 
-        /// <summary>Recomputes only the given material keys - `{0}` is the caller's parameter list.
-        /// A key with no eligible lines left simply loses its row, which is what the DELETE is for.</summary>
-        public const string SqlRefreshMaterialAggregatesTemplate = @"
-DELETE FROM MaterialAggregate WHERE MaterialKey IN ({0});
+        /// <summary>Last writer wins, instead of the insert failing.
+        ///
+        /// The refresh below is a DELETE followed by an INSERT, and most callers run it with no
+        /// transaction around the pair. Two of them overlapping - which is all it takes for two
+        /// save paths to fire at once - interleaves as delete, delete, insert, insert, and the
+        /// second insert hit "UNIQUE constraint failed: MaterialAggregate.MaterialKey" and put an
+        /// error dialog in front of the user for nothing. Every writer recomputes the same row from
+        /// the same live data, so overwriting is not just safe here, it is the correct answer.</summary>
+        private const string SqlMaterialAggregateUpsert = @"
+ON CONFLICT(MaterialKey) DO UPDATE SET
+    MaterialName   = excluded.MaterialName,
+    LineCount      = excluded.LineCount,
+    TotalOrdered   = excluded.TotalOrdered,
+    TotalCalledOff = excluded.TotalCalledOff,
+    Unit           = excluded.Unit";
+
+        /// <summary>The two halves of the refresh, kept separately so a test can run just the write
+        /// half twice and prove the upsert above actually holds. Both take the caller's parameter
+        /// list as `{0}`.</summary>
+        public const string SqlRefreshMaterialAggregatesDeleteTemplate =
+            "DELETE FROM MaterialAggregate WHERE MaterialKey IN ({0});";
+
+        public const string SqlRefreshMaterialAggregatesInsertTemplate = @"
 INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
 " + SqlComputeMaterialAggregates + @"
   AND lower(TRIM(poi.ItemName)) IN ({0})
-GROUP BY K;";
+GROUP BY K
+" + SqlMaterialAggregateUpsert + ";";
+
+        /// <summary>Recomputes only the given material keys - `{0}` is the caller's parameter list.
+        /// A key with no eligible lines left simply loses its row, which is what the DELETE is for.</summary>
+        public const string SqlRefreshMaterialAggregatesTemplate =
+            SqlRefreshMaterialAggregatesDeleteTemplate + SqlRefreshMaterialAggregatesInsertTemplate;
+
+        /// <summary>v14 repair: reattach quote lines that were never given a PR line to point at.
+        ///
+        /// Merging PRs used to copy quote lines without their PrItemId, so every quote on every
+        /// merged PR was orphaned and could only be found again by matching its item text. On a
+        /// merged PR that is exactly the case that breaks: two source PRs asking for the same item
+        /// leave two PR lines with identical names, and the text match returned the first one to
+        /// both quote lines - so a 12 NOS line and a 33 NOS line both read 12, and the PO wizard
+        /// refused the order as over-allocated.
+        ///
+        /// The pairing rule matches PrLineMatcher exactly: a PR line already spoken for by a linked
+        /// quote line on the same RFQ is off the table, and the rest are handed out one-to-one in
+        /// SortOrder. Row numbers on both sides are compared, so the Nth unlinked quote line of a
+        /// name takes the Nth free PR line of that name.
+        ///
+        /// The pairs are materialised into an indexed temp table first, and only then joined back.
+        /// Expressing the same thing as a correlated subquery on the UPDATE re-evaluated both window
+        /// functions over the whole table for every candidate row: 187 seconds at 20,000 PRs against
+        /// 4 seconds this way, for byte-identical results - and that gap grows with the row count.</summary>
+        public const string SqlRelinkOrphanedRfqItems = @"
+CREATE TEMP TABLE IF NOT EXISTS _relink_rfq (RfqItemId TEXT PRIMARY KEY, PrItemId TEXT NOT NULL);
+DELETE FROM _relink_rfq;
+
+INSERT OR IGNORE INTO _relink_rfq (RfqItemId, PrItemId)
+WITH free_pr AS (
+    SELECT r.Id AS RfqId, p.Id AS PrItemId, lower(TRIM(p.ItemName)) AS Nm,
+           ROW_NUMBER() OVER (PARTITION BY r.Id, lower(TRIM(p.ItemName)) ORDER BY p.SortOrder, p.Id) AS Rn
+    FROM RequestForQuotation r
+    JOIN PrItem p ON p.PrId = r.PrId
+    WHERE NOT EXISTS (SELECT 1 FROM RfqItem x WHERE x.RfqId = r.Id AND x.PrItemId = p.Id)
+),
+loose AS (
+    SELECT i.Id AS RfqItemId, i.RfqId, lower(TRIM(i.ItemName)) AS Nm,
+           ROW_NUMBER() OVER (PARTITION BY i.RfqId, lower(TRIM(i.ItemName)) ORDER BY i.SortOrder, i.Id) AS Rn
+    FROM RfqItem i
+    WHERE i.PrItemId IS NULL AND TRIM(i.ItemName) <> ''
+)
+SELECT l.RfqItemId, f.PrItemId
+FROM loose l
+JOIN free_pr f ON f.RfqId = l.RfqId AND f.Nm = l.Nm AND f.Rn = l.Rn;
+
+UPDATE RfqItem
+SET PrItemId = (SELECT PrItemId FROM _relink_rfq WHERE RfqItemId = RfqItem.Id)
+WHERE PrItemId IS NULL AND Id IN (SELECT RfqItemId FROM _relink_rfq);
+
+DROP TABLE _relink_rfq;";
+
+        /// <summary>v14 repair: the same reattachment for PO lines, which lost their link the same
+        /// way (a PO raised from an orphaned quote copied the missing link straight through).</summary>
+        public const string SqlRelinkOrphanedPoItems = @"
+CREATE TEMP TABLE IF NOT EXISTS _relink_po (PoItemId TEXT PRIMARY KEY, PrItemId TEXT NOT NULL);
+DELETE FROM _relink_po;
+
+INSERT OR IGNORE INTO _relink_po (PoItemId, PrItemId)
+WITH free_pr AS (
+    SELECT po.Id AS PoId, p.Id AS PrItemId, lower(TRIM(p.ItemName)) AS Nm,
+           ROW_NUMBER() OVER (PARTITION BY po.Id, lower(TRIM(p.ItemName)) ORDER BY p.SortOrder, p.Id) AS Rn
+    FROM PurchaseOrder po
+    JOIN PrItem p ON p.PrId = po.PrId
+    WHERE NOT EXISTS (SELECT 1 FROM PurchaseOrderItem x WHERE x.PoId = po.Id AND x.PrItemId = p.Id)
+),
+loose AS (
+    SELECT i.Id AS PoItemId, i.PoId, lower(TRIM(i.ItemName)) AS Nm,
+           ROW_NUMBER() OVER (PARTITION BY i.PoId, lower(TRIM(i.ItemName)) ORDER BY i.SortOrder, i.Id) AS Rn
+    FROM PurchaseOrderItem i
+    WHERE i.PrItemId IS NULL AND TRIM(i.ItemName) <> ''
+)
+SELECT l.PoItemId, f.PrItemId
+FROM loose l
+JOIN free_pr f ON f.PoId = l.PoId AND f.Nm = l.Nm AND f.Rn = l.Rn;
+
+UPDATE PurchaseOrderItem
+SET PrItemId = (SELECT PrItemId FROM _relink_po WHERE PoItemId = PurchaseOrderItem.Id)
+WHERE PrItemId IS NULL AND Id IN (SELECT PoItemId FROM _relink_po);
+
+DROP TABLE _relink_po;";
+
+        /// <summary>v14 repair: give combined POs the line items they were never written.
+        ///
+        /// A combined PO stored money and nothing else, so its PRs stayed "Unordered" for ever and
+        /// the Raw &amp; Packing tab never saw the quantity. The lines are derived exactly as the
+        /// fixed code now derives them - from the quote the PO is linked to - so a repaired PO and a
+        /// newly raised one agree. Deliberately narrowed to combined POs (CombinedPrs non-empty)
+        /// with no lines at all: a single-PO row with no items is a lump-sum order or one the user
+        /// emptied on purpose, and must not have items invented for it.</summary>
+        public const string SqlBackfillCombinedPoItems = @"
+INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal, SortOrder)
+SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2)
+            || '-a' || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+       po.Id,
+       ri.PrItemId,
+       ri.Id,
+       ri.ItemName,
+       ri.Quantity,
+       COALESCE(NULLIF(ri.Unit, ''), 'pcs'),
+       ri.QuotedUnitPrice,
+       ri.Discount,
+       ri.Quantity * MAX(0, COALESCE(ri.QuotedUnitPrice, 0) - COALESCE(ri.Discount, 0)),
+       ri.SortOrder
+FROM PurchaseOrder po
+JOIN RfqItem ri ON ri.RfqId = po.LinkedRfqId
+WHERE COALESCE(po.CombinedPrs, '') <> ''
+  AND po.LinkedRfqId IS NOT NULL
+  AND ri.IsQuoted = 1
+  AND TRIM(ri.ItemName) <> ''
+  AND NOT EXISTS (SELECT 1 FROM PurchaseOrderItem x WHERE x.PoId = po.Id);";
 
         /// <summary>The material keys a PR's PO items currently name. Captured before a write so the
         /// materials a rename or delete moves rows *away from* are recomputed too.</summary>

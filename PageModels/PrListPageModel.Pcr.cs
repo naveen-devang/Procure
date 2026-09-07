@@ -58,6 +58,7 @@ namespace Procure.PageModels
                 pr.Status = ProcurementStatus.PcrSubmitted;
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
+                DataChangeNotifier.Notify(ProcurementChange.Pr);
             }
             catch (Exception ex)
             {

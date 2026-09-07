@@ -174,6 +174,31 @@ WHERE COALESCE(BaseAmount, 0) > 0
                 await repair.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
+            // v14: reattach quote and PO lines that were never given a PR line to point at (the
+            // merge used to drop the link), then give combined POs the line items they never got.
+            // Order matters - the backfill copies PrItemId off the quote lines repaired above.
+            if (fromVersion < 14)
+            {
+                foreach (var repairSql in new[]
+                         {
+                             DatabaseConstants.SqlRelinkOrphanedRfqItems,
+                             DatabaseConstants.SqlRelinkOrphanedPoItems,
+                             DatabaseConstants.SqlBackfillCombinedPoItems,
+                         })
+                {
+                    using var relink = connection.CreateCommand();
+                    relink.CommandText = repairSql;
+                    await relink.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
+
+                // The backfill above adds PO item rows, which are what MaterialAggregate summarises.
+                // Skipping this leaves the Raw & Packing tab reporting figures that predate the
+                // repair - the exact staleness DatabaseSelfCheck asserts against.
+                using var aggregates = connection.CreateCommand();
+                aggregates.CommandText = DatabaseConstants.SqlRebuildAllMaterialAggregates;
+                await aggregates.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
             // Backfill the search text for every existing row. Only reached when the schema version
             // moved, so this runs once per database, not once per launch. ~240ms at 20,000 PRs.
             using var backfill = connection.CreateCommand();

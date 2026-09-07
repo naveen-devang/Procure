@@ -316,7 +316,7 @@ namespace Procure
         // Hides the tab from the sidebar entirely rather than just blocking navigation to it - the
         // route still exists, but CallOffPageModel/CallOffRepository are DI singletons that never
         // get constructed until MaterialsContent.Content is actually assigned (see OnNavigating),
-        // so turning this off costs nothing beyond hiding the icon: no query, no PoChangeNotifier
+        // so turning this off costs nothing beyond hiding the icon: no query, no DataChangeNotifier
         // subscription, nothing sitting in memory.
         private void UpdateMaterialsTabVisibility()
         {
