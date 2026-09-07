@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using Procure.Models;
 
@@ -43,11 +44,7 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(clipboardText))
                 return result;
 
-            var rawLines = clipboardText
-                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(l => l.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToList();
+            var rawLines = SplitRecords(clipboardText);
 
             if (rawLines.Count == 0)
                 return result;
@@ -82,11 +79,7 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(clipboardText))
                 return result;
 
-            var rawLines = clipboardText
-                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(l => l.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToList();
+            var rawLines = SplitRecords(clipboardText);
 
             if (rawLines.Count == 0)
                 return result;
@@ -118,11 +111,7 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(clipboardText))
                 return result;
 
-            var rawLines = clipboardText
-                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(l => l.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToList();
+            var rawLines = SplitRecords(clipboardText);
 
             if (rawLines.Count == 0)
                 return result;
@@ -176,11 +165,7 @@ namespace Procure.Utilities
             if (string.IsNullOrWhiteSpace(clipboardText))
                 return result;
 
-            var rawLines = clipboardText
-                .Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(l => l.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .ToList();
+            var rawLines = SplitRecords(clipboardText);
 
             if (rawLines.Count == 0)
                 return result;
@@ -366,8 +351,10 @@ namespace Procure.Utilities
             }
             else
             {
-                // Single column: apply smart heuristics to extract quantity and unit if present
-                string text = line.Trim();
+                // Single column: apply smart heuristics to extract quantity and unit if present.
+                // Use the parsed field, not the raw record - a quoted multi-line cell still carries
+                // its "..." wrapper in `line`.
+                string text = (columns.Length > 0 ? columns[0] : line).Trim();
 
                 // Check "5x Dell Monitor"
                 var match = PrefixQtyRegex.Match(text);
@@ -450,19 +437,128 @@ namespace Procure.Utilities
 
         private static string[] SplitColumns(string line)
         {
+            bool hasQuote = line.Contains('"');
+
             if (line.Contains('\t'))
             {
-                return line.Split('\t');
+                return hasQuote ? SplitQuotedFields(line, '\t') : line.Split('\t');
+            }
+
+            // A quoted payload with no tab is a single cell whose text (item name / spec) may itself
+            // hold commas and newlines - Excel wraps exactly that in "...". Unwrap it, never split it.
+            if (hasQuote)
+            {
+                return SplitQuotedFields(line, '\0');
             }
 
             // Splitting "1,250.00" into ["1","250.00"] turned pasted prices into price+discount
             // pairs and pasted quantities of "1,000" into 1.
-            if (line.Contains(',') && !line.StartsWith('"') && !FormattedNumberLineRegex.IsMatch(line))
+            if (line.Contains(',') && !FormattedNumberLineRegex.IsMatch(line))
             {
                 return line.Split(',');
             }
 
             return new[] { line };
+        }
+
+        /// <summary>Splits one clipboard record into fields on <paramref name="delim"/>, honouring
+        /// RFC 4180 double-quote spans: a delimiter or newline inside "..." is literal text, and ""
+        /// is an escaped quote. Pass '\0' to simply unwrap a single quoted cell. Fields come back
+        /// unquoted; callers trim.</summary>
+        private static string[] SplitQuotedFields(string line, char delim)
+        {
+            var fields = new List<string>();
+            var sb = new StringBuilder();
+            bool inQuotes = false;
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (inQuotes)
+                {
+                    if (c == '"')
+                    {
+                        if (i + 1 < line.Length && line[i + 1] == '"') { sb.Append('"'); i++; }
+                        else inQuotes = false;
+                    }
+                    else sb.Append(c);
+                }
+                else if (c == '"') inQuotes = true;
+                else if (delim != '\0' && c == delim) { fields.Add(sb.ToString()); sb.Clear(); }
+                else sb.Append(c);
+            }
+
+            fields.Add(sb.ToString());
+            return fields.ToArray();
+        }
+
+        /// <summary>Breaks clipboard text into one string per spreadsheet row, treating a CR/LF as a
+        /// row break only when it is NOT inside a quoted cell. A multi-line Excel cell arrives
+        /// wrapped in "..." with its newlines inside - that stays one record, and one item. Quotes
+        /// are left in place for <see cref="SplitColumns"/> to interpret; blank rows are dropped.</summary>
+        internal static List<string> SplitRecords(string? text)
+        {
+            var records = new List<string>();
+            if (string.IsNullOrEmpty(text)) return records;
+
+            var sb = new StringBuilder();
+            bool inQuotes = false;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '"')
+                {
+                    sb.Append('"');
+                    if (inQuotes && i + 1 < text.Length && text[i + 1] == '"') { sb.Append('"'); i++; }
+                    else inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (!inQuotes && (c == '\n' || c == '\r'))
+                {
+                    if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                    FlushRecord(records, sb);
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+
+            FlushRecord(records, sb);
+            return records;
+        }
+
+        private static void FlushRecord(List<string> records, StringBuilder sb)
+        {
+            var s = sb.ToString().Trim();
+            sb.Clear();
+            if (!string.IsNullOrWhiteSpace(s)) records.Add(s);
+        }
+
+        /// <summary>True when the clipboard payload is a spreadsheet grid the item table should fan
+        /// out into rows - several rows, or one tab-separated row. A single cell (even a multi-line
+        /// one) is false, so a paste into a name field just fills that field.</summary>
+        public static bool LooksLikeGrid(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var records = SplitRecords(text);
+            if (records.Count > 1) return true;
+            return records.Count == 1 && records[0].Contains('\t');
+        }
+
+        /// <summary>Unwraps a single pasted cell to its plain text - strips the Excel "..." wrapper
+        /// and unescapes "" - without column-splitting it, for dropping a pasted spec straight into
+        /// one field. Multi-line content keeps its line breaks.</summary>
+        public static string NormalizeSingleName(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            var records = SplitRecords(text);
+            if (records.Count != 1) return text.Trim();
+            var rec = records[0];
+            // Only a quoted cell needs unwrapping; an unquoted name is returned verbatim - it may
+            // legitimately contain commas, and must never be column-split here.
+            return rec.Contains('"') ? SplitQuotedFields(rec, '\0')[0].Trim() : rec;
         }
 
         private static bool IsHeaderRow(string line)

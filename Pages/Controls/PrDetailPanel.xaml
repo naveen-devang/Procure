@@ -794,8 +794,12 @@
                                     <Grid ColumnDefinitions="*, Auto, Auto, Auto" ColumnSpacing="10" VerticalOptions="Center">
                                         <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
                                             <Label Text="{Binding ItemName}" FontFamily="SegoeSemibold" FontSize="12.5"
-                                                   LineBreakMode="TailTruncation" MaxLines="2"
-                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
+                                                   ToolTipProperties.Text="{Binding ItemName}"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}">
+                                                <Label.Behaviors>
+                                                    <converters:ExpandOnHoverBehavior />
+                                                </Label.Behaviors>
+                                            </Label>
                                             <Label Text="{Binding Notes}" FontSize="11"
                                                    LineBreakMode="TailTruncation" MaxLines="2"
                                                    IsVisible="{Binding Notes, Converter={StaticResource NullToBoolConverter}}"

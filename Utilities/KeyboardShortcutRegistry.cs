@@ -29,7 +29,6 @@ namespace Procure.Utilities
 
         public const string ModalSave = "Modal.Save";
         public const string ModalSelectAll = "Modal.SelectAll";
-        public const string ModalPaste = "Modal.Paste";
 
         public const string PcrPrint = "PcrPreview.Print";
         public const string PcrPrevPage = "PcrPreview.PrevPage";
@@ -67,7 +66,6 @@ namespace Procure.Utilities
 
             new(KeyboardShortcutIds.ModalSave, "Save (active dialog)", "Dialogs", "Ctrl+S"),
             new(KeyboardShortcutIds.ModalSelectAll, "Select All (active dialog)", "Dialogs", "Ctrl+A"),
-            new(KeyboardShortcutIds.ModalPaste, "Paste Rows (Batch Create)", "Dialogs", "Ctrl+V"),
 
             new(KeyboardShortcutIds.PcrPrint, "Print", "PDF Preview", "Ctrl+P"),
             new(KeyboardShortcutIds.PcrPrevPage, "Previous Page", "PDF Preview", "Left"),

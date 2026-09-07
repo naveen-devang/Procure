@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:u="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Modals.BatchRfqModal"
              x:DataType="pageModels:PrListPageModel"
              IsVisible="{Binding IsBatchRfqModalVisible}">
@@ -176,22 +177,15 @@
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </Grid>
 
-                            <!-- Table Rows. Virtualized with a bounded height — this list is the
-                                 union of items across every selected PR, so it is the largest
-                                 typing surface in the app; the old stack realized and re-measured
-                                 all of it per keystroke. -->
-                            <CollectionView ItemsSource="{Binding BatchEditingRfqItems}"
-                                            HeightRequest="{Binding BatchRfqItemsListHeight}"
-                                            SelectionMode="None">
-                                <CollectionView.ItemsLayout>
-                                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="6" />
-                                </CollectionView.ItemsLayout>
-                                <CollectionView.ItemTemplate>
+                            <!-- Table Rows flow in the modal's single outer ScrollView, like the Add PR
+                                 and Edit PR sheets - no inner scrollport. -->
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding BatchEditingRfqItems}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:RfqItem">
                                         <Grid ColumnDefinitions="36, 75, *, 70, 85, 80, 90, 85"
                                               ColumnSpacing="8"
                                               Padding="4,2"
-                                              VerticalOptions="Center">
+                                              VerticalOptions="Start">
                                             <!-- Quoted CheckBox -->
                                             <CheckBox Color="{DynamicResource AccentFill}" Grid.Column="0"
                                                       IsChecked="{Binding IsQuoted, Mode=TwoWay}"
@@ -211,14 +205,17 @@
                                                        TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                             </Border>
 
-                                            <!-- Item Description -->
+                                            <!-- Item Description - clamped to 2 lines; hover to see the full spec. -->
                                             <Label Grid.Column="2"
                                                    Text="{Binding ItemName}"
                                                    FontSize="12"
                                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                                    VerticalOptions="Center"
-                                                   MaxLines="2"
-                                                   LineBreakMode="TailTruncation" />
+                                                   ToolTipProperties.Text="{Binding ItemName}">
+                                                <Label.Behaviors>
+                                                    <u:ExpandOnHoverBehavior />
+                                                </Label.Behaviors>
+                                            </Label>
 
                                             <!-- Quantity & Unit -->
                                             <Label Grid.Column="3"
@@ -277,8 +274,8 @@
                                                    TextChanged="OnBatchRfqLastPriceTextChanged" />
                                         </Grid>
                                     </DataTemplate>
-                                </CollectionView.ItemTemplate>
-                            </CollectionView>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                     </Border>
 

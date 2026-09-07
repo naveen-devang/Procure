@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:u="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Modals.BatchCreateModal"
              x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
@@ -58,7 +59,7 @@
                         <RoundRectangle CornerRadius="8" />
                     </Border.StrokeShape>
                     <VerticalStackLayout Spacing="6">
-                        <Grid ColumnDefinitions="Auto, 110, 160, 90, 150, *" ColumnSpacing="10" VerticalOptions="Center">
+                        <Grid ColumnDefinitions="Auto, 110, 160, 90, 150, *, Auto" ColumnSpacing="10" VerticalOptions="Center">
                             <Label Grid.Column="0" Text="New Row Defaults" FontFamily="SegoeSemibold" FontSize="12"
                                    VerticalOptions="Center"
                                    TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
@@ -67,8 +68,13 @@
                             <Picker Grid.Column="3" ItemsSource="{Binding AllPriorities}" SelectedItem="{Binding BatchSharedPriority, Mode=TwoWay}" HeightRequest="32" FontSize="11" />
                             <Entry Grid.Column="4" Text="{Binding BatchSharedRequestor, Mode=TwoWay}" Placeholder="Default requestor" HeightRequest="32" FontSize="11" />
                             <Entry Grid.Column="5" Text="{Binding BatchSharedNotes, Mode=TwoWay}" Placeholder="Notes / purpose" HeightRequest="32" FontSize="11" />
+                            <Button Grid.Column="6" Text="Apply to all rows"
+                                    Command="{Binding ApplyDefaultsToAllRowsCommand}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    FontSize="11" HeightRequest="32" Padding="12,0"
+                                    ToolTipProperties.Text="Set Plant, PR Type, Priority, Requestor and Notes on every row (including pasted ones) to these defaults" />
                         </Grid>
-                        <Label Text="Pre-fills new rows and fills blanks when pasting from Excel - never changes a row you've already edited."
+                        <Label Text="Pre-fills new rows and fills blanks when pasting from Excel. &quot;Apply to all rows&quot; overwrites Plant / PR Type / Priority / Requestor / Notes on every row."
                                FontSize="10" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                     </VerticalStackLayout>
                 </Border>
@@ -77,12 +83,13 @@
                 <Grid Grid.Row="2" ColumnDefinitions="*, Auto" VerticalOptions="Center">
                     <Label Grid.Column="0" Text="{Binding RequisitionsSectionLabel}" FontFamily="SegoeSemibold" FontSize="14"
                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
-                    <!-- No separate "Paste PRs from Excel" button here - pasting a multi-line block
-                         straight into the PR Number/Description fields already fans out into rows
-                         (HandleBatchPrRowPaste), and Ctrl+V with the modal open and no field
-                         focused does the same (PrListPage.xaml.cs). The button was a third,
-                         redundant entry point to the exact same command. -->
+                    <!-- Excel import is button-only: Ctrl+V is a plain text paste everywhere in the
+                         modal now. "Paste rows" reads the clipboard and fans it out into PR rows. -->
                     <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="Paste rows from Excel"
+                                Command="{Binding PasteBatchPrRowsFromClipboardCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                FontSize="11" HeightRequest="28" Padding="12,0" />
                         <Button Text="+ Add Row"
                                 Command="{Binding AddBatchPrRowCommand}"
                                 Style="{StaticResource SecondaryButton}"
@@ -162,11 +169,7 @@
                          like the rest of the file. -->
                     <ScrollView Grid.Column="1">
                         <!-- BindingContext scoped to the selected row (and x:DataType matching it),
-                             the same pattern the old per-row CollectionView template used - it's what
-                             lets the PR Number/Description Loaded+Paste code-behind hooks below find a
-                             real BatchPrEntry on BindingContext (ExecuteBatchPrNoPasteAsync etc. cast
-                             sender.BindingContext to BatchPrEntry), so pasting a multi-row block
-                             straight into a field still fans out into new rows exactly as before. -->
+                             the same pattern the old per-row CollectionView template used. -->
                         <VerticalStackLayout Spacing="14" Padding="0,0,16,0"
                                              BindingContext="{Binding SelectedBatchEntry}"
                                              x:DataType="models:BatchPrEntry">
@@ -175,18 +178,14 @@
                                     <Label Text="PR Number *" FontSize="11" FontFamily="SegoeSemibold"
                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                     <Entry x:Name="DetailPrNoEntry" Text="{Binding PrNo, Mode=TwoWay}"
-                                           Loaded="OnBatchPrNoEntryLoaded"
-                                           TextChanged="OnBatchPrNoTextChanged"
-                                           Placeholder="e.g. PR-2026-001 - or paste multiple rows"
+                                           Placeholder="e.g. PR-2026-001"
                                            HeightRequest="36" FontSize="12" />
                                 </VerticalStackLayout>
 
                                 <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                    <Label Text="Description / Summary *" FontSize="11" FontFamily="SegoeSemibold"
+                                    <Label Text="Description / Summary" FontSize="11" FontFamily="SegoeSemibold"
                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                                     <Entry Text="{Binding Description, Mode=TwoWay}"
-                                           Loaded="OnBatchDescriptionEntryLoaded"
-                                           TextChanged="OnBatchDescriptionTextChanged"
                                            Placeholder="Requisition title or item summary..." HeightRequest="36" FontSize="12" />
                                 </VerticalStackLayout>
                             </Grid>
@@ -227,11 +226,14 @@
                                     <Label Grid.Column="0" Text="Line Items" FontFamily="SegoeSemibold" FontSize="14"
                                            TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}"
                                            VerticalOptions="Center" />
-                                    <!-- No separate "Paste Items" button - pasting a multi-line block
-                                         straight into an item's name field already splits into
-                                         multiple item rows (HandleInlineItemPaste), same parser the
-                                         button called. -->
+                                    <!-- "Paste items" reads the clipboard and appends parsed line
+                                         items to this PR. Ctrl+V in a field is a plain paste. -->
                                     <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                        <Button Text="Paste items from Excel"
+                                                Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.PasteBatchItemsFromClipboardCommand}"
+                                                CommandParameter="{Binding .}"
+                                                Style="{StaticResource SecondaryButton}"
+                                                FontSize="11" HeightRequest="28" Padding="10,0" />
                                         <Button Text="+ Add Item"
                                                 Command="{Binding Source={x:Reference ThisModal}, Path=BindingContext.AddBatchItemToPrCommand}"
                                                 CommandParameter="{Binding .}"
@@ -244,19 +246,22 @@
                                     <BindableLayout.ItemTemplate>
                                         <DataTemplate x:DataType="models:PrItem">
                                             <Grid ColumnDefinitions="*, 75, 70, 90, Auto" ColumnSpacing="8" VerticalOptions="Center">
-                                                <Entry Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
-                                                       Loaded="OnBatchItemNameEntryLoaded"
-                                                       TextChanged="OnBatchItemNameTextChanged"
-                                                       Placeholder="Item name / spec... (or paste multiple)" HeightRequest="34" FontSize="12" />
+                                                <!-- Fixed two-line field: wraps and scrolls inside for a longer spec,
+                                                     full text on hover. Height never changes, so the row never jumps. -->
+                                                <Editor Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
+                                                        AutoSize="Disabled"
+                                                        HeightRequest="46"
+                                                        VerticalOptions="Center"
+                                                        ToolTipProperties.Text="{Binding ItemName}"
+                                                        Placeholder="Item name / spec..." FontSize="12" />
                                                 <Entry Grid.Column="1" Text="{Binding Quantity, Mode=TwoWay}"
-                                                       Loaded="OnBatchItemQuantityEntryLoaded"
-                                                       TextChanged="OnBatchItemQuantityTextChanged"
+                                                       VerticalOptions="Center"
                                                        Placeholder="Qty" Keyboard="Numeric" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
                                                 <Entry Grid.Column="2" Text="{Binding Unit, Mode=TwoWay}"
-                                                       Loaded="OnBatchItemUnitEntryLoaded"
-                                                       TextChanged="OnBatchItemUnitTextChanged"
+                                                       VerticalOptions="Center"
                                                        Placeholder="pcs" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
                                                 <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
+                                                       VerticalOptions="Center"
                                                        Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
                                                 <Button Grid.Column="4" Text="&#xE74D;"
                                                         FontFamily="Segoe Fluent Icons"
@@ -265,6 +270,7 @@
                                                         BackgroundColor="Transparent"
                                                         TextColor="{StaticResource FluentCritical}"
                                                         ToolTipProperties.Text="Remove Item"
+                                                        VerticalOptions="Center"
                                                         HeightRequest="28" WidthRequest="28" Padding="0" FontSize="11" />
                                             </Grid>
                                         </DataTemplate>

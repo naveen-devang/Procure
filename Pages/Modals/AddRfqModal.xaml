@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:u="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Modals.AddRfqModal"
              x:Name="RfqModalRoot"
              x:DataType="pageModels:PrListPageModel"
@@ -177,18 +178,11 @@
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                             </Grid>
 
-                            <!-- Table Rows. A virtualizing CollectionView with a bounded height:
-                                 the old non-virtualized stack realized every row at open and
-                                 re-measured all of them on every keystroke — with 60+ items that
-                                 was the typing lag. Height tracks the item count up to ~8 rows,
-                                 then the table scrolls internally. -->
-                            <CollectionView ItemsSource="{Binding EditingRfqItems}"
-                                            HeightRequest="{Binding RfqItemsListHeight}"
-                                            SelectionMode="None">
-                                <CollectionView.ItemsLayout>
-                                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="6" />
-                                </CollectionView.ItemsLayout>
-                                <CollectionView.ItemTemplate>
+                            <!-- Table Rows flow in the modal's single outer ScrollView, like the Add PR
+                                 and Edit PR sheets - no inner scrollport. An RFQ's item list is the
+                                 parent PR's line items (tens at most). -->
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding EditingRfqItems}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:RfqItem">
                                         <Grid ColumnDefinitions="36, *, 72, 64, 82, 80, 95, 90, 34"
                                               ColumnSpacing="8"
@@ -201,13 +195,16 @@
                                                       VerticalOptions="Center"
                                                       HorizontalOptions="Center" />
 
-                                            <!-- Item Description (editable: correct a name or fill in a split line) -->
-                                            <Entry Grid.Column="1"
-                                                   Text="{Binding ItemName, Mode=TwoWay}"
-                                                   Placeholder="Item name / spec..."
-                                                   FontSize="12"
-                                                   HeightRequest="32"
-                                                   VerticalOptions="Center" />
+                                            <!-- Item Description (editable). Fixed two-line field: wraps and scrolls
+                                                 inside for a longer spec, full text on hover. Height never changes. -->
+                                            <Editor Grid.Column="1"
+                                                    Text="{Binding ItemName, Mode=TwoWay}"
+                                                    Placeholder="Item name / spec..."
+                                                    FontSize="12"
+                                                    AutoSize="Disabled"
+                                                    HeightRequest="44"
+                                                    VerticalOptions="Center"
+                                                    ToolTipProperties.Text="{Binding ItemName}" />
 
                                             <!-- Quantity (editable: a vendor may re-pack or split a PR line) -->
                                             <Entry Grid.Column="2"
@@ -216,7 +213,7 @@
                                                    Keyboard="Numeric"
                                                    HeightRequest="32"
                                                    FontSize="12"
-                                                   HorizontalOptions="Fill"
+                                                   VerticalOptions="Center"
                                                    HorizontalTextAlignment="End" />
 
                                             <!-- Unit -->
@@ -225,7 +222,7 @@
                                                    Placeholder="pcs"
                                                    HeightRequest="32"
                                                    FontSize="12"
-                                                   HorizontalOptions="Fill"
+                                                   VerticalOptions="Center"
                                                    HorizontalTextAlignment="Start" />
 
                                             <!-- Unit Price Input -->
@@ -235,6 +232,7 @@
                                                    Keyboard="Numeric"
                                                    HeightRequest="32"
                                                    FontSize="12"
+                                                   VerticalOptions="Center"
                                                    HorizontalTextAlignment="End"
                                                    IsEnabled="{Binding IsQuoted}"
                                                    Loaded="OnRfqUnitPriceEntryLoaded"
@@ -248,6 +246,7 @@
                                                    Keyboard="Numeric"
                                                    HeightRequest="32"
                                                    FontSize="12"
+                                                   VerticalOptions="Center"
                                                    HorizontalTextAlignment="End"
                                                    IsEnabled="{Binding IsQuoted}"
                                                    Loaded="OnRfqDiscountEntryLoaded"
@@ -270,6 +269,7 @@
                                                    Keyboard="Numeric"
                                                    HeightRequest="32"
                                                    FontSize="12"
+                                                   VerticalOptions="Center"
                                                    HorizontalTextAlignment="End"
                                                    IsEnabled="{Binding IsQuoted}"
                                                    Loaded="OnRfqLastPriceEntryLoaded"
@@ -289,8 +289,8 @@
                                                     VerticalOptions="Center" />
                                         </Grid>
                                     </DataTemplate>
-                                </CollectionView.ItemTemplate>
-                            </CollectionView>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                     </Border>
 

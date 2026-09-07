@@ -61,7 +61,9 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string NewRfqTechnicalApproval { get; set; } = string.Empty;
 
-        public List<string> AvailableTechnicalApprovals { get; } = new() { "Approved", "Not Approved" };
+        // Blank first entry = "no technical approval recorded". Stored as an empty string, which
+        // both PCR exporters already render as "-". Shared by the Add RFQ and Batch RFQ pickers.
+        public List<string> AvailableTechnicalApprovals { get; } = new() { string.Empty, "Approved", "Not Approved" };
 
         [ObservableProperty]
         public partial ObservableCollection<RfqItem> EditingRfqItems { get; set; } = new();
@@ -80,11 +82,6 @@ namespace Procure.PageModels
 
         [ObservableProperty]
         public partial string FormattedCalculatedRfqGrandTotal { get; set; } = string.Empty;
-
-        // Bounds the item table's virtualizing CollectionView: grows with the list up to ~8 rows,
-        // then the table scrolls internally instead of realizing every row.
-        [ObservableProperty]
-        public partial double RfqItemsListHeight { get; set; } = 42;
 
         // Distinguishes the recalc's own item-sum sync from a user-typed lump sum: after the sync
         // has driven NewRfqQuoteAmount, clearing every price must zero the total instead of
@@ -159,7 +156,6 @@ namespace Procure.PageModels
             var cur = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency;
             FormattedCalculatedRfqGrandTotal = $"{cur} {CalculatedRfqGrandTotal:N2}";
             HasEditingRfqItems = EditingRfqItems != null && EditingRfqItems.Count > 0;
-            RfqItemsListHeight = Math.Clamp(EditingRfqItems?.Count ?? 0, 1, 8) * 42;
             OnPropertyChanged(nameof(AllRfqItemsSelected));
         }
 

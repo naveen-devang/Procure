@@ -737,7 +737,10 @@ namespace Procure.Data
         /// spreadsheet back to check each price landed on its own row.</summary>
         private static async Task PcrExportFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
         {
-            var pr = NewPr("pcr-export", (Brush, 12m), (Brush, 33m));
+            // First item's name is a spec pasted from one Excel cell - three hard lines. It must
+            // reach both exports as three stacked lines, growing the row down, not the column across.
+            const string multiLineName = "PUMP CASING GASKET\nSPIRAL WOUND, DN80\nCL300 RF";
+            var pr = NewPr("pcr-export", (multiLineName, 12m), (Brush, 33m));
             await repo.SaveAsync(pr);
 
             // Four distinct prices, so every cell can be told apart from every other.
@@ -778,10 +781,23 @@ namespace Procure.Data
             Assert(CountOccurrences(sheet, ">12 NOS<") >= 1, "the 12 NOS line is printed with its own quantity");
             Assert(CountOccurrences(sheet, ">33 NOS<") >= 1, "and the 33 NOS line with its own");
 
+            // The multi-line item name keeps its hard breaks in the sheet (Excel wraps on \n only
+            // with wrapText + preserved whitespace) and every line's text survives.
+            Assert(sheet.Contains("xml:space=\"preserve\""), "the item description cell preserves whitespace");
+            Assert(sheet.Contains("PUMP CASING GASKET\nSPIRAL WOUND, DN80\nCL300 RF"),
+                "the three-line item name reaches the sheet with its line breaks intact");
+
             // The PDF shares the pairing but renders to a binary stream, so this is a smoke test:
             // it must build both pages without throwing on the same data.
             var pdf = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, rfqs, "flow check");
             Assert(pdf.Length > 1000, $"the PDF is produced; got {pdf.Length} bytes");
+
+            // Each hard line of the item name is drawn as its own PDF text op - never one mangled
+            // string with a raw newline in it.
+            var pdfText = System.Text.Encoding.Latin1.GetString(pdf);
+            Assert(pdfText.Contains("(PUMP CASING GASKET) Tj"), "the PDF draws the item name's first line on its own");
+            Assert(pdfText.Contains("(SPIRAL WOUND, DN80) Tj"), "and its second line");
+            Assert(pdfText.Contains("(CL300 RF) Tj"), "and its third line");
         }
 
         private static string ReadSheetXml(byte[] xlsx)

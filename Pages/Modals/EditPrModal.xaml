@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Procure.PageModels"
              xmlns:models="clr-namespace:Procure.Models"
+             xmlns:u="clr-namespace:Procure.Utilities"
              x:Class="Procure.Pages.Modals.EditPrModal"
              x:Name="ThisModal"
              x:DataType="pageModels:PrListPageModel"
@@ -72,7 +73,7 @@
                     </Grid>
 
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="Description *" FontSize="12" FontFamily="SegoeSemibold"
+                        <Label Text="Description" FontSize="12" FontFamily="SegoeSemibold"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                         <Entry Text="{Binding EditingPrDescription, Mode=TwoWay}"
                                Placeholder="Item or service requested..." HeightRequest="36" />
@@ -103,19 +104,22 @@
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="models:PrItem">
                                     <Grid ColumnDefinitions="*, 75, 70, 90, Auto" ColumnSpacing="8" VerticalOptions="Center">
-                                        <Entry Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
-                                               Loaded="OnEditingItemNameEntryLoaded"
-                                               TextChanged="OnEditingItemNameTextChanged"
-                                               Placeholder="Item name / spec..." HeightRequest="34" FontSize="12" />
+                                        <!-- Fixed two-line field: wraps and scrolls inside for a longer spec,
+                                             full text on hover. Height never changes, so the row never jumps. -->
+                                        <Editor Grid.Column="0" Text="{Binding ItemName, Mode=TwoWay}"
+                                                AutoSize="Disabled"
+                                                HeightRequest="46"
+                                                VerticalOptions="Center"
+                                                ToolTipProperties.Text="{Binding ItemName}"
+                                                Placeholder="Item name / spec..." FontSize="12" />
                                         <Entry Grid.Column="1" Text="{Binding Quantity, Mode=TwoWay}"
-                                               Loaded="OnEditingItemQuantityEntryLoaded"
-                                               TextChanged="OnEditingItemQuantityTextChanged"
+                                               VerticalOptions="Center"
                                                Placeholder="Qty" Keyboard="Numeric" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
                                         <Entry Grid.Column="2" Text="{Binding Unit, Mode=TwoWay}"
-                                               Loaded="OnEditingItemUnitEntryLoaded"
-                                               TextChanged="OnEditingItemUnitTextChanged"
+                                               VerticalOptions="Center"
                                                Placeholder="pcs" HeightRequest="34" FontSize="12" HorizontalTextAlignment="Center" />
                                         <Entry Grid.Column="3" Text="{Binding EstimatedUnitPrice, Mode=TwoWay}"
+                                               VerticalOptions="Center"
                                                Placeholder="Price (opt)" Keyboard="Numeric" HeightRequest="34" FontSize="12" />
                                         <Button Grid.Column="4" Text="&#xE74D;"
                                                 FontFamily="Segoe Fluent Icons"
@@ -124,6 +128,7 @@
                                                 BackgroundColor="Transparent"
                                                 TextColor="{StaticResource FluentCritical}"
                                                 ToolTipProperties.Text="Remove Item"
+                                                VerticalOptions="Center"
                                                 HeightRequest="28" WidthRequest="28" Padding="0" FontSize="11" />
                                     </Grid>
                                 </DataTemplate>

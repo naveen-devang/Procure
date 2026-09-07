@@ -180,6 +180,38 @@ namespace Procure.PageModels
             UpdateBatchEntriesSummary();
         }
 
+        // The New Row Defaults bar only pre-fills new rows and blank cells on paste. This button
+        // is the explicit "make every row match the defaults" action - it overwrites Plant, PR
+        // Type, Priority, Requestor and Notes on ALL rows (including ones pasted from Excel), so a
+        // 50-row paste can be set to one plant / type / priority in a click. Blank defaults are
+        // skipped so an empty Notes box does not wipe everyone's notes. PR Number, Description and
+        // line items are per-row and never touched.
+        [RelayCommand]
+        public async Task ApplyDefaultsToAllRowsAsync()
+        {
+            if (BatchPrEntries.Count == 0) return;
+
+            if (Shell.Current != null)
+            {
+                var confirm = await Shell.Current.DisplayAlertAsync(
+                    "Apply Defaults to All Rows",
+                    $"Set Plant, PR Type, Priority, Requestor and Notes to the current New Row Defaults on all {BatchPrEntries.Count} row(s)? This overwrites those fields on every row.",
+                    "Apply", "Cancel");
+                if (!confirm) return;
+            }
+
+            foreach (var entry in BatchPrEntries)
+            {
+                if (!string.IsNullOrWhiteSpace(BatchSharedPlant)) entry.Plant = BatchSharedPlant;
+                if (!string.IsNullOrWhiteSpace(BatchSharedPrType)) entry.PrType = BatchSharedPrType;
+                if (!string.IsNullOrWhiteSpace(BatchSharedPriority)) entry.Priority = BatchSharedPriority;
+                if (!string.IsNullOrWhiteSpace(BatchSharedRequestor)) entry.Requestor = BatchSharedRequestor;
+                if (!string.IsNullOrWhiteSpace(BatchSharedNotes)) entry.Notes = BatchSharedNotes;
+            }
+
+            UpdateBatchEntriesSummary();
+        }
+
         // Copies the source row's custom-field values onto every other row, but only into a
         // field that row hasn't already got a value for - it never overwrites a tag someone
         // already typed on another PR. Lives on each row's Custom Fields section, not as one
@@ -295,19 +327,13 @@ namespace Procure.PageModels
                 // Filter valid line items
                 var validItems = entry.Items.Where(i => !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
 
+                // Description is optional. When it's blank but the row has line items, fill it from
+                // them so the board card still has a readable title; a row with neither is allowed
+                // (a placeholder PR held by its number).
                 var desc = entry.Description?.Trim() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(desc))
+                if (string.IsNullOrWhiteSpace(desc) && validItems.Count > 0)
                 {
-                    if (validItems.Count > 0)
-                    {
-                        desc = string.Join(", ", validItems.Select(i => $"{i.ItemName} ({i.FormattedQuantity})"));
-                    }
-                    else
-                    {
-                        errors.Add($"Row {index} ({entry.PrNo}): Description or at least one Line Item is required.");
-                        index++;
-                        continue;
-                    }
+                    desc = string.Join(", ", validItems.Select(i => $"{i.ItemName} ({i.FormattedQuantity})"));
                 }
 
                 var prType = string.IsNullOrWhiteSpace(entry.PrType) ? BatchSharedPrType : entry.PrType;
@@ -443,221 +469,50 @@ namespace Procure.PageModels
             }
         }
 
-        public void HandleInlineItemPaste(PrItem currentItem, string rawPastedText, ObservableCollection<PrItem> targetCollection)
+        // Excel import for line items is a button now (Paste items from Excel), not a paste hook on
+        // the name field - Ctrl+V in a field is a plain text paste. Parsed items are appended;
+        // a single leftover blank row is dropped first.
+        [RelayCommand]
+        public async Task PasteBatchItemsFromClipboardAsync(BatchPrEntry? entry)
         {
-            if (string.IsNullOrWhiteSpace(rawPastedText))
-                return;
-
-            var parsed = ClipboardItemParser.ParsePrItems(rawPastedText, currentItem.PrId, currentItem.SortOrder);
-            if (parsed.Count == 0) return;
-
-            // Set current item to first parsed item's attributes
-            var first = parsed[0];
-            currentItem.ItemName = first.ItemName;
-            currentItem.Quantity = first.Quantity;
-            currentItem.Unit = first.Unit;
-            currentItem.EstimatedUnitPrice = first.EstimatedUnitPrice;
-            currentItem.Notes = first.Notes;
-
-            // Insert subsequent parsed items right after current item
-            int currentIndex = targetCollection.IndexOf(currentItem);
-            if (currentIndex < 0) currentIndex = 0;
-
-            for (int i = 1; i < parsed.Count; i++)
+            if (entry == null) return;
+            try
             {
-                int targetIndex = currentIndex + i;
-                if (targetIndex < targetCollection.Count && string.IsNullOrWhiteSpace(targetCollection[targetIndex].ItemName))
+                if (!Clipboard.Default.HasText)
                 {
-                    targetCollection[targetIndex].ItemName = parsed[i].ItemName;
-                    targetCollection[targetIndex].Quantity = parsed[i].Quantity;
-                    targetCollection[targetIndex].Unit = parsed[i].Unit;
-                    targetCollection[targetIndex].EstimatedUnitPrice = parsed[i].EstimatedUnitPrice;
-                    targetCollection[targetIndex].Notes = parsed[i].Notes;
+                    if (Shell.Current != null)
+                        await Shell.Current.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the item rows from Excel first.", "OK");
+                    return;
                 }
-                else if (targetIndex <= targetCollection.Count)
-                {
-                    targetCollection.Insert(targetIndex, parsed[i]);
-                }
-                else
-                {
-                    targetCollection.Add(parsed[i]);
-                }
-            }
 
-            if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && targetCollection.Count > 0)
+                var text = await Clipboard.Default.GetTextAsync();
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                var parsed = ClipboardItemParser.ParsePrItems(text, entry.Id, entry.Items.Count);
+                if (parsed.Count == 0)
+                {
+                    if (Shell.Current != null)
+                        await Shell.Current.DisplayAlertAsync("No Items Detected", "Could not read any line items from the clipboard text.", "OK");
+                    return;
+                }
+
+                if (entry.Items.Count == 1 && string.IsNullOrWhiteSpace(entry.Items[0].ItemName))
+                    entry.Items.Clear();
+
+                foreach (var item in parsed)
+                {
+                    item.PrId = entry.Id;
+                    entry.Items.Add(item);
+                }
+                entry.NotifyItemsChanged();
+
+                if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && entry.Items.Count > 0)
+                    CurrentEditingPr.Description = entry.Items[0].ItemName;
+            }
+            catch (Exception ex)
             {
-                CurrentEditingPr.Description = targetCollection[0].ItemName;
+                _errorHandler.HandleError(ex);
             }
-        }
-
-        public void HandleInlineQuantityPaste(PrItem currentItem, string rawPastedText, ObservableCollection<PrItem> targetCollection)
-        {
-            if (string.IsNullOrWhiteSpace(rawPastedText))
-                return;
-
-            var parsed = ClipboardItemParser.ParseQuantities(rawPastedText);
-            if (parsed.Count == 0) return;
-
-            // Set current item's quantity
-            var first = parsed[0];
-            currentItem.Quantity = first.Quantity;
-            if (!string.IsNullOrWhiteSpace(first.Unit))
-            {
-                currentItem.Unit = first.Unit;
-            }
-
-            int currentIndex = targetCollection.IndexOf(currentItem);
-            if (currentIndex < 0) currentIndex = 0;
-
-            for (int i = 1; i < parsed.Count; i++)
-            {
-                int targetIndex = currentIndex + i;
-                if (targetIndex < targetCollection.Count)
-                {
-                    targetCollection[targetIndex].Quantity = parsed[i].Quantity;
-                    if (!string.IsNullOrWhiteSpace(parsed[i].Unit))
-                    {
-                        targetCollection[targetIndex].Unit = parsed[i].Unit!;
-                    }
-                }
-                else
-                {
-                    targetCollection.Add(new PrItem
-                    {
-                        Id = Guid.NewGuid(),
-                        PrId = currentItem.PrId,
-                        ItemName = string.Empty,
-                        Quantity = parsed[i].Quantity,
-                        Unit = !string.IsNullOrWhiteSpace(parsed[i].Unit) ? parsed[i].Unit! : "pcs",
-                        SortOrder = targetIndex
-                    });
-                }
-            }
-        }
-
-        public void HandleInlineUnitPaste(PrItem currentItem, string rawPastedText, ObservableCollection<PrItem> targetCollection)
-        {
-            if (string.IsNullOrWhiteSpace(rawPastedText))
-                return;
-
-            var parsed = ClipboardItemParser.ParseUnits(rawPastedText);
-            if (parsed.Count == 0) return;
-
-            // Set current item's unit
-            currentItem.Unit = parsed[0];
-
-            int currentIndex = targetCollection.IndexOf(currentItem);
-            if (currentIndex < 0) currentIndex = 0;
-
-            for (int i = 1; i < parsed.Count; i++)
-            {
-                int targetIndex = currentIndex + i;
-                if (targetIndex < targetCollection.Count)
-                {
-                    targetCollection[targetIndex].Unit = parsed[i];
-                }
-                else
-                {
-                    targetCollection.Add(new PrItem
-                    {
-                        Id = Guid.NewGuid(),
-                        PrId = currentItem.PrId,
-                        ItemName = string.Empty,
-                        Quantity = 1,
-                        Unit = parsed[i],
-                        SortOrder = targetIndex
-                    });
-                }
-            }
-        }
-
-        public void HandleBatchPrRowPaste(BatchPrEntry currentEntry, string rawPastedText, bool isPrNoColumn)
-        {
-            if (string.IsNullOrWhiteSpace(rawPastedText))
-                return;
-
-            var parsed = ClipboardItemParser.ParseBatchPrEntries(
-                rawPastedText,
-                BatchSharedRequestor,
-                BatchSharedPriority,
-                BatchSharedNotes,
-                BatchSharedCustomValues,
-                isPrNoFirst: isPrNoColumn,
-                defaultPlant: BatchSharedPlant,
-                defaultPrType: BatchSharedPrType);
-
-            if (parsed.Count == 0) return;
-
-            // Set current entry attributes to first parsed row
-            var first = parsed[0];
-            if (isPrNoColumn)
-            {
-                currentEntry.PrNo = first.PrNo;
-                if (!string.IsNullOrWhiteSpace(first.Description))
-                    currentEntry.Description = first.Description;
-            }
-            else
-            {
-                currentEntry.Description = first.Description;
-                if (first.PrNo != null && (first.PrNo.StartsWith("PR-", StringComparison.OrdinalIgnoreCase) || first.PrNo.StartsWith("PR#", StringComparison.OrdinalIgnoreCase)))
-                    currentEntry.PrNo = first.PrNo;
-            }
-
-            if (!string.IsNullOrWhiteSpace(first.Requestor))
-                currentEntry.Requestor = first.Requestor;
-            if (!string.IsNullOrWhiteSpace(first.Priority))
-                currentEntry.Priority = first.Priority;
-            if (!string.IsNullOrWhiteSpace(first.Notes))
-                currentEntry.Notes = first.Notes;
-
-            // If current entry items was empty or blank and first has items with names, copy items
-            if (first.Items.Count > 0 && !string.IsNullOrWhiteSpace(first.Items[0].ItemName))
-            {
-                if (currentEntry.Items.Count <= 1 && (currentEntry.Items.Count == 0 || string.IsNullOrWhiteSpace(currentEntry.Items[0].ItemName)))
-                {
-                    currentEntry.Items.Clear();
-                    foreach (var itm in first.Items)
-                    {
-                        itm.PrId = currentEntry.Id;
-                        currentEntry.Items.Add(itm);
-                    }
-                    currentEntry.NotifyItemsChanged();
-                }
-            }
-
-            // Insert subsequent parsed PR rows directly after currentEntry, skipping duplicates
-            int currentIndex = BatchPrEntries.IndexOf(currentEntry);
-            if (currentIndex < 0) currentIndex = 0;
-            int insertOffset = 1;
-
-            for (int i = 1; i < parsed.Count; i++)
-            {
-                var candidate = parsed[i];
-
-                // Skip if another row in BatchPrEntries already has this PR number
-                if (!string.IsNullOrWhiteSpace(candidate.PrNo) &&
-                    BatchPrEntries.Any(e => e != currentEntry && string.Equals(e.PrNo?.Trim(), candidate.PrNo.Trim(), StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
-                int targetIndex = currentIndex + insertOffset;
-                if (targetIndex < BatchPrEntries.Count && string.IsNullOrWhiteSpace(BatchPrEntries[targetIndex].Description) && string.IsNullOrWhiteSpace(BatchPrEntries[targetIndex].PrNo))
-                {
-                    BatchPrEntries[targetIndex] = candidate;
-                }
-                else if (targetIndex <= BatchPrEntries.Count)
-                {
-                    BatchPrEntries.Insert(targetIndex, candidate);
-                }
-                else
-                {
-                    BatchPrEntries.Add(candidate);
-                }
-                insertOffset++;
-            }
-
-            UpdateBatchEntriesSummary();
         }
     }
 }

@@ -125,11 +125,6 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string BatchPoCurrency { get; set; } = "AED";
 
-        // Bounds the shared-RFQ item table's virtualizing CollectionView (up to ~8 visible rows).
-        [ObservableProperty]
-        public partial double BatchRfqItemsListHeight { get; set; } = 42;
-
-
         // ================= BATCH SHARED RFQ OPERATIONS =================
 
         public void RecalculateBatchRfqTotals()
@@ -174,7 +169,6 @@ namespace Procure.PageModels
             var cur = string.IsNullOrWhiteSpace(BatchRfqCurrency) ? "AED" : BatchRfqCurrency;
             FormattedCalculatedBatchRfqGrandTotal = $"{cur} {CalculatedBatchRfqGrandTotal:N2}";
             HasBatchEditingRfqItems = BatchEditingRfqItems != null && BatchEditingRfqItems.Count > 0;
-            BatchRfqItemsListHeight = Math.Clamp(BatchEditingRfqItems?.Count ?? 0, 1, 8) * 42;
             OnPropertyChanged(nameof(AllBatchRfqItemsSelected));
         }
 

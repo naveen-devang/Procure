@@ -166,12 +166,12 @@ namespace Procure.Pages
             var s = _shortcuts;
             bool IsSave() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalSave), key);
             bool IsSelectAll() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalSelectAll), key);
-            bool IsPaste() => Procure.Utilities.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.ModalPaste), key);
 
-            // Ctrl+A/Ctrl+V and bare arrow keys all have a native meaning inside a focused text field
-            // (select-all-text, paste-text, move-cursor) - stepping on that inside, say, the "Pages to
-            // Print" box would be a regression, not a feature. Ctrl+S has no such native meaning in a
-            // plain text box, so it's never guarded.
+            // Ctrl+A and bare arrow keys all have a native meaning inside a focused text field
+            // (select-all-text, move-cursor) - stepping on that inside, say, the "Pages to Print" box
+            // would be a regression, not a feature. Ctrl+V is never touched here: it is always a plain
+            // text paste, and the Excel bulk import is a visible button in the Batch Create modal.
+            // Ctrl+S has no native meaning in a plain text box, so it's never guarded.
             var textFieldFocused = IsTextInputFocused();
 
             if (_viewModel.IsPcrPreviewVisible)
@@ -210,12 +210,6 @@ namespace Procure.Pages
                 if (_viewModel.IsBatchRfqModalVisible) { _viewModel.SelectAllBatchRfqItemsCommand.Execute(null); return true; }
                 if (_viewModel.IsAddPoModalVisible) { _viewModel.SelectAllPoRfqsCommand.Execute(null); return true; }
                 return false;
-            }
-
-            if (!textFieldFocused && IsPaste() && _viewModel.IsBatchCreateModalVisible)
-            {
-                _viewModel.PasteBatchPrRowsFromClipboardCommand.Execute(null);
-                return true;
             }
 
             return false;

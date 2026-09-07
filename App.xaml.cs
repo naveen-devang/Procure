@@ -46,6 +46,7 @@ namespace Procure
             if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
             {
                 Utilities.PrLineMatcherSelfCheck.Run();
+                Utilities.ClipboardItemParserSelfCheck.Run();
             }
 
             // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.

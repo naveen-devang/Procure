@@ -37,6 +37,10 @@ namespace Procure.Services.Export
         // to agree or a column sized to the exact figure still triggers a shrink.
         private const double MoneyCellPad = 13;
 
+        // A multi-line item name grows its row downward; past this many lines it truncates with an
+        // ellipsis rather than letting one row swallow a page.
+        private const int MaxItemNameLines = 8;
+
         public static byte[] GeneratePdf(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
@@ -127,9 +131,13 @@ namespace Procure.Services.Export
             double availableForDescAndVendors = contentWidth - slNoWidth - qtyWidth - historicalWidth;
             double maxDescWidthByVendorFloor = availableForDescAndVendors - (supplierCount * vendorPairWidthFloor);
 
-            double widestItemTextWidth = prItems.Count > 0
-                ? prItems.Max(item => MeasureTextWidth(item.ItemName, "F1", 7.5))
-                : 0;
+            // The widest single LINE of any item name - never the whole multi-line string - so a
+            // tall spec grows the row down without ever widening this column.
+            double widestItemTextWidth = prItems
+                .SelectMany(item => HardLines(item.ItemName, MaxItemNameLines))
+                .Select(line => MeasureTextWidth(line, "F1", 7.5))
+                .DefaultIfEmpty(0)
+                .Max();
             double idealDescWidth = widestItemTextWidth + descPadding;
             double effectiveDescCap = Math.Max(descWidthFloor, Math.Min(descWidthCap, maxDescWidthByVendorFloor));
             double descWidth = Math.Clamp(idealDescWidth, descWidthFloor, effectiveDescCap);
@@ -674,11 +682,33 @@ namespace Procure.Services.Export
             int itemIndex = 1;
 
             // Per-item description wrap - measured against the actual description column width, so
-            // only a row whose own item name genuinely needs a second line grows; every other row
-            // keeps its normal single-line height. Replaces the old fixed 36-character truncation.
+            // only a row whose own item name genuinely needs more lines grows; every other row
+            // keeps its normal single-line height. A name pasted from one Excel cell can carry its
+            // own hard line breaks (HardLines); each of those is then soft-wrapped to the column.
             const double itemDescLineHeight = 9.0;
+
+            List<string> WrapItemName(string? name)
+            {
+                var outLines = new List<string>();
+                foreach (var hard in HardLines(name, MaxItemNameLines))
+                {
+                    if (hard.Length == 0) { outLines.Add(string.Empty); continue; }
+                    outLines.AddRange(WrapText(hard, "F1", 7.5, descWidth - 8, maxLines: MaxItemNameLines, truncate: true));
+                    if (outLines.Count >= MaxItemNameLines) break;
+                }
+                if (outLines.Count == 0) outLines.Add(string.Empty);
+                if (outLines.Count > MaxItemNameLines)
+                {
+                    outLines = outLines.Take(MaxItemNameLines).ToList();
+                    var last = outLines[^1];
+                    while (last.Length > 0 && MeasureTextWidth(last + " ..", "F1", 7.5) > descWidth - 8) last = last[..^1];
+                    outLines[^1] = last.TrimEnd() + " ..";
+                }
+                return outLines;
+            }
+
             var itemDescLines = prItems
-                .Select(item => WrapText(item.ItemName, "F1", 7.5, descWidth - 8, maxLines: 2))
+                .Select(item => WrapItemName(item.ItemName))
                 .ToList();
             var itemRowHeights = itemDescLines
                 .Select(lines => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight)
@@ -726,11 +756,13 @@ namespace Procure.Services.Export
 
             if (prItems.Count == 0)
             {
-                double rowH = 18;
+                var fallbackDescLines = WrapItemName(pr.Description);
+                double rowH = Math.Max(18, 18 + (fallbackDescLines.Count - 1) * itemDescLineHeight);
                 DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
-                DrawText("1", colX[0], curY - 12, font: "F1", fontSize: 8, align: "center", width: slNoWidth);
-                DrawText(pr.Description, colX[1] + 4, curY - 12, font: "F1", fontSize: 8);
-                DrawText(pr.ItemsCount.ToString(), colX[2], curY - 12, font: "F1", fontSize: 8, align: "center", width: qtyWidth);
+                double fbCenterY = curY - ((rowH - itemDescLineHeight) / 2.0) - (itemDescLineHeight * 0.75);
+                DrawText("1", colX[0], fbCenterY, font: "F1", fontSize: 8, align: "center", width: slNoWidth);
+                DrawCenteredBlock(fallbackDescLines, colX[1] + 4, curY, rowH, itemDescLineHeight, "F1", 8, descWidth - 4, align: "left");
+                DrawText(pr.ItemsCount.ToString(), colX[2], fbCenterY, font: "F1", fontSize: 8, align: "center", width: qtyWidth);
 
                 for (int i = 0; i < supplierCount; i++)
                 {
@@ -739,10 +771,10 @@ namespace Procure.Services.Export
                     var amt = rfq.BaseAmount > 0 ? rfq.BaseAmount : (rfq.QuoteAmount ?? 0m);
                     // No PrItem row exists in this fallback, so there's no matched RfqItem to read a
                     // quantity from.
-                    DrawText("-", colX[VendorQtyColIdx(i)], curY - 12, font: "F1", fontSize: 8, align: "center", width: vendorQtyW[i]);
-                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], curY - 12, cur, amt, fontSize: 8);
+                    DrawText("-", colX[VendorQtyColIdx(i)], fbCenterY, font: "F1", fontSize: 8, align: "center", width: vendorQtyW[i]);
+                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], fbCenterY, cur, amt, fontSize: 8);
                 }
-                DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, curY - 12, defaultCur, 0.00m, fontSize: 8);
+                DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, fbCenterY, defaultCur, 0.00m, fontSize: 8);
                 curY -= rowH;
             }
             else
@@ -1243,6 +1275,44 @@ namespace Procure.Services.Export
                 .Replace("\\", "\\\\")
                 .Replace("(", "\\(")
                 .Replace(")", "\\)");
+        }
+
+        /// <summary>The explicit lines of an item name / spec pasted from one Excel cell: CRLF
+        /// normalised, other control chars dropped, each line trimmed, leading/trailing blank
+        /// lines removed, at most one interior blank kept, and the whole thing capped at
+        /// <paramref name="maxLines"/> (the last kept line gets a trailing ellipsis if any were
+        /// dropped). Each returned line is then soft-wrapped by the caller against the column width -
+        /// so a long name grows the row DOWN, never widens the column.</summary>
+        internal static List<string> HardLines(string? name, int maxLines)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return new List<string> { string.Empty };
+
+            var normalised = name.Replace("\r\n", "\n").Replace('\r', '\n');
+            var raw = normalised.Split('\n');
+
+            var lines = new List<string>();
+            bool lastWasBlank = false;
+            foreach (var r in raw)
+            {
+                // Strip tabs and other C0 control chars a stray paste can carry; keep the text.
+                var cleaned = new string(r.Where(c => c >= ' ' || c == '\t').ToArray())
+                    .Replace('\t', ' ')
+                    .Trim();
+
+                bool blank = cleaned.Length == 0;
+                if (blank && (lines.Count == 0 || lastWasBlank)) continue; // no leading / double blanks
+                lines.Add(cleaned);
+                lastWasBlank = blank;
+            }
+            while (lines.Count > 0 && lines[^1].Length == 0) lines.RemoveAt(lines.Count - 1); // trailing blank
+            if (lines.Count == 0) return new List<string> { string.Empty };
+
+            if (maxLines > 0 && lines.Count > maxLines)
+            {
+                lines = lines.Take(maxLines).ToList();
+                lines[^1] = (lines[^1].TrimEnd() + " ..").Trim();
+            }
+            return lines;
         }
 
         public static string FormatRfqNumbers(IReadOnlyList<RequestForQuotation> selectedRfqs)

@@ -207,11 +207,10 @@ namespace Procure.PageModels
                 {
                     Id = i.Id,
                     PrId = i.PrId,
-                    // Stripped defensively - a merge/consolidation path apparently can leave an
-                    // embedded \n/\r/\t in one of these (see PR-2026-008). The modal's own
-                    // TextChanged handlers now guard on IsFocused so this alone would no longer
-                    // crash, but a name with a stray newline in it is bad data regardless of that.
-                    ItemName = StripControlChars(i.ItemName),
+                    // A line break in an item name is legitimate now - a spec pasted from one Excel
+                    // cell. Keep it (just normalise CRLF, drop tabs which would confuse the paste
+                    // parser). The unit is always a short token, so that stays fully stripped.
+                    ItemName = NormalizeMultilineName(i.ItemName),
                     Quantity = i.Quantity,
                     Unit = string.IsNullOrWhiteSpace(i.Unit) ? "pcs" : StripControlChars(i.Unit),
                     EstimatedUnitPrice = i.EstimatedUnitPrice,
@@ -242,6 +241,10 @@ namespace Procure.PageModels
 
         private static string StripControlChars(string? value) =>
             string.IsNullOrEmpty(value) ? string.Empty : value.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ").Trim();
+
+        private static string NormalizeMultilineName(string? value) =>
+            string.IsNullOrEmpty(value) ? string.Empty
+                : value.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\t", " ").Trim();
 
         [RelayCommand]
         public async Task SavePrModalAsync()
@@ -282,16 +285,11 @@ namespace Procure.PageModels
 
             CurrentEditingPr.Items = new ObservableCollection<PrItem>(validItems);
 
+            // Description is optional - filled from the line items when blank so the board card
+            // keeps a readable title, but never required.
             if (string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && validItems.Count > 0)
             {
                 CurrentEditingPr.Description = CurrentEditingPr.ItemsSummary;
-            }
-
-            if (string.IsNullOrWhiteSpace(CurrentEditingPr.Description))
-            {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Description or at least one Line Item is required.", "OK");
-                return;
             }
 
             try

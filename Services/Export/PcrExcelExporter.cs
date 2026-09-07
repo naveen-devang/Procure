@@ -164,12 +164,44 @@ namespace Procure.Services.Export
         // No live text measurement is available in this hand-written OOXML writer, so wrapping is
         // estimated from character count against the column's own fixed width (set in <cols>
         // above) rather than measured pixel-for-pixel - close enough to size the row, since Excel's
-        // own wrapText does the real wrapping once the row is tall enough to show it.
+        // own wrapText does the real wrapping once the row is tall enough to show it. Hard line
+        // breaks in the text (a spec pasted from one Excel cell) each start a fresh line before the
+        // soft-wrap estimate runs, so a multi-line name grows the row DOWN, not the column across.
         private static int EstimateWrappedLineCount(string text, int charsPerLine, int maxLines)
         {
             if (string.IsNullOrEmpty(text)) return 1;
-            var lines = (int)Math.Ceiling(text.Length / (double)charsPerLine);
-            return Math.Clamp(lines, 1, maxLines);
+            var hard = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            int total = 0;
+            foreach (var seg in hard)
+            {
+                total += Math.Max(1, (int)Math.Ceiling(seg.Length / (double)Math.Max(1, charsPerLine)));
+            }
+            return Math.Clamp(total, 1, maxLines);
+        }
+
+        // The item name goes into an inlineStr cell that has wrapText on: normalise CRLF so Excel
+        // shows the hard breaks, turn tabs into spaces, drop other control chars, and trim - with
+        // xml:space="preserve" on the <t> so a leading/trailing space is not eaten either.
+        private static string NormalizeCellText(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            var normalised = value.Replace("\r\n", "\n").Replace('\r', '\n');
+            var sb = new StringBuilder(normalised.Length);
+            foreach (var c in normalised)
+            {
+                if (c == '\n' || c >= ' ') sb.Append(c);
+                else if (c == '\t') sb.Append(' ');
+                // other C0 control chars: dropped
+            }
+            return sb.ToString().Trim();
+        }
+
+        // Longest single line of a possibly multi-line name - drives the description column width so
+        // a tall spec never widens the column.
+        private static int LongestLineLength(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            return value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Max(l => l.Length);
         }
 
         private static void AddWorksheet(
@@ -202,7 +234,7 @@ namespace Procure.Services.Export
             const int descColWidthCap = 70;
             const int vendorQtyColWidth = 10;
             const int vendorPriceColWidth = 18;
-            var widestItemNameLength = pr.Items?.Count > 0 ? pr.Items.Max(i => i.ItemName?.Length ?? 0) : 0;
+            var widestItemNameLength = pr.Items?.Count > 0 ? pr.Items.Max(i => LongestLineLength(i.ItemName)) : 0;
             int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
 
             var sb = new StringBuilder();
@@ -365,10 +397,12 @@ namespace Procure.Services.Export
             if (prItems.Count == 0)
             {
                 // Fallback for PRs with no item rows
+                var fallbackDescLines = EstimateWrappedLineCount(pr.Description, descColWidth - 2, maxLines: 8);
+                var fallbackRowHeight = Math.Max(22, 20 + fallbackDescLines * 16);
                 sb.Append($@"
-        <row r=""{r}"" ht=""22"">
+        <row r=""{r}"" ht=""{fallbackRowHeight}"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>1</t></is></c>
-            <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t>{EscapeXml(pr.Description)}</t></is></c>
+            <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(NormalizeCellText(pr.Description))}</t></is></c>
             <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{pr.ItemsCount}</t></is></c>");
 
                 for (int i = 0; i < supplierCount; i++)
@@ -407,13 +441,13 @@ namespace Procure.Services.Export
                     // Sized per-row from this item's own name only, not uniformly across every
                     // item row - a five-word item three rows down growing its own row shouldn't
                     // change the height of every short one-word row around it.
-                    var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 3);
+                    var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 8);
                     var itemRowHeight = 20 + (descLines * 16);
 
                     sb.Append($@"
         <row r=""{r}"" ht=""{itemRowHeight}"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>{itemIndex++}</t></is></c>
-            <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t>{EscapeXml(item.ItemName)}</t></is></c>
+            <c r=""B{r}"" s=""5"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(NormalizeCellText(item.ItemName))}</t></is></c>
             <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {EscapeXml(item.Unit)}</t></is></c>");
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;

@@ -78,14 +78,50 @@ jobs:
           }
           Get-Content notes.md
 
+      # Pinned to match the Velopack library version in Procure.csproj - a floating vpk could
+      # change delta / feed behaviour between releases with no corresponding code change. The
+      # global tool persists across the steps below (same runner, same job).
+      - name: Install Velopack CLI
+        shell: pwsh
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      # Pulls the current latest release's full package + releases.win.json into .\Releases so the
+      # pack step can diff against it and emit a delta. continue-on-error: the very first delta
+      # release has no base, and a transient GitHub 5xx must not fail a release - pack then just
+      # produces a full-only package, exactly the old behaviour.
+      - name: Download latest release (delta base)
+        id: vpk_download
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          vpk download github `
+            --repoUrl https://github.com/${{ github.repository }} `
+            --token "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Pack with Velopack
         shell: pwsh
         run: |
-          dotnet tool install -g vpk
+          if ("${{ steps.vpk_download.outcome }}" -ne "success") {
+            Write-Host "::warning::No delta base downloaded - this release will be full-only."
+          }
           $version = "${{ github.ref_name }}" -replace '^v', ''
           vpk pack -u Procure -v $version -e Procure.exe `
             -p bin\Release\net10.0-windows10.0.19041.0\win-x64\publish `
             --releaseNotes notes.md
+
+      # Surfaces the delta / full ratio in the run log so each release can be eyeballed. A ratio
+      # near 100% just means a broad change (a runtime bump) - informational, never a gate.
+      - name: Report delta size
+        shell: pwsh
+        run: |
+          $full = Get-ChildItem Releases -Filter "*-full.nupkg" | Select-Object -First 1
+          $delta = Get-ChildItem Releases -Filter "*-delta.nupkg" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($delta -and $full) {
+            $ratio = [math]::Round($delta.Length / $full.Length * 100)
+            Write-Host "Delta $([math]::Round($delta.Length/1MB,2)) MB / Full $([math]::Round($full.Length/1MB,1)) MB ($ratio% of full)"
+          } elseif ($full) {
+            Write-Host "::warning::Full-only release ($([math]::Round($full.Length/1MB,1)) MB) - no delta generated."
+          }
 
       - name: Upload to GitHub Releases
         shell: pwsh
