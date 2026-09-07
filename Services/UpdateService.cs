@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -109,8 +110,23 @@ namespace Procure.Services
                 // real download path; the release URL is the most meaningful thing to put there.
                 result.DownloadUrl = result.ReleaseUrl;
                 result.LatestVersionString = asset.Version.ToString();
-                result.AssetName = asset.FileName;
-                result.SizeBytes = asset.Size;
+
+                // Report what will actually be downloaded. Velopack's GithubSource scans prior
+                // releases for a delta chain from the installed version; when one exists and is
+                // short enough (DeltasBeforeFallback), DownloadUpdatesAsync fetches the deltas
+                // instead of the ~120 MB full package. Show that size, not the full one.
+                var deltas = _pendingUpdate.DeltasToTarget?.ToArray() ?? Array.Empty<VelopackAsset>();
+                if (deltas.Length > 0)
+                {
+                    result.SizeBytes = deltas.Sum(d => d.Size);
+                    result.AssetName = deltas[^1].FileName;
+                    result.IsDeltaDownload = true;
+                }
+                else
+                {
+                    result.SizeBytes = asset.Size;
+                    result.AssetName = asset.FileName;
+                }
                 result.IsUpdateAvailable = true;
                 if (Version.TryParse(asset.Version.ToString().Split('-')[0], out var v))
                 {
