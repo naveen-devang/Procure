@@ -13,6 +13,7 @@ using Procure.Data;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
+using Procure.Utilities;
 
 namespace Procure.PageModels
 {
@@ -99,6 +100,7 @@ namespace Procure.PageModels
         public partial string CurrentVersion { get; set; } = "v1.0.0";
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanCheckForUpdates))]
         public partial bool IsCheckingForUpdates { get; set; }
 
         [ObservableProperty]
@@ -114,13 +116,22 @@ namespace Procure.PageModels
         public partial bool IsStatusError { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanCheckForUpdates))]
         public partial bool IsDownloading { get; set; }
+
+        // Download finished in the background (or here) and is waiting for a restart to apply.
+        [ObservableProperty]
+        public partial bool IsUpdateDownloaded { get; set; }
 
         [ObservableProperty]
         public partial double DownloadProgress { get; set; }
 
         [ObservableProperty]
         public partial string DownloadPercentageText { get; set; } = "0%";
+
+        // Blocks "Check for Updates" while a check OR a download (from either entry point) is in
+        // flight, so the two can't overlap.
+        public bool CanCheckForUpdates => !IsCheckingForUpdates && !IsDownloading;
 
         // Default Approval Stages
         [ObservableProperty]
@@ -161,6 +172,12 @@ namespace Procure.PageModels
             DatabaseDirectory = _settingsService.DatabaseDirectory;
             DatabasePath = DatabaseConstants.DatabaseFilePath;
             AutoCheckUpdates = _settingsService.AutoCheckUpdatesOnStartup;
+
+            // Mirror the shared download state so a background auto-download that's already
+            // running (or finished) shows the moment the Settings page opens.
+            _updateService.UpdateStateChanged += OnUpdateServiceStateChanged;
+            SyncFromUpdateService();
+
             IsSidebarCompact = _settingsService.IsSidebarCompact;
             AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
             IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
@@ -269,10 +286,48 @@ namespace Procure.PageModels
             _settingsService.AccentTheme = accentId;
         }
 
+        private void OnUpdateServiceStateChanged(object? sender, EventArgs e)
+            => MainThread.BeginInvokeOnMainThread(SyncFromUpdateService);
+
+        // Pulls the shared UpdateService download state onto the bound properties. Called on every
+        // state change and once at construction, so a background auto-download that's already
+        // running or finished is reflected the instant this page is opened.
+        private void SyncFromUpdateService()
+        {
+            var status = _updateService.DownloadStatus;
+            IsDownloading = status == UpdateDownloadStatus.Running;
+            IsUpdateDownloaded = status == UpdateDownloadStatus.Done;
+            DownloadProgress = _updateService.DownloadProgress;
+            DownloadPercentageText = $"{_updateService.DownloadProgress * 100:F0}%";
+
+            if (UpdateInfo == null && _updateService.LastKnownUpdate is { IsUpdateAvailable: true } known)
+            {
+                UpdateInfo = known;
+                IsUpdateAvailable = true;
+            }
+
+            var tag = _updateService.PendingUpdateTag ?? UpdateInfo?.TagName ?? "update";
+            switch (status)
+            {
+                case UpdateDownloadStatus.Running:
+                    IsStatusError = false;
+                    UpdateStatusMessage = $"Downloading {tag}  {DownloadPercentageText}";
+                    break;
+                case UpdateDownloadStatus.Done:
+                    IsStatusError = false;
+                    UpdateStatusMessage = $"{tag} downloaded - restart to apply.";
+                    break;
+                case UpdateDownloadStatus.Failed when !IsCheckingForUpdates:
+                    IsStatusError = true;
+                    UpdateStatusMessage = "Update download failed. Try again.";
+                    break;
+            }
+        }
+
         [RelayCommand]
         public async Task CheckForUpdatesAsync()
         {
-            if (IsCheckingForUpdates || IsDownloading) return;
+            if (IsCheckingForUpdates || IsDownloading || _updateService.IsUpdateBusy) return;
 
             try
             {
@@ -303,60 +358,39 @@ namespace Procure.PageModels
             finally
             {
                 IsCheckingForUpdates = false;
+                SyncFromUpdateService();
             }
         }
 
         [RelayCommand]
         public async Task DownloadAndInstallUpdateAsync()
         {
-            if (UpdateInfo == null || IsDownloading) return;
+            if (UpdateInfo == null) return;
+
+            // Already downloaded (here or by the startup auto-download) - go straight to applying.
+            if (_updateService.DownloadStatus == UpdateDownloadStatus.Done)
+            {
+                await LaunchAndOfferRestartAsync();
+                return;
+            }
+
+            // A download is already running (the auto-download). Nothing to start - the progress
+            // bar is already following the shared state.
+            if (_updateService.DownloadStatus == UpdateDownloadStatus.Running) return;
 
             if (string.IsNullOrWhiteSpace(UpdateInfo.DownloadUrl))
             {
-                // Fallback to release page
                 await OpenReleasePageAsync();
                 return;
             }
 
             try
             {
-                IsDownloading = true;
-                DownloadProgress = 0.0;
-                DownloadPercentageText = "0%";
-                UpdateStatusMessage = $"Downloading {UpdateInfo.AssetName}...";
-
-                var progressReporter = new Progress<double>(p =>
-                {
-                    DownloadProgress = p;
-                    DownloadPercentageText = $"{p * 100:F0}%";
-                });
-
-                var installerPath = await _updateService.DownloadUpdateAsync(UpdateInfo, progressReporter);
-
-                UpdateStatusMessage = "Download complete! Launching installer...";
-
-                var launched = _updateService.LaunchInstaller(installerPath);
-                if (launched)
-                {
-                    if (Shell.Current != null)
-                    {
-                        var exit = await Shell.Current.DisplayAlertAsync(
-                            "Installer Launched",
-                            "The update installer has been launched. Would you like to close the app to proceed with installation?",
-                            "Close App",
-                            "Later");
-
-                        if (exit && Application.Current != null)
-                        {
-                            Application.Current.Quit();
-                        }
-                    }
-                }
-                else
-                {
-                    // Fallback to explorer/browser
-                    await OpenReleasePageAsync();
-                }
+                IsStatusError = false;
+                // Progress + IsDownloading are driven by UpdateStateChanged -> SyncFromUpdateService,
+                // so the auto-download and this click show the same bar.
+                await _updateService.DownloadUpdateAsync(UpdateInfo);
+                await LaunchAndOfferRestartAsync();
             }
             catch (Exception ex)
             {
@@ -364,9 +398,30 @@ namespace Procure.PageModels
                 UpdateStatusMessage = $"Download failed: {ex.Message}";
                 _errorHandler.HandleError(ex);
             }
-            finally
+        }
+
+        private async Task LaunchAndOfferRestartAsync()
+        {
+            UpdateStatusMessage = "Applying update...";
+            var launched = _updateService.LaunchInstaller("velopack-update-ready");
+            if (!launched)
             {
-                IsDownloading = false;
+                await OpenReleasePageAsync();
+                return;
+            }
+
+            if (Shell.Current != null)
+            {
+                var exit = await Shell.Current.DisplayAlertAsync(
+                    "Update Ready",
+                    "The update is downloaded and ready. Close the app now to finish installing?",
+                    "Restart Now",
+                    "Later");
+
+                if (exit && Application.Current != null)
+                {
+                    Application.Current.Quit();
+                }
             }
         }
 

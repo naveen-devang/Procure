@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
 using Velopack;
 using Velopack.Sources;
+using Procure.Utilities;
 using UpdateInfo = Procure.Models.UpdateInfo;
 using VelopackUpdateInfo = Velopack.UpdateInfo;
 
@@ -40,6 +41,22 @@ namespace Procure.Services
 
         private VelopackUpdateInfo? _pendingUpdate;
 
+        // One coordinator for the whole app: RunAsync dedupes concurrent download requests for the
+        // same version, so the startup auto-download and a Settings "Download & Install" click
+        // cannot start two Velopack fetches. Passive - no timer, no thread.
+        private readonly UpdateDownloadCoordinator _download = new();
+        private volatile bool _isChecking;
+
+        public UpdateDownloadStatus DownloadStatus => _download.Status;
+        public double DownloadProgress => _download.Progress;
+        public string? PendingUpdateTag => _download.VersionTag;
+        public UpdateInfo? LastKnownUpdate { get; private set; }
+        public bool IsUpdateBusy => _isChecking || _download.IsRunning;
+
+        public event EventHandler? UpdateStateChanged;
+
+        private void RaiseState() => UpdateStateChanged?.Invoke(this, EventArgs.Empty);
+
         // AppInfo.Current.VersionString is not a fallback worth showing: it reads
         // ApplicationDisplayVersion/ApplicationVersion from Procure.csproj, which MAUI's build
         // bakes into the assembly regardless of what's actually running - they're scaffold
@@ -65,6 +82,7 @@ namespace Procure.Services
         public UpdateService(ILogger<UpdateService>? logger = null)
         {
             _logger = logger;
+            _download.Changed += (_, _) => RaiseState();
         }
 
         public async Task<UpdateInfo> CheckForUpdatesAsync(string repoOwnerAndName)
@@ -81,6 +99,8 @@ namespace Procure.Services
                 return result;
             }
 
+            _isChecking = true;
+            RaiseState();
             try
             {
                 if (!_manager.IsInstalled)
@@ -133,12 +153,18 @@ namespace Procure.Services
                     result.Version = v;
                 }
 
+                LastKnownUpdate = result;
                 return result;
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to check for updates on {Repo}", repoOwnerAndName);
                 throw;
+            }
+            finally
+            {
+                _isChecking = false;
+                RaiseState();
             }
         }
 
@@ -149,24 +175,39 @@ namespace Procure.Services
                 throw new InvalidOperationException("No pending update to download - call CheckForUpdatesAsync first.");
             }
 
-            var deltaCount = _pendingUpdate.DeltasToTarget?.Length ?? 0;
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            await _manager.DownloadUpdatesAsync(_pendingUpdate, p => progress?.Report(p / 100.0), ct);
-            sw.Stop();
-            progress?.Report(1.0);
+            var pending = _pendingUpdate;
+            var deltaCount = pending.DeltasToTarget?.Length ?? 0;
+            var tag = string.IsNullOrWhiteSpace(update.TagName) ? $"v{pending.TargetFullRelease.Version}" : update.TagName;
 
-            // One durable line so "did the delta path actually run?" is answerable after the fact -
-            // Velopack's own logging isn't persisted here. deltaCount>0 means a delta chain was
-            // offered; whether it was used vs a full fallback shows in how long/large the download
-            // was (a code-only delta is ~2 MB and finishes in a second or two).
-            try
+            // Through the coordinator: a concurrent request for the same version (startup
+            // auto-download racing a Settings click) latches onto this same download instead of
+            // starting a second Velopack fetch. The Settings page follows progress via
+            // UpdateStateChanged / DownloadProgress, not the `progress` argument.
+            await _download.RunAsync(tag, async (coordProgress, token) =>
             {
-                var expected = update.IsDeltaDownload
-                    ? $"delta x{deltaCount}, ~{update.SizeBytes / 1048576.0:F1} MB"
-                    : $"full, ~{update.SizeBytes / 1048576.0:F1} MB";
-                Utilities.CrashLog.Write($"UPDATE DOWNLOAD {update.TagName}: {expected}, took {sw.Elapsed.TotalSeconds:F1}s");
-            }
-            catch { /* logging must never break the update */ }
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                await _manager.DownloadUpdatesAsync(pending, p =>
+                {
+                    var f = p / 100.0;
+                    coordProgress.Report(f);
+                    progress?.Report(f);
+                }, token).ConfigureAwait(false);
+                sw.Stop();
+
+                // One durable line so "did the delta path actually run?" is answerable after the
+                // fact - Velopack's own logging isn't persisted here. A code-only delta is ~2 MB
+                // and finishes in a second or two; a full fallback is ~120 MB and 30s+.
+                try
+                {
+                    var expected = update.IsDeltaDownload
+                        ? $"delta x{deltaCount}, ~{update.SizeBytes / 1048576.0:F1} MB"
+                        : $"full, ~{update.SizeBytes / 1048576.0:F1} MB";
+                    Utilities.CrashLog.Write($"UPDATE DOWNLOAD {tag}: {expected}, took {sw.Elapsed.TotalSeconds:F1}s");
+                }
+                catch { /* logging must never break the update */ }
+            }, ct).ConfigureAwait(false);
+
+            progress?.Report(1.0);
 
             // Velopack tracks the downloaded package itself; there's no installer file path for
             // the caller to do anything with. This return value only exists so LaunchInstaller

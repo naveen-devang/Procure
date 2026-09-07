@@ -633,7 +633,7 @@
                                         <Button Grid.Column="1"
                                                 Text="Check for Updates"
                                                 Command="{Binding CheckForUpdatesCommand}"
-                                                IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                IsEnabled="{Binding CanCheckForUpdates}"
                                                 Style="{StaticResource SecondaryButton}"
                                                 HeightRequest="36" Padding="16,0" />
                                     </Grid>
@@ -705,7 +705,7 @@
 
                                             <VerticalStackLayout Spacing="4" IsVisible="{Binding IsDownloading}">
                                                 <Grid ColumnDefinitions="*, Auto">
-                                                    <Label Grid.Column="0" Text="Downloading update..." FontSize="11" TextColor="{StaticResource Gray400}" />
+                                                    <Label Grid.Column="0" Text="Downloading in the background..." FontSize="11" TextColor="{StaticResource Gray400}" />
                                                     <Label Grid.Column="1" Text="{Binding DownloadPercentageText}" FontSize="11" FontFamily="SegoeSemibold" TextColor="{DynamicResource Primary}" />
                                                 </Grid>
                                                 <ProgressBar Progress="{Binding DownloadProgress}" HeightRequest="6" />
@@ -715,6 +715,13 @@
                                                 <Button Text="Download &amp; Install Update"
                                                         Command="{Binding DownloadAndInstallUpdateCommand}"
                                                         IsEnabled="{Binding IsDownloading, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                        IsVisible="{Binding IsUpdateDownloaded, Converter={StaticResource BoolToInvertedBoolConverter}}"
+                                                        Style="{StaticResource PrimaryButton}"
+                                                        HeightRequest="36" Padding="18,0" />
+
+                                                <Button Text="Restart to Apply Update"
+                                                        Command="{Binding DownloadAndInstallUpdateCommand}"
+                                                        IsVisible="{Binding IsUpdateDownloaded}"
                                                         Style="{StaticResource PrimaryButton}"
                                                         HeightRequest="36" Padding="18,0" />
 

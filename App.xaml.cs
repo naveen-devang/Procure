@@ -47,6 +47,7 @@ namespace Procure
             {
                 Utilities.PrLineMatcherSelfCheck.Run();
                 Utilities.ClipboardItemParserSelfCheck.Run();
+                Utilities.UpdateDownloadCoordinatorSelfCheck.Run();
             }
 
             // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.
@@ -304,8 +305,12 @@ namespace Procure
 
                             if (update.IsUpdateAvailable)
                             {
+                                // The coordinator inside UpdateService dedupes this against a
+                                // Settings "Download & Install" click; a download already Done for
+                                // this version returns immediately.
                                 await updateService.DownloadUpdateAsync(update);
-                                NotifyUpdateReady(update.TagName);
+                                if (updateService.DownloadStatus == Utilities.UpdateDownloadStatus.Done)
+                                    NotifyUpdateReady(update.TagName);
                             }
                         }
                     }
