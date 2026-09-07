@@ -157,8 +157,10 @@
                                 HeightRequest="70" />
                     </VerticalStackLayout>
 
-                    <!-- Dynamic Custom Fields Section (Optimized BindableLayout) -->
-                    <VerticalStackLayout Spacing="8">
+                    <!-- Dynamic Custom Fields Section (Optimized BindableLayout).
+                         Hidden entirely when no custom columns are defined, matching BatchCreateModal. -->
+                    <VerticalStackLayout Spacing="8"
+                                         IsVisible="{Binding EditingCustomValues.Count, Converter={StaticResource IntGreaterThanZeroConverter}}">
                         <Label Text="Team Custom Fields" FontFamily="SegoeSemibold" FontSize="14"
                                TextColor="{AppThemeBinding Light={StaticResource DarkOnLightBackground}, Dark={StaticResource LightOnDarkBackground}}" />
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding EditingCustomValues}">
