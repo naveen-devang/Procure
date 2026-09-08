@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using Microsoft.Data.Sqlite;
-using Microsoft.Maui.Storage;
 
 namespace Procure.Data
 {
@@ -16,18 +15,24 @@ namespace Procure.Data
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
         public const int SchemaVersion = 14;
-        private const string CustomDbPathKey = "CustomDatabaseDirectory";
 
-        public static string DefaultDatabaseDirectory => FileSystem.AppDataDirectory;
+        public static string DefaultDatabaseDirectory => AppPaths.AppData;
+
+        /// <summary>
+        /// Reads / writes the saved custom database directory. The host wires these up at startup
+        /// (the MAUI app backs them with Preferences; a WinUI build with its own settings file).
+        /// Left unset, there is no saved custom directory and <see cref="DefaultDatabaseDirectory"/>
+        /// is used - which is also what a fresh install sees.
+        /// </summary>
+        public static Func<string?>? SavedDirectoryReader { get; set; }
+        public static Action<string>? SavedDirectoryWriter { get; set; }
 
         /// <summary>
         /// PROCURE_DB_DIR points the whole app at another database for the length of one run, without
         /// touching the saved path. That is how the capacity tests in Tools/generate-test-db.py are run
-        /// against a 20,000-PR database while your real one stays where it is. Unset, this is exactly
-        /// the saved preference as before.
+        /// against a 20,000-PR database while your real one stays where it is.
         /// </summary>
-        // Resolved once per process: every DB call routes through these, and the uncached form cost
-        // two Preferences reads (a registry hit when unpackaged) plus a directory stat per connection.
+        // Resolved once per process: every DB call routes through these.
         private static string? _cachedDirectory;
         private static string? _cachedConnectionString;
 
@@ -38,14 +43,15 @@ namespace Procure.Data
                 if (_cachedDirectory is null)
                 {
                     _cachedDirectory = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
-                                       ?? Preferences.Default.Get(CustomDbPathKey, DefaultDatabaseDirectory);
+                                       ?? SavedDirectoryReader?.Invoke()
+                                       ?? DefaultDatabaseDirectory;
                     Directory.CreateDirectory(_cachedDirectory); // no-op when it already exists
                 }
                 return _cachedDirectory;
             }
             set
             {
-                Preferences.Default.Set(CustomDbPathKey, value);
+                SavedDirectoryWriter?.Invoke(value);
                 _cachedDirectory = null;
                 _cachedConnectionString = null;
             }

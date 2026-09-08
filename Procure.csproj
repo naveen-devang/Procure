@@ -99,5 +99,21 @@
 		     build; drop it once bundle_green ships >= 2.1.13. -->
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
 	</ItemGroup>
-	
+
+	<!-- Models, data layer and pure business logic moved to Procure.Core (MIGRATION-PLAN.md
+	     Phase 1). Same namespaces (Procure.Models / Procure.Data / Procure.Utilities), so the
+	     global usings and existing code are unchanged. -->
+	<ItemGroup>
+		<ProjectReference Include="Procure.Core\Procure.Core.csproj" />
+	</ItemGroup>
+
+	<!-- Sibling projects live in subfolders of this one; keep their sources out of this build. -->
+	<ItemGroup>
+		<Compile Remove="Procure.Core\**\*.cs;Procure.Spike\**\*.cs" />
+		<MauiXaml Remove="Procure.Core\**\*.xaml;Procure.Spike\**\*.xaml" />
+		<Content Remove="Procure.Core\**\*;Procure.Spike\**\*" />
+		<None Remove="Procure.Core\**\*;Procure.Spike\**\*" />
+		<Page Remove="Procure.Spike\**\*.xaml" />
+	</ItemGroup>
+
 </Project>

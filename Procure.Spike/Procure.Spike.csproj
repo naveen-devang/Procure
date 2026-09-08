@@ -29,27 +29,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260529003" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.11" />
-    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
-  <!-- Data layer, linked from the MAUI project. Kept in lockstep by path, not copied. -->
   <ItemGroup>
-    <Compile Include="..\Models\*.cs" LinkBase="_Linked\Models"
-             Exclude="..\Models\PastelThemeOption.cs;..\Models\ShortcutRowViewModel.cs" />
-    <Compile Include="..\Data\SqliteDatabase.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\DatabaseConstants.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\PurchaseRequisitionRepository.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\PurchaseRequisitionRepository.Writes.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\PurchaseRequisitionRepository.Restructure.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\IPurchaseRequisitionRepository.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\MaterialAggregateMaintenance.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\CustomColumnRepository.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Data\Repositories\ICustomColumnRepository.cs" LinkBase="_Linked\Data" />
-    <Compile Include="..\Utilities\MoneyFormat.cs" LinkBase="_Linked\Utilities" />
-    <Compile Include="..\Utilities\PrLineMatcher.cs" LinkBase="_Linked\Utilities" />
+    <ProjectReference Include="..\Procure.Core\Procure.Core.csproj" />
   </ItemGroup>
 
 </Project>

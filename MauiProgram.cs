@@ -15,6 +15,16 @@ namespace Procure
     {
         public static MauiApp CreateMauiApp()
         {
+            // DatabaseConstants now lives in Procure.Core (no MAUI). Back its saved-directory
+            // hooks with Preferences, the same store it used to read/write directly.
+            Procure.Data.DatabaseConstants.SavedDirectoryReader = () =>
+            {
+                var v = Microsoft.Maui.Storage.Preferences.Default.Get("CustomDatabaseDirectory", string.Empty);
+                return string.IsNullOrEmpty(v) ? null : v;
+            };
+            Procure.Data.DatabaseConstants.SavedDirectoryWriter = v =>
+                Microsoft.Maui.Storage.Preferences.Default.Set("CustomDatabaseDirectory", v);
+
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
