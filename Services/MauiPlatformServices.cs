@@ -42,6 +42,12 @@ public sealed class MauiNavigationService : INavigationService
 
     public Task GoToBoardAndCreateAsync() =>
         Shell.Current is null ? Task.CompletedTask : Shell.Current.GoToAsync("//prboard?action=new");
+
+    public async Task GoToBoardWithSearchAsync(string search)
+    {
+        await GoToAsync(AppRoute.Board);
+        if (PageModels.PrListPageModel.Current is { } board) board.SearchText = search;
+    }
 }
 
 public sealed class MauiDialogService : IDialogService

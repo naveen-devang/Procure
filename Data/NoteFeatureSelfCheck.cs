@@ -14,7 +14,7 @@ namespace Procure.Data
         public static async Task RunAsync(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             var marker = "nfsc-" + Guid.NewGuid().ToString("N")[..6] + "-";
-            var vm = new NotePageModel(repo, errorHandler, linkTargets);
+            var vm = new NotePageModel(repo, errorHandler, linkTargets, new Abstractions.HeadlessUiDispatcher(), new Abstractions.HeadlessDialogService(), new Abstractions.HeadlessNavigationService());
 
             try
             {

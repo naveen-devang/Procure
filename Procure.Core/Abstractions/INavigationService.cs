@@ -22,4 +22,8 @@ public interface INavigationService
 
     /// <summary>Board with the "create a PR now" action queued (was <c>//prboard?action=new</c>).</summary>
     Task GoToBoardAndCreateAsync();
+
+    /// <summary>Go to the board and drop <paramref name="search"/> into its search box
+    /// (how Tasks / Notes "open linked PRs" works).</summary>
+    Task GoToBoardWithSearchAsync(string search);
 }

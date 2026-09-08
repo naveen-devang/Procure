@@ -6,8 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Controls;
-using Microsoft.Maui.Dispatching;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -57,11 +56,19 @@ namespace Procure.PageModels
         // Raised when a note is opened; the page hands the RTF to the editor control.
         public event Action<string>? EditorLoadRequested;
 
-        public NotePageModel(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
+        private readonly IUiDispatcher _dispatcher;
+        private readonly IDialogService _dialogs;
+        private readonly INavigationService _navigation;
+
+        public NotePageModel(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets,
+            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation)
         {
             _repo = repo;
             _errorHandler = errorHandler;
             _linkTargets = linkTargets;
+            _dispatcher = dispatcher;
+            _dialogs = dialogs;
+            _navigation = navigation;
         }
 
         public Task PreloadDataAsync() => LoadListAsync();
@@ -87,7 +94,7 @@ namespace Procure.PageModels
         partial void OnFilterTextChanged(string value)
         {
             var generation = ++_filterGeneration;
-            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(250), () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(250), () =>
             {
                 if (generation == _filterGeneration) RebuildList();
             });
@@ -218,10 +225,9 @@ namespace Procure.PageModels
         {
             if (SelectedNote is null || SelectedNote.Links.Count == 0) return;
             var terms = string.Join(' ', SelectedNote.Links.Select(l => l.Label).Where(l => l.Length > 0).Distinct());
-            if (terms.Length == 0 || Shell.Current is null) return;
+            if (terms.Length == 0) return;
 
-            await Shell.Current.GoToAsync("//prboard");
-            if (PrListPageModel.Current is { } board) board.SearchText = terms;
+            await _navigation.GoToBoardWithSearchAsync(terms);
         }
 
         // ---- new / delete / pin / duplicate ----
@@ -260,9 +266,9 @@ namespace Procure.PageModels
             item ??= _all.FirstOrDefault(n => n.Id == SelectedNote?.Id);
             if (item is null) return;
 
-            if (confirm && Shell.Current is not null)
+            if (confirm)
             {
-                var ok = await Shell.Current.DisplayAlertAsync("Delete note",
+                var ok = await _dialogs.DisplayAlertAsync("Delete note",
                     $"Delete “{item.DisplayTitle}”?", "Delete", "Cancel");
                 if (!ok) return;
             }
@@ -411,7 +417,7 @@ namespace Procure.PageModels
         {
             _pending[note.Id] = (note, plainText);
             var generation = _saveGeneration[note.Id] = _saveGeneration.GetValueOrDefault(note.Id) + 1;
-            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(800), async () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(800), async () =>
             {
                 if (_saveGeneration.GetValueOrDefault(note.Id) != generation) return;
                 await SaveNoteAsync(note.Id);

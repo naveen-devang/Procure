@@ -21,7 +21,7 @@ namespace Procure.Data
         public static async Task RunAsync(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
         {
             var marker = "tfsc-" + Guid.NewGuid().ToString("N")[..6] + "-";
-            var vm = new TodoPageModel(repo, errorHandler, linkTargets);
+            var vm = new TodoPageModel(repo, errorHandler, linkTargets, new Abstractions.HeadlessUiDispatcher(), new Abstractions.HeadlessDialogService(), new Abstractions.HeadlessNavigationService());
 
             try
             {

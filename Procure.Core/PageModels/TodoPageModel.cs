@@ -6,8 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Controls;
-using Microsoft.Maui.Dispatching;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -185,11 +184,19 @@ namespace Procure.PageModels
 
         public Array PriorityOptions { get; } = Enum.GetValues(typeof(TodoPriority));
 
-        public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets)
+        private readonly IUiDispatcher _dispatcher;
+        private readonly IDialogService _dialogs;
+        private readonly INavigationService _navigation;
+
+        public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets,
+            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation)
         {
             _repo = repo;
             _errorHandler = errorHandler;
             _linkTargets = linkTargets;
+            _dispatcher = dispatcher;
+            _dialogs = dialogs;
+            _navigation = navigation;
 
             // DI singleton - lives for the process, so this is never unsubscribed. Fires when the
             // PR detail panel's task strip changes a linked task.
@@ -255,7 +262,7 @@ namespace Procure.PageModels
         partial void OnFilterTextChanged(string value)
         {
             var generation = ++_rebuildGeneration;
-            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(250), () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(250), () =>
             {
                 if (generation == _rebuildGeneration) Rebuild();
             });
@@ -796,11 +803,7 @@ namespace Procure.PageModels
             var terms = string.Join(' ', task.Links.Select(l => l.Label).Where(l => l.Length > 0).Distinct());
             if (terms.Length == 0) return;
 
-            if (Shell.Current != null)
-            {
-                await Shell.Current.GoToAsync("//prboard");
-                if (PrListPageModel.Current is { } board) board.SearchText = terms;
-            }
+            await _navigation.GoToBoardWithSearchAsync(terms);
         }
 
         [RelayCommand]
@@ -809,9 +812,9 @@ namespace Procure.PageModels
             task ??= SelectedTask;
             if (task is null) return;
 
-            if (!string.IsNullOrWhiteSpace(task.Title) && Shell.Current != null)
+            if (!string.IsNullOrWhiteSpace(task.Title))
             {
-                var ok = await Shell.Current.DisplayAlertAsync("Delete task",
+                var ok = await _dialogs.DisplayAlertAsync("Delete task",
                     $"Delete “{task.Title}”?", "Delete", "Cancel");
                 if (!ok) return;
             }
@@ -840,9 +843,8 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task ClearFinishedAsync()
         {
-            if (Shell.Current != null)
             {
-                var ok = await Shell.Current.DisplayAlertAsync("Clear finished",
+                var ok = await _dialogs.DisplayAlertAsync("Clear finished",
                     "Permanently delete every completed task?", "Delete", "Cancel");
                 if (!ok) return;
             }
@@ -921,7 +923,7 @@ namespace Procure.PageModels
         private void ScheduleSave(TodoTask task)
         {
             var generation = _saveGeneration[task.Id] = _saveGeneration.GetValueOrDefault(task.Id) + 1;
-            Dispatcher.GetForCurrentThread()?.DispatchDelayed(TimeSpan.FromMilliseconds(400), async () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(400), async () =>
             {
                 if (_saveGeneration.GetValueOrDefault(task.Id) != generation) return;
                 if (string.IsNullOrWhiteSpace(task.Title)) return; // don't persist a blank new task yet
