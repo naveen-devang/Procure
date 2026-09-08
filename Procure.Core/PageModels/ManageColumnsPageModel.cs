@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -41,12 +41,16 @@ namespace Procure.PageModels
         /// pattern SettingsPageModel.Current and PrListPageModel.Current use.</summary>
         public static ManageColumnsPageModel? Current { get; private set; }
 
+        private readonly IDialogService _dialogs;
+
         public ManageColumnsPageModel(
             ICustomColumnRepository columnRepo,
-            IErrorHandler errorHandler)
+            IErrorHandler errorHandler,
+            IDialogService dialogs)
         {
             _columnRepo = columnRepo;
             _errorHandler = errorHandler;
+            _dialogs = dialogs;
             Current = this;
         }
 
@@ -81,8 +85,7 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(NewColumnName))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Please enter a column name.", "OK");
+                await _dialogs.DisplayAlertAsync("Validation", "Please enter a column name.", "OK");
                 return;
             }
 
@@ -115,9 +118,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeleteColumnAsync(CustomColumnDefinition col)
         {
-            if (Shell.Current == null) return;
-
-            var confirm = await Shell.Current.DisplayAlertAsync(
+            var confirm = await _dialogs.DisplayAlertAsync(
                 "Delete Column",
                 $"Are you sure you want to delete column '{col.Name}'? This will also remove any values saved under this column across all PRs.",
                 "Delete",

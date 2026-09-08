@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -75,10 +75,16 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool IsBusy { get; set; }
 
-        public CallOffPageModel(ICallOffRepository repo, IErrorHandler errorHandler)
+        private readonly IUiDispatcher _dispatcher;
+        private readonly IDialogService _dialogs;
+
+        public CallOffPageModel(ICallOffRepository repo, IErrorHandler errorHandler,
+            IUiDispatcher dispatcher, IDialogService dialogs)
         {
             _repo = repo;
             _errorHandler = errorHandler;
+            _dispatcher = dispatcher;
+            _dialogs = dialogs;
 
             // This page model is a DI singleton that outlives every visit to the tab, so this
             // subscription is never unsubscribed - same lifetime as the event source itself.
@@ -158,12 +164,11 @@ namespace Procure.PageModels
         partial void OnSearchTextChanged(string value)
         {
             var generation = ++_searchGeneration;
-            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), async () =>
-                {
-                    if (generation != _searchGeneration) return;
-                    await RebuildGroupsAsync(generation);
-                });
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(300), async () =>
+            {
+                if (generation != _searchGeneration) return;
+                await RebuildGroupsAsync(generation);
+            });
         }
 
         // Search matches material, vendor or PO number, applied in SQL. Groups stay collapsed:
@@ -268,8 +273,7 @@ namespace Procure.PageModels
 
             if (!decimal.TryParse(NewCallOffQuantity, NumberStyles.Number, CultureInfo.InvariantCulture, out var qty) || qty <= 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Enter a quantity greater than zero.", "OK");
+                await _dialogs.DisplayAlertAsync("Validation", "Enter a quantity greater than zero.", "OK");
                 return;
             }
 
