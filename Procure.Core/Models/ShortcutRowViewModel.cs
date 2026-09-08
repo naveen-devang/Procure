@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
+using Procure.Abstractions;
 using Procure.Services;
 using Procure.Utilities;
 
@@ -13,6 +13,7 @@ namespace Procure.Models
     public partial class ShortcutRowViewModel : ObservableObject
     {
         private readonly IKeyboardShortcutService _service;
+        private readonly IUiDispatcher _dispatcher;
 
         public string Id { get; }
         public string DisplayName { get; }
@@ -32,12 +33,13 @@ namespace Procure.Models
         partial void OnComboChanged(string value) => OnPropertyChanged(nameof(DisplayText));
         partial void OnIsRecordingChanged(bool value) => OnPropertyChanged(nameof(DisplayText));
 
-        public ShortcutRowViewModel(KeyboardShortcutDefinition definition, IKeyboardShortcutService service)
+        public ShortcutRowViewModel(KeyboardShortcutDefinition definition, IKeyboardShortcutService service, IUiDispatcher dispatcher)
         {
             Id = definition.Id;
             DisplayName = definition.DisplayName;
             Scope = definition.Scope;
             _service = service;
+            _dispatcher = dispatcher;
 
             Combo = service.GetCombo(Id);
             IsCustomized = service.IsCustomized(Id);
@@ -48,7 +50,7 @@ namespace Procure.Models
 
         private void OnShortcutsChanged(object? sender, System.EventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            _dispatcher.Post(() =>
             {
                 Combo = _service.GetCombo(Id);
                 IsCustomized = _service.IsCustomized(Id);
@@ -57,7 +59,7 @@ namespace Procure.Models
 
         private void OnRecordingChanged(object? sender, System.EventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() => IsRecording = _service.RecordingActionId == Id);
+            _dispatcher.Post(() => IsRecording = _service.RecordingActionId == Id);
         }
 
         [RelayCommand]

@@ -99,10 +99,13 @@ public sealed class MauiClipboardService : IClipboardService
 
 public sealed class MauiAppHost : IAppHost
 {
+    private readonly ISettingsService _settings;
+
     public event EventHandler? ThemeChanged;
 
-    public MauiAppHost()
+    public MauiAppHost(ISettingsService settings)
     {
+        _settings = settings;
         if (Application.Current is not null)
             Application.Current.RequestedThemeChanged += (_, _) => ThemeChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -111,4 +114,12 @@ public sealed class MauiAppHost : IAppHost
 
     public Task OpenFileAsync(string path) =>
         Launcher.Default.OpenAsync(new OpenFileRequest { File = new ReadOnlyFile(path) });
+
+    public async Task ApplyThemeAsync(string mode)
+    {
+        if (Shell.Current is Procure.AppShell shell)
+            await shell.TransitionThemeAsync(mode);
+        else
+            _settings.AppTheme = mode;
+    }
 }

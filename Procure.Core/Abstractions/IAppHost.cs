@@ -17,4 +17,7 @@ public interface IAppHost
 
     /// <summary>Open <paramref name="path"/> with the OS default application.</summary>
     Task OpenFileAsync(string path);
+
+    /// <summary>Apply a theme mode ("Light" / "Dark" / "System"), animating the switch when the host can.</summary>
+    Task ApplyThemeAsync(string mode);
 }
