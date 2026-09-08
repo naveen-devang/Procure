@@ -42,65 +42,65 @@ namespace Procure.Services
             {
                 Id = "Blue",
                 Name = "Pastel Blue",
-                LightColor = Color.FromArgb("#3A82EE"),
-                DarkColor = Color.FromArgb("#60CDFF"),
-                BgColor = Color.FromArgb("#243A82EE")
+                LightHex = "#3A82EE",
+                DarkHex = "#60CDFF",
+                BgHex = "#243A82EE"
             },
             new PastelThemeOption
             {
                 Id = "Purple",
                 Name = "Pastel Purple",
-                LightColor = Color.FromArgb("#8B6CE8"),
-                DarkColor = Color.FromArgb("#B198F0"),
-                BgColor = Color.FromArgb("#248B6CE8")
+                LightHex = "#8B6CE8",
+                DarkHex = "#B198F0",
+                BgHex = "#248B6CE8"
             },
             new PastelThemeOption
             {
                 Id = "Mint",
                 Name = "Pastel Mint",
-                LightColor = Color.FromArgb("#2E9E6D"),
-                DarkColor = Color.FromArgb("#6CCB5F"),
-                BgColor = Color.FromArgb("#242E9E6D")
+                LightHex = "#2E9E6D",
+                DarkHex = "#6CCB5F",
+                BgHex = "#242E9E6D"
             },
             new PastelThemeOption
             {
                 Id = "Coral",
                 Name = "Pastel Coral",
-                LightColor = Color.FromArgb("#E07238"),
-                DarkColor = Color.FromArgb("#FFA043"),
-                BgColor = Color.FromArgb("#24E07238")
+                LightHex = "#E07238",
+                DarkHex = "#FFA043",
+                BgHex = "#24E07238"
             },
             new PastelThemeOption
             {
                 Id = "Pink",
                 Name = "Pastel Rose",
-                LightColor = Color.FromArgb("#D95382"),
-                DarkColor = Color.FromArgb("#FF99A4"),
-                BgColor = Color.FromArgb("#24D95382")
+                LightHex = "#D95382",
+                DarkHex = "#FF99A4",
+                BgHex = "#24D95382"
             },
             new PastelThemeOption
             {
                 Id = "Red",
                 Name = "Pastel Crimson",
-                LightColor = Color.FromArgb("#C83E4D"),
-                DarkColor = Color.FromArgb("#FF7B7B"),
-                BgColor = Color.FromArgb("#24C83E4D")
+                LightHex = "#C83E4D",
+                DarkHex = "#FF7B7B",
+                BgHex = "#24C83E4D"
             },
             new PastelThemeOption
             {
                 Id = "Yellow",
                 Name = "Pastel Amber",
-                LightColor = Color.FromArgb("#D48B17"),
-                DarkColor = Color.FromArgb("#FCE100"),
-                BgColor = Color.FromArgb("#24D48B17")
+                LightHex = "#D48B17",
+                DarkHex = "#FCE100",
+                BgHex = "#24D48B17"
             },
             new PastelThemeOption
             {
                 Id = "Teal",
                 Name = "Pastel Teal",
-                LightColor = Color.FromArgb("#1E989B"),
-                DarkColor = Color.FromArgb("#48CAE4"),
-                BgColor = Color.FromArgb("#241E989B")
+                LightHex = "#1E989B",
+                DarkHex = "#48CAE4",
+                BgHex = "#241E989B"
             }
         };
 
@@ -300,18 +300,19 @@ namespace Procure.Services
             // is unreadable at text size: deep in Light, pastel in Dark. It follows the theme because
             // ApplyThemeMode re-runs this. (FluentPrimaryBg/FluentInfo/FocusStroke/SecondaryDarkText
             // were also written here; nothing reads them - dropped.)
-            var primary = ThemeHelper.IsDark ? palette.DarkColor : palette.LightColor;
+            var darkColor = Color.FromArgb(palette.DarkHex);
+            var primary = ThemeHelper.IsDark ? darkColor : Color.FromArgb(palette.LightHex);
 
             Application.Current.Resources["Primary"] = primary;
-            Application.Current.Resources["PrimaryDark"] = palette.DarkColor;
-            Application.Current.Resources["AccentFill"] = palette.DarkColor;
+            Application.Current.Resources["PrimaryDark"] = darkColor;
+            Application.Current.Resources["AccentFill"] = darkColor;
             Application.Current.Resources["PrimaryBrush"] = new SolidColorBrush(primary);
 
             foreach (var dict in Application.Current.Resources.MergedDictionaries)
             {
                 dict["Primary"] = primary;
-                dict["PrimaryDark"] = palette.DarkColor;
-                dict["AccentFill"] = palette.DarkColor;
+                dict["PrimaryDark"] = darkColor;
+                dict["AccentFill"] = darkColor;
                 dict["PrimaryBrush"] = new SolidColorBrush(primary);
             }
         }

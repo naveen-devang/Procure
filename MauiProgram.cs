@@ -154,6 +154,13 @@ namespace Procure
             builder.Services.AddSingleton<ILinkTargetService, LinkTargetService>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
+            // Procure.Core platform abstractions (MIGRATION-PLAN.md Phase 1b) - MAUI implementations.
+            builder.Services.AddSingleton<Procure.Abstractions.IUiDispatcher, Procure.Services.MauiUiDispatcher>();
+            builder.Services.AddSingleton<Procure.Abstractions.INavigationService, Procure.Services.MauiNavigationService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IDialogService, Procure.Services.MauiDialogService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IClipboardService, Procure.Services.MauiClipboardService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IAppHost, Procure.Services.MauiAppHost>();
+
             // Services
             builder.Services.AddSingleton<ISettingsService, SettingsService>();
             builder.Services.AddSingleton<IKeyboardShortcutService, KeyboardShortcutService>();

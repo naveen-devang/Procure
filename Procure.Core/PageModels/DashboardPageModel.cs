@@ -3,8 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data;
 using Procure.Models;
 using Procure.Services;
@@ -16,6 +15,9 @@ namespace Procure.PageModels
         private readonly IDashboardMetricsService _metricsService;
         private readonly ISettingsService _settingsService;
         private readonly IErrorHandler _errorHandler;
+        private readonly IUiDispatcher _dispatcher;
+        private readonly INavigationService _navigation;
+        private readonly IAppHost _appHost;
 
         [ObservableProperty]
         public partial DashboardMetrics Metrics { get; set; } = new();
@@ -26,18 +28,21 @@ namespace Procure.PageModels
         public DashboardPageModel(
             IDashboardMetricsService metricsService,
             ISettingsService settingsService,
-            IErrorHandler errorHandler)
+            IErrorHandler errorHandler,
+            IUiDispatcher dispatcher,
+            INavigationService navigation,
+            IAppHost appHost)
         {
             _metricsService = metricsService;
             _settingsService = settingsService;
             _errorHandler = errorHandler;
+            _dispatcher = dispatcher;
+            _navigation = navigation;
+            _appHost = appHost;
 
             _settingsService.SettingsChanged += OnSettingsChanged;
             Utilities.DataChangeNotifier.Changed += OnDataChanged;
-            if (Application.Current != null)
-            {
-                Application.Current.RequestedThemeChanged += OnAppRequestedThemeChanged;
-            }
+            _appHost.ThemeChanged += OnAppRequestedThemeChanged;
         }
 
         /// <summary>Set by the page as it appears and disappears. The metrics query is a full sweep
@@ -63,12 +68,10 @@ namespace Procure.PageModels
             // thread. 400ms because these are discrete saves, not keystrokes - long enough to collapse
             // a burst, short enough to feel immediate.
             var generation = ++_refreshGeneration;
-            MainThread.BeginInvokeOnMainThread(() =>
-                Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                    ?.DispatchDelayed(TimeSpan.FromMilliseconds(400), () =>
-                    {
-                        if (generation == _refreshGeneration && IsVisible) _ = LoadDataAsync();
-                    }));
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(400), () =>
+            {
+                if (generation == _refreshGeneration && IsVisible) _ = LoadDataAsync();
+            });
         }
 
         /// <summary>Test seam: how many refreshes the debounce has actually let through.</summary>
@@ -80,10 +83,7 @@ namespace Procure.PageModels
         {
             _settingsService.SettingsChanged -= OnSettingsChanged;
             Utilities.DataChangeNotifier.Changed -= OnDataChanged;
-            if (Application.Current != null)
-            {
-                Application.Current.RequestedThemeChanged -= OnAppRequestedThemeChanged;
-            }
+            _appHost.ThemeChanged -= OnAppRequestedThemeChanged;
         }
 
         // The Urgent priority badge and status badges on the Needs Attention widget go through
@@ -105,7 +105,7 @@ namespace Procure.PageModels
         // queue-flag guard cannot fold the two together. It only carries new information when the
         // theme follows the OS ("System"); pinned to Light/Dark, the only thing that can raise it
         // is this app's own AppTheme setter, which SettingsChanged has already handled.
-        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+        private void OnAppRequestedThemeChanged(object? sender, EventArgs e)
         {
             if (_settingsService.AppTheme is "Light" or "Dark") return;
             RefreshCardVisuals();
@@ -116,7 +116,7 @@ namespace Procure.PageModels
 
         private void RefreshCardVisuals()
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            _dispatcher.Post(() =>
             {
                 CardRepaintsForTest++;
                 foreach (var pr in Metrics.NeedsAttentionPrs)
@@ -178,7 +178,7 @@ namespace Procure.PageModels
         {
             try
             {
-                await Shell.Current.GoToAsync("//prboard");
+                await _navigation.GoToAsync(AppRoute.Board);
             }
             catch (Exception ex)
             {
@@ -191,7 +191,7 @@ namespace Procure.PageModels
         {
             try
             {
-                await Shell.Current.GoToAsync("//prboard?action=new");
+                await _navigation.GoToBoardAndCreateAsync();
             }
             catch (Exception ex)
             {

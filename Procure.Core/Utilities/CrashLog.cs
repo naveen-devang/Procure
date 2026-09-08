@@ -9,8 +9,7 @@ namespace Procure.Utilities
     /// throws itself, since a logger that can crash the app is worse than no logger.</summary>
     public static class CrashLog
     {
-        private static readonly string LogPath =
-            Path.Combine(Microsoft.Maui.Storage.FileSystem.AppDataDirectory, "crash.log");
+        private static readonly string LogPath = Path.Combine(AppPaths.AppData, "crash.log");
 
         public static void Write(string context, Exception? ex = null)
         {

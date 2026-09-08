@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using System.IO;
-using Microsoft.Maui.Storage;
 
 namespace Procure.Utilities
 {
@@ -14,8 +13,8 @@ namespace Procure.Utilities
     // location the SQLite database already lives in for this exact reason.
     public static class UpdateStateStore
     {
-        private static readonly string LastUpdateCheckFile = Path.Combine(FileSystem.AppDataDirectory, "last-update-check.txt");
-        private static readonly string LastWhatsNewVersionFile = Path.Combine(FileSystem.AppDataDirectory, "last-whats-new-version.txt");
+        private static readonly string LastUpdateCheckFile = Path.Combine(AppPaths.AppData, "last-update-check.txt");
+        private static readonly string LastWhatsNewVersionFile = Path.Combine(AppPaths.AppData, "last-whats-new-version.txt");
 
         public static DateTime GetLastUpdateCheckUtc()
         {
