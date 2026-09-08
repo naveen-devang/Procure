@@ -25,6 +25,11 @@ namespace Procure
             Procure.Data.DatabaseConstants.SavedDirectoryWriter = v =>
                 Microsoft.Maui.Storage.Preferences.Default.Set("CustomDatabaseDirectory", v);
 
+#if WINDOWS
+            // Core view models report page-load times through PerfProbe; forward them to the HUD.
+            Procure.Utilities.PerfProbe.PageLoad = Procure.Utilities.PerfHud.ReportPageLoad;
+#endif
+
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()

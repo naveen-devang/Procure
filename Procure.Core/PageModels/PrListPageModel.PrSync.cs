@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Maui.Controls;
 using Procure.Models;
 using Procure.Utilities;
 
@@ -82,7 +81,7 @@ namespace Procure.PageModels
         private async Task<bool> ConfirmRemovePrItemAsync(PrItem item)
         {
             var pr = CurrentEditingPr;
-            if (pr == null || Shell.Current == null) return true;
+            if (pr == null || false) return true;
 
             // Match against what the PR actually has saved, not the modal's working copy.
             var saved = pr.Items?.FirstOrDefault(i => i.Id == item.Id);
@@ -92,7 +91,7 @@ namespace Procure.PageModels
             if (orders.Count > 0)
             {
                 var poNos = string.Join(", ", orders.Select(o => o.Po.PoNo).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct());
-                await Shell.Current.DisplayAlertAsync(
+                await _dialogs.DisplayAlertAsync(
                     "Item Already Ordered",
                     $"'{saved.ItemName}' is on purchase order {poNos}. Cancel or edit that PO first, then remove the line.",
                     "OK");
@@ -103,7 +102,7 @@ namespace Procure.PageModels
             if (quoted.Count == 0) return true;
 
             var vendors = string.Join(", ", quoted.Select(q => q.Rfq.Vendor).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct());
-            var removeQuotes = await Shell.Current.DisplayAlertAsync(
+            var removeQuotes = await _dialogs.DisplayAlertAsync(
                 "Item Is Quoted",
                 $"{quoted.Count} quote line(s) price '{saved.ItemName}' ({vendors}). Remove those quote lines too?\n\nLeaving them keeps their prices in each vendor's total and in the price comparison.",
                 "Remove them",
@@ -118,7 +117,7 @@ namespace Procure.PageModels
         /// a visible "Over-ordered" state rather than the old cheerful "Complete".</summary>
         private async Task<bool> ConfirmQuantityCutsAsync(PurchaseRequisition pr, List<PrItem> newItems)
         {
-            if (Shell.Current == null || pr.Items == null || pr.Items.Count == 0) return true;
+            if (false || pr.Items == null || pr.Items.Count == 0) return true;
 
             var ordered = PrLineMatcher.OrderedQuantities(pr.Items, pr.Pos);
             var cuts = new List<string>();
@@ -131,7 +130,7 @@ namespace Procure.PageModels
 
             if (cuts.Count == 0) return true;
 
-            return await Shell.Current.DisplayAlertAsync(
+            return await _dialogs.DisplayAlertAsync(
                 "Less Than Already Ordered",
                 string.Join("\n", cuts) + "\n\nSave anyway? The line will be marked over-ordered.",
                 "Save anyway",

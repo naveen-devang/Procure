@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -451,12 +450,12 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task AddPoItemLineAsync(PoRfqSelection? card)
         {
-            if (card == null || Shell.Current == null) return;
+            if (card == null || false) return;
             var prItems = TargetPrForPo?.Items;
             if (prItems == null || prItems.Count == 0) return;
 
             var names = prItems.Select(i => i.ItemName).ToArray();
-            var pick = await Shell.Current.DisplayActionSheetAsync("Add line for item", "Cancel", null, names);
+            var pick = await _dialogs.DisplayActionSheetAsync("Add line for item", "Cancel", null, names);
             if (string.IsNullOrWhiteSpace(pick) || pick == "Cancel") return;
 
             var prItem = prItems.FirstOrDefault(i => i.ItemName == pick) ?? prItems.First();
@@ -507,8 +506,8 @@ namespace Procure.PageModels
             var selected = PoRfqSelections?.Where(r => r.IsSelected).ToList();
             if (selected == null || selected.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Please select at least one supplier quote to configure PO.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Please select at least one supplier quote to configure PO.", "OK");
                 return;
             }
 
@@ -548,16 +547,16 @@ namespace Procure.PageModels
             var selectedRfqs = PoRfqSelections?.Where(r => r.IsSelected).ToList();
             if (selectedRfqs == null || selectedRfqs.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Please select at least one RFQ / Supplier quote to raise a PO.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Please select at least one RFQ / Supplier quote to raise a PO.", "OK");
                 return;
             }
 
             // Check for over-allocation errors
             if (HasPoQuantityValidationErrors)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Quantity Over-allocation", PoQuantityValidationErrorMessage, "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Quantity Over-allocation", PoQuantityValidationErrorMessage, "OK");
                 return;
             }
 
@@ -566,8 +565,8 @@ namespace Procure.PageModels
             {
                 if (string.IsNullOrWhiteSpace(rfqSel.PoNo))
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Validation", $"Please enter a PO Number for {rfqSel.VendorName}.", "OK");
+                    if (true)
+                        await _dialogs.DisplayAlertAsync("Validation", $"Please enter a PO Number for {rfqSel.VendorName}.", "OK");
                     return;
                 }
             }
@@ -593,8 +592,8 @@ namespace Procure.PageModels
                         .FirstOrDefault(g => g.Count() > 1);
                     if (duplicateTarget != null)
                     {
-                        if (Shell.Current != null)
-                            await Shell.Current.DisplayAlertAsync("Duplicate Target", $"Two selected quotes would update the same existing PO ({duplicateTarget.First().VendorName}). Please deselect one of them.", "OK");
+                        if (true)
+                            await _dialogs.DisplayAlertAsync("Duplicate Target", $"Two selected quotes would update the same existing PO ({duplicateTarget.First().VendorName}). Please deselect one of them.", "OK");
                         return;
                     }
 
@@ -721,9 +720,9 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task UpdatePoStatusAsync(PurchaseOrder po)
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
-            var action = await Shell.Current.DisplayActionSheetAsync(
+            var action = await _dialogs.DisplayActionSheetAsync(
                 $"Update Status for {po.PoNo}",
                 "Cancel",
                 null,
@@ -759,9 +758,9 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeletePoAsync(PurchaseOrder po)
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
-            var confirm = await Shell.Current.DisplayAlertAsync("Delete PO", $"Delete PO {po.PoNo}?", "Delete", "Cancel");
+            var confirm = await _dialogs.DisplayAlertAsync("Delete PO", $"Delete PO {po.PoNo}?", "Delete", "Cancel");
             if (!confirm) return;
 
             try

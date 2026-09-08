@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -219,16 +218,16 @@ namespace Procure.PageModels
         {
             if (BatchEditingRfqItems == null || BatchEditingRfqItems.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("No Items", "There are no items in this shared RFQ to copy.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("No Items", "There are no items in this shared RFQ to copy.", "OK");
                 return;
             }
 
             var selectedItems = BatchEditingRfqItems.Where(i => i.IsQuoted && !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
             if (selectedItems.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
                 return;
             }
 
@@ -285,8 +284,8 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Shared RFQ", "Please select at least 1 requisition.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Shared RFQ", "Please select at least 1 requisition.", "OK");
                 return;
             }
 
@@ -369,15 +368,15 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(BatchRfqNo))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "RFQ Number is required.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "RFQ Number is required.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(BatchRfqVendor))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Vendor name is required.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Vendor name is required.", "OK");
                 return;
             }
 
@@ -433,9 +432,9 @@ namespace Procure.PageModels
                 ApplyFilters();
                 DataChangeNotifier.Notify(ProcurementChange.Rfq);
 
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync(
+                    await _dialogs.DisplayAlertAsync(
                         "Shared RFQ Created",
                         $"Shared RFQ {rfqTemplate.RfqNo} created across {selected.Count} requisitions with full item quotes and commercial terms.",
                         "OK");
@@ -459,8 +458,8 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Combined PO", "Please select at least 1 requisition.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Combined PO", "Please select at least 1 requisition.", "OK");
                 return;
             }
 
@@ -506,8 +505,8 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(BatchPoNo))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "PO Number is required.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "PO Number is required.", "OK");
                 return;
             }
 
@@ -544,9 +543,9 @@ namespace Procure.PageModels
                 UpdateSelectionState();
                 ApplyFilters();
 
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync(
+                    await _dialogs.DisplayAlertAsync(
                         "Combined PO Created",
                         $"Combined PO {poTemplate.PoNo} created across {selected.Count} requisitions.",
                         "OK");

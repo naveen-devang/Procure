@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -244,9 +243,9 @@ namespace Procure.PageModels
 
             if (orderedBy is { Count: > 0 })
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync(
+                    await _dialogs.DisplayAlertAsync(
                         "Line Already Ordered",
                         $"'{item.ItemName}' was ordered on {string.Join(", ", orderedBy)}. Edit or cancel that PO first, then remove the line.",
                         "OK");
@@ -266,16 +265,16 @@ namespace Procure.PageModels
         {
             if (EditingRfqItems == null || EditingRfqItems.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("No Items", "There are no items in this RFQ to copy.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("No Items", "There are no items in this RFQ to copy.", "OK");
                 return;
             }
 
             var selectedItems = EditingRfqItems.Where(i => i.IsQuoted && !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
             if (selectedItems.Count == 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
                 return;
             }
 
@@ -489,15 +488,15 @@ namespace Procure.PageModels
 
             if (string.IsNullOrWhiteSpace(NewRfqNo))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Please enter an RFQ Number.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Please enter an RFQ Number.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(NewRfqVendor))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Please enter a Vendor name.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Please enter a Vendor name.", "OK");
                 return;
             }
 
@@ -628,7 +627,7 @@ namespace Procure.PageModels
         private async Task ReconcileNewQuoteLinesToPrAsync(List<RfqItem> lines)
         {
             var pr = TargetPrForRfq;
-            if (pr == null || Shell.Current == null || _rfqLinesAddedThisSession.Count == 0) return;
+            if (pr == null || false || _rfqLinesAddedThisSession.Count == 0) return;
 
             var matched = PrLineMatcher.Map(lines, pr.Items);
             var strays = lines
@@ -640,7 +639,7 @@ namespace Procure.PageModels
             var listing = string.Join("\n", strays.Take(5).Select(l => $"• {l.ItemName} ({l.FormattedQuantity})"));
             if (strays.Count > 5) listing += $"\n• …and {strays.Count - 5} more";
 
-            var add = await Shell.Current.DisplayAlertAsync(
+            var add = await _dialogs.DisplayAlertAsync(
                 strays.Count == 1 ? "Line Not On The Requisition" : "Lines Not On The Requisition",
                 $"{listing}\n\nAdd to requisition {pr.PrNo}? Without this the quantity is quoted and ordered but never counted against the PR.",
                 "Add to PR",
@@ -691,15 +690,14 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task MarkQuoteReceivedAsync(RequestForQuotation rfq)
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
-            var amountStr = await Shell.Current.DisplayPromptAsync(
+            var amountStr = await _dialogs.DisplayPromptAsync(
                 "Quote Received",
                 $"Enter quote amount for {rfq.Vendor}:",
                 "Save",
                 "Cancel",
-                "Quote Amount (e.g. 5000)",
-                keyboard: Keyboard.Numeric);
+                "Quote Amount (e.g. 5000)");
 
             if (amountStr == null) return;
 
@@ -728,7 +726,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeleteRfqAsync(RequestForQuotation rfq)
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
             // A PO raised from this quote keeps its money but loses its provenance when the quote
             // goes: its Edit screen can no longer show the terms it was built on, and the price
@@ -742,12 +740,12 @@ namespace Procure.PageModels
                 .ToList();
 
             var confirm = dependentPos is { Count: > 0 }
-                ? await Shell.Current.DisplayAlertAsync(
+                ? await _dialogs.DisplayAlertAsync(
                     "Delete Quoted RFQ",
                     $"Purchase order {string.Join(", ", dependentPos)} was raised from this quote.\n\nDeleting it keeps the order and its value, but the order loses the commercial terms it was built on and drops out of the price comparison.",
                     "Delete anyway",
                     "Cancel")
-                : await Shell.Current.DisplayAlertAsync("Delete RFQ", $"Delete RFQ for {rfq.Vendor}?", "Delete", "Cancel");
+                : await _dialogs.DisplayAlertAsync("Delete RFQ", $"Delete RFQ for {rfq.Vendor}?", "Delete", "Cancel");
 
             if (!confirm) return;
 

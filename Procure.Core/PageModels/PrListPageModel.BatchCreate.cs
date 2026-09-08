@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -191,9 +190,9 @@ namespace Procure.PageModels
         {
             if (BatchPrEntries.Count == 0) return;
 
-            if (Shell.Current != null)
+            if (true)
             {
-                var confirm = await Shell.Current.DisplayAlertAsync(
+                var confirm = await _dialogs.DisplayAlertAsync(
                     "Apply Defaults to All Rows",
                     $"Set Plant, PR Type, Priority, Requestor and Notes to the current New Row Defaults on all {BatchPrEntries.Count} row(s)? This overwrites those fields on every row.",
                     "Apply", "Cancel");
@@ -367,8 +366,8 @@ namespace Procure.PageModels
 
             if (errors.Count > 0)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", string.Join("\n", errors), "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", string.Join("\n", errors), "OK");
                 return;
             }
 
@@ -411,14 +410,14 @@ namespace Procure.PageModels
         {
             try
             {
-                if (!Clipboard.Default.HasText)
+                if (!await _clipboard.HasTextAsync())
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Please copy lines from Excel first.", "OK");
+                    if (true)
+                        await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Please copy lines from Excel first.", "OK");
                     return;
                 }
 
-                var text = await Clipboard.Default.GetTextAsync();
+                var text = await _clipboard.GetTextAsync();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
                 var parsedEntries = ClipboardItemParser.ParseBatchPrEntries(
@@ -432,8 +431,8 @@ namespace Procure.PageModels
 
                 if (parsedEntries.Count == 0)
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("No Requisitions Detected", "Could not detect valid requisitions from clipboard text.", "OK");
+                    if (true)
+                        await _dialogs.DisplayAlertAsync("No Requisitions Detected", "Could not detect valid requisitions from clipboard text.", "OK");
                     return;
                 }
 
@@ -478,21 +477,21 @@ namespace Procure.PageModels
             if (entry == null) return;
             try
             {
-                if (!Clipboard.Default.HasText)
+                if (!await _clipboard.HasTextAsync())
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the item rows from Excel first.", "OK");
+                    if (true)
+                        await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the item rows from Excel first.", "OK");
                     return;
                 }
 
-                var text = await Clipboard.Default.GetTextAsync();
+                var text = await _clipboard.GetTextAsync();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
                 var parsed = ClipboardItemParser.ParsePrItems(text, entry.Id, entry.Items.Count);
                 if (parsed.Count == 0)
                 {
-                    if (Shell.Current != null)
-                        await Shell.Current.DisplayAlertAsync("No Items Detected", "Could not read any line items from the clipboard text.", "OK");
+                    if (true)
+                        await _dialogs.DisplayAlertAsync("No Items Detected", "Could not read any line items from the clipboard text.", "OK");
                     return;
                 }
 

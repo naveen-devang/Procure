@@ -59,7 +59,7 @@ namespace Procure
             });
 
             Procure.Utilities.BoardTrace.Mark("shell-ctor-done");
-            Procure.Utilities.BoardTrace.StartPulse(Dispatcher);
+            Procure.Utilities.BoardTrace.StartPulse(_services.GetRequiredService<Procure.Abstractions.IUiDispatcher>());
 
             if (Environment.GetEnvironmentVariable("PROCURE_OPEN_CALENDAR") == "1")
             {

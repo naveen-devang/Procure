@@ -21,4 +21,11 @@ public interface IDialogService
     /// <paramref name="destruction"/> may be null.
     /// </summary>
     Task<string?> DisplayActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons);
+
+    /// <summary>Single-line text prompt. Returns the entered text, or null if cancelled.</summary>
+    Task<string?> DisplayPromptAsync(string title, string message, string accept, string cancel,
+        string? placeholder = null, string initialValue = "");
+
+    /// <summary>Native folder picker. Returns the chosen path, or null if cancelled.</summary>
+    Task<string?> PickFolderAsync();
 }

@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -20,7 +19,8 @@ namespace Procure.PageModels
     // Board state and the paths every feature file leans on: construction and disposal,
     // loading, filtering, paging, the status banner and inline status transitions.
     // Feature areas live in the sibling PrListPageModel.*.cs partials.
-    [QueryProperty(nameof(ActionParam), "action")]
+    // (Was [QueryProperty] for the "//prboard?action=new" deep link; the nav service sets
+    //  ActionParam directly now - Procure.Core has no MAUI Shell.)
     public partial class PrListPageModel : ObservableObject, IDisposable
     {
         private readonly IPurchaseRequisitionRepository _prRepo;
@@ -93,8 +93,7 @@ namespace Procure.PageModels
             ToastText = message;
             IsToastVisible = true;
             var gen = ++_toastGeneration;
-            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                ?.DispatchDelayed(TimeSpan.FromMilliseconds(2500), () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(2500), () =>
                 {
                     if (gen == _toastGeneration) IsToastVisible = false;
                 });
@@ -153,6 +152,11 @@ namespace Procure.PageModels
             }
         }
 
+        private readonly IUiDispatcher _dispatcher;
+        private readonly IDialogService _dialogs;
+        private readonly IClipboardService _clipboard;
+        private readonly IAppHost _appHost;
+
         public PrListPageModel(
             IPurchaseRequisitionRepository prRepo,
             ICustomColumnRepository customColumnRepo,
@@ -160,7 +164,11 @@ namespace Procure.PageModels
             IPcrExportService pcrExportService,
             ISettingsService settingsService,
             IErrorHandler errorHandler,
-            ITodoRepository todoRepo)
+            ITodoRepository todoRepo,
+            IUiDispatcher dispatcher,
+            IDialogService dialogs,
+            IClipboardService clipboard,
+            IAppHost appHost)
         {
             _prRepo = prRepo;
             _customColumnRepo = customColumnRepo;
@@ -169,12 +177,13 @@ namespace Procure.PageModels
             _settingsService = settingsService;
             _errorHandler = errorHandler;
             _todoRepo = todoRepo;
+            _dispatcher = dispatcher;
+            _dialogs = dialogs;
+            _clipboard = clipboard;
+            _appHost = appHost;
 
             _settingsService.SettingsChanged += OnSettingsChanged;
-            if (Application.Current != null)
-            {
-                Application.Current.RequestedThemeChanged += OnAppRequestedThemeChanged;
-            }
+            _appHost.ThemeChanged += OnAppRequestedThemeChanged;
 
             Current = this;
         }
@@ -194,10 +203,7 @@ namespace Procure.PageModels
         public void Dispose()
         {
             _settingsService.SettingsChanged -= OnSettingsChanged;
-            if (Application.Current != null)
-            {
-                Application.Current.RequestedThemeChanged -= OnAppRequestedThemeChanged;
-            }
+            _appHost.ThemeChanged -= OnAppRequestedThemeChanged;
         }
 
         private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
@@ -207,7 +213,7 @@ namespace Procure.PageModels
                 // Thresholds feed the overdue filter and the banner only — nothing on a card is bound to them.
                 case nameof(ISettingsService.NormalOverdueDays):
                 case nameof(ISettingsService.UrgentOverdueDays):
-                    MainThread.BeginInvokeOnMainThread(() =>
+                    _dispatcher.Post(() =>
                     {
                         ApplyFilters();
                     });
@@ -226,7 +232,7 @@ namespace Procure.PageModels
         // queue-flag guard cannot fold the two together. It only carries new information when the
         // theme follows the OS ("System"); pinned to Light/Dark, the only thing that can raise it
         // is this app's own AppTheme setter, which SettingsChanged has already handled.
-        private void OnAppRequestedThemeChanged(object? sender, AppThemeChangedEventArgs e)
+        private void OnAppRequestedThemeChanged(object? sender, EventArgs e)
         {
             if (_settingsService.AppTheme is "Light" or "Dark") return;
             RefreshCardVisuals();
@@ -240,7 +246,7 @@ namespace Procure.PageModels
             // single theme click lands here twice. Coalesce — one queued pass repaints everything.
             if (Interlocked.CompareExchange(ref _cardVisualsRefreshQueued, 1, 0) != 0) return;
 
-            MainThread.BeginInvokeOnMainThread(() =>
+            _dispatcher.Post(() =>
             {
                 Interlocked.Exchange(ref _cardVisualsRefreshQueued, 0);
 
@@ -455,8 +461,7 @@ namespace Procure.PageModels
             // retired by the counter, so there is no CancellationTokenSource to allocate per
             // keystroke and the callback already runs on the UI thread with nothing to marshal back.
             var generation = ++_searchGeneration;
-            Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                ?.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(300), () =>
                 {
                     if (generation == _searchGeneration) ApplyFilters(true);
                 });
@@ -731,15 +736,12 @@ namespace Procure.PageModels
                 {
                     if (Procure.Utilities.BoardTrace.IsEnabled)
                         Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
-#if WINDOWS
                     if (loadTimer is not null)
-                        Procure.Utilities.PerfHud.ReportPageLoad("board first paint", loadTimer.ElapsedMilliseconds);
-#endif
+                        Procure.Utilities.PerfProbe.ReportPageLoad("board first paint", loadTimer.ElapsedMilliseconds);
                     // The first fill is one viewport; grow the window to a full page shortly after,
                     // off the critical path, so "Showing N of M" reaches PageSize without the user
                     // having to scroll to trigger the first threshold fetch.
-                    Microsoft.Maui.Dispatching.Dispatcher.GetForCurrentThread()
-                        ?.DispatchDelayed(TimeSpan.FromMilliseconds(250), () => _ = LoadMoreAsync());
+                    _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(250), () => _ = LoadMoreAsync());
                 }
             }
             catch (Exception ex)
@@ -813,9 +815,9 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task ChangePrStatusAsync(PurchaseRequisition pr)
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
-            var selected = await Shell.Current.DisplayActionSheetAsync(
+            var selected = await _dialogs.DisplayActionSheetAsync(
                 $"Update Status for {pr.PrNo}",
                 "Cancel",
                 null,

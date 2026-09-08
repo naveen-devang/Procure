@@ -40,8 +40,11 @@ public sealed class MauiNavigationService : INavigationService
     public Task GoToAsync(AppRoute route) =>
         Shell.Current is null ? Task.CompletedTask : Shell.Current.GoToAsync(Route(route));
 
-    public Task GoToBoardAndCreateAsync() =>
-        Shell.Current is null ? Task.CompletedTask : Shell.Current.GoToAsync("//prboard?action=new");
+    public async Task GoToBoardAndCreateAsync()
+    {
+        await GoToAsync(AppRoute.Board);
+        if (PageModels.PrListPageModel.Current is { } board) board.ActionParam = "new";
+    }
 
     public async Task GoToBoardWithSearchAsync(string search)
     {
@@ -63,6 +66,28 @@ public sealed class MauiDialogService : IDialogService
 
     public async Task<string?> DisplayActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons) =>
         Root is null ? null : await Root.DisplayActionSheetAsync(title, cancel, destruction, buttons);
+
+    public async Task<string?> DisplayPromptAsync(string title, string message, string accept, string cancel,
+        string? placeholder = null, string initialValue = "") =>
+        Root is null ? null : await Root.DisplayPromptAsync(title, message, accept, cancel, placeholder, initialValue: initialValue);
+
+    public async Task<string?> PickFolderAsync()
+    {
+        try
+        {
+            var window = (Microsoft.UI.Xaml.Window)Application.Current!.Windows[0].Handler!.PlatformView!;
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            picker.FileTypeFilter.Add("*");
+            var folder = await picker.PickSingleFolderAsync();
+            return folder?.Path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 public sealed class MauiClipboardService : IClipboardService

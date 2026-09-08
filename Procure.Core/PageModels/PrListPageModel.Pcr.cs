@@ -9,8 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -338,11 +337,7 @@ namespace Procure.PageModels
                 // dead-ending at a path in a dialog.
                 try
                 {
-                    await Launcher.Default.OpenAsync(new OpenFileRequest
-                    {
-                        Title = Path.GetFileName(filePath),
-                        File = new ReadOnlyFile(filePath)
-                    });
+                    await _appHost.OpenFileAsync(filePath);
                 }
                 catch
                 {
@@ -447,9 +442,9 @@ namespace Procure.PageModels
                     toggled.IsSelected = false;
                     toggled.PropertyChanged += OnExportRfqSelectionPropertyChanged;
 
-                    if (Shell.Current != null)
+                    if (true)
                     {
-                        _ = Shell.Current.DisplayAlertAsync("Limit Reached", "A maximum of 5 suppliers can be selected on the comparison sheet.", "OK");
+                        _ = _dialogs.DisplayAlertAsync("Limit Reached", "A maximum of 5 suppliers can be selected on the comparison sheet.", "OK");
                     }
                 }
                 UpdateSelectedRfqCount();
@@ -523,9 +518,9 @@ namespace Procure.PageModels
             var selected = ExportRfqSelections.Where(s => s.IsSelected).Select(s => s.Rfq).ToList();
             if (selected.Count == 0)
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
+                    await _dialogs.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
                 }
                 return;
             }
@@ -552,7 +547,7 @@ namespace Procure.PageModels
         public partial bool IsPcrPreviewVisible { get; set; }
 
         [ObservableProperty]
-        public partial ObservableCollection<ImageSource> PcrPreviewPages { get; set; } = new();
+        public partial ObservableCollection<byte[]> PcrPreviewPages { get; set; } = new();
 
         [ObservableProperty]
         public partial bool IsPcrPreviewBusy { get; set; }
@@ -582,7 +577,7 @@ namespace Procure.PageModels
         public partial int PcrPreviewPageIndex { get; set; }
 
         [ObservableProperty]
-        public partial ImageSource? PcrPreviewCurrentPage { get; set; }
+        public partial byte[]? PcrPreviewCurrentPage { get; set; }
 
         [ObservableProperty]
         public partial string PcrPreviewPagerText { get; set; } = string.Empty;
@@ -704,9 +699,9 @@ namespace Procure.PageModels
             var selected = ExportRfqSelections.Where(s => s.IsSelected).Select(s => s.Rfq).ToList();
             if (selected.Count == 0)
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
+                    await _dialogs.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
                 }
                 return;
             }
@@ -771,7 +766,7 @@ namespace Procure.PageModels
                 PcrPreviewPages.Clear();
                 foreach (var png in images)
                 {
-                    PcrPreviewPages.Add(ImageSource.FromStream(() => new MemoryStream(png)));
+                    PcrPreviewPages.Add(png);
                 }
                 PcrPreviewPageSummary = images.Count == 1 ? "1 page" : $"{images.Count} pages";
                 IsPcrPagerVisible = images.Count > 1;
@@ -873,18 +868,18 @@ namespace Procure.PageModels
             if (_pcrPreviewBytes == null || _pcrPreviewPr == null) return;
             if (string.IsNullOrWhiteSpace(PcrSelectedPrinter))
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync("No Printer Selected", "Choose a printer from the list first.", "OK");
+                    await _dialogs.DisplayAlertAsync("No Printer Selected", "Choose a printer from the list first.", "OK");
                 }
                 return;
             }
 
             if (!TryParsePcrPageRange(PcrPageRangeText, PcrPreviewPages.Count, out var pageIndices, out var rangeError))
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync("Invalid Page Range", rangeError, "OK");
+                    await _dialogs.DisplayAlertAsync("Invalid Page Range", rangeError, "OK");
                 }
                 return;
             }

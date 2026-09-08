@@ -75,26 +75,16 @@ namespace Procure.Utilities
             return sb.ToString();
         }
 
-        public static async Task CopyToClipboardAsync(IEnumerable<RfqItem> items)
+        public static Task CopyToClipboardAsync(IEnumerable<RfqItem> items)
         {
             var html = GenerateHtmlTable(items);
             var plainText = GeneratePlainTextTable(items);
 
-#if WINDOWS
-            try
-            {
-                var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
-                dataPackage.SetHtmlFormat(Windows.ApplicationModel.DataTransfer.HtmlFormatHelper.CreateHtmlFormat(html));
-                dataPackage.SetText(plainText);
-                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-                return;
-            }
-            catch
-            {
-                // Fall back to MAUI clipboard if Windows DataPackage fails
-            }
-#endif
-            await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.SetTextAsync(plainText);
+            var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetHtmlFormat(Windows.ApplicationModel.DataTransfer.HtmlFormatHelper.CreateHtmlFormat(html));
+            dataPackage.SetText(plainText);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            return Task.CompletedTask;
         }
     }
 }

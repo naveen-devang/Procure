@@ -21,6 +21,8 @@ public sealed class HeadlessDialogService : IDialogService
     public Task DisplayAlertAsync(string title, string message, string cancel) => Task.CompletedTask;
     public Task<bool> DisplayAlertAsync(string title, string message, string accept, string cancel) => Task.FromResult(true);
     public Task<string?> DisplayActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons) => Task.FromResult<string?>(null);
+    public Task<string?> DisplayPromptAsync(string title, string message, string accept, string cancel, string? placeholder = null, string initialValue = "") => Task.FromResult<string?>(null);
+    public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
 }
 
 public sealed class HeadlessNavigationService : INavigationService

@@ -6,7 +6,10 @@
        See MIGRATION-PLAN.md Phase 1. -->
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- Windows-only, like the app. Lets the data + rasterization layer use System.Drawing
+         and WinRT clipboard APIs without a UI framework. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -23,6 +26,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.11" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.11" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />

@@ -31,7 +31,7 @@ namespace Procure.Utilities
         /// <summary>A 15ms dispatcher heartbeat: any gap over 100ms means the UI thread was blocked
         /// for that long (layout, realization, inflation - everything), logged as ui-blocked with the
         /// block's end timestamp. This is the ground truth for freeze duration.</summary>
-        public static void StartPulse(Microsoft.Maui.Dispatching.IDispatcher dispatcher)
+        public static void StartPulse(Procure.Abstractions.IUiDispatcher dispatcher)
         {
             if (TracePath is null) return;
             var last = Clock.ElapsedMilliseconds;
@@ -40,9 +40,9 @@ namespace Procure.Utilities
                 var now = Clock.ElapsedMilliseconds;
                 if (now - last > 100) Mark($"ui-blocked {now - last} ms (block ended here)");
                 last = now;
-                dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(15), Tick);
+                dispatcher.PostDelayed(TimeSpan.FromMilliseconds(15), Tick);
             }
-            dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(15), Tick);
+            dispatcher.PostDelayed(TimeSpan.FromMilliseconds(15), Tick);
         }
     }
 }

@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
-using Microsoft.Maui.Controls;
+using Procure.Abstractions;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.Services;
@@ -121,7 +120,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeleteSelectedPrsAsync()
         {
-            if (Shell.Current == null) return;
+            if (false) return;
 
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count == 0) return;
@@ -130,7 +129,7 @@ namespace Procure.PageModels
                 ? $"{selected[0].PrNo} ({selected[0].Description})"
                 : $"{selected.Count} requisitions";
 
-            var confirm = await Shell.Current.DisplayAlertAsync(
+            var confirm = await _dialogs.DisplayAlertAsync(
                 "Delete Requisitions",
                 $"Delete {label} and all associated RFQs, PCRs, and POs? This cannot be undone.",
                 "Delete",
@@ -246,8 +245,8 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 2)
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Combine Requisitions", "Please select at least 2 requisitions to combine.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Combine Requisitions", "Please select at least 2 requisitions to combine.", "OK");
                 return;
             }
 
@@ -289,15 +288,15 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(MergeMasterPrNo))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Master PR Number is required.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Master PR Number is required.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(MergeDescription))
             {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlertAsync("Validation", "Description is required.", "OK");
+                if (true)
+                    await _dialogs.DisplayAlertAsync("Validation", "Description is required.", "OK");
                 return;
             }
 
@@ -425,9 +424,9 @@ namespace Procure.PageModels
 
             if (childPrs.Count == 0)
             {
-                if (Shell.Current != null)
+                if (true)
                 {
-                    await Shell.Current.DisplayAlertAsync("Split Requisition", "Could not locate source requisitions for this combined PR.", "OK");
+                    await _dialogs.DisplayAlertAsync("Split Requisition", "Could not locate source requisitions for this combined PR.", "OK");
                 }
                 return;
             }
@@ -563,18 +562,18 @@ namespace Procure.PageModels
                 // PR line Ids move during a split, which moves the PO items hanging off them.
                 Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
 
-                if (Shell.Current != null)
+                if (true)
                 {
                     if (kept.Count < 2)
                     {
-                        await Shell.Current.DisplayAlertAsync(
+                        await _dialogs.DisplayAlertAsync(
                             "Requisitions Restored",
                             $"Successfully split {targetPrNo}. All source requisitions are now active on your board.",
                             "OK");
                     }
                     else
                     {
-                        await Shell.Current.DisplayAlertAsync(
+                        await _dialogs.DisplayAlertAsync(
                             "Requisitions Split",
                             $"Successfully separated {split.Count} requisition(s) ({string.Join(", ", split.Select(s => s.PrNo))}). Remaining {kept.Count} requisitions remain combined in master requisition.",
                             "OK");
@@ -605,9 +604,9 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task SplitSharedRfqAsync(RequestForQuotation rfq)
         {
-            if (rfq == null || Shell.Current == null) return;
+            if (rfq == null || false) return;
 
-            var confirm = await Shell.Current.DisplayAlertAsync(
+            var confirm = await _dialogs.DisplayAlertAsync(
                 "Split Shared RFQ",
                 $"Unlink shared RFQ {rfq.RfqNo}? Each linked requisition will keep its own independent quotation.",
                 "Split",
@@ -638,7 +637,7 @@ namespace Procure.PageModels
                 UpdateSelectionState();
                 ApplyFilters();
 
-                await Shell.Current.DisplayAlertAsync("Shared RFQ Unlinked", $"Shared RFQ {rfq.RfqNo} has been unlinked into independent quotations.", "OK");
+                await _dialogs.DisplayAlertAsync("Shared RFQ Unlinked", $"Shared RFQ {rfq.RfqNo} has been unlinked into independent quotations.", "OK");
             }
             catch (Exception ex)
             {
@@ -664,9 +663,9 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task SplitCombinedPoAsync(PurchaseOrder po)
         {
-            if (po == null || Shell.Current == null) return;
+            if (po == null || false) return;
 
-            var confirm = await Shell.Current.DisplayAlertAsync(
+            var confirm = await _dialogs.DisplayAlertAsync(
                 "Split Combined PO",
                 $"Unlink combined purchase order {po.PoNo}? Each linked requisition will maintain its independent PO.",
                 "Split",
@@ -695,7 +694,7 @@ namespace Procure.PageModels
                 UpdateSelectionState();
                 ApplyFilters();
 
-                await Shell.Current.DisplayAlertAsync("Combined PO Unlinked", $"Purchase order {po.PoNo} has been unlinked into independent orders.", "OK");
+                await _dialogs.DisplayAlertAsync("Combined PO Unlinked", $"Purchase order {po.PoNo} has been unlinked into independent orders.", "OK");
             }
             catch (Exception ex)
             {

@@ -99,7 +99,7 @@
                                     <Border.GestureRecognizers>
                                         <PanGestureRecognizer PanUpdated="OnPreviewPanUpdated" />
                                     </Border.GestureRecognizers>
-                                    <Image Source="{Binding PcrPreviewCurrentPage}"
+                                    <Image Source="{Binding PcrPreviewCurrentPage, Converter={StaticResource BytesToImageSourceConverter}}"
                                            Aspect="AspectFit"
                                            WidthRequest="700" />
                                 </Border>
