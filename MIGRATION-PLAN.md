@@ -184,6 +184,27 @@ low-risk and independently valuable even if the port is paused after it.
 
 ---
 
+## 5a. Standing requirements
+
+- **Perf HUD in every phase build until cutover.** The frame-time / fps /
+  worst-frame-per-second / first-page-load readout from the Phase 0 spike stays
+  visible in every intermediate WinUI build, so a regression is caught the moment
+  it appears. Remove it only at Phase 6.
+- **Build WinUI with MSBuild, not `dotnet build`** — the XAML markup compiler
+  crashes (WMC9999) under the dotnet CLI here. Spike pins
+  `Microsoft.WindowsAppSDK` to 1.8.x (2.4.0's WinUI sub-package isn't restored).
+
+## Progress
+
+- **Phase 0** — done. `Procure.Spike`, WinUI 3 board on the real 20k DB, smooth. Go.
+- **Phase 1a** — done (`f2f2c96`). `Procure.Core` extracted: models, data layer,
+  repositories, `PrLineMatcher`/`MoneyFormat`. MAUI-free. Self-checks pass
+  (ProcurementFlow: 178 checks). MAUI app still builds + runs.
+- **Phase 1b** — next: Services + PageModels → Core, plus the abstraction
+  interfaces, implemented over MAUI. Ship as a no-op refactor release.
+
+---
+
 ## 6. Decision checkpoints
 
 - **After Phase 0:** go / no-go on the whole migration, based on measured perf.
