@@ -109,11 +109,11 @@
 
 	<!-- Sibling projects live in subfolders of this one; keep their sources out of this build. -->
 	<ItemGroup>
-		<Compile Remove="Procure.Core\**\*.cs;Procure.Spike\**\*.cs" />
-		<MauiXaml Remove="Procure.Core\**\*.xaml;Procure.Spike\**\*.xaml" />
-		<Content Remove="Procure.Core\**\*;Procure.Spike\**\*" />
-		<None Remove="Procure.Core\**\*;Procure.Spike\**\*" />
-		<Page Remove="Procure.Spike\**\*.xaml" />
+		<Compile Remove="Procure.Core\**\*.cs;Procure.App\**\*.cs" />
+		<MauiXaml Remove="Procure.Core\**\*.xaml;Procure.App\**\*.xaml" />
+		<Content Remove="Procure.Core\**\*;Procure.App\**\*" />
+		<None Remove="Procure.Core\**\*;Procure.App\**\*" />
+		<Page Remove="Procure.App\**\*.xaml" />
 	</ItemGroup>
 
 </Project>

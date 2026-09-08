@@ -1,0 +1,90 @@
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+using Procure.Abstractions;
+using Procure.App.Platform;
+using Procure.App.Views;
+using Procure.Data;
+using Procure.Data.Repositories;
+using Procure.PageModels;
+using Procure.Services;
+using Procure.Services.Export;
+
+namespace Procure.App;
+
+public partial class App : Application
+{
+    public static IServiceProvider Services { get; private set; } = null!;
+    public static DispatcherQueue UiQueue { get; private set; } = null!;
+
+    public App()
+    {
+        InitializeComponent();
+        UiQueue = DispatcherQueue.GetForCurrentThread();
+
+        // Point at the real 20k test DB unless PROCURE_DB_DIR is already set. A real install
+        // would fall through to DatabaseConstants' AppPaths default.
+        var dbDir = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
+                    ?? @"E:\Procure\Procure\TestData\procure-20k";
+        Environment.SetEnvironmentVariable("PROCURE_DB_DIR", dbDir);
+
+        SQLitePCL.Batteries_V2.Init();
+        Services = BuildServices();
+    }
+
+    private Window? _window;
+
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        _window = Services.GetRequiredService<MainWindow>();
+        _window.Activate();
+    }
+
+    private static IServiceProvider BuildServices()
+    {
+        var s = new ServiceCollection();
+
+        s.AddSingleton<ShellContext>();
+
+        // Platform abstractions (WinUI implementations of the Procure.Core interfaces).
+        s.AddSingleton<IUiDispatcher, WinUiDispatcher>();
+        s.AddSingleton<INavigationService, WinUiNavigationService>();
+        s.AddSingleton<IDialogService, WinUiDialogService>();
+        s.AddSingleton<IClipboardService, WinUiClipboardService>();
+        s.AddSingleton<IAppHost, WinUiAppHost>();
+
+        // Data + repositories
+        s.AddSingleton<SqliteDatabase>();
+        s.AddSingleton<ICustomColumnRepository, CustomColumnRepository>();
+        s.AddSingleton<ICallOffRepository, CallOffRepository>();
+        s.AddSingleton<ITodoRepository, TodoRepository>();
+        s.AddSingleton<INoteRepository, NoteRepository>();
+        s.AddSingleton<ILinkTargetService, LinkTargetService>();
+        s.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
+
+        // Services (WinUI placeholders where the app-side port is still pending)
+        s.AddSingleton<ISettingsService, JsonSettingsService>();
+        s.AddSingleton<IErrorHandler, WinUiErrorHandler>();
+        s.AddSingleton<IKeyboardShortcutService, RegistryOnlyKeyboardShortcutService>();
+        s.AddSingleton<IDashboardMetricsService, DashboardMetricsService>();
+        s.AddSingleton<IUpdateService, UnavailableUpdateService>();
+        s.AddSingleton<ICsvExportService, UnavailableCsvExportService>();
+        s.AddSingleton<IPcrExportService, UnavailablePcrExportService>();
+
+        // View models
+        s.AddSingleton<DashboardPageModel>();
+        s.AddSingleton<PrListPageModel>();
+        s.AddSingleton<CallOffPageModel>();
+        s.AddSingleton<TodoPageModel>();
+        s.AddSingleton<NotePageModel>();
+        s.AddSingleton<ManageColumnsPageModel>();
+        s.AddSingleton<SettingsPageModel>();
+
+        // Windows / pages
+        s.AddSingleton<MainWindow>();
+        s.AddTransient<PrBoardPage>();
+
+        return s.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
+    }
+}

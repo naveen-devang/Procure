@@ -1,4 +1,4 @@
-namespace Procure.Spike;
+namespace Procure.App;
 
 /// <summary>x:Bind format helpers for the card template.</summary>
 public static class Fmt

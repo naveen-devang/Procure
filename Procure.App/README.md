@@ -1,4 +1,4 @@
-# Procure.Spike — Phase 0 spike
+# Procure.App — Phase 0 spike
 
 Throwaway. Answers one question: **is a native WinUI 3 PR board measurably smoother
 than the MAUI build at 20k rows?** (MIGRATION-PLAN.md, Phase 0.)
@@ -22,9 +22,9 @@ under the dotnet CLI here.
 
 ```
 & "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
-  Procure.Spike\Procure.Spike.csproj -t:Restore,Build -p:Configuration=Debug -p:Platform=x64
+  Procure.App\Procure.App.csproj -t:Restore,Build -p:Configuration=Debug -p:Platform=x64
 
-.\Procure.Spike\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\Procure.Spike.exe
+.\Procure.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\Procure.App.exe
 ```
 
 Pinned to `Microsoft.WindowsAppSDK` **1.8.x** (not the MAUI project's 2.4.0 — 2.4.0's

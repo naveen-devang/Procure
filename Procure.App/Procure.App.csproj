@@ -1,17 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Phase 0 spike (MIGRATION-PLAN.md). Throwaway: proves whether a native WinUI 3
-       PR board is measurably smoother than the MAUI build at 20k rows, against the
-       real repository + the real SQLite file. Links the data-layer source directly
-       from ..\Procure (no Procure.Core extraction yet - that is Phase 1) and stubs
-       the 2 MAUI platform types DatabaseConstants touches (SpikeShims.cs). Does not
-       modify the MAUI project. -->
+  <!-- The native WinUI 3 app (MIGRATION-PLAN.md Phase 2+). Replaces the MAUI head:
+       same Procure.Core, same SQLite file, same Velopack packaging. Build with
+       MSBuild, not `dotnet build` (the XAML compiler crashes under the CLI here). -->
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>Procure.Spike</RootNamespace>
+    <RootNamespace>Procure.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -22,13 +19,14 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <EnableMsixTooling>true</EnableMsixTooling>
-    <DefineConstants>$(DefineConstants);SPIKE</DefineConstants>
     <NoWarn>$(NoWarn);MSB3270;CsWinRT1028;CS0618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260529003" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>

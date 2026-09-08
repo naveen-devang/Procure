@@ -1,0 +1,208 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Procure.Abstractions;
+using Procure.Services;
+using Procure.PageModels;
+
+namespace Procure.App.Platform;
+
+// WinUI 3 implementations of the Procure.Core abstractions. See MIGRATION-PLAN.md Phase 2.
+
+public sealed class WinUiDispatcher : IUiDispatcher
+{
+    private readonly DispatcherQueue _queue = App.UiQueue;
+
+    public bool IsMainThread => _queue?.HasThreadAccess ?? false;
+
+    public void Post(Action action)
+    {
+        if (IsMainThread) action();
+        else _queue.TryEnqueue(() => action());
+    }
+
+    public void PostDelayed(TimeSpan delay, Action action)
+    {
+        var timer = _queue.CreateTimer();
+        timer.Interval = delay;
+        timer.IsRepeating = false;
+        timer.Tick += (t, _) => { t.Stop(); action(); };
+        timer.Start();
+    }
+}
+
+public sealed class WinUiClipboardService : IClipboardService
+{
+    public Task<bool> HasTextAsync()
+    {
+        var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+        return Task.FromResult(content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text));
+    }
+
+    public async Task<string?> GetTextAsync()
+    {
+        var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+        if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text)) return null;
+        return await content.GetTextAsync();
+    }
+
+    public Task SetTextAsync(string text)
+    {
+        var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        pkg.SetText(text);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class WinUiNavigationService : INavigationService
+{
+    private readonly ShellContext _shell;
+    public WinUiNavigationService(ShellContext shell) => _shell = shell;
+
+    /// <summary>Set by MainWindow: (route, param) -> navigate the content frame.</summary>
+    public static Action<AppRoute, string?>? Navigate { get; set; }
+
+    public Task GoToAsync(AppRoute route)
+    {
+        Navigate?.Invoke(route, null);
+        return Task.CompletedTask;
+    }
+
+    public Task GoToBoardAndCreateAsync()
+    {
+        Navigate?.Invoke(AppRoute.Board, "new");
+        return Task.CompletedTask;
+    }
+
+    public Task GoToBoardWithSearchAsync(string search)
+    {
+        Navigate?.Invoke(AppRoute.Board, null);
+        if (PrListPageModel.Current is { } board) board.SearchText = search;
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class WinUiDialogService : IDialogService
+{
+    private readonly ShellContext _shell;
+    public WinUiDialogService(ShellContext shell) => _shell = shell;
+
+    private async Task<ContentDialogResult> ShowAsync(string title, object content, string? primary, string? secondary, string close)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            CloseButtonText = close,
+            XamlRoot = _shell.XamlRoot,
+        };
+        if (primary is not null) dialog.PrimaryButtonText = primary;
+        if (secondary is not null) dialog.SecondaryButtonText = secondary;
+        return await dialog.ShowAsync();
+    }
+
+    public async Task DisplayAlertAsync(string title, string message, string cancel)
+    {
+        if (_shell.XamlRoot is null) return;
+        await ShowAsync(title, message, null, null, cancel);
+    }
+
+    public async Task<bool> DisplayAlertAsync(string title, string message, string accept, string cancel)
+    {
+        if (_shell.XamlRoot is null) return false;
+        var r = await ShowAsync(title, message, accept, null, cancel);
+        return r == ContentDialogResult.Primary;
+    }
+
+    public async Task<string?> DisplayActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons)
+    {
+        if (_shell.XamlRoot is null) return null;
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Single, Margin = new Thickness(0, 8, 0, 0) };
+        foreach (var b in buttons) list.Items.Add(b);
+        if (destruction is not null) list.Items.Add(destruction);
+
+        string? picked = null;
+        list.ItemClick += (_, e) => picked = e.ClickedItem as string;
+        list.IsItemClickEnabled = true;
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = list,
+            CloseButtonText = cancel,
+            XamlRoot = _shell.XamlRoot,
+        };
+        list.ItemClick += (_, _) => dialog.Hide();
+        await dialog.ShowAsync();
+        return picked;
+    }
+
+    public async Task<string?> DisplayPromptAsync(string title, string message, string accept, string cancel,
+        string? placeholder = null, string initialValue = "")
+    {
+        if (_shell.XamlRoot is null) return null;
+        var box = new TextBox { PlaceholderText = placeholder ?? "", Text = initialValue, Margin = new Thickness(0, 8, 0, 0) };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(box);
+        var r = await ShowAsync(title, panel, accept, null, cancel);
+        return r == ContentDialogResult.Primary ? box.Text : null;
+    }
+
+    public async Task<string?> PickFolderAsync()
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_shell.Window);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            var folder = await picker.PickSingleFolderAsync();
+            return folder?.Path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}
+
+public sealed class WinUiAppHost : IAppHost
+{
+    private readonly ShellContext _shell;
+    private readonly ISettingsService _settings;
+
+    public WinUiAppHost(ShellContext shell, ISettingsService settings)
+    {
+        _shell = shell;
+        _settings = settings;
+        _shell.ThemeChanged += (_, _) => ThemeChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public event EventHandler? ThemeChanged;
+
+    public void Quit() => Microsoft.UI.Xaml.Application.Current.Exit();
+
+    public Task OpenFileAsync(string path) =>
+        Windows.System.Launcher.LaunchUriAsync(new Uri(path)).AsTask();
+
+    public Task ApplyThemeAsync(string mode)
+    {
+        _settings.AppTheme = mode;
+        if (_shell.Window?.Content is FrameworkElement root)
+        {
+            root.RequestedTheme = mode switch
+            {
+                "Light" => ElementTheme.Light,
+                "Dark" => ElementTheme.Dark,
+                _ => ElementTheme.Default,
+            };
+        }
+        _shell.RaiseThemeChanged();
+        return Task.CompletedTask;
+    }
+}
