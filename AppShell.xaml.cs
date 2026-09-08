@@ -161,6 +161,10 @@ namespace Procure
             {
                 root.PreviewKeyDown -= OnShellPreviewKeyDown;
                 root.PreviewKeyDown += OnShellPreviewKeyDown;
+#if WINDOWS
+                // Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
+                Procure.Utilities.PerfHud.Attach(root);
+#endif
             }
 
 #if WINDOWS

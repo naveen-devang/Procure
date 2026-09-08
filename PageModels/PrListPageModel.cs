@@ -662,6 +662,7 @@ namespace Procure.PageModels
             // running. Without it the empty view - "No requisitions found" - flashes before the first
             // page lands, which now happens on every open because the read is asynchronous.
             var showSkeleton = FilteredPrs.Count == 0 && !_hasEverLoaded;
+            var loadTimer = showSkeleton ? Stopwatch.StartNew() : null;
             if (showSkeleton)
             {
                 IsBusy = true;
@@ -730,6 +731,10 @@ namespace Procure.PageModels
                 {
                     if (Procure.Utilities.BoardTrace.IsEnabled)
                         Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
+#if WINDOWS
+                    if (loadTimer is not null)
+                        Procure.Utilities.PerfHud.ReportPageLoad("board first paint", loadTimer.ElapsedMilliseconds);
+#endif
                     // The first fill is one viewport; grow the window to a full page shortly after,
                     // off the critical path, so "Showing N of M" reaches PageSize without the user
                     // having to scroll to trigger the first threshold fetch.
