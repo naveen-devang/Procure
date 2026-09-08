@@ -26,10 +26,12 @@ namespace Procure
                     {
                         windows.OnWindowCreated(window =>
                         {
-                            window.SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop
-                            {
-                                Kind = Microsoft.UI.Composition.SystemBackdrops.MicaKind.Base
-                            };
+                            // Mica backdrop removed (perf experiment, PERF-PLAN.md Phase A.1).
+                            // TitleBarHelper already paints the window root grid opaque and every
+                            // page paints an opaque background, so Mica was never visible - it only
+                            // put the window on the DWM backdrop composition path. No visual change;
+                            // restore with `window.SystemBackdrop = new MicaBackdrop { Kind = Base }`
+                            // if it turns out not to matter.
 
                             try
                             {
