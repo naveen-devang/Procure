@@ -196,12 +196,32 @@ low-risk and independently valuable even if the port is paused after it.
 
 ## Progress
 
-- **Phase 0** — done. `Procure.Spike`, WinUI 3 board on the real 20k DB, smooth. Go.
-- **Phase 1a** — done (`f2f2c96`). `Procure.Core` extracted: models, data layer,
-  repositories, `PrLineMatcher`/`MoneyFormat`. MAUI-free. Self-checks pass
-  (ProcurementFlow: 178 checks). MAUI app still builds + runs.
-- **Phase 1b** — next: Services + PageModels → Core, plus the abstraction
-  interfaces, implemented over MAUI. Ship as a no-op refactor release.
+- **Phase 0** — done. WinUI 3 board on the real 20k DB, smooth. Go.
+- **Phase 1a** — done (`f2f2c96`). `Procure.Core` = models, data layer,
+  repositories, `PrLineMatcher`/`MoneyFormat`. MAUI-free.
+- **Phase 1b** — done (`525c5ed`). All 7 view models + the 5 abstractions in Core.
+  MAUI impls `Services/MauiPlatformServices.cs`, headless test impls
+  `Procure.Core/Abstractions/HeadlessPlatform.cs`. `Procure.Core` is now
+  `net10.0-windows` (+ System.Drawing). Self-checks pass incl. ProcurementFlow 178.
+- **Phase 2 kickoff** — done + verified (`9f82d31`). `Procure.App` (WinUI 3 head):
+  full DI, WinUI abstraction impls in `Procure.App/Platform/`, `JsonSettingsService`,
+  `NavigationView` shell (7 tabs) + perf HUD, `PrBoardPage` drives the real
+  `PrListPageModel` from DI against the 20k DB — renders real cards, user confirmed.
+  6 tabs are `StubPage`; placeholder services for updates/exports/shortcuts.
+- **Next Phase 2:** (1) theme dictionaries — port `Resources/Styles/*.xaml`,
+  ~960 `AppThemeBinding` → ~65 `ThemeResource` brushes; (2) real board XAML
+  (`Pages/PrListPage.xaml`, 753 lines); (3) the other 6 pages; (4) 13 modals →
+  `ContentDialog`; (5) port the app-side service impls, replacing
+  `Procure.App/Platform/PlaceholderServices.cs`. Then §5 data migration + dogfood.
+- **Also outstanding:** ship Phase 1 as a no-op refactor release (tag).
+
+### Build commands
+
+- WinUI app (MSBuild only — the dotnet CLI crashes the XAML compiler here):
+  `MSBuild.exe Procure.App\Procure.App.csproj -t:Build -p:Configuration=Debug -p:Platform=x64`
+- MAUI app (still builds): `dotnet build Procure.csproj -c Debug -f net10.0-windows10.0.19041.0`
+- WinUI pages must load from the `Loaded` event (MainWindow sets `Frame.Content`
+  directly, so `OnNavigatedTo` never fires) and call `SqliteDatabase.InitializeAsync()`.
 
 ---
 
