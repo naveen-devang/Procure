@@ -23,6 +23,16 @@ public partial class App : Application
         InitializeComponent();
         UiQueue = DispatcherQueue.GetForCurrentThread();
 
+        UnhandledException += (_, e) =>
+            Procure.Utilities.CrashLog.Write("WinUI UnhandledException", e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            Procure.Utilities.CrashLog.Write("AppDomain.UnhandledException", e.ExceptionObject as Exception);
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Procure.Utilities.CrashLog.Write("TaskScheduler.UnobservedTaskException", e.Exception);
+            e.SetObserved();
+        };
+
         // Point at the real 20k test DB unless PROCURE_DB_DIR is already set. A real install
         // would fall through to DatabaseConstants' AppPaths default.
         var dbDir = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")

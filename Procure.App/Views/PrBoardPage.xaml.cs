@@ -2,7 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
+
+using Microsoft.Extensions.DependencyInjection;
 using Procure.PageModels;
 
 namespace Procure.App.Views;
@@ -19,17 +20,25 @@ public sealed partial class PrBoardPage : Page
         InitializeComponent();
         Vm = (PrListPageModel)App.Services.GetService(typeof(PrListPageModel))!;
         DataContext = Vm;
+        Loaded += OnLoaded;
     }
 
-    protected override async void OnNavigatedTo(NavigationEventArgs e)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        base.OnNavigatedTo(e);
         Board.ItemsSource = Vm.FilteredPrs;
         SearchBox.Text = Vm.SearchText;
-        if (!_loaded)
+        if (_loaded) return;
+        _loaded = true;
+        try
         {
-            _loaded = true;
+            await App.Services.GetRequiredService<Procure.Data.SqliteDatabase>().InitializeAsync();
             await Vm.LoadPrsAsync();
+            await Task.Delay(300);
+            Procure.Utilities.CrashLog.Write($"PrBoardPage load: FilteredPrs={Vm.FilteredPrs.Count} total={Vm.TotalFilteredCount}");
+        }
+        catch (Exception ex)
+        {
+            Procure.Utilities.CrashLog.Write("PrBoardPage load failed", ex);
         }
         CountText.Text = $"{Vm.FilteredPrs.Count} of {Vm.TotalFilteredCount}";
     }
