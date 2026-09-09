@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Procure.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models"
+    xmlns:conv="using:Procure.App.Converters"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Page.Resources>
+        <conv:HexBrushConverter x:Key="HexBrush" />
+        <conv:EqualsToVisibilityConverter x:Key="EqVis" />
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:NullOrEmptyToVisibilityConverter x:Key="NullVis" />
+
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="RowTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="RowHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{ThemeResource AppBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.ColumnSpan="2" Spacing="3" Padding="28,22,28,18">
+            <TextBlock Text="Settings &amp; Configuration" FontWeight="SemiBold" FontSize="24"
+                       Foreground="{ThemeResource AppTextPrimary}" />
+            <TextBlock Text="Appearance, navigation, procurement defaults, custom columns, updates, storage, and keyboard shortcuts."
+                       FontSize="12.5" Foreground="{ThemeResource AppTextSecondary}" />
+        </StackPanel>
+
+        <!-- category rail -->
+        <Border Grid.Row="1" Background="{ThemeResource AppSecondaryBackground}">
+            <ListView x:Name="Rail" SelectionMode="Single" Padding="10,8" SelectionChanged="Rail_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Label}" FontSize="13" Padding="4,8"
+                                   Foreground="{ThemeResource AppTextPrimary}" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+
+        <!-- section panes (all built; the old page was always-built too) -->
+        <ScrollViewer Grid.Row="1" Grid.Column="1" Padding="28,16,28,32">
+            <Grid>
+
+                <!-- ===== Appearance ===== -->
+                <Border Style="{StaticResource Card}"
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Appearance}">
+                    <StackPanel Spacing="18">
+                        <TextBlock Text="Appearance &amp; Theme Personalization" Style="{StaticResource SectionTitle}" />
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Color Mode" Style="{StaticResource RowTitle}" />
+                            <RadioButtons x:Name="ThemeModeRadio" MaxColumns="3" SelectionChanged="ThemeMode_SelectionChanged">
+                                <x:String>Dark</x:String>
+                                <x:String>Light</x:String>
+                                <x:String>System</x:String>
+                            </RadioButtons>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" Margin="0,6,0,0">
+                            <TextBlock Text="Pastel Accent Theme Palette" Style="{StaticResource RowTitle}" />
+                            <TextBlock Style="{StaticResource RowHint}"
+                                       Text="Choose your accent highlight color for buttons, badges, and status indicators across the entire app." />
+                            <!-- data-driven from AccentPalettes.All (Core) - one template, not 8 buttons -->
+                            <GridView x:Name="AccentGrid" ItemsSource="{Binding AvailableAccentThemes}"
+                                      SelectionMode="Single" SelectionChanged="Accent_SelectionChanged"
+                                      IsItemClickEnabled="False">
+                                <GridView.ItemContainerStyle>
+                                    <Style TargetType="GridViewItem">
+                                        <Setter Property="Margin" Value="0,0,10,10" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </GridView.ItemContainerStyle>
+                                <GridView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PastelThemeOption">
+                                        <!-- 4px inset so the GridViewItem's selection ring is visible around the swatch -->
+                                        <Border Width="146" Height="38" Margin="4" CornerRadius="6" BorderThickness="1"
+                                                Background="{x:Bind BgHex, Converter={StaticResource HexBrush}}"
+                                                BorderBrush="{x:Bind DarkHex, Converter={StaticResource HexBrush}}">
+                                            <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </GridView.ItemTemplate>
+                            </GridView>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== Navigation ===== -->
+                <Border Style="{StaticResource Card}"
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Navigation}">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="Navigation &amp; Sidebar" Style="{StaticResource SectionTitle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Compact Sidebar Mode" Style="{StaticResource RowTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Collapse the left navigation pane to icon-only mode to maximize workspace area." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsOn="{Binding IsSidebarCompact, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Auto-collapse on Narrow Windows" Style="{StaticResource RowTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Automatically switch to compact mode when window width is reduced below 1024px." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsOn="{Binding AutoCollapseSidebarOnNarrow, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Raw &amp; Packing Materials Tab" Style="{StaticResource RowTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Show the delivery call-off tracker in the sidebar. Existing purchase orders aren't affected either way." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsOn="{Binding IsRawPackingTabEnabled, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== Procurement ===== -->
+                <StackPanel Spacing="22"
+                            Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Procurement}">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="Procurement Defaults" Style="{StaticResource SectionTitle}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="150" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Default Currency" Style="{StaticResource RowTitle}" />
+                                    <TextBlock Style="{StaticResource RowHint}" Text="Applied when creating new RFQs and purchase requisitions." />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
+                                          SelectedItem="{Binding DefaultCurrency, Mode=TwoWay}" />
+                            </Grid>
+                            <Border Height="1" Background="{ThemeResource AppHairline}" />
+                            <TextBlock Text="SLA Overdue Thresholds" Style="{StaticResource RowTitle}" />
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Urgent Priority (days)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBox Text="{Binding UrgentDays, Mode=TwoWay}" />
+                                    <TextBlock Style="{StaticResource RowHint}" Text="Flagged as overdue after this many days" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Normal Priority (days)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBox Text="{Binding NormalDays, Mode=TwoWay}" />
+                                    <TextBlock Style="{StaticResource RowHint}" Text="Standard PR overdue warning threshold" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding SavedMessage}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource FluentSuccess}"
+                                           Visibility="{Binding SavedMessage, Converter={StaticResource NullVis}}" />
+                                <Button Content="Save Settings" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveSettingsCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Default PCR Approval Stages" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Style="{StaticResource RowHint}" Text="Global approval stage sequence copied when a new PCR is created." />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Reset to 4 Default Roles" FontSize="11" Height="32"
+                                        Command="{Binding ResetDefaultStagesToPresetCommand}" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding DefaultApprovalStages}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border Padding="12,8" Margin="0,0,0,8" BorderThickness="1" CornerRadius="6"
+                                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                                <Button Grid.Column="1" Content="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                        Width="28" Height="28" Padding="0" Click="StageUp_Click" Tag="{x:Bind}" />
+                                                <Button Grid.Column="2" Content="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                        Width="28" Height="28" Padding="0" Click="StageDown_Click" Tag="{x:Bind}" />
+                                                <Button Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                        Width="28" Height="28" Padding="0" Background="Transparent"
+                                                        Foreground="{ThemeResource FluentCritical}" Click="StageRemove_Click" Tag="{x:Bind}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding NewDefaultStageName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         PlaceholderText="Enter stage title (e.g. Legal Counsel, Managing Director)..." />
+                                <Button Grid.Column="1" Content="+ Add Default Stage" Style="{StaticResource AccentButtonStyle}"
+                                        Command="{Binding AddNewDefaultStageCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ===== Custom Columns ===== -->
+                <StackPanel Spacing="22"
+                            Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Columns}">
+                  <StackPanel Spacing="22" DataContext="{Binding ColumnsModel}">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Custom Column Definitions" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Team-specific metadata fields (e.g. Cost Center, GL Account) that attach to every PR." />
+                            </StackPanel>
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Column Name" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBox Text="{Binding NewColumnName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="e.g. Cost Center, GL Code, Department" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Data Type" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableDataTypes}"
+                                              SelectedItem="{Binding NewColumnDataType, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Spacing="4" Visibility="{Binding ShowOptionsField, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="Dropdown Options (comma-separated)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBox Text="{Binding NewColumnOptions, Mode=TwoWay}" PlaceholderText="e.g. IT, Engineering, Operations, Finance, HR" />
+                            </StackPanel>
+                            <Button Content="Add Column" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right"
+                                    Command="{Binding AddColumnCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="Active Custom Columns" Style="{StaticResource SectionTitle}" />
+                            <ItemsControl ItemsSource="{Binding Columns}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CustomColumnDefinition">
+                                        <Border Margin="0,0,0,10" Padding="16,12" BorderThickness="1" CornerRadius="6"
+                                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <TextBlock Text="{x:Bind SelectOptions}" FontSize="11" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                               Foreground="{ThemeResource AppTextSecondary}"
+                                                               Visibility="{x:Bind SelectOptions, Converter={StaticResource NullVis}}" />
+                                                </StackPanel>
+                                                <Border Grid.Column="1" Padding="8,3" CornerRadius="4" VerticalAlignment="Center"
+                                                        Background="{ThemeResource BadgeCombinedPrBg}">
+                                                    <TextBlock Text="{x:Bind DataType}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{ThemeResource BadgeCombinedPrText}" />
+                                                </Border>
+                                                <Button Grid.Column="2" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                        Height="28" Width="28" Padding="0" CornerRadius="4"
+                                                        Background="{ThemeResource FluentCriticalBg}" Foreground="{ThemeResource FluentCritical}"
+                                                        Click="DeleteColumn_Click" ToolTipService.ToolTip="Delete Column" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- ===== Updates ===== -->
+                <Border Style="{StaticResource Card}"
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Updates}">
+                    <StackPanel Spacing="16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Software Updates" Style="{StaticResource SectionTitle}" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="Installed Version:" FontSize="12" Foreground="{ThemeResource AppTextTertiary}" />
+                                    <TextBlock Text="{Binding CurrentVersion}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Check for Updates" Command="{Binding CheckForUpdatesCommand}"
+                                    IsEnabled="{Binding CanCheckForUpdates}" />
+                        </Grid>
+                        <CheckBox Content="Automatically check for new releases when app starts"
+                                  IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="10"
+                                    Visibility="{Binding UpdateStatusMessage, Converter={StaticResource NullVis}}">
+                            <ProgressRing IsActive="{Binding IsCheckingForUpdates}" Width="18" Height="18" />
+                            <TextBlock Text="{Binding UpdateStatusMessage}" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                        </StackPanel>
+                        <Border BorderThickness="1" CornerRadius="6" Padding="16" BorderBrush="{ThemeResource PrimaryTextBrush}"
+                                Background="{ThemeResource AppTertiaryBackground}"
+                                Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolVis}}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{Binding UpdateInfo.Title}" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Text="{Binding UpdateInfo.ReleaseNotes}" FontSize="12" MaxLines="6" TextTrimming="CharacterEllipsis"
+                                           TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Button Content="Download &amp; Install" Style="{StaticResource AccentButtonStyle}"
+                                            Command="{Binding DownloadAndInstallUpdateCommand}" />
+                                    <Button Content="View Release on GitHub" Command="{Binding OpenReleasePageCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== Storage ===== -->
+                <Border Style="{StaticResource Card}"
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Storage}">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="SQLite Storage &amp; Database Location" Style="{StaticResource SectionTitle}" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Current Database File Path:" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <Border Padding="12,10" BorderThickness="1" CornerRadius="4"
+                                    BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                <TextBlock Text="{Binding DatabasePath}" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                                           Foreground="{ThemeResource AppTextPrimary}" />
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Content="Open DB Folder in Explorer" Command="{Binding OpenDatabaseFolderCommand}" />
+                            <Button Content="Change Database Location..." Command="{Binding ChangeDatabaseLocationCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== Shortcuts ===== -->
+                <Border Style="{StaticResource Card}"
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Shortcuts}">
+                    <StackPanel Spacing="14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Keyboard Shortcuts" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Click a shortcut, then press a new key combination. Escape cancels." />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Reset All to Defaults" FontSize="11" Height="32"
+                                    Command="{Binding ResetAllShortcutsCommand}" />
+                        </Grid>
+                        <ListView ItemsSource="{Binding ShortcutRows}" SelectionMode="None" MaxHeight="520">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,0,6" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:ShortcutRowViewModel">
+                                    <Border Padding="12,8" BorderThickness="1" CornerRadius="6"
+                                            BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" FontSize="12.5" Foreground="{ThemeResource AppTextPrimary}" />
+                                                <TextBlock Text="{x:Bind Scope}" FontSize="10.5" Foreground="{ThemeResource AppTextTertiary}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="{x:Bind DisplayText, Mode=OneWay}" Width="140" Height="30" FontSize="11.5"
+                                                    Command="{x:Bind StartRecordingCommand}" />
+                                            <Button Grid.Column="2" Content="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                                    Width="30" Height="30" Padding="0" Background="Transparent"
+                                                    Command="{x:Bind ResetToDefaultCommand}"
+                                                    Visibility="{x:Bind IsCustomized, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -90,6 +90,7 @@ public sealed partial class MainWindow : Window
                 AppRoute.Tasks => App.Services.GetService(typeof(TasksPage))!,
                 AppRoute.Notes => App.Services.GetService(typeof(NotesPage))!,
                 AppRoute.CallOff => App.Services.GetService(typeof(CallOffPage))!,
+                AppRoute.Settings => App.Services.GetService(typeof(SettingsPage))!,
                 _ => new StubPage(route.ToString()),
             };
         }
