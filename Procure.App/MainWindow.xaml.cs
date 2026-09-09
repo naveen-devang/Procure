@@ -86,6 +86,7 @@ public sealed partial class MainWindow : Window
             ContentFrame.Content = route switch
             {
                 AppRoute.Board => App.Services.GetService(typeof(PrBoardPage)) ?? new PrBoardPage(),
+                AppRoute.Dashboard => App.Services.GetService(typeof(DashboardPage))!,
                 _ => new StubPage(route.ToString()),
             };
         }
