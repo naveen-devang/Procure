@@ -96,6 +96,7 @@ public partial class App : Application
         s.AddTransient<PrBoardPage>();
         s.AddTransient<DashboardPage>();
         s.AddTransient<TasksPage>();
+        s.AddTransient<NotesPage>();
 
         return s.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
     }
