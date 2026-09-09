@@ -71,3 +71,17 @@ sealed class DateTimeOffsetConverter : IValueConverter
     public object ConvertBack(object value, Type t, object p, string l) =>
         value is DateTimeOffset o ? o.DateTime : default(DateTime);
 }
+
+sealed class PercentTextConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l) =>
+        value is double d ? $"{d:F0}%" : value is decimal m ? $"{m:F0}%" : "";
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}
+
+sealed class ShortDateConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l) =>
+        value is DateTime d ? d.ToString("dd MMM yyyy") : "";
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}

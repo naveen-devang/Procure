@@ -21,7 +21,7 @@
                 <muxc:NavigationViewItem Content="PR Board" Tag="Board" IsSelected="True">
                     <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="ViewAll" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
-                <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="Materials">
+                <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="CallOff">
                     <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItem Content="Tasks" Tag="Tasks">
