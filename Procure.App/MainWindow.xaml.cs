@@ -46,6 +46,7 @@ public sealed partial class MainWindow : Window
             _lastLoadMs = ms;
         });
 
+        _shell.ThemeChanged += (_, _) => RefreshThemeState();
         Activated += OnFirstActivated;
         CompositionTarget.Rendering += OnRendering;
         NavigateTo(AppRoute.Board, null);
@@ -58,6 +59,13 @@ public sealed partial class MainWindow : Window
         _themeApplied = true;
         _ = _appHost.ApplyThemeAsync(_settings.AppTheme);
         (_appHost as WinUiAppHost)?.ApplyAccentColor(_settings.AccentTheme);
+        RefreshThemeState();
+    }
+
+    private void RefreshThemeState()
+    {
+        if (Content is FrameworkElement fe)
+            Procure.App.Converters.BoardTheme.IsDark = fe.ActualTheme == ElementTheme.Dark;
     }
 
     private void Nav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
