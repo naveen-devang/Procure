@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class PoItemCallOff : ObservableObject
+    public partial class PoItemCallOff : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PoItemId { get; set; }

@@ -6,7 +6,7 @@ namespace Procure.Models
 {
     // A freeform note. Body is RTF produced by the RichEditBox (Format == "rtf"). Loaded in full
     // only when the note is opened - the list binds NoteListItem instead.
-    public partial class Note : ObservableObject
+    public partial class Note : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

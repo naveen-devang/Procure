@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class ExportRfqSelection : ObservableObject
+    public partial class ExportRfqSelection : ObservableModel
     {
         public RequestForQuotation Rfq { get; }
 

@@ -16,7 +16,7 @@ namespace Procure.Models
     /// realised row - which is what made scrolling stutter. Reading them from the summary also means
     /// a collapsed group can show correct totals while holding no lines at all.
     /// </summary>
-    public partial class MaterialGroup : ObservableObject
+    public partial class MaterialGroup : ObservableModel
     {
         public MaterialGroup(MaterialGroupSummary summary)
         {

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class CustomFieldValue : ObservableObject
+    public partial class CustomFieldValue : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PrId { get; set; }

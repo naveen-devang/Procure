@@ -15,7 +15,7 @@ namespace Procure.Models
     // Personal checklist row. One TodoTask table; the whole list is loaded once and kept in
     // memory (see TodoPageModel) - a personal list is hundreds of rows at most. Fields past
     // SortOrder are reserved for later phases and stay null until then.
-    public partial class TodoTask : ObservableObject
+    public partial class TodoTask : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

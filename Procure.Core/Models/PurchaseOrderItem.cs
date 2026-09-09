@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class PurchaseOrderItem : ObservableObject, Procure.Utilities.IPrLine
+    public partial class PurchaseOrderItem : ObservableModel, Procure.Utilities.IPrLine
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PoId { get; set; }

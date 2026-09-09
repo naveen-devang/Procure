@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class BatchPrEntry : ObservableObject
+    public partial class BatchPrEntry : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

@@ -8,7 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class PurchaseRequisition : ObservableObject
+    public partial class PurchaseRequisition : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

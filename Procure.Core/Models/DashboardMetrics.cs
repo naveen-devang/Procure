@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class DashboardMetrics : ObservableObject
+    public partial class DashboardMetrics : ObservableModel
     {
         [ObservableProperty]
         public partial int TotalPrs { get; set; }

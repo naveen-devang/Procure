@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class CustomColumnDefinition : ObservableObject
+    public partial class CustomColumnDefinition : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
 

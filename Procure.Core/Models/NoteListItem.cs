@@ -6,7 +6,7 @@ namespace Procure.Models
     // The sidebar row. Never carries Body - the whole point is that opening the Notes tab reads
     // only titles and snippets. Title/Snippet/Pinned/UpdatedAt are observable so an edit to the
     // open note updates its row in place without a list reload.
-    public partial class NoteListItem : ObservableObject
+    public partial class NoteListItem : ObservableModel
     {
         public Guid Id { get; init; }
 

@@ -7,7 +7,7 @@ namespace Procure.Models
     // One row per PO item eligible for call-off tracking (Raw/Packing Material PRs only).
     // CalledOffQuantity is the pre-aggregated sum from PoItemCallOff, kept in sync locally
     // after each log/delete so the group totals never need a full reload to stay accurate.
-    public partial class CallOffLine : ObservableObject
+    public partial class CallOffLine : ObservableModel
     {
         public Guid PoItemId { get; set; }
         public string MaterialName { get; set; } = string.Empty;

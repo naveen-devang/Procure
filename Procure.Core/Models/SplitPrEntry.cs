@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class SplitPrEntry : ObservableObject
+    public partial class SplitPrEntry : ObservableModel
     {
         public PurchaseRequisition Pr { get; set; } = null!;
 

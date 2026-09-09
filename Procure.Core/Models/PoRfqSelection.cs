@@ -9,7 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class PoRfqItemSelection : ObservableObject, Procure.Utilities.IPrLine, Procure.Utilities.IQuantified
+    public partial class PoRfqItemSelection : ObservableModel, Procure.Utilities.IPrLine, Procure.Utilities.IQuantified
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid? RfqItemId { get; set; }
@@ -237,7 +237,7 @@ namespace Procure.Models
         partial void OnQuantityChanged(decimal value) => OnPriceOrSelectionChanged?.Invoke();
     }
 
-    public partial class PoRfqSelection : ObservableObject
+    public partial class PoRfqSelection : ObservableModel
     {
         public RequestForQuotation? Rfq { get; }
         public Guid? EditingPoId { get; set; }

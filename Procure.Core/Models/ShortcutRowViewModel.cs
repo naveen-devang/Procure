@@ -10,7 +10,7 @@ namespace Procure.Models
     // IKeyboardShortcutService singleton rather than routing every update through SettingsPageModel -
     // these rows are created once and live for the app's lifetime alongside that same singleton, so
     // there's nothing to leak by not unsubscribing.
-    public partial class ShortcutRowViewModel : ObservableObject
+    public partial class ShortcutRowViewModel : ObservableModel
     {
         private readonly IKeyboardShortcutService _service;
         private readonly IUiDispatcher _dispatcher;

@@ -39,6 +39,11 @@ public partial class App : Application
                     ?? @"E:\Procure\Procure\TestData\procure-20k";
         Environment.SetEnvironmentVariable("PROCURE_DB_DIR", dbDir);
 
+        // WinUI x:Bind invokes PropertyChanged on the raising thread and throws cross-thread;
+        // several repo writes mutate models from Task.Run. Marshal those notifications.
+        Procure.Models.ObservableModel.OnUiThread = () => UiQueue.HasThreadAccess;
+        Procure.Models.ObservableModel.UiPost = a => UiQueue.TryEnqueue(() => a());
+
         SQLitePCL.Batteries_V2.Init();
         Services = BuildServices();
     }

@@ -19,17 +19,30 @@ public sealed class WinUiErrorHandler : IErrorHandler
     private readonly ShellContext _shell;
     public WinUiErrorHandler(ShellContext shell) => _shell = shell;
 
+    private bool _dialogOpen;
+
     public void HandleError(Exception ex)
     {
         CrashLog.Write("WinUiErrorHandler.HandleError", ex);
         if (_shell.XamlRoot is null) return;
-        _ = new ContentDialog
+
+        void Show()
         {
-            Title = "Something went wrong",
-            Content = ex.Message,
-            CloseButtonText = "OK",
-            XamlRoot = _shell.XamlRoot,
-        }.ShowAsync();
+            if (_dialogOpen) return;             // WinUI allows only one ContentDialog at a time
+            _dialogOpen = true;
+            var dialog = new ContentDialog
+            {
+                Title = "Something went wrong",
+                Content = ex.Message,
+                CloseButtonText = "OK",
+                XamlRoot = _shell.XamlRoot,
+            };
+            dialog.Closed += (_, _) => _dialogOpen = false;
+            _ = dialog.ShowAsync();
+        }
+
+        var q = App.UiQueue;
+        if (q.HasThreadAccess) Show(); else q.TryEnqueue(Show);
     }
 }
 

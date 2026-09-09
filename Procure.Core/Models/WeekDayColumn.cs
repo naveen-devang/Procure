@@ -7,7 +7,7 @@ namespace Procure.Models
 {
     // One column of the Week view. Rebuilt on week navigation (7 per week); Tasks are shared
     // instances from _all. NewTaskTitle is the column's own add field.
-    public partial class WeekDayColumn : ObservableObject
+    public partial class WeekDayColumn : ObservableModel
     {
         public WeekDayColumn(DateTime date, int colIndex, IEnumerable<TodoTask> tasks)
         {

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class Approval : ObservableObject
+    public partial class Approval : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PcrId { get; set; }

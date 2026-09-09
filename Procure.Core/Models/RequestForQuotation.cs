@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Procure.Models
 {
-    public partial class RequestForQuotation : ObservableObject
+    public partial class RequestForQuotation : ObservableModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PrId { get; set; }
