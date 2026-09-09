@@ -87,6 +87,7 @@ public sealed partial class MainWindow : Window
             {
                 AppRoute.Board => App.Services.GetService(typeof(PrBoardPage)) ?? new PrBoardPage(),
                 AppRoute.Dashboard => App.Services.GetService(typeof(DashboardPage))!,
+                AppRoute.Tasks => App.Services.GetService(typeof(TasksPage))!,
                 _ => new StubPage(route.ToString()),
             };
         }
