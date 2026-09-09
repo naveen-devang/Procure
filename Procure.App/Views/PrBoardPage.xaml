@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Procure.Models"
     xmlns:local="using:Procure.App"
+    xmlns:views="using:Procure.App.Views"
     xmlns:conv="using:Procure.App.Converters"
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -264,13 +265,9 @@
                                                Text="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource Chevron}}" />
                                 </Grid>
 
-                                <!-- expanded detail (real PrDetailPanel port lands in Phase 2 step 3) -->
-                                <Border Padding="18" Background="{ThemeResource AppTertiaryBackground}"
-                                        BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}"
-                                        Visibility="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource BoolVis}}">
-                                    <TextBlock Foreground="{ThemeResource AppTextSecondary}" FontSize="12.5"
-                                               Text="Detail panel — porting in Phase 2 step 3 (RFQs, PCR approvals, POs)." />
-                                </Border>
+                                <!-- expanded detail - x:Load defers building the heavy panel until the
+                                     card is expanded (the MAUI LazyExpander equivalent) -->
+                                <views:PrDetailPanel x:Name="DetailPanel" x:Load="{x:Bind IsExpanded, Mode=OneWay}" />
                             </StackPanel>
                         </Border>
                     </DataTemplate>
