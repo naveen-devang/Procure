@@ -20,6 +20,11 @@ public partial class App : Application
 
     public App()
     {
+        // Must run before anything else - lets Velopack intercept install/update/uninstall
+        // command-line invocations on launch (e.g. the relaunch hop after ApplyUpdatesAndRestart),
+        // and sets VelopackLocator.Current, which UpdateService's UpdateManager needs at construction.
+        Velopack.VelopackApp.Build().Run();
+
         InitializeComponent();
         UiQueue = DispatcherQueue.GetForCurrentThread();
 

@@ -24,8 +24,22 @@ public sealed class UpdateService : IUpdateService
 
     private readonly ILogger<UpdateService>? _logger;
 
-    private readonly UpdateManager _manager =
-        new(new GithubSource($"https://github.com/{Procure.AppConstants.GitHubRepository}", null, prerelease: false));
+    // Lazy + guarded: on an unpackaged dev build there is no VelopackLocator, and the
+    // UpdateManager ctor throws. That is not an error - there is just nothing to update.
+    private readonly Lazy<UpdateManager?> _managerLazy = new(() =>
+    {
+        try
+        {
+            return new UpdateManager(new GithubSource(
+                $"https://github.com/{Procure.AppConstants.GitHubRepository}", null, prerelease: false));
+        }
+        catch
+        {
+            return null;
+        }
+    });
+
+    private UpdateManager? Mgr => _managerLazy.Value;
 
     private VelopackUpdateInfo? _pendingUpdate;
 
@@ -43,8 +57,8 @@ public sealed class UpdateService : IUpdateService
     private void RaiseState() => UpdateStateChanged?.Invoke(this, EventArgs.Empty);
 
     public string CurrentVersionString =>
-        _manager.IsInstalled && _manager.CurrentVersion != null
-            ? _manager.CurrentVersion.ToString()
+        Mgr is { IsInstalled: true, CurrentVersion: { } cv }
+            ? cv.ToString()
             : "Dev build";
 
     public Version CurrentVersion =>
@@ -74,13 +88,13 @@ public sealed class UpdateService : IUpdateService
         RaiseState();
         try
         {
-            if (!_manager.IsInstalled)
+            if (Mgr is not { IsInstalled: true } mgr)
             {
                 _logger?.LogInformation("Velopack reports app is not installed - skipping update check.");
                 return result;
             }
 
-            _pendingUpdate = await _manager.CheckForUpdatesAsync();
+            _pendingUpdate = await mgr.CheckForUpdatesAsync();
             if (_pendingUpdate == null)
             {
                 return result;
@@ -129,7 +143,7 @@ public sealed class UpdateService : IUpdateService
 
     public async Task<string> DownloadUpdateAsync(UpdateInfo update, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        if (_pendingUpdate == null)
+        if (_pendingUpdate == null || Mgr is not { } mgr)
         {
             throw new InvalidOperationException("No pending update to download - call CheckForUpdatesAsync first.");
         }
@@ -141,7 +155,7 @@ public sealed class UpdateService : IUpdateService
         await _download.RunAsync(tag, async (coordProgress, token) =>
         {
             var sw = Stopwatch.StartNew();
-            await _manager.DownloadUpdatesAsync(pending, p =>
+            await mgr.DownloadUpdatesAsync(pending, p =>
             {
                 var f = p / 100.0;
                 coordProgress.Report(f);
@@ -165,7 +179,7 @@ public sealed class UpdateService : IUpdateService
 
     public bool LaunchInstaller(string installerPath)
     {
-        if (_pendingUpdate == null)
+        if (_pendingUpdate == null || Mgr is not { } mgr)
         {
             _logger?.LogError("LaunchInstaller called with no pending Velopack update.");
             return false;
@@ -173,7 +187,7 @@ public sealed class UpdateService : IUpdateService
 
         try
         {
-            _manager.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease);
+            mgr.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease);
             return true;
         }
         catch (Exception ex)
