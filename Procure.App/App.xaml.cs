@@ -78,14 +78,14 @@ public partial class App : Application
         s.AddSingleton<ILinkTargetService, LinkTargetService>();
         s.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
-        // Services (WinUI placeholders where the app-side port is still pending)
+        // Services
         s.AddSingleton<ISettingsService, JsonSettingsService>();
         s.AddSingleton<IErrorHandler, WinUiErrorHandler>();
-        s.AddSingleton<IKeyboardShortcutService, RegistryOnlyKeyboardShortcutService>();
+        s.AddSingleton<IKeyboardShortcutService, WinUiKeyboardShortcutService>();
         s.AddSingleton<IDashboardMetricsService, DashboardMetricsService>();
-        s.AddSingleton<IUpdateService, UnavailableUpdateService>();
-        s.AddSingleton<ICsvExportService, UnavailableCsvExportService>();
-        s.AddSingleton<IPcrExportService, UnavailablePcrExportService>();
+        s.AddSingleton<IUpdateService, Procure.App.Platform.UpdateService>();
+        s.AddSingleton<ICsvExportService, Procure.Services.CsvExportService>();
+        s.AddSingleton<IPcrExportService, Procure.App.Platform.PcrExportService>();
 
         // View models
         s.AddSingleton<DashboardPageModel>();

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Maui.Storage;
 using Procure.Models;
 
 namespace Procure.Services
@@ -108,7 +107,7 @@ namespace Procure.Services
             }
             if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
             {
-                targetDir = FileSystem.AppDataDirectory;
+                targetDir = Procure.AppPaths.AppData;
             }
 
             var filePath = Path.Combine(targetDir, filename);

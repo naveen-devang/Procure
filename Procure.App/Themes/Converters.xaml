@@ -26,4 +26,6 @@
     <conv:PoFulfillmentColorConverter x:Key="FulfilColor" />
     <conv:PoFulfillmentBgConverter x:Key="FulfilBg" />
     <conv:PoFulfillmentStrokeConverter x:Key="FulfilStroke" />
+    <conv:BytesToImageConverter x:Key="PngImg" />
+    <conv:SegmentedSelectionBrushConverter x:Key="SegBg" />
 </ResourceDictionary>

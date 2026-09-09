@@ -296,5 +296,6 @@
     <modals:BatchRfqModal x:Name="BatchRfqModal_" x:Load="{x:Bind Vm.IsBatchRfqModalVisible, Mode=OneWay}" />
     <modals:ExportPcrModal x:Name="ExportPcrModal_" x:Load="{x:Bind Vm.IsExportPcrModalVisible, Mode=OneWay}" />
     <modals:AddPoModal x:Name="AddPoModal_" x:Load="{x:Bind Vm.IsAddPoModalVisible, Mode=OneWay}" />
+    <modals:PcrPreviewModal x:Name="PcrPreviewModal_" x:Load="{x:Bind Vm.IsPcrPreviewVisible, Mode=OneWay}" />
   </Grid>
 </Page>

@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.PcrPreviewModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <Style x:Key="Sec" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+        <Style x:Key="H" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="Seg" TargetType="Button">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="2,0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="#99000000">
+        <Border Margin="28" CornerRadius="8" BorderThickness="1"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- header -->
+                <Grid Padding="20,16,16,14" Background="{ThemeResource AppTertiaryBackground}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Preview Price Comparison Sheet" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Text="{Binding PcrPreviewPageSummary}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                            Command="{Binding ClosePcrPreviewCommand}" />
+                </Grid>
+
+                <!-- body: preview left, options right -->
+                <Grid Grid.Row="1" Padding="20,16" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="260" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- clipping viewport; zoom = scale transform, pan = translate (see code-behind) -->
+                        <Grid x:Name="PreviewViewport" Background="{ThemeResource AppSubtleFill}"
+                              SizeChanged="PreviewViewport_SizeChanged">
+                            <Border x:Name="SheetFrame" BorderThickness="1" BorderBrush="{ThemeResource AppHairline}"
+                                    Background="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <CompositeTransform x:Name="SheetTransform"
+                                                        ScaleX="{Binding PcrPreviewZoom}"
+                                                        ScaleY="{Binding PcrPreviewZoom}"
+                                                        TranslateX="{Binding PcrPreviewPanX}"
+                                                        TranslateY="{Binding PcrPreviewPanY}" />
+                                </Border.RenderTransform>
+                                <Image Source="{Binding PcrPreviewCurrentPage, Converter={StaticResource PngImg}}"
+                                       Stretch="Uniform" Width="700" />
+                            </Border>
+
+                            <StackPanel x:Name="BusyOverlay" Visibility="{Binding IsPcrPreviewBusy, Converter={StaticResource BoolVis}}"
+                                        Background="{ThemeResource AppSubtleFill}" Padding="18,14"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <ProgressRing IsActive="{Binding IsPcrPreviewBusy}" />
+                                <TextBlock Text="Rendering preview…" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center"
+                                        Visibility="{Binding IsPcrPagerVisible, Converter={StaticResource BoolVis}}">
+                                <Button Content="&#x2039;" Command="{Binding PreviousPcrPreviewPageCommand}"
+                                        Width="30" Height="30" Padding="0" FontSize="14" />
+                                <TextBlock Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalAlignment="Center"
+                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                <Button Content="&#x203A;" Command="{Binding NextPcrPreviewPageCommand}"
+                                        Width="30" Height="30" Padding="0" FontSize="14" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
+                                       Foreground="{ThemeResource AppTextSecondary}"
+                                       Text="{Binding PcrPreviewZoomLabel}" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- options -->
+                    <ScrollViewer Grid.Column="1">
+                        <StackPanel Spacing="12">
+                            <Border Style="{StaticResource Sec}">
+                                <StackPanel Spacing="14">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Printer" Style="{StaticResource H}" />
+                                        <ComboBox ItemsSource="{Binding PcrAvailablePrinters}"
+                                                  SelectedItem="{Binding PcrSelectedPrinter, Mode=TwoWay}"
+                                                  PlaceholderText="No printers found" HorizontalAlignment="Stretch" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Paper Size" Style="{StaticResource H}" />
+                                        <ComboBox ItemsSource="{Binding PcrPaperSizeOptions}"
+                                                  SelectedItem="{Binding PcrPaperSize, Mode=TwoWay}"
+                                                  HorizontalAlignment="Stretch" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Pages to Print" Style="{StaticResource H}" />
+                                        <TextBox Text="{Binding PcrPageRangeText, Mode=TwoWay}"
+                                                 PlaceholderText="All pages (e.g. 1-3, 5)" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Copies" Style="{StaticResource H}" />
+                                        <TextBox Text="{Binding PcrCopiesText, Mode=TwoWay}" MaxLength="2" FontSize="12" Width="64"
+                                                 HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                    <CheckBox Content="Print on both sides" IsChecked="{Binding PcrDoubleSided, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Sec}">
+                                <StackPanel Spacing="14">
+                                    <TextBlock Text="Layout Options" Style="{StaticResource H}" />
+                                    <CheckBox Content="Fit sheet to one page" IsChecked="{Binding PcrShrinkToFit, Mode=TwoWay}" />
+
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Orientation" FontSize="11.5" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource AppTextPrimary}" />
+                                        <Grid ColumnSpacing="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Style="{StaticResource Seg}" Content="Landscape"
+                                                    Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Landscape"
+                                                    Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Landscape}" />
+                                            <Button Grid.Column="1" Style="{StaticResource Seg}" Content="Portrait"
+                                                    Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Portrait"
+                                                    Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Portrait}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Margins" FontSize="11.5" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource AppTextPrimary}" />
+                                        <Grid ColumnSpacing="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Style="{StaticResource Seg}" Content="Normal"
+                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Normal"
+                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Normal}" />
+                                            <Button Grid.Column="1" Style="{StaticResource Seg}" Content="Narrow"
+                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Narrow"
+                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Narrow}" />
+                                            <Button Grid.Column="2" Style="{StaticResource Seg}" Content="Wide"
+                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Wide"
+                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Wide}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <CheckBox Content="Include signature boxes" IsChecked="{Binding PcrIncludeSignatureBoxes, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- footer -->
+                <Grid Grid.Row="2" Padding="20,14" ColumnSpacing="8" Background="{ThemeResource AppTertiaryBackground}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="&#x2190; Back" Command="{Binding BackToPcrExportModalCommand}" />
+                    <Button Grid.Column="2" Content="Save As…" Command="{Binding SavePcrPreviewCommand}" />
+                    <Button Grid.Column="3" Content="Print…" Style="{StaticResource AccentButtonStyle}"
+                            Command="{Binding PrintPcrPreviewCommand}" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
