@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.EditPrModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
+
+    <Grid Background="#B3000000">
+        <Border MaxWidth="950" MaxHeight="760" Margin="24" Padding="24" CornerRadius="10"
+                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <Grid RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding EditModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
+                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
+                            Command="{Binding CloseEditModalCommand}" />
+                </Grid>
+
+                <ScrollViewer Grid.Row="1">
+                    <StackPanel Spacing="16" Padding="0,0,16,0">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="150" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="PR Number *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBox Text="{Binding EditingPrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBox Text="{Binding EditingPrRequestor, Mode=TwoWay}" PlaceholderText="e.g. Sarah Lin" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPlants}"
+                                          SelectedItem="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="4">
+                                <TextBlock Text="PR Type *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPrTypes}"
+                                          SelectedItem="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Description" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBox Text="{Binding EditingPrDescription, Mode=TwoWay}" PlaceholderText="Item or service requested..." />
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Line Items &amp; Quantities" FontWeight="SemiBold" FontSize="14"
+                                           VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Paste from Excel" FontSize="11" Height="28" Padding="10,0"
+                                            Command="{Binding PasteEditingPrItemsFromClipboardCommand}" />
+                                    <Button Content="+ Add Item" FontSize="11" Height="28" Padding="10,0"
+                                            Command="{Binding AddEditingPrItemCommand}" />
+                                </StackPanel>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding EditingPrItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PrItem">
+                                        <Grid ColumnSpacing="8" Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="75" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="95" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" Height="46"
+                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
+                                                     TextAlignment="Center" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12"
+                                                     TextAlignment="Center" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay}" PlaceholderText="Price" FontSize="12"
+                                                     VerticalAlignment="Center" />
+                                            <Button Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                    Width="28" Height="28" Padding="0" Background="Transparent" BorderThickness="0"
+                                                    Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Center"
+                                                    Click="RemoveItem_Click" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Priority" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
+                                          SelectedItem="{Binding CurrentEditingPr.Priority, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="Status" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SelectableStatuses}"
+                                          SelectedItem="{Binding CurrentEditingPr.Status, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Notes &amp; Justification" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBox Text="{Binding EditingPrNotes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
+                                     PlaceholderText="Additional procurement details or notes..." />
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" Visibility="{Binding EditingCustomValues.Count, Converter={StaticResource CountVis}}">
+                            <TextBlock Text="Team Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                            <ItemsControl ItemsSource="{Binding EditingCustomValues}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CustomFieldValue">
+                                        <StackPanel Spacing="4" Margin="0,0,0,8">
+                                            <TextBlock Text="{x:Bind ColumnName}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Bind OptionsList}" SelectedItem="{x:Bind Value, Mode=TwoWay}"
+                                                      Visibility="{x:Bind IsSelect, Converter={StaticResource BoolVis}}" />
+                                            <CalendarDatePicker Date="{x:Bind DateValue, Converter={StaticResource Dto}, Mode=TwoWay}"
+                                                                Visibility="{x:Bind IsDate, Converter={StaticResource BoolVis}}" />
+                                            <TextBox Text="{x:Bind Value, Mode=TwoWay}"
+                                                     Visibility="{x:Bind IsNumber, Converter={StaticResource BoolVis}}" />
+                                            <TextBox Text="{x:Bind Value, Mode=TwoWay}"
+                                                     Visibility="{x:Bind IsText, Converter={StaticResource BoolVis}}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,10,0,0">
+                            <Button Content="Cancel" Command="{Binding CloseEditModalCommand}" />
+                            <Button Content="Save Requisition" Style="{StaticResource AccentButtonStyle}" Command="{Binding SavePrModalCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

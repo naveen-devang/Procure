@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly ISettingsService _settings;
     private readonly IAppHost _appHost;
 
+    private readonly System.Diagnostics.Process _proc = System.Diagnostics.Process.GetCurrentProcess();
     private long _lastTicks;
     private double _emaMs;
     private double _worstMs;
@@ -120,7 +121,10 @@ public sealed partial class MainWindow : Window
             if ((DateTime.UtcNow - _windowStart).TotalSeconds >= 1)
             {
                 var load = _lastLoadMs > 0 ? $"   load {_lastLoadMs} ms ({_lastLoadWhat})" : "";
-                HudText.Text = $"frame {_emaMs:F1} ms ({1000.0 / Math.Max(_emaMs, 0.01):F0} fps)   worst/1s {_worstMs:F1} ms{load}";
+                _proc.Refresh();
+                var ws = _proc.WorkingSet64 / (1024.0 * 1024.0);
+                var gc = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
+                HudText.Text = $"frame {_emaMs:F1} ms ({1000.0 / Math.Max(_emaMs, 0.01):F0} fps)   worst/1s {_worstMs:F1} ms   ram {ws:F0} MB (gc {gc:F0}){load}";
                 _worstMs = 0;
                 _windowStart = DateTime.UtcNow;
             }

@@ -100,3 +100,20 @@ sealed class ZeroCountToVisibilityConverter : IValueConverter
     }
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }
+
+// int/collection count > 0 -> Visible
+sealed class CountToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l)
+    {
+        var n = value switch { int i => i, System.Collections.ICollection c => c.Count, _ => 0 };
+        return n > 0 ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+    }
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}
+
+sealed class SelectAllToggleConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l) => value is true ? "Deselect All" : "Select All";
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}

@@ -286,6 +286,8 @@
     </Grid>
 
     <!-- modal layer (each x:Load-deferred on its VM visibility flag) -->
+    <modals:EditPrModal x:Name="EditModal" x:Load="{x:Bind Vm.IsEditModalVisible, Mode=OneWay}" />
+    <modals:AddRfqModal x:Name="AddRfqModal_" x:Load="{x:Bind Vm.IsAddRfqModalVisible, Mode=OneWay}" />
     <modals:MergePrModal x:Name="MergeModal" x:Load="{x:Bind Vm.IsMergePrModalVisible, Mode=OneWay}" />
     <modals:SplitPrModal x:Name="SplitModal" x:Load="{x:Bind Vm.IsSplitPrModalVisible, Mode=OneWay}" />
     <modals:ApprovalConfigModal x:Name="ApprovalModal" x:Load="{x:Bind Vm.IsApprovalConfigModalVisible, Mode=OneWay}" />

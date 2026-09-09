@@ -13,9 +13,11 @@
     <conv:DoneGlyphConverter x:Key="DoneGlyph" />
     <conv:StrikethroughConverter x:Key="Strike" />
     <conv:ZeroCountToVisibilityConverter x:Key="ZeroVis" />
+    <conv:CountToVisibilityConverter x:Key="CountVis" />
     <conv:PercentTextConverter x:Key="Pct" />
     <conv:ShortDateConverter x:Key="ShortDate" />
     <conv:PriorityColorConverter x:Key="PriorityColor" />
     <conv:StatusColorConverter x:Key="StatusColor" />
     <conv:StatusBadgeBgConverter x:Key="StatusBg" />
+    <conv:SelectAllToggleConverter x:Key="SelAll" />
 </ResourceDictionary>
