@@ -27,6 +27,10 @@ public sealed partial class PrBoardPage : Page
         Vm = App.Services.GetRequiredService<PrListPageModel>();
         _shell = App.Services.GetRequiredService<ShellContext>();
         DataContext = Vm;
+        // Vm is resolved from DI *after* InitializeComponent, so the compiled x:Bind expressions
+        // (the modal x:Load flags) evaluated against a null Vm. Re-run them now that Vm is set,
+        // which also subscribes them to Vm.PropertyChanged.
+        Bindings.Update();
         Loaded += OnLoaded;
         Unloaded += (_, _) => _shell.ThemeChanged -= OnThemeChanged;
     }

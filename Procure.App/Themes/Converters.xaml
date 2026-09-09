@@ -20,4 +20,10 @@
     <conv:StatusColorConverter x:Key="StatusColor" />
     <conv:StatusBadgeBgConverter x:Key="StatusBg" />
     <conv:SelectAllToggleConverter x:Key="SelAll" />
+    <conv:BoolToFilterChipBgConverter x:Key="ChipBg" />
+    <conv:BoolToFilterChipStrokeConverter x:Key="ChipStroke" />
+    <conv:BoolToFilterChipTextConverter x:Key="ChipText" />
+    <conv:PoFulfillmentColorConverter x:Key="FulfilColor" />
+    <conv:PoFulfillmentBgConverter x:Key="FulfilBg" />
+    <conv:PoFulfillmentStrokeConverter x:Key="FulfilStroke" />
 </ResourceDictionary>
