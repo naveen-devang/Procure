@@ -35,7 +35,7 @@
             <Setter Property="BorderBrush" Value="{ThemeResource PillBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Padding" Value="6,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </Page.Resources>
@@ -161,7 +161,7 @@
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                         <Setter Property="Padding" Value="0" />
-                        <Setter Property="Margin" Value="0,0,0,14" />
+                        <Setter Property="Margin" Value="0,0,0,8" />
                     </Style>
                 </ListView.ItemContainerStyle>
 
@@ -172,97 +172,97 @@
                                 Background="{ThemeResource AppSecondaryBackground}">
                             <StackPanel>
                                 <!-- header row (tap to expand) -->
-                                <Grid Padding="14,14,18,14" ColumnSpacing="10" Tapped="Card_Tapped" Background="Transparent">
+                                <Grid ColumnSpacing="9" Padding="6,8,14,8" Tapped="Card_Tapped" Background="Transparent">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="128" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
-                                    <CheckBox Grid.Column="0" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                                    <!-- priority accent rail -->
+                                    <Rectangle Grid.Column="0" Width="3" Margin="0,6" RadiusX="1.5" RadiusY="1.5"
+                                               Fill="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}" />
+
+                                    <CheckBox Grid.Column="1" MinWidth="0" Padding="0" Margin="8,0,0,0" VerticalAlignment="Center"
                                               IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
                                               Checked="PrCheck_Toggled" Unchecked="PrCheck_Toggled" Tapped="Child_Tapped" />
 
-                                    <Button Grid.Column="1" Content="{x:Bind Priority}" Click="Priority_Click" Tapped="Child_Tapped"
-                                            FontSize="11" FontWeight="SemiBold" Height="26" Padding="8,0" CornerRadius="4"
+                                    <Button Grid.Column="2" Content="{x:Bind Priority, Mode=OneWay}" Click="Priority_Click" Tapped="Child_Tapped"
+                                            FontSize="11" FontWeight="SemiBold" Height="24" Padding="8,0" CornerRadius="4"
                                             BorderThickness="1" VerticalAlignment="Center"
-                                            Foreground="{x:Bind Priority, Converter={StaticResource PriorityColor}}"
-                                            Background="{x:Bind Priority, Converter={StaticResource PriorityBg}}"
-                                            BorderBrush="{x:Bind Priority, Converter={StaticResource PriorityBorder}}" />
+                                            Foreground="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}"
+                                            Background="{x:Bind Priority, Converter={StaticResource PriorityBg}, Mode=OneWay}"
+                                            BorderBrush="{x:Bind Priority, Converter={StaticResource PriorityBorder}, Mode=OneWay}" />
 
-                                    <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
                                         <Border Visibility="{x:Bind PrType, Converter={StaticResource NullOrEmptyVis}}"
-                                                Padding="6,2" CornerRadius="4" BorderThickness="1" HorizontalAlignment="Left"
+                                                Padding="6,1" CornerRadius="4" BorderThickness="1" HorizontalAlignment="Left"
                                                 Background="{x:Bind PrType, Converter={StaticResource PrTypeBg}}"
                                                 BorderBrush="{x:Bind PrType, Converter={StaticResource PrTypeBorder}}">
-                                            <TextBlock Text="{x:Bind PrType}" FontSize="10" FontWeight="SemiBold"
+                                            <TextBlock Text="{x:Bind PrType}" FontSize="9.5" FontWeight="SemiBold"
                                                        Foreground="{x:Bind PrType, Converter={StaticResource PrTypeColor}}" />
                                         </Border>
-                                        <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="14"
+                                        <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="13.5"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                         <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <TextBlock Text="{x:Bind Requestor}" FontSize="12" TextTrimming="CharacterEllipsis"
-                                                       MaxWidth="80" Foreground="{ThemeResource AppTextSecondary}" />
+                                            <TextBlock Text="{x:Bind Requestor}" FontSize="11.5" TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="90" Foreground="{ThemeResource AppTextSecondary}" />
                                             <TextBlock Text="{x:Bind Plant}" FontSize="11" FontWeight="SemiBold"
                                                        Foreground="{ThemeResource PrimaryTextBrush}"
                                                        Visibility="{x:Bind Plant, Converter={StaticResource NullOrEmptyVis}}" />
                                         </StackPanel>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="3" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Description}" FontWeight="SemiBold" FontSize="13"
+                                    <StackPanel Grid.Column="4" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontWeight="SemiBold" FontSize="12.5"
                                                    Foreground="{ThemeResource AppTextPrimary}"
                                                    MaxLines="2" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Border Style="{StaticResource PillChip}" Padding="5,1"
-                                                    Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}}">
-                                                <TextBlock FontSize="9.5" FontWeight="SemiBold"
-                                                           Foreground="{ThemeResource AppTextSecondary}"
-                                                           Text="{x:Bind ItemsCount}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Border Style="{StaticResource PillChip}"
+                                                    Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}"
+                                                           Text="{x:Bind ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items', Mode=OneWay}" />
                                             </Border>
-                                            <TextBlock Text="{x:Bind AgeDisplay}" FontSize="11"
+                                            <Border Style="{StaticResource PillChip}">
+                                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource PillTextNeutral}"
+                                                           Text="{x:Bind RfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} RFQ', Mode=OneWay}" />
+                                            </Border>
+                                            <Border Style="{StaticResource PillChip}">
+                                                <TextBlock Text="{x:Bind PcrStatusDisplay, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}, Mode=OneWay}" />
+                                            </Border>
+                                            <Border Style="{StaticResource PillChip}">
+                                                <TextBlock Text="{x:Bind FormattedTotalPoValue, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{x:Bind TotalPoValue, Converter={StaticResource PoPillText}, Mode=OneWay}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Bind AgeDisplay}" FontSize="10.5"
                                                        Foreground="{ThemeResource AppTextTertiary}" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </StackPanel>
 
-                                    <Border Grid.Column="4" Style="{StaticResource PillChip}">
-                                        <TextBlock Text="{x:Bind RfqCount}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{ThemeResource PillTextNeutral}" />
-                                    </Border>
-                                    <Border Grid.Column="5" Style="{StaticResource PillChip}">
-                                        <TextBlock Text="{x:Bind PcrStatusDisplay}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}}" />
-                                    </Border>
-                                    <Border Grid.Column="6" Style="{StaticResource PillChip}">
-                                        <TextBlock Text="{x:Bind FormattedTotalPoValue}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{x:Bind TotalPoValue, Converter={StaticResource PoPillText}}" />
-                                    </Border>
-
-                                    <Button Grid.Column="7" Content="{x:Bind Status}" Click="Status_Click" Tapped="Child_Tapped"
-                                            FontSize="12" FontWeight="SemiBold" Height="28" Padding="12,0" CornerRadius="6"
+                                    <Button Grid.Column="5" Content="{x:Bind Status, Mode=OneWay}" Click="Status_Click" Tapped="Child_Tapped"
+                                            FontSize="11.5" FontWeight="SemiBold" Height="26" Padding="12,0" CornerRadius="6"
                                             BorderThickness="0" VerticalAlignment="Center"
-                                            Background="{x:Bind Status, Converter={StaticResource StatusBg}}"
-                                            Foreground="{x:Bind Status, Converter={StaticResource StatusColor}}" />
+                                            Background="{x:Bind Status, Converter={StaticResource StatusBg}, Mode=OneWay}"
+                                            Foreground="{x:Bind Status, Converter={StaticResource StatusColor}, Mode=OneWay}" />
 
-                                    <Button Grid.Column="8" Click="Edit_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
-                                            Height="30" Width="30" Padding="0" CornerRadius="4" FontSize="12"
+                                    <Button Grid.Column="6" Click="Edit_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
+                                            Height="28" Width="28" Padding="0" CornerRadius="4" FontSize="12"
                                             FontFamily="Segoe Fluent Icons" Content="&#xE70F;"
                                             ToolTipService.ToolTip="Edit PR" />
-                                    <Button Grid.Column="9" Click="Delete_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
-                                            Height="30" Width="30" Padding="0" CornerRadius="4" FontSize="12"
+                                    <Button Grid.Column="7" Click="Delete_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
+                                            Height="28" Width="28" Padding="0" CornerRadius="4" FontSize="12"
                                             FontFamily="Segoe Fluent Icons" Content="&#xE74D;"
                                             Foreground="{ThemeResource FluentCritical}"
                                             ToolTipService.ToolTip="Delete PR" />
 
-                                    <TextBlock Grid.Column="10" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                    <TextBlock Grid.Column="8" FontFamily="Segoe Fluent Icons" FontSize="11" Margin="0,0,10,0"
                                                VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}"
                                                Text="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource Chevron}}" />
                                 </Grid>
