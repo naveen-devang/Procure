@@ -292,5 +292,8 @@
     <modals:SplitPrModal x:Name="SplitModal" x:Load="{x:Bind Vm.IsSplitPrModalVisible, Mode=OneWay}" />
     <modals:ApprovalConfigModal x:Name="ApprovalModal" x:Load="{x:Bind Vm.IsApprovalConfigModalVisible, Mode=OneWay}" />
     <modals:BatchPoModal x:Name="BatchPoModal_" x:Load="{x:Bind Vm.IsBatchPoModalVisible, Mode=OneWay}" />
+    <modals:BatchCreateModal x:Name="BatchCreateModal_" x:Load="{x:Bind Vm.IsBatchCreateModalVisible, Mode=OneWay}" />
+    <modals:BatchRfqModal x:Name="BatchRfqModal_" x:Load="{x:Bind Vm.IsBatchRfqModalVisible, Mode=OneWay}" />
+    <modals:ExportPcrModal x:Name="ExportPcrModal_" x:Load="{x:Bind Vm.IsExportPcrModalVisible, Mode=OneWay}" />
   </Grid>
 </Page>

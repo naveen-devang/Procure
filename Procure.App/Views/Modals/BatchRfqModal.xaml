@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.BatchRfqModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
+
+    <UserControl.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+        <Style x:Key="Lbl" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="#B3000000">
+        <Border MaxWidth="950" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
+                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <ScrollViewer>
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Create Shared RFQ across Selected PRs" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Text="{Binding BatchRfqPrsSummary}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
+                                Command="{Binding CloseBatchRfqModalCommand}" />
+                    </Grid>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="200" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="RFQ Number" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding BatchRfqNo, Mode=TwoWay}" PlaceholderText="e.g. RFQ-BUNDLE-01" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Vendor Name *" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding BatchRfqVendor, Mode=TwoWay}" PlaceholderText="e.g. Al-Futtaim Engineering" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableTechnicalApprovals}"
+                                              SelectedItem="{Binding BatchRfqTechnicalApproval, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Currency" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}" SelectedItem="{Binding BatchRfqCurrency, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding BatchRfqPaymentTerms, Mode=TwoWay}" PlaceholderText="30 Days Net" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableIncoterms}" SelectedItem="{Binding BatchRfqIncoterms, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="4">
+                                    <TextBlock Text="Delivery / Lead Time" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding BatchRfqDeliveryLeadTime, Mode=TwoWay}" PlaceholderText="e.g. 2 Weeks" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="4">
+                                    <TextBlock Text="Warranty" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding BatchRfqWarranty, Mode=TwoWay}" PlaceholderText="e.g. 12 Months" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Visibility="{Binding HasBatchEditingRfqItems, Converter={StaticResource BoolVis}}">
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Consolidated Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="{Binding AllBatchRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
+                                            Command="{Binding ToggleAllBatchRfqItemsCommand}" />
+                                    <Button Content="Copy for Email" FontSize="11" Height="28" Padding="10,0"
+                                            Command="{Binding CopySelectedBatchRfqItemsForEmailCommand}" />
+                                </StackPanel>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding BatchEditingRfqItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:RfqItem">
+                                        <Grid ColumnSpacing="8" Padding="4,2" Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36" />
+                                                <ColumnDefinition Width="75" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="85" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="85" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Border Grid.Column="1" Padding="6,2" CornerRadius="4" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                    BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
+                                                <TextBlock Text="{x:Bind Notes}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{x:Bind ItemName}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBlock Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right"
+                                                     IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Base Quote Sum" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBox Text="{Binding BatchRfqQuoteAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="13" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Freight" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBox Text="{Binding BatchRfqFreight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="Other Charges" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBox Text="{Binding BatchRfqOtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="4">
+                                    <TextBlock Text="Total Discount" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBox Text="{Binding BatchRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="4">
+                                    <TextBlock Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableVatTypes}" SelectedItem="{Binding BatchRfqVatType, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+                            <Border Padding="12,10" CornerRadius="6" BorderThickness="1"
+                                    BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                        <TextBlock Text="{Binding FormattedCalculatedBatchRfqGrandTotal}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding CalculatedBatchRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
+                                               FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Command="{Binding CloseBatchRfqModalCommand}" />
+                        <Button Content="Create Shared RFQs" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveBatchRfqModalCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
