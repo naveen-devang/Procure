@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.MergePrModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
+
+    <Grid Background="#B3000000">
+        <Border MaxWidth="660" MaxHeight="760" Margin="24" Padding="26" CornerRadius="10"
+                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <ScrollViewer>
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Combine Requisitions into Master PR" FontWeight="SemiBold" FontSize="18"
+                                       Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Text="Consolidate multiple requisitions into a single package for unified RFQs, approvals, and POs."
+                                       FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextTertiary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
+                                Command="{Binding CloseMergePrModalCommand}" />
+                    </Grid>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Selected Source Requisitions to Merge:" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AppTextPrimary}" />
+                        <Border Padding="10,8" CornerRadius="6" BorderThickness="1"
+                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                            <ItemsControl ItemsSource="{Binding SelectedPrsForMerge}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PurchaseRequisition">
+                                        <Grid ColumnSpacing="10" Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{x:Bind Description}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind Requestor}" FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
+                                            <TextBlock Grid.Column="3" Text="{x:Bind Priority}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{x:Bind Priority, Converter={StaticResource PriorityColor}}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="140" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Combined PR Number *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBox Text="{Binding MergeMasterPrNo, Mode=TwoWay}" PlaceholderText="e.g. 12345/6780" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Priority" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
+                                      SelectedItem="{Binding MergePriority, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Requestor / Department" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBox Text="{Binding MergeRequestor, Mode=TwoWay}" PlaceholderText="e.g. Consolidated Procurement" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Combined Description / Line Items *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBox Text="{Binding MergeDescription, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="90"
+                                 PlaceholderText="Consolidated item list..." />
+                    </StackPanel>
+
+                    <Border Padding="12,10" CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppTertiaryBackground}">
+                        <CheckBox IsChecked="{Binding MergeCopyChildRfqs, Mode=TwoWay}">
+                            <StackPanel Spacing="1">
+                                <TextBlock Text="Copy existing vendor RFQs &amp; quotes into Master PR" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Text="If unchecked, the consolidated PR will start with a fresh RFQ slate."
+                                           FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource AppTextTertiary}" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Consolidation Notes &amp; Lineage" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBox Text="{Binding MergeNotes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                                 PlaceholderText="Lineage details..." />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Command="{Binding CloseMergePrModalCommand}" />
+                        <Button Content="Combine Requisitions" Style="{StaticResource AccentButtonStyle}" Command="{Binding ConfirmMergePrModalCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

@@ -6,6 +6,7 @@
     xmlns:models="using:Procure.Models"
     xmlns:local="using:Procure.App"
     xmlns:views="using:Procure.App.Views"
+    xmlns:modals="using:Procure.App.Views.Modals"
     xmlns:conv="using:Procure.App.Converters"
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -39,7 +40,8 @@
         </Style>
     </Page.Resources>
 
-    <Grid Padding="28,20,28,0" RowSpacing="18" Background="{ThemeResource AppBackground}">
+  <Grid Background="{ThemeResource AppBackground}">
+    <Grid Padding="28,20,28,0" RowSpacing="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -282,4 +284,11 @@
             </StackPanel>
         </Grid>
     </Grid>
+
+    <!-- modal layer (each x:Load-deferred on its VM visibility flag) -->
+    <modals:MergePrModal x:Name="MergeModal" x:Load="{x:Bind Vm.IsMergePrModalVisible, Mode=OneWay}" />
+    <modals:SplitPrModal x:Name="SplitModal" x:Load="{x:Bind Vm.IsSplitPrModalVisible, Mode=OneWay}" />
+    <modals:ApprovalConfigModal x:Name="ApprovalModal" x:Load="{x:Bind Vm.IsApprovalConfigModalVisible, Mode=OneWay}" />
+    <modals:BatchPoModal x:Name="BatchPoModal_" x:Load="{x:Bind Vm.IsBatchPoModalVisible, Mode=OneWay}" />
+  </Grid>
 </Page>
