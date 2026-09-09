@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
         if (_themeApplied) return;
         _themeApplied = true;
         _ = _appHost.ApplyThemeAsync(_settings.AppTheme);
+        (_appHost as WinUiAppHost)?.ApplyAccentColor(_settings.AccentTheme);
     }
 
     private void Nav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

@@ -180,10 +180,53 @@ public sealed class WinUiAppHost : IAppHost
     {
         _shell = shell;
         _settings = settings;
-        _shell.ThemeChanged += (_, _) => ThemeChanged?.Invoke(this, EventArgs.Empty);
+        _shell.ThemeChanged += (_, _) =>
+        {
+            ApplyAccentColor(_settings.AccentTheme);   // Primary is deep-in-light / pastel-in-dark
+            ThemeChanged?.Invoke(this, EventArgs.Empty);
+        };
+        _settings.SettingsChanged += (_, e) =>
+        {
+            if (e.Key == nameof(ISettingsService.AccentTheme))
+                ApplyAccentColor(_settings.AccentTheme);
+        };
     }
 
     public event EventHandler? ThemeChanged;
+
+    /// <summary>Startup + accent-picker hook. Rewrites AccentFillBrush / PrimaryTextBrush
+    /// (App.xaml keeps them out of the theme dictionaries for exactly this).</summary>
+    public void ApplyAccentColor(string accentId)
+    {
+        var p = Procure.Models.AccentPalettes.All.FirstOrDefault(
+                    x => string.Equals(x.Id, accentId, StringComparison.OrdinalIgnoreCase))
+                ?? Procure.Models.AccentPalettes.All[0];
+
+        var isDark = _shell.Window?.Content is FrameworkElement fe
+                     && fe.ActualTheme == ElementTheme.Dark;
+
+        var fill = ParseHex(p.DarkHex);                       // pastel fill, both modes
+        var primary = ParseHex(isDark ? p.DarkHex : p.LightHex);   // text/icons on plain bg
+
+        var res = Microsoft.UI.Xaml.Application.Current.Resources;
+        res["AccentFillBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(fill);
+        res["PrimaryTextBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(primary);
+    }
+
+    private static Windows.UI.Color ParseHex(string hex)
+    {
+        hex = hex.TrimStart('#');
+        byte a = 255, r, g, b;
+        if (hex.Length == 8)
+        {
+            a = Convert.ToByte(hex.Substring(0, 2), 16);
+            hex = hex.Substring(2);
+        }
+        r = Convert.ToByte(hex.Substring(0, 2), 16);
+        g = Convert.ToByte(hex.Substring(2, 2), 16);
+        b = Convert.ToByte(hex.Substring(4, 2), 16);
+        return Windows.UI.Color.FromArgb(a, r, g, b);
+    }
 
     public void Quit() => Microsoft.UI.Xaml.Application.Current.Exit();
 
