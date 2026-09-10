@@ -101,14 +101,18 @@ public partial class App : Application
         s.AddSingleton<ManageColumnsPageModel>();
         s.AddSingleton<SettingsPageModel>();
 
-        // Windows / pages
+        // Windows / pages. Singletons: MainWindow.NavigateTo caches by route, but it was
+        // resolving a NEW page instance on every revisit - each new PrBoardPage re-ran the
+        // full 20k board load and added another never-removed FilteredPrs.CollectionChanged
+        // handler bound to the now-dead page, so the board got jankier and RAM climbed with
+        // every visit. The page models are already singletons; the pages should be too.
         s.AddSingleton<MainWindow>();
-        s.AddTransient<PrBoardPage>();
-        s.AddTransient<DashboardPage>();
-        s.AddTransient<TasksPage>();
-        s.AddTransient<NotesPage>();
-        s.AddTransient<CallOffPage>();
-        s.AddTransient<SettingsPage>();
+        s.AddSingleton<PrBoardPage>();
+        s.AddSingleton<DashboardPage>();
+        s.AddSingleton<TasksPage>();
+        s.AddSingleton<NotesPage>();
+        s.AddSingleton<CallOffPage>();
+        s.AddSingleton<SettingsPage>();
 
         return s.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
     }
