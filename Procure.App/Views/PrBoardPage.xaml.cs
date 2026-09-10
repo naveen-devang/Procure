@@ -30,6 +30,30 @@ public sealed partial class PrBoardPage : Page
         // which also subscribes them to Vm.PropertyChanged.
         Bindings.Update();
         Loaded += OnLoaded;
+
+        // Esc closes the topmost modal. handledEventsToo so a TextBox inside a modal
+        // that marks the key handled doesn't swallow it.
+        AddHandler(KeyDownEvent, new KeyEventHandler(OnPageKeyDown), handledEventsToo: true);
+        // Click on a modal's dimmed backdrop (the modal UserControl's root Grid, not its
+        // content card) closes it too - one handler for all 11 modals.
+        AddHandler(TappedEvent, new TappedEventHandler(OnPageTapped), handledEventsToo: true);
+    }
+
+    private void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Escape && Vm.CloseTopmostModal())
+            e.Handled = true;
+    }
+
+    private void OnPageTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (Vm.IsAnyModalVisible
+            && e.OriginalSource is Grid { Parent: UserControl } backdrop
+            && backdrop.Background is Microsoft.UI.Xaml.Media.SolidColorBrush)
+        {
+            Vm.CloseTopmostModal();
+            e.Handled = true;
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
