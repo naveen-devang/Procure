@@ -142,9 +142,6 @@ public sealed partial class PrBoardPage : Page
             Vm.SelectedStatusFilter = s;
     }
 
-    private void OverdueChip_Click(object sender, RoutedEventArgs e) => Vm.ToggleFilterOverdueCommand.Execute(null);
-    private void PcrPendingChip_Click(object sender, RoutedEventArgs e) => Vm.ToggleFilterPcrPendingCommand.Execute(null);
-    private void UrgentChip_Click(object sender, RoutedEventArgs e) => Vm.ToggleFilterUrgentCommand.Execute(null);
 
     // ----- card interactions -----
 
