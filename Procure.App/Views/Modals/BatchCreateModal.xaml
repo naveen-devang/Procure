@@ -42,14 +42,14 @@
 
                 <Border Grid.Row="1" Padding="14,10" CornerRadius="8" BorderThickness="1"
                         BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
-                    <Grid ColumnSpacing="10">
+                    <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="110" />
-                            <ColumnDefinition Width="160" />
-                            <ColumnDefinition Width="90" />
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="86" />
+                            <ColumnDefinition Width="1.7*" />
+                            <ColumnDefinition Width="96" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.3*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="New Row Defaults" VerticalAlignment="Center" Style="{StaticResource Lbl}" />

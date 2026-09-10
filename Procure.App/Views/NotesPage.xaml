@@ -69,9 +69,8 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Notes" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}">
-                            <Run Text="{Binding NoteCount}" /><Run Text=" notes" />
-                        </TextBlock>
+                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}"
+                                   Text="{Binding NoteCountLabel}" />
                     </StackPanel>
                     <Button Grid.Column="1" Content="+ New" FontSize="11.5" Height="30" Padding="12,0" CornerRadius="7"
                             Command="{Binding NewNoteCommand}" />

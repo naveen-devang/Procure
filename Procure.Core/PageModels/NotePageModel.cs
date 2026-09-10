@@ -39,6 +39,7 @@ namespace Procure.PageModels
 
         public bool HasSelection => SelectedNote is not null;
         public int NoteCount => _all.Count;
+        public string NoteCountLabel => _all.Count == 1 ? "1 note" : $"{_all.Count} notes";
 
         // ---- PR / RFQ / PO link typeahead ----
         // Queried per keystroke against a bounded search rather than held in full - see
@@ -112,6 +113,7 @@ namespace Procure.PageModels
             Notes.Clear();
             foreach (var n in rows) Notes.Add(n);
             OnPropertyChanged(nameof(NoteCount));
+            OnPropertyChanged(nameof(NoteCountLabel));
         }
 
         // ---- selection ----
