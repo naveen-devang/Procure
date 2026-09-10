@@ -81,34 +81,51 @@
 
                         <StackPanel Spacing="8">
                             <TextBlock Text="Color Mode" Style="{StaticResource RowTitle}" />
-                            <RadioButtons x:Name="ThemeModeRadio" MaxColumns="3" SelectionChanged="ThemeMode_SelectionChanged">
-                                <x:String>Dark</x:String>
-                                <x:String>Light</x:String>
-                                <x:String>System</x:String>
-                            </RadioButtons>
+                            <!-- segmented toggle group: a small mutually-exclusive choice, not a
+                                 vertical list of radios (Fluent commanding). -->
+                            <Border BorderBrush="{ThemeResource AppControlBorder}" BorderThickness="1"
+                                    CornerRadius="4" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="ThemeDark" Style="{StaticResource SegmentButton}"
+                                                  Content="Dark" Tag="Dark" Click="ThemeMode_Click" />
+                                    <ToggleButton x:Name="ThemeLight" Style="{StaticResource SegmentButton}"
+                                                  Content="Light" Tag="Light" Click="ThemeMode_Click"
+                                                  BorderThickness="1,0,1,0" BorderBrush="{ThemeResource AppControlBorder}" />
+                                    <ToggleButton x:Name="ThemeSystem" Style="{StaticResource SegmentButton}"
+                                                  Content="System" Tag="System" Click="ThemeMode_Click" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <StackPanel Spacing="8" Margin="0,6,0,0">
                             <TextBlock Text="Pastel Accent Theme Palette" Style="{StaticResource RowTitle}" />
                             <TextBlock Style="{StaticResource RowHint}"
                                        Text="Choose your accent highlight color for buttons, badges, and status indicators across the entire app." />
-                            <!-- data-driven from AccentPalettes.All (Core). RadioButtons: real
-                                 single-select semantics + selection dot, items size to content
-                                 (a fixed-width GridView item was clipping on the right). -->
-                            <muxc:RadioButtons x:Name="AccentGroup" MaxColumns="3"
-                                               ItemsSource="{Binding AvailableAccentThemes}"
-                                               SelectionChanged="Accent_SelectionChanged">
-                                <muxc:RadioButtons.ItemTemplate>
+                            <!-- swatch tiles: the pastel fill IS the control; the GridView selection
+                                 ring marks the current choice. MinWidth (not fixed Width) so long
+                                 names ("Pastel Crimson") don't clip. -->
+                            <GridView x:Name="AccentGrid" ItemsSource="{Binding AvailableAccentThemes}"
+                                      SelectionMode="Single" IsItemClickEnabled="False"
+                                      SelectionChanged="Accent_SelectionChanged">
+                                <GridView.ItemContainerStyle>
+                                    <Style TargetType="GridViewItem">
+                                        <Setter Property="Margin" Value="0,0,8,8" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="CornerRadius" Value="8" />
+                                    </Style>
+                                </GridView.ItemContainerStyle>
+                                <GridView.ItemTemplate>
                                     <DataTemplate x:DataType="models:PastelThemeOption">
-                                        <Border CornerRadius="6" Padding="12,6" MinWidth="120" BorderThickness="1"
+                                        <Border MinWidth="120" Height="40" Margin="3" CornerRadius="6" BorderThickness="1"
                                                 Background="{x:Bind BgHex, Converter={StaticResource HexBrush}}"
                                                 BorderBrush="{x:Bind DarkHex, Converter={StaticResource HexBrush}}">
                                             <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Foreground="{ThemeResource AppTextPrimary}" />
                                         </Border>
                                     </DataTemplate>
-                                </muxc:RadioButtons.ItemTemplate>
-                            </muxc:RadioButtons>
+                                </GridView.ItemTemplate>
+                            </GridView>
                         </StackPanel>
                     </StackPanel>
                 </Border>

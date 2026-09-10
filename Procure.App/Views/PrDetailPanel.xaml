@@ -42,19 +42,20 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
-        <Style x:Key="IconBtn" TargetType="Button">
+        <Style x:Key="IconBtn" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Width" Value="24" />
-            <Setter Property="Height" Value="24" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="4" />
             <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
         </Style>
         <Style x:Key="Chip" TargetType="Border">
-            <Setter Property="Padding" Value="7,2.5" />
-            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,2,8,3" />
+            <Setter Property="CornerRadius" Value="999" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
             <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
@@ -70,7 +71,7 @@
         <StackPanel Spacing="16">
 
             <!-- consolidated-master banner -->
-            <Border Padding="14,10" CornerRadius="6" BorderThickness="1"
+            <Border Padding="14,10" CornerRadius="8" BorderThickness="1"
                     BorderBrush="{ThemeResource BadgeCombinedPrBorder}" Background="{ThemeResource BadgeCombinedPrBg}"
                     Visibility="{Binding IsConsolidatedMaster, Converter={StaticResource BoolVis}}">
                 <Grid ColumnSpacing="10">
@@ -138,7 +139,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                     <TextBlock Text="{x:Bind RfqNo}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
-                                                    <Border Padding="5,1.5" CornerRadius="3" BorderThickness="1"
+                                                    <Border Padding="5,1.5" CornerRadius="999" BorderThickness="1"
                                                             BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
                                                             Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}">
                                                         <TextBlock Text="{x:Bind SharedPrs, Converter={StaticResource Fmt}, ConverterParameter='Shared ({0})'}"
@@ -146,7 +147,7 @@
                                                     </Border>
                                                 </StackPanel>
                                                 <Button Grid.Column="1" Content="{x:Bind Status}" Click="RfqStatus_Click"
-                                                        FontSize="10.5" Height="24" Padding="8,0" CornerRadius="4"
+                                                        FontSize="10.5" Height="24" Padding="8,0" CornerRadius="999"
                                                         Background="{ThemeResource AppSubtleFill}" Foreground="{ThemeResource AppTextPrimary}" />
                                             </Grid>
                                             <Grid>
@@ -224,7 +225,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="2. PCR &amp; Approvals" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Padding="8,2" CornerRadius="4" BorderThickness="1"
+                            <Border Grid.Column="1" Padding="8,2" CornerRadius="999" BorderThickness="1"
                                     BorderBrush="{ThemeResource PillBorder}" Background="{ThemeResource PillBg}"
                                     Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
                                 <TextBlock Text="{Binding Pcr.ApprovalSummary}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
@@ -358,7 +359,7 @@
                                             </Grid.RowDefinitions>
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                 <TextBlock Text="{x:Bind PoNo}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
-                                                <Border Padding="5,1" CornerRadius="3" BorderThickness="1"
+                                                <Border Padding="5,1" CornerRadius="999" BorderThickness="1"
                                                         BorderBrush="{ThemeResource BadgeCombinedPoBorder}" Background="{ThemeResource BadgeCombinedPoBg}"
                                                         Visibility="{x:Bind IsCombinedPo, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="{x:Bind CombinedPrs, Converter={StaticResource Fmt}, ConverterParameter='Combined ({0})'}"
@@ -397,7 +398,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="{ThemeResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         <TextBlock Text="Requisition Line Items" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
-                        <Border Padding="6,2" CornerRadius="8" Background="{ThemeResource AppSubtleFill}">
+                        <Border Padding="6,2" CornerRadius="999" Background="{ThemeResource AppSubtleFill}">
                             <TextBlock Text="{Binding ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items'}"
                                        FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
                         </Border>

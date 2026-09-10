@@ -65,8 +65,10 @@ public sealed partial class SettingsPage : Page
     {
         _syncing = true;
         Rail.SelectedItem = Sections.FirstOrDefault(s => s.Key == Vm.SelectedSection) ?? Sections[0];
-        ThemeModeRadio.SelectedIndex = Vm.SelectedThemeMode switch { "Light" => 1, "System" => 2, _ => 0 };
-        AccentGroup.SelectedItem = Vm.AvailableAccentThemes.FirstOrDefault(a => a.Id == Vm.SelectedAccentTheme);
+        ThemeDark.IsChecked = Vm.SelectedThemeMode is "Dark" or "";
+        ThemeLight.IsChecked = Vm.SelectedThemeMode == "Light";
+        ThemeSystem.IsChecked = Vm.SelectedThemeMode == "System";
+        AccentGrid.SelectedItem = Vm.AvailableAccentThemes.FirstOrDefault(a => a.Id == Vm.SelectedAccentTheme);
         _syncing = false;
     }
 
@@ -76,15 +78,15 @@ public sealed partial class SettingsPage : Page
         Vm.SelectSectionCommand.Execute(s.Key);
     }
 
-    private void ThemeMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ThemeMode_Click(object sender, RoutedEventArgs e)
     {
-        if (_syncing || ThemeModeRadio.SelectedItem is not string mode) return;
-        Vm.SelectThemeModeCommand.Execute(mode);
+        if (_syncing || sender is not FrameworkElement { Tag: string mode }) return;
+        Vm.SelectThemeModeCommand.Execute(mode);   // SyncFromVm re-checks the right one
     }
 
     private void Accent_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncing || AccentGroup.SelectedItem is not PastelThemeOption opt) return;
+        if (_syncing || AccentGrid.SelectedItem is not PastelThemeOption opt) return;
         Vm.SelectAccentThemeCommand.Execute(opt.Id);
     }
 
