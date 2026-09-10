@@ -55,7 +55,7 @@
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableTechnicalApprovals}"
-                                              SelectedItem="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
+                                              SelectedValue="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <Grid ColumnSpacing="10">
@@ -69,7 +69,7 @@
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="Currency" Style="{StaticResource Lbl}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
-                                              SelectedItem="{Binding NewRfqCurrency, Mode=TwoWay}" />
+                                              SelectedValue="{Binding NewRfqCurrency, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
@@ -78,7 +78,7 @@
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableIncoterms}"
-                                              SelectedItem="{Binding NewRfqIncoterms, Mode=TwoWay}" />
+                                              SelectedValue="{Binding NewRfqIncoterms, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4">
                                     <TextBlock Text="Delivery / Lead Time" Style="{StaticResource Lbl}" />
@@ -180,7 +180,7 @@
                                 <StackPanel Grid.Column="4" Spacing="4">
                                     <TextBlock Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableVatTypes}"
-                                              SelectedItem="{Binding NewRfqVatType, Mode=TwoWay}" />
+                                              SelectedValue="{Binding NewRfqVatType, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <Border Padding="12,10" CornerRadius="6" BorderThickness="1"

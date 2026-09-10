@@ -79,6 +79,13 @@ public sealed partial class PrBoardPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         SearchBox.Text = Vm.SearchText;
+        // ComboBox items + selection set from code: the XAML {Binding ItemsSource} + SelectedItem
+        // combo never established a visible selection in the port ("blank until you re-pick").
+        if (StatusFilterBox.ItemsSource is null)
+        {
+            StatusFilterBox.ItemsSource = Vm.StatusFilterOptions;
+            StatusFilterBox.SelectedItem = Vm.SelectedStatusFilter;
+        }
 
         if (!_loaded)
         {
@@ -127,6 +134,12 @@ public sealed partial class PrBoardPage : Page
         {
             if (Vm.LoadMoreCommand.CanExecute(null)) Vm.LoadMoreCommand.Execute(null);
         }
+    }
+
+    private void StatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (StatusFilterBox.SelectedItem is string s && s != Vm.SelectedStatusFilter)
+            Vm.SelectedStatusFilter = s;
     }
 
     private void OverdueChip_Click(object sender, RoutedEventArgs e) => Vm.ToggleFilterOverdueCommand.Execute(null);

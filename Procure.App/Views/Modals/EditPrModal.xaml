@@ -45,12 +45,12 @@
                             <StackPanel Grid.Column="2" Spacing="4">
                                 <TextBlock Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPlants}"
-                                          SelectedItem="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" />
+                                          SelectedValue="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" />
                             </StackPanel>
                             <StackPanel Grid.Column="3" Spacing="4">
                                 <TextBlock Text="PR Type *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPrTypes}"
-                                          SelectedItem="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" />
+                                          SelectedValue="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" />
                             </StackPanel>
                         </Grid>
 
@@ -111,12 +111,12 @@
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Priority" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
-                                          SelectedItem="{Binding CurrentEditingPr.Priority, Mode=TwoWay}" />
+                                          SelectedValue="{Binding CurrentEditingPr.Priority, Mode=TwoWay}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
                                 <TextBlock Text="Status" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SelectableStatuses}"
-                                          SelectedItem="{Binding CurrentEditingPr.Status, Mode=TwoWay}" />
+                                          SelectedValue="{Binding CurrentEditingPr.Status, Mode=TwoWay}" />
                             </StackPanel>
                         </Grid>
 
@@ -133,7 +133,7 @@
                                     <DataTemplate x:DataType="models:CustomFieldValue">
                                         <StackPanel Spacing="4" Margin="0,0,0,8">
                                             <TextBlock Text="{x:Bind ColumnName}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Bind OptionsList}" SelectedItem="{x:Bind Value, Mode=TwoWay}"
+                                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Bind OptionsList}" SelectedValue="{x:Bind Value, Mode=TwoWay}"
                                                       Visibility="{x:Bind IsSelect, Converter={StaticResource BoolVis}}" />
                                             <CalendarDatePicker Date="{x:Bind DateValue, Converter={StaticResource Dto}, Mode=TwoWay}"
                                                                 Visibility="{x:Bind IsDate, Converter={StaticResource BoolVis}}" />

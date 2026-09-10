@@ -67,7 +67,7 @@
                         <StackPanel Grid.Column="1" Spacing="4">
                             <TextBlock Text="Priority" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                             <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
-                                      SelectedItem="{Binding MergePriority, Mode=TwoWay}" />
+                                      SelectedValue="{Binding MergePriority, Mode=TwoWay}" />
                         </StackPanel>
                     </Grid>
 

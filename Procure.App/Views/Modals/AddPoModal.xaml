@@ -268,7 +268,7 @@
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="4" Spacing="2">
                                                                 <TextBlock Text="VAT Type" Style="{StaticResource Lbl}" />
-                                                                <ComboBox HorizontalAlignment="Stretch" FontSize="11.5" SelectedItem="{x:Bind VatType, Mode=TwoWay}">
+                                                                <ComboBox HorizontalAlignment="Stretch" FontSize="11.5" SelectedValue="{x:Bind VatType, Mode=TwoWay}">
                                                                     <x:String>5%</x:String>
                                                                     <x:String>RC</x:String>
                                                                     <x:String>V0</x:String>

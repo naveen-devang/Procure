@@ -90,9 +90,8 @@
             <TextBox Grid.Column="0" x:Name="SearchBox" Height="36" VerticalAlignment="Center"
                      PlaceholderText="Search by PR #, item, requestor..." TextChanged="SearchBox_TextChanged" />
 
-            <ComboBox Grid.Column="1" Height="36" VerticalAlignment="Center" HorizontalAlignment="Stretch"
-                      ItemsSource="{Binding StatusFilterOptions}"
-                      SelectedItem="{Binding SelectedStatusFilter, Mode=TwoWay}" />
+            <ComboBox x:Name="StatusFilterBox" Grid.Column="1" Height="36" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                      SelectionChanged="StatusFilter_SelectionChanged" />
 
             <ToggleButton Grid.Column="2" Content="Overdue SLA" Height="36" FontSize="12"
                           IsChecked="{Binding FilterOverdueOnly, Mode=OneWay}" Click="OverdueChip_Click"
@@ -112,9 +111,9 @@
         </Grid>
 
         <!-- Batch action bar -->
-        <Border Grid.Row="2" Padding="16,10" CornerRadius="8" BorderThickness="1"
-                BorderBrush="{ThemeResource PrimaryTextBrush}"
-                Background="{ThemeResource AppSecondaryBackground}"
+        <Border Grid.Row="2" Padding="16,10" CornerRadius="8" BorderThickness="1,1,1,1"
+                BorderBrush="{ThemeResource AppControlBorder}"
+                Background="{ThemeResource AppTertiaryBackground}"
                 Visibility="{Binding IsBatchSelectionActive, Converter={StaticResource BoolVis}}">
             <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions>

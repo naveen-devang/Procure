@@ -397,7 +397,7 @@
 
                     <TextBlock Text="Priority" Style="{StaticResource FieldLabel}" />
                     <ComboBox ItemsSource="{Binding PriorityOptions}" HorizontalAlignment="Stretch"
-                              SelectedItem="{Binding SelectedTask.Priority, Mode=TwoWay}" />
+                              SelectedValue="{Binding SelectedTask.Priority, Mode=TwoWay}" />
 
                     <TextBlock Text="Due date" Style="{StaticResource FieldLabel}" />
                     <Grid ColumnSpacing="6">
@@ -419,7 +419,7 @@
 
                     <TextBlock Text="Repeats" Style="{StaticResource FieldLabel}" />
                     <ComboBox ItemsSource="{Binding RecurrenceOptions}" HorizontalAlignment="Stretch"
-                              SelectedItem="{Binding SelectedRecurrence, Mode=TwoWay}" />
+                              SelectedValue="{Binding SelectedRecurrence, Mode=TwoWay}" />
 
                     <TextBlock Text="Linked records" Style="{StaticResource FieldLabel}" />
                     <ItemsControl ItemsSource="{Binding SelectedTask.Links}"
