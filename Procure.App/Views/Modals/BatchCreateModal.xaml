@@ -14,6 +14,11 @@
     </UserControl.Resources>
 
     <Grid Background="#B3000000">
+        <Grid.ChildrenTransitions>
+            <TransitionCollection>
+                <EntranceThemeTransition FromVerticalOffset="18" />
+            </TransitionCollection>
+        </Grid.ChildrenTransitions>
         <Border MaxWidth="1020" MaxHeight="840" Margin="24" Padding="24" CornerRadius="10"
                 VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">

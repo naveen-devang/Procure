@@ -68,6 +68,11 @@
 
     <Border Background="{ThemeResource AppTertiaryBackground}" Padding="18"
             BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}">
+        <Border.Transitions>
+            <TransitionCollection>
+                <EntranceThemeTransition FromVerticalOffset="14" />
+            </TransitionCollection>
+        </Border.Transitions>
         <StackPanel Spacing="16">
 
             <!-- consolidated-master banner -->

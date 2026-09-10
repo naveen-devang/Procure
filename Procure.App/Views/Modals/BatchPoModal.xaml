@@ -5,6 +5,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Background="#B3000000">
+        <Grid.ChildrenTransitions>
+            <TransitionCollection>
+                <EntranceThemeTransition FromVerticalOffset="18" />
+            </TransitionCollection>
+        </Grid.ChildrenTransitions>
         <Border MaxWidth="480" Margin="24" Padding="26" CornerRadius="10"
                 VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">

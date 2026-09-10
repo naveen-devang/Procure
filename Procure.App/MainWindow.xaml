@@ -60,7 +60,15 @@
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.FooterMenuItems>
 
-            <Frame x:Name="ContentFrame" />
+            <Frame x:Name="ContentFrame">
+                <!-- Fires on a direct Content set too (NavigateTo assigns .Content to keep DI
+                     singletons), so tab switches get the standard entrance animation. -->
+                <Frame.ContentTransitions>
+                    <TransitionCollection>
+                        <NavigationThemeTransition />
+                    </TransitionCollection>
+                </Frame.ContentTransitions>
+            </Frame>
         </muxc:NavigationView>
 
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
