@@ -155,6 +155,7 @@
                 x:Name="Board"
                 SelectionMode="None"
                 ShowsScrollingPlaceholders="False"
+                ItemsSource="{Binding FilteredPrs}"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}, ConverterParameter=invert}"
                 ContainerContentChanging="Board_ContainerContentChanging">
                 <ListView.ItemContainerStyle>

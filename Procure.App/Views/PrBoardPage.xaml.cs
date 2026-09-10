@@ -30,6 +30,26 @@ public sealed partial class PrBoardPage : Page
         // which also subscribes them to Vm.PropertyChanged.
         Bindings.Update();
         Loaded += OnLoaded;
+        // Leaving the board releases its loaded PR window (only above the VM's 500-row
+        // threshold - a light session keeps its place and this is a no-op). The next
+        // Loaded -> BoardAppearing reloads the first page. Mirrors what MAUI did in
+        // OnDisappearing; WinUI has no page-nav lifecycle so it's wired here.
+        Unloaded += (_, _) =>
+        {
+            if (Vm.BoardDisappearing())
+            {
+                // Just dropped a few hundred reference-rich PRs (only above the 500-row window -
+                // a rare "scrolled deep then left" moment, never on a small database). Compact the
+                // gen2 heap so the pages actually return to the OS; off the UI thread so the tab
+                // switch isn't waiting on it - the MS-sanctioned "free memory after a heavy
+                // sequence" case, and ~50 MB comes back here in practice.
+                _ = System.Threading.Tasks.Task.Run(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                    GC.WaitForPendingFinalizers();
+                });
+            }
+        };
 
         // Esc closes the topmost modal. handledEventsToo so a TextBox inside a modal
         // that marks the key handled doesn't swallow it.
@@ -58,7 +78,6 @@ public sealed partial class PrBoardPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        Board.ItemsSource = Vm.FilteredPrs;
         SearchBox.Text = Vm.SearchText;
 
         if (!_loaded)
@@ -68,15 +87,16 @@ public sealed partial class PrBoardPage : Page
             try
             {
                 await App.Services.GetRequiredService<Procure.Data.SqliteDatabase>().InitializeAsync();
-                await Vm.LoadPrsAsync();
-                await Task.Delay(300);
-                Procure.Utilities.CrashLog.Write($"PrBoardPage load: FilteredPrs={Vm.FilteredPrs.Count} total={Vm.TotalFilteredCount}");
             }
             catch (Exception ex)
             {
-                Procure.Utilities.CrashLog.Write("PrBoardPage load failed", ex);
+                Procure.Utilities.CrashLog.Write("PrBoardPage DB init failed", ex);
             }
         }
+
+        // Starts the first load, or reloads if BoardDisappearing released the window;
+        // a no-op when the board still holds its data.
+        Vm.BoardAppearing();
         UpdateEmptyState();
     }
 

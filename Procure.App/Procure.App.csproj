@@ -20,6 +20,17 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <EnableMsixTooling>true</EnableMsixTooling>
     <NoWarn>$(NoWarn);MSB3270;CsWinRT1028;CS0618</NoWarn>
+
+    <!-- Memory & GC - matches Procure.csproj. Workstation + concurrent: one managed heap
+         instead of one per core, gen2 collected in the background. These are the .NET
+         defaults for a standalone app, but the MAUI head set them explicitly while the
+         WinUI runtimeconfig.json had nothing - stated here so the flavor can't drift on a
+         many-core box. TieredPGO trims the JIT'd-code footprint; R2R helps cold start. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

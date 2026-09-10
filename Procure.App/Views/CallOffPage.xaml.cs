@@ -19,7 +19,11 @@ public sealed partial class CallOffPage : Page
         Vm = App.Services.GetRequiredService<CallOffPageModel>();
         DataContext = Vm;
         Loaded += OnLoaded;
-        Unloaded += (_, _) => Vm.IsVisible = false;
+        Unloaded += (_, _) =>
+        {
+            Vm.IsVisible = false;
+            Vm.ReleaseLines();   // collapse every group -> drop the loaded CallOffLine rows
+        };
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)

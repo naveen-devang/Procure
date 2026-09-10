@@ -337,11 +337,14 @@ namespace Procure.PageModels
         /// stays wired to <see cref="OnPrItemPropertyChanged"/> otherwise, and the row can never be
         /// collected. The next <see cref="BoardAppearing"/> finds _hasLoadedOnce false and takes the
         /// exact path a first-ever open takes - same skeleton, same fast first paint - not new code.</summary>
-        public void BoardDisappearing()
+        /// <returns>true if the loaded window was actually released - the host can use that as the
+        /// cue to nudge the GC, since dropping a few hundred PRs with their full RFQ/PO/item graphs
+        /// leaves a lot of gen2 garbage the collector won't otherwise reclaim promptly.</returns>
+        public bool BoardDisappearing()
         {
             _isBoardVisible = false;
 
-            if (_loadedPrs.Count <= ReleaseThreshold) return;
+            if (_loadedPrs.Count <= ReleaseThreshold) return false;
 
             foreach (var pr in _loadedPrs)
             {
@@ -357,6 +360,8 @@ namespace Procure.PageModels
 
             if (Procure.Utilities.BoardTrace.IsEnabled)
                 Procure.Utilities.BoardTrace.Mark("board-window-released");
+
+            return true;
         }
 
         private bool _loadInFlight;
