@@ -190,7 +190,6 @@ namespace Procure.PageModels
         {
             if (BatchPrEntries.Count == 0) return;
 
-            if (true)
             {
                 var confirm = await _dialogs.DisplayAlertAsync(
                     "Apply Defaults to All Rows",
@@ -366,7 +365,6 @@ namespace Procure.PageModels
 
             if (errors.Count > 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", string.Join("\n", errors), "OK");
                 return;
             }
@@ -412,7 +410,6 @@ namespace Procure.PageModels
             {
                 if (!await _clipboard.HasTextAsync())
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Please copy lines from Excel first.", "OK");
                     return;
                 }
@@ -431,7 +428,6 @@ namespace Procure.PageModels
 
                 if (parsedEntries.Count == 0)
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("No Requisitions Detected", "Could not detect valid requisitions from clipboard text.", "OK");
                     return;
                 }
@@ -479,7 +475,6 @@ namespace Procure.PageModels
             {
                 if (!await _clipboard.HasTextAsync())
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the item rows from Excel first.", "OK");
                     return;
                 }
@@ -490,7 +485,6 @@ namespace Procure.PageModels
                 var parsed = ClipboardItemParser.ParsePrItems(text, entry.Id, entry.Items.Count);
                 if (parsed.Count == 0)
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("No Items Detected", "Could not read any line items from the clipboard text.", "OK");
                     return;
                 }

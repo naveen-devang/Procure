@@ -97,7 +97,6 @@ namespace Procure.PageModels
             {
                 if (!await _clipboard.HasTextAsync())
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Please copy lines from Excel first.", "OK");
                     return;
                 }
@@ -105,7 +104,6 @@ namespace Procure.PageModels
                 var text = await _clipboard.GetTextAsync();
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("Clipboard Empty", "Clipboard text is empty.", "OK");
                     return;
                 }
@@ -115,7 +113,6 @@ namespace Procure.PageModels
 
                 if (parsedItems.Count == 0)
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("No Items Detected", "Could not detect valid items from clipboard text.", "OK");
                     return;
                 }
@@ -259,14 +256,12 @@ namespace Procure.PageModels
 
             if (string.IsNullOrWhiteSpace(CurrentEditingPr.PrNo))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "PR Number is required.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(CurrentEditingPr.PrType))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "PR Type is required. Please select a PR Type.", "OK");
                 return;
             }
@@ -339,7 +334,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeletePrAsync(PurchaseRequisition pr)
         {
-            if (false) return;
 
             // Naming the orders is the whole point of the warning - "and all associated POs" gave no
             // clue that a raised order was about to go with it. Deleting is still allowed: a

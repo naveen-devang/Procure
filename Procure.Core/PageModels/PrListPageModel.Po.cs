@@ -506,7 +506,6 @@ namespace Procure.PageModels
             var selected = PoRfqSelections?.Where(r => r.IsSelected).ToList();
             if (selected == null || selected.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Please select at least one supplier quote to configure PO.", "OK");
                 return;
             }
@@ -547,7 +546,6 @@ namespace Procure.PageModels
             var selectedRfqs = PoRfqSelections?.Where(r => r.IsSelected).ToList();
             if (selectedRfqs == null || selectedRfqs.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Please select at least one RFQ / Supplier quote to raise a PO.", "OK");
                 return;
             }
@@ -555,7 +553,6 @@ namespace Procure.PageModels
             // Check for over-allocation errors
             if (HasPoQuantityValidationErrors)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Quantity Over-allocation", PoQuantityValidationErrorMessage, "OK");
                 return;
             }
@@ -565,7 +562,6 @@ namespace Procure.PageModels
             {
                 if (string.IsNullOrWhiteSpace(rfqSel.PoNo))
                 {
-                    if (true)
                         await _dialogs.DisplayAlertAsync("Validation", $"Please enter a PO Number for {rfqSel.VendorName}.", "OK");
                     return;
                 }
@@ -592,7 +588,6 @@ namespace Procure.PageModels
                         .FirstOrDefault(g => g.Count() > 1);
                     if (duplicateTarget != null)
                     {
-                        if (true)
                             await _dialogs.DisplayAlertAsync("Duplicate Target", $"Two selected quotes would update the same existing PO ({duplicateTarget.First().VendorName}). Please deselect one of them.", "OK");
                         return;
                     }
@@ -720,7 +715,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task UpdatePoStatusAsync(PurchaseOrder po)
         {
-            if (false) return;
 
             var action = await _dialogs.DisplayActionSheetAsync(
                 $"Update Status for {po.PoNo}",
@@ -758,7 +752,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeletePoAsync(PurchaseOrder po)
         {
-            if (false) return;
 
             var confirm = await _dialogs.DisplayAlertAsync("Delete PO", $"Delete PO {po.PoNo}?", "Delete", "Cancel");
             if (!confirm) return;

@@ -243,7 +243,6 @@ namespace Procure.PageModels
 
             if (orderedBy is { Count: > 0 })
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync(
                         "Line Already Ordered",
@@ -265,7 +264,6 @@ namespace Procure.PageModels
         {
             if (EditingRfqItems == null || EditingRfqItems.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("No Items", "There are no items in this RFQ to copy.", "OK");
                 return;
             }
@@ -273,7 +271,6 @@ namespace Procure.PageModels
             var selectedItems = EditingRfqItems.Where(i => i.IsQuoted && !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
             if (selectedItems.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
                 return;
             }
@@ -488,14 +485,12 @@ namespace Procure.PageModels
 
             if (string.IsNullOrWhiteSpace(NewRfqNo))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Please enter an RFQ Number.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(NewRfqVendor))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Please enter a Vendor name.", "OK");
                 return;
             }
@@ -690,7 +685,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task MarkQuoteReceivedAsync(RequestForQuotation rfq)
         {
-            if (false) return;
 
             var amountStr = await _dialogs.DisplayPromptAsync(
                 "Quote Received",
@@ -726,7 +720,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeleteRfqAsync(RequestForQuotation rfq)
         {
-            if (false) return;
 
             // A PO raised from this quote keeps its money but loses its provenance when the quote
             // goes: its Edit screen can no longer show the terms it was built on, and the price

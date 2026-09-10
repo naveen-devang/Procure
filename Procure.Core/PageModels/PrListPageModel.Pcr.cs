@@ -442,7 +442,6 @@ namespace Procure.PageModels
                     toggled.IsSelected = false;
                     toggled.PropertyChanged += OnExportRfqSelectionPropertyChanged;
 
-                    if (true)
                     {
                         _ = _dialogs.DisplayAlertAsync("Limit Reached", "A maximum of 5 suppliers can be selected on the comparison sheet.", "OK");
                     }
@@ -518,7 +517,6 @@ namespace Procure.PageModels
             var selected = ExportRfqSelections.Where(s => s.IsSelected).Select(s => s.Rfq).ToList();
             if (selected.Count == 0)
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
                 }
@@ -699,7 +697,6 @@ namespace Procure.PageModels
             var selected = ExportRfqSelections.Where(s => s.IsSelected).Select(s => s.Rfq).ToList();
             if (selected.Count == 0)
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
                 }
@@ -868,7 +865,6 @@ namespace Procure.PageModels
             if (_pcrPreviewBytes == null || _pcrPreviewPr == null) return;
             if (string.IsNullOrWhiteSpace(PcrSelectedPrinter))
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync("No Printer Selected", "Choose a printer from the list first.", "OK");
                 }
@@ -877,7 +873,6 @@ namespace Procure.PageModels
 
             if (!TryParsePcrPageRange(PcrPageRangeText, PcrPreviewPages.Count, out var pageIndices, out var rangeError))
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync("Invalid Page Range", rangeError, "OK");
                 }

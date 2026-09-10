@@ -218,7 +218,6 @@ namespace Procure.PageModels
         {
             if (BatchEditingRfqItems == null || BatchEditingRfqItems.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("No Items", "There are no items in this shared RFQ to copy.", "OK");
                 return;
             }
@@ -226,7 +225,6 @@ namespace Procure.PageModels
             var selectedItems = BatchEditingRfqItems.Where(i => i.IsQuoted && !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
             if (selectedItems.Count == 0)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("No Selected Items", "Please select at least one item to copy for email.", "OK");
                 return;
             }
@@ -284,7 +282,6 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Shared RFQ", "Please select at least 1 requisition.", "OK");
                 return;
             }
@@ -368,14 +365,12 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(BatchRfqNo))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "RFQ Number is required.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(BatchRfqVendor))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Vendor name is required.", "OK");
                 return;
             }
@@ -432,7 +427,6 @@ namespace Procure.PageModels
                 ApplyFilters();
                 DataChangeNotifier.Notify(ProcurementChange.Rfq);
 
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync(
                         "Shared RFQ Created",
@@ -458,7 +452,6 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 1)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Combined PO", "Please select at least 1 requisition.", "OK");
                 return;
             }
@@ -505,7 +498,6 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(BatchPoNo))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "PO Number is required.", "OK");
                 return;
             }
@@ -543,7 +535,6 @@ namespace Procure.PageModels
                 UpdateSelectionState();
                 ApplyFilters();
 
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync(
                         "Combined PO Created",

@@ -815,7 +815,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task ChangePrStatusAsync(PurchaseRequisition pr)
         {
-            if (false) return;
 
             var selected = await _dialogs.DisplayActionSheetAsync(
                 $"Update Status for {pr.PrNo}",

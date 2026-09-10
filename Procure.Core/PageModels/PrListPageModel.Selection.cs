@@ -120,7 +120,6 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task DeleteSelectedPrsAsync()
         {
-            if (false) return;
 
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count == 0) return;
@@ -245,7 +244,6 @@ namespace Procure.PageModels
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
             if (selected.Count < 2)
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Combine Requisitions", "Please select at least 2 requisitions to combine.", "OK");
                 return;
             }
@@ -288,14 +286,12 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(MergeMasterPrNo))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Master PR Number is required.", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(MergeDescription))
             {
-                if (true)
                     await _dialogs.DisplayAlertAsync("Validation", "Description is required.", "OK");
                 return;
             }
@@ -424,7 +420,6 @@ namespace Procure.PageModels
 
             if (childPrs.Count == 0)
             {
-                if (true)
                 {
                     await _dialogs.DisplayAlertAsync("Split Requisition", "Could not locate source requisitions for this combined PR.", "OK");
                 }
@@ -562,7 +557,6 @@ namespace Procure.PageModels
                 // PR line Ids move during a split, which moves the PO items hanging off them.
                 Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
 
-                if (true)
                 {
                     if (kept.Count < 2)
                     {
