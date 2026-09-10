@@ -16,7 +16,6 @@ namespace Procure.App.Views;
 public sealed partial class PrBoardPage : Page
 {
     public PrListPageModel Vm { get; }
-    private readonly ShellContext _shell;
 
     private DispatcherTimer? _searchDebounce;
     private bool _loaded;
@@ -25,22 +24,18 @@ public sealed partial class PrBoardPage : Page
     {
         InitializeComponent();
         Vm = App.Services.GetRequiredService<PrListPageModel>();
-        _shell = App.Services.GetRequiredService<ShellContext>();
         DataContext = Vm;
         // Vm is resolved from DI *after* InitializeComponent, so the compiled x:Bind expressions
         // (the modal x:Load flags) evaluated against a null Vm. Re-run them now that Vm is set,
         // which also subscribes them to Vm.PropertyChanged.
         Bindings.Update();
         Loaded += OnLoaded;
-        Unloaded += (_, _) => _shell.ThemeChanged -= OnThemeChanged;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Board.ItemsSource = Vm.FilteredPrs;
         SearchBox.Text = Vm.SearchText;
-        _shell.ThemeChanged -= OnThemeChanged;
-        _shell.ThemeChanged += OnThemeChanged;
 
         if (!_loaded)
         {
@@ -68,15 +63,6 @@ public sealed partial class PrBoardPage : Page
         EmptyText.Text = Vm.IsGenuinelyEmpty
             ? "No PR entries yet. Create your first purchase requisition to get started."
             : "No purchase requisitions match your criteria.";
-    }
-
-    // Converter bindings don't re-run on RequestedTheme change - rebuild the item source
-    // after BoardTheme.IsDark has been refreshed by MainWindow.
-    private void OnThemeChanged(object? sender, EventArgs e)
-    {
-        var src = Board.ItemsSource;
-        Board.ItemsSource = null;
-        Board.ItemsSource = src;
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
