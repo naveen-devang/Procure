@@ -66,7 +66,7 @@ public sealed partial class SettingsPage : Page
         _syncing = true;
         Rail.SelectedItem = Sections.FirstOrDefault(s => s.Key == Vm.SelectedSection) ?? Sections[0];
         ThemeModeRadio.SelectedIndex = Vm.SelectedThemeMode switch { "Light" => 1, "System" => 2, _ => 0 };
-        AccentGrid.SelectedItem = Vm.AvailableAccentThemes.FirstOrDefault(a => a.Id == Vm.SelectedAccentTheme);
+        AccentGroup.SelectedItem = Vm.AvailableAccentThemes.FirstOrDefault(a => a.Id == Vm.SelectedAccentTheme);
         _syncing = false;
     }
 
@@ -84,7 +84,7 @@ public sealed partial class SettingsPage : Page
 
     private void Accent_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncing || AccentGrid.SelectedItem is not PastelThemeOption opt) return;
+        if (_syncing || AccentGroup.SelectedItem is not PastelThemeOption opt) return;
         Vm.SelectAccentThemeCommand.Execute(opt.Id);
     }
 

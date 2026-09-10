@@ -55,7 +55,17 @@ public partial class App : Application
         // Force the settings service up now: its ctor migrates MAUI preferences and wires
         // DatabaseConstants' saved-directory hooks, both of which must be in place before the
         // first DB access (PrBoardPage load).
-        Services.GetRequiredService<ISettingsService>();
+        var settings = Services.GetRequiredService<ISettingsService>();
+
+        // App-level theme is the only one that reaches the NavigationView pane and popups;
+        // element-level RequestedTheme (WinUiAppHost) does not, and left the light-mode tab
+        // bar dark. Set it here, before any window - "System" just follows the OS.
+        RequestedTheme = settings.AppTheme switch
+        {
+            "Light" => ApplicationTheme.Light,
+            "Dark" => ApplicationTheme.Dark,
+            _ => RequestedTheme,
+        };
     }
 
     private Window? _window;

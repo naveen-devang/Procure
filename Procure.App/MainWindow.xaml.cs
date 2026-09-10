@@ -47,10 +47,29 @@ public sealed partial class MainWindow : Window
             _lastLoadMs = ms;
         });
 
-        _shell.ThemeChanged += (_, _) => RefreshThemeState();
+        _shell.ThemeChanged += (_, _) => { ApplyRootTheme(); RefreshThemeState(); };
         Activated += OnFirstActivated;
         CompositionTarget.Rendering += OnRendering;
+
+        // Set the theme BEFORE first render. NavigationView does not re-theme its pane
+        // reliably once it has loaded, so a saved "Light" applied later (OnFirstActivated)
+        // left the tab bar dark. Also pin it on Nav itself, which is more reliable than
+        // letting it inherit.
+        ApplyRootTheme();
+
         NavigateTo(AppRoute.Board, null);
+    }
+
+    private void ApplyRootTheme()
+    {
+        var t = _settings.AppTheme switch
+        {
+            "Light" => ElementTheme.Light,
+            "Dark" => ElementTheme.Dark,
+            _ => ElementTheme.Default,
+        };
+        if (Content is FrameworkElement root && root.RequestedTheme != t) root.RequestedTheme = t;
+        if (Nav.RequestedTheme != t) Nav.RequestedTheme = t;
     }
 
     private bool _themeApplied;
