@@ -54,7 +54,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="1. Select Suppliers to Compare" Style="{StaticResource H}" />
-                                    <Border Grid.Column="1" Padding="8,2" CornerRadius="4" BorderThickness="1"
+                                    <Border Grid.Column="1" Padding="8,2" CornerRadius="999" BorderThickness="1"
                                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
                                         <TextBlock Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                     </Border>
