@@ -23,8 +23,66 @@ public sealed class JsonSettingsService : ISettingsService
         {
             if (File.Exists(_path))
                 _values = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_path)) ?? new();
+            else
+                MigrateFromMauiPreferences();   // one-time, only before settings.json first exists
         }
         catch { /* corrupt file -> defaults */ }
+
+        // The custom database directory was a MAUI Preference; back it with settings.json now.
+        Procure.Data.DatabaseConstants.SavedDirectoryReader = () =>
+            _values.TryGetValue(nameof(DatabaseDirectory), out var d) && !string.IsNullOrWhiteSpace(d) ? d : null;
+        Procure.Data.DatabaseConstants.SavedDirectoryWriter = v => Set(nameof(DatabaseDirectory), v);
+    }
+
+    // MAUI stored settings via Preferences, which on unpackaged Windows is this JSON file:
+    //   %LOCALAPPDATA%\User Name\com.companyname.procure\Settings\preferences.dat  ->  {"":{ "<key>": "<string>" }}
+    // On a colleague's first launch of the WinUI build, carry those forward so their theme,
+    // accent, currency, tab toggles, approval roles and custom DB path don't silently reset.
+    private void MigrateFromMauiPreferences()
+    {
+        var dat = Path.Combine(AppPaths.AppData, "..", "Settings", "preferences.dat");
+        if (!File.Exists(dat)) return;
+
+        Dictionary<string, string> old;
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(dat));
+            if (!doc.RootElement.TryGetProperty("", out var bucket)) return;
+            old = new();
+            foreach (var p in bucket.EnumerateObject())
+                if (p.Value.ValueKind == JsonValueKind.String) old[p.Name] = p.Value.GetString()!;
+        }
+        catch { return; }
+
+        string? V(string k) => old.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+        void Copy(string mauiKey, string jsonKey, Func<string, string>? map = null)
+        {
+            if (V(mauiKey) is { } v) _values[jsonKey] = map is null ? v : map(v);
+        }
+        string Lower(string s) => s.Trim().ToLowerInvariant();     // MAUI writes bools as "True"/"False"
+
+        Copy("Procure_AppTheme", nameof(AppTheme));
+        Copy("Procure_AccentTheme", nameof(AccentTheme));
+        Copy("Procure_DefaultCurrency", nameof(DefaultCurrency));
+        Copy("Procure_UrgentDays", nameof(UrgentOverdueDays));
+        Copy("Procure_NormalDays", nameof(NormalOverdueDays));
+        Copy("Procure_IsSidebarCompact", nameof(IsSidebarCompact), Lower);
+        Copy("Procure_SidebarCompact", nameof(IsSidebarCompact), Lower);   // older key name, if the newer is absent
+        Copy("Procure_AutoCollapseOnNarrow", nameof(AutoCollapseSidebarOnNarrow), Lower);
+        Copy("Procure_RawPackingTabEnabled", nameof(IsRawPackingTabEnabled), Lower);
+        Copy("Procure_AutoCheckUpdates", nameof(AutoCheckUpdatesOnStartup), Lower);
+        Copy("Procure_DefaultApprovalRoles", "DefaultApprovalRoles",
+             v => string.Join('|', v.Split("|||", StringSplitOptions.RemoveEmptyEntries)));
+        Copy("CustomDatabaseDirectory", nameof(DatabaseDirectory));
+
+        if (_values.Count == 0) return;
+        try { File.WriteAllText(_path, JsonSerializer.Serialize(_values)); } catch { }
+
+        // Keyboard shortcut overrides lived under the same Preferences store.
+        if (V("Procure_KeyboardShortcutOverrides") is { } ko && ko.Trim() is not ("" or "{}"))
+        {
+            try { File.WriteAllText(Path.Combine(AppPaths.AppData, "keyboard-shortcuts.json"), ko); } catch { }
+        }
     }
 
     public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;

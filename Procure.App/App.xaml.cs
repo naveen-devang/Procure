@@ -51,6 +51,11 @@ public partial class App : Application
 
         SQLitePCL.Batteries_V2.Init();
         Services = BuildServices();
+
+        // Force the settings service up now: its ctor migrates MAUI preferences and wires
+        // DatabaseConstants' saved-directory hooks, both of which must be in place before the
+        // first DB access (PrBoardPage load).
+        Services.GetRequiredService<ISettingsService>();
     }
 
     private Window? _window;
