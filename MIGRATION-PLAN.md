@@ -208,12 +208,32 @@ low-risk and independently valuable even if the port is paused after it.
   `NavigationView` shell (7 tabs) + perf HUD, `PrBoardPage` drives the real
   `PrListPageModel` from DI against the 20k DB — renders real cards, user confirmed.
   6 tabs are `StubPage`; placeholder services for updates/exports/shortcuts.
-- **Next Phase 2:** (1) theme dictionaries — port `Resources/Styles/*.xaml`,
-  ~960 `AppThemeBinding` → ~65 `ThemeResource` brushes; (2) real board XAML
-  (`Pages/PrListPage.xaml`, 753 lines); (3) the other 6 pages; (4) 13 modals →
-  `ContentDialog`; (5) port the app-side service impls, replacing
-  `Procure.App/Platform/PlaceholderServices.cs`. Then §5 data migration + dogfood.
-- **Also outstanding:** ship Phase 1 as a no-op refactor release (tag).
+- **Phase 2 — done.** All 6 pages + `PrDetailPanel` + all 11 modals ported native.
+  Theme dictionaries (`Themes/AppColors.xaml`), converters, accent picker. App-side
+  services all real (`UpdateService`/`PcrExportService`/`CsvExportService`/
+  `WinUiKeyboardShortcutService`; pure exporters moved to `Procure.Core`). Perf:
+  board revisit 7 ms/144 fps, scroll 144 fps (MAUI was ~25 fps); pages are DI
+  singletons. Theme switches live (incl. NavigationView pane + card tags).
+  Modals close on Esc + backdrop. MAUI settings migrate on first WinUI launch
+  (`preferences.dat` → `settings.json`). PcrPreview render path verified headless.
+
+- **Phase 6 — cutover, NOT started. What it needs:**
+  1. `Procure.App.csproj`: add `<AssemblyName>Procure</AssemblyName>` so the exe is
+     `Procure.exe` (matches the MAUI releases + `vpk pack -e Procure.exe`), so an
+     installed MAUI copy updates *in place* instead of installing alongside.
+  2. Rewrite `.github/workflows/release.yml`: point the Publish step at
+     `Procure.App/Procure.App.csproj` (keep the same self-contained flags).
+     **Verified 2026-09-10:** `dotnet publish` on `Procure.App` does NOT hit the
+     WMC9999 XAML-compiler crash (that's a `dotnet build` incremental-Debug issue
+     only) — 222 MB self-contained folder, exe runs clean. So the CI step needs no
+     MSBuild call, just the project path change + drop the WindowsAppSDK-bump step's
+     `Procure.csproj` reference.
+  3. Keep `vpk pack -u Procure -e Procure.exe` unchanged; verify the in-place update
+     from the last MAUI release (v1.0.25) → v2.0.0 on a real installed copy
+     (§5 Risk 2) before tagging for real.
+  4. Move MAUI code to a `maui-legacy` branch; delete `Procure.csproj` from `main`.
+  5. Dogfood a week on 2-3 machines first (§5, Phase 5).
+- **Also outstanding:** ship Phase 1 as a no-op refactor release (tag) — independent.
 
 ### Build commands
 
