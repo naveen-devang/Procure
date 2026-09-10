@@ -19,10 +19,23 @@
             Background="{ThemeResource AppBackground}"
             SelectionChanged="Nav_SelectionChanged">
             <muxc:NavigationView.Resources>
-                <!-- Kill the acrylic pane fills (transparent on an unpackaged build); solid surface. -->
-                <StaticResource x:Key="NavigationViewDefaultPaneBackground" ResourceKey="AppBackground" />
-                <StaticResource x:Key="NavigationViewExpandedPaneBackground" ResourceKey="AppBackground" />
-                <StaticResource x:Key="NavigationViewTopPaneBackground" ResourceKey="AppBackground" />
+                <!-- Replace the acrylic pane fills (transparent on an unpackaged build) with a
+                     solid surface. Theme-keyed so it re-resolves live when RequestedTheme flips -
+                     a plain StaticResource froze the pane to its launch-time colour. -->
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#F3F3F3" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F3F3F3" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#F3F3F3" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#202020" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#202020" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#202020" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
             </muxc:NavigationView.Resources>
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard">
