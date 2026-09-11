@@ -81,11 +81,11 @@ public sealed partial class PrBoardPage : Page
         SearchBox.Text = Vm.SearchText;
         // ComboBox items + selection set from code: the XAML {Binding ItemsSource} + SelectedItem
         // combo never established a visible selection in the port ("blank until you re-pick").
-        if (StatusFilterBox.ItemsSource is null)
-        {
-            StatusFilterBox.ItemsSource = Vm.StatusFilterOptions;
-            StatusFilterBox.SelectedItem = Vm.SelectedStatusFilter;
-        }
+        // Re-set every time Loaded fires (not just the first time) - this page is a DI singleton,
+        // so Loaded refires on every nav back to the board, and the ComboBox's displayed content
+        // goes blank on that revisit if it isn't nudged again.
+        StatusFilterBox.ItemsSource = Vm.StatusFilterOptions;
+        StatusFilterBox.SelectedItem = Vm.SelectedStatusFilter;
 
         if (!_loaded)
         {
