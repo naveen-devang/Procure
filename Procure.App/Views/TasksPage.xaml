@@ -229,7 +229,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="NewTaskBox" PlaceholderText="Add a task" FontSize="13.5"
+                            <TextBox x:Name="NewTaskBox" PlaceholderText="Add a task" FontSize="13.5" Height="36"
                                      GotFocus="Composer_GotFocus" KeyDown="NewTask_KeyDown"
                                      Text="{Binding NewTaskTitle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#xE70D;" FontSize="11"
@@ -278,7 +278,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" Margin="0,6,0,0" />
-                                <TextBox Grid.Column="1" PlaceholderText="Optional notes" FontSize="12.5"
+                                <TextBox Grid.Column="1" PlaceholderText="Optional notes" FontSize="12.5" Height="36"
                                          Text="{Binding NewTaskNotes, Mode=TwoWay}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
