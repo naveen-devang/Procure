@@ -456,7 +456,7 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Padding="5,1" CornerRadius="999" Background="{ThemeResource AppSubtleFill}" VerticalAlignment="Center">
+                                        <Border Padding="5,1" CornerRadius="9" MinWidth="40" Background="{ThemeResource AppSubtleFill}" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Type}" FontSize="9" Foreground="{ThemeResource AppTextTertiary}" />
                                         </Border>
                                         <TextBlock Grid.Column="1" Text="{x:Bind Label}" FontSize="11.5" VerticalAlignment="Center"

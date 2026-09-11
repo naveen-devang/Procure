@@ -237,7 +237,7 @@
                                                VerticalAlignment="Center"
                                                Foreground="{x:Bind TotalPoValue, Converter={StaticResource PoPillText}, Mode=OneWay}" />
                                     <Button Content="{x:Bind Status, Mode=OneWay}" Click="Status_Click" Tapped="Child_Tapped"
-                                            FontSize="11.5" FontWeight="SemiBold" Height="28" Padding="12,0" CornerRadius="999"
+                                            FontSize="11.5" FontWeight="SemiBold" Height="28" Padding="12,0" CornerRadius="14" MinWidth="56"
                                             BorderThickness="0" VerticalAlignment="Center"
                                             Background="{x:Bind Status, Converter={StaticResource StatusBg}, Mode=OneWay}"
                                             Foreground="{x:Bind Status, Converter={StaticResource StatusColor}, Mode=OneWay}" />

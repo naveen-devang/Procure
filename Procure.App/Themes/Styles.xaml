@@ -44,9 +44,12 @@
         <Setter Property="Padding" Value="16" />
     </Style>
 
-    <!-- Capsule status / type / count label. Pair with BadgeText. -->
+    <!-- Capsule status / type / count label. Pair with BadgeText. A fixed radius + MinWidth,
+         not 999 - 999 on a near-square short-text box draws as a literal ellipse, not a pill
+         (confirmed by zooming a rendered "Capex" badge). -->
     <Style x:Key="Badge" TargetType="Border">
-        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="MinWidth" Value="50" />
         <Setter Property="Padding" Value="9,2,9,3" />
         <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -59,10 +62,10 @@
 
     <!-- Board filter toggles - pill geometry; on/off colour stays converter-driven at the call site. -->
     <Style x:Key="FilterChip" TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
-        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Height" Value="36" />
         <Setter Property="Padding" Value="14,0" />
-        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinWidth" Value="70" />
         <Setter Property="FontSize" Value="12" />
     </Style>
 
