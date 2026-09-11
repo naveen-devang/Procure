@@ -193,10 +193,12 @@
                                         <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="13"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                         <Border Visibility="{x:Bind PrType, Converter={StaticResource NullOrEmptyVis}}"
-                                                Padding="9,2" CornerRadius="999" BorderThickness="1" VerticalAlignment="Center"
+                                                Padding="10,3" CornerRadius="10" BorderThickness="1" VerticalAlignment="Center"
+                                                MinWidth="60" HorizontalAlignment="Left"
                                                 Background="{x:Bind PrType, Converter={StaticResource PrTypeBg}}"
                                                 BorderBrush="{x:Bind PrType, Converter={StaticResource PrTypeBorder}}">
                                             <TextBlock Text="{x:Bind PrType}" FontSize="9.5" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
                                                        Foreground="{x:Bind PrType, Converter={StaticResource PrTypeColor}}" />
                                         </Border>
                                     </StackPanel>
