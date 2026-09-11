@@ -63,15 +63,15 @@
                     <TextBlock Text="&#xE895;" FontFamily="Segoe Fluent Icons" FontSize="10" VerticalAlignment="Center"
                                Foreground="{ThemeResource AppTextTertiary}"
                                Visibility="{x:Bind HasRecurrence, Converter={StaticResource BoolVis}, Mode=OneWay}" />
-                    <Border Padding="7,3" CornerRadius="9" BorderThickness="1" VerticalAlignment="Center"
-                            BorderBrush="{ThemeResource PrimaryTextBrush}"
+                    <Border Padding="7,3" CornerRadius="9" BorderThickness="0" VerticalAlignment="Center"
+                            Background="{ThemeResource AppSubtleFill}"
                             Visibility="{x:Bind HasLinks, Converter={StaticResource BoolVis}, Mode=OneWay}"
                             Tapped="Link_Tapped">
                         <TextBlock Text="{x:Bind LinksBadge, Mode=OneWay}" FontSize="10"
                                    Foreground="{ThemeResource PrimaryTextBrush}" />
                     </Border>
-                    <Border Padding="7,3" CornerRadius="9" BorderThickness="1" VerticalAlignment="Center"
-                            BorderBrush="{ThemeResource AppHairline}"
+                    <Border Padding="7,3" CornerRadius="9" BorderThickness="0" VerticalAlignment="Center"
+                            Background="{ThemeResource AppSubtleFill}"
                             Visibility="{x:Bind HasDueDate, Converter={StaticResource BoolVis}, Mode=OneWay}">
                         <TextBlock Text="{x:Bind DueLabel, Mode=OneWay}" FontSize="10.5"
                                    Foreground="{x:Bind IsOverdue, Converter={StaticResource OverdueColor}, Mode=OneWay}" />
@@ -451,8 +451,8 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Padding="9,5" CornerRadius="9" BorderThickness="1" HorizontalAlignment="Left"
-                                            BorderBrush="{ThemeResource PrimaryTextBrush}">
+                                    <Border Padding="9,5" CornerRadius="9" BorderThickness="0" HorizontalAlignment="Left"
+                                            Background="{ThemeResource AppSubtleFill}">
                                         <TextBlock Text="{x:Bind Label}" FontSize="11" Foreground="{ThemeResource PrimaryTextBrush}" />
                                     </Border>
                                     <Button Grid.Column="1" Content="Unlink" FontSize="11" Height="30" Background="Transparent"

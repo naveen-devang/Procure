@@ -216,7 +216,7 @@
                                         <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="13"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                         <Border Visibility="{x:Bind PrType, Converter={StaticResource NullOrEmptyVis}}"
-                                                Padding="10,3" CornerRadius="10" BorderThickness="1" VerticalAlignment="Center"
+                                                Padding="10,3" CornerRadius="10" BorderThickness="0" VerticalAlignment="Center"
                                                 MinWidth="60" HorizontalAlignment="Left"
                                                 Background="{x:Bind PrType, Converter={StaticResource PrTypeBg}}"
                                                 BorderBrush="{x:Bind PrType, Converter={StaticResource PrTypeBorder}}">
@@ -327,7 +327,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Text="{Binding ExpandedPr.PrNo}" FontSize="18" FontWeight="SemiBold"
                                        Foreground="{ThemeResource AppTextPrimary}" />
-                            <Border Padding="10,3,10,5" CornerRadius="10" MinWidth="60" BorderThickness="1"
+                            <Border Padding="10,3,10,5" CornerRadius="10" MinWidth="60" BorderThickness="0"
                                     VerticalAlignment="Center" HorizontalAlignment="Left"
                                     Visibility="{Binding ExpandedPr.PrType, Converter={StaticResource NullOrEmptyVis}}"
                                     Background="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBg}}"

@@ -146,8 +146,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:NoteLink">
-                                <Border Margin="0,0,6,4" Padding="8,3" CornerRadius="9" BorderThickness="1"
-                                        BorderBrush="{ThemeResource PrimaryTextBrush}">
+                                <Border Margin="0,0,6,4" Padding="8,3" CornerRadius="9" BorderThickness="0"
+                                        Background="{ThemeResource AppSubtleFill}">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="{x:Bind Label}" FontSize="10.5" Foreground="{ThemeResource PrimaryTextBrush}"
                                                    Tapped="LinkOpen_Tapped" />

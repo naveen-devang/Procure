@@ -119,7 +119,7 @@
                             <TextBlock Text="1. RFQs &amp; Vendor Quotes" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
                             <Button Grid.Column="1" Content="+ Add RFQ" FontSize="11" Height="28" Padding="10,0" Click="AddRfq_Click"
                                     Background="{ThemeResource FluentTealBg}" Foreground="{ThemeResource FluentTeal}"
-                                    BorderBrush="{ThemeResource BadgeSharedRfqBorder}" BorderThickness="1" />
+                                    BorderBrush="{ThemeResource BadgeSharedRfqBorder}" BorderThickness="0" />
                         </Grid>
                         <ItemsControl ItemsSource="{Binding Rfqs}">
                             <ItemsControl.ItemTemplate>
@@ -140,7 +140,7 @@
                                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                                         <TextBlock Text="{x:Bind RfqNo}" FontSize="11"
                                                                    Foreground="{ThemeResource AppTextTertiary}" />
-                                                        <Border Padding="5,1.5" CornerRadius="9" MinWidth="40" BorderThickness="1"
+                                                        <Border Padding="5,1.5" CornerRadius="9" MinWidth="40" BorderThickness="0"
                                                                 BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
                                                                 Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}">
                                                             <TextBlock Text="{x:Bind SharedPrs, Converter={StaticResource Fmt}, ConverterParameter='Shared ({0})'}"
@@ -242,7 +242,7 @@
                             <TextBlock Text="2. PCR &amp; Approvals" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
                             <!-- Asymmetric bottom padding + explicit centering, same as the other
                                  badges: Plus Jakarta Sans sits text high in a tight pill otherwise. -->
-                            <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="1"
+                            <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="0"
                                     VerticalAlignment="Center"
                                     BorderBrush="{ThemeResource PillBorder}" Background="{ThemeResource PillBg}"
                                     Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
@@ -361,7 +361,7 @@
                                 <TextBlock Text="3. Purchase Orders" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Content="+ Add PO" FontSize="11" Height="28" Padding="10,0" Click="AddPo_Click"
                                         Background="{ThemeResource FluentSuccessBg}" Foreground="{ThemeResource FluentSuccess}"
-                                        BorderBrush="{ThemeResource BadgeCombinedPoBorder}" BorderThickness="1" />
+                                        BorderBrush="{ThemeResource BadgeCombinedPoBorder}" BorderThickness="0" />
                             </Grid>
                             <Border Style="{StaticResource Chip}" HorizontalAlignment="Left"
                                     Visibility="{Binding HasItems, Converter={StaticResource BoolVis}}"
@@ -387,7 +387,7 @@
                                             </Grid.RowDefinitions>
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                 <TextBlock Text="{x:Bind PoNo}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
-                                                <Border Padding="5,1" CornerRadius="9" MinWidth="40" BorderThickness="1"
+                                                <Border Padding="5,1" CornerRadius="9" MinWidth="40" BorderThickness="0"
                                                         BorderBrush="{ThemeResource BadgeCombinedPoBorder}" Background="{ThemeResource BadgeCombinedPoBg}"
                                                         Visibility="{x:Bind IsCombinedPo, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="{x:Bind CombinedPrs, Converter={StaticResource Fmt}, ConverterParameter='Combined ({0})'}"
