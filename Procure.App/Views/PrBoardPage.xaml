@@ -205,20 +205,29 @@
                                     <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontSize="12.5"
                                                Foreground="{ThemeResource AppTextPrimary}"
                                                MaxLines="1" TextTrimming="CharacterEllipsis" />
-                                    <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}" VerticalAlignment="Center">
                                             <Run Text="{x:Bind Requestor}" />
                                             <Run Text="·" />
                                             <Run Text="{x:Bind Plant}" Foreground="{ThemeResource PrimaryTextBrush}" />
                                         </TextBlock>
-                                        <TextBlock Text="{x:Bind ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items', Mode=OneWay}"
-                                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}"
-                                                   Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}" />
-                                        <TextBlock Text="{x:Bind RfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} RFQ', Mode=OneWay}"
-                                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
-                                        <TextBlock Text="{x:Bind PcrStatusDisplay, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}, Mode=OneWay}" />
-                                        <TextBlock Text="{x:Bind AgeDisplay}" FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
+                                        <Border Style="{StaticResource PillChip}"
+                                                Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                            <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}"
+                                                       Text="{x:Bind ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items', Mode=OneWay}" />
+                                        </Border>
+                                        <Border Style="{StaticResource PillChip}">
+                                            <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource PillTextNeutral}"
+                                                       Text="{x:Bind RfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} RFQ', Mode=OneWay}" />
+                                        </Border>
+                                        <Border Style="{StaticResource PillChip}">
+                                            <TextBlock Text="{x:Bind PcrStatusDisplay, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}, Mode=OneWay}" />
+                                        </Border>
+                                        <Border Style="{StaticResource PillChip}">
+                                            <TextBlock Text="{x:Bind AgeDisplay}" FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource AppTextTertiary}" />
+                                        </Border>
                                     </StackPanel>
                                 </StackPanel>
 
