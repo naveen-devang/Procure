@@ -53,12 +53,16 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
         </Style>
+        <!-- Fill only, no stroke. A 1px border in a saturated colour on a rounded rect whose
+             measured size is fractional (9.5px chip text, asymmetric padding) gets antialiased
+             across two physical pixels - solid on one edge, washed out on another, worst on the
+             corner arcs. That's the "half-rendered" look. The tinted fill already carries the
+             meaning, and it matches how every badge on the board is drawn. -->
         <Style x:Key="Chip" TargetType="Border">
             <Setter Property="Padding" Value="8,2,8,3" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="MinWidth" Value="40" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
         </Style>
         <Style x:Key="ChipText" TargetType="TextBlock">
@@ -429,9 +433,14 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource AppTextSecondary}" />
                         </Border>
-                        <Border Style="{StaticResource Chip}" Background="{ThemeResource FluentCautionBg}" BorderBrush="{ThemeResource FluentCaution}"
+                        <!-- Same muted amber as the per-line "Unordered / Pending" tags, not raw
+                             FluentCaution (#FCE100 in dark - a near-fluorescent yellow). -->
+                        <Border Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                Background="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilBg}}"
                                 Visibility="{Binding HasPendingItemsSummary, Converter={StaticResource BoolVis}}">
-                            <TextBlock Text="{Binding PendingItemsSummaryText}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource FluentCaution}" />
+                            <TextBlock Text="{Binding PendingItemsSummaryText}" FontSize="10" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilColor}}" />
                         </Border>
                     </StackPanel>
                     <ItemsControl ItemsSource="{Binding Items}">
