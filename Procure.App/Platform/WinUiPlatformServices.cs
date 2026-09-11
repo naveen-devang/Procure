@@ -211,7 +211,27 @@ public sealed class WinUiAppHost : IAppHost
         var res = Microsoft.UI.Xaml.Application.Current.Resources;
         res["AccentFillBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(fill);
         res["PrimaryTextBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(primary);
+
+        // Repoint the Fluent accent brushes so AccentButtonStyle, ToggleButton-checked,
+        // NavigationView selection etc. use the app's pastel accent instead of the bright
+        // Windows system accent. 'primary' pairs with TextOnAccentFillColorPrimaryBrush
+        // (white in light, near-black in dark) - deep accent in light, pastel in dark.
+        Microsoft.UI.Xaml.Media.SolidColorBrush B(Windows.UI.Color c) => new(c);
+        res["AccentFillColorDefaultBrush"] = B(primary);
+        res["AccentFillColorSecondaryBrush"] = B(WithAlpha(primary, 0.90));
+        res["AccentFillColorTertiaryBrush"] = B(WithAlpha(primary, 0.80));
+        // AccentButtonStyle resolves these at style-load from generic.xaml, so the
+        // AccentFillColor* swap above doesn't reach it - set them directly too.
+        res["AccentButtonBackground"] = B(primary);
+        res["AccentButtonBackgroundPointerOver"] = B(WithAlpha(primary, 0.90));
+        res["AccentButtonBackgroundPressed"] = B(WithAlpha(primary, 0.80));
+        res["AccentButtonBorderBrush"] = B(primary);
+        res["AccentButtonBorderBrushPointerOver"] = B(WithAlpha(primary, 0.90));
+        res["AccentButtonBorderBrushPressed"] = B(WithAlpha(primary, 0.80));
     }
+
+    private static Windows.UI.Color WithAlpha(Windows.UI.Color c, double a) =>
+        Windows.UI.Color.FromArgb((byte)(a * 255), c.R, c.G, c.B);
 
     private static Windows.UI.Color ParseHex(string hex)
     {

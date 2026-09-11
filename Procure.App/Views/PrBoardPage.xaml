@@ -34,7 +34,7 @@
             <Setter Property="Background" Value="{ThemeResource PillBg}" />
             <Setter Property="BorderBrush" Value="{ThemeResource PillBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -94,20 +94,11 @@
                       SelectionChanged="StatusFilter_SelectionChanged" />
 
             <ToggleButton Grid.Column="2" Style="{StaticResource FilterChip}" Content="Overdue SLA"
-                          IsChecked="{Binding FilterOverdueOnly, Mode=TwoWay}"
-                          Background="{Binding FilterOverdueOnly, Converter={StaticResource ChipBg}}"
-                          BorderBrush="{Binding FilterOverdueOnly, Converter={StaticResource ChipStroke}}"
-                          Foreground="{Binding FilterOverdueOnly, Converter={StaticResource ChipText}}" />
+                          IsChecked="{Binding FilterOverdueOnly, Mode=TwoWay}" />
             <ToggleButton Grid.Column="3" Style="{StaticResource FilterChip}" Content="PCR Awaiting Sign"
-                          IsChecked="{Binding FilterPcrPendingOnly, Mode=TwoWay}"
-                          Background="{Binding FilterPcrPendingOnly, Converter={StaticResource ChipBg}}"
-                          BorderBrush="{Binding FilterPcrPendingOnly, Converter={StaticResource ChipStroke}}"
-                          Foreground="{Binding FilterPcrPendingOnly, Converter={StaticResource ChipText}}" />
+                          IsChecked="{Binding FilterPcrPendingOnly, Mode=TwoWay}" />
             <ToggleButton Grid.Column="4" Style="{StaticResource FilterChip}" Content="Urgent Only"
-                          IsChecked="{Binding FilterUrgentOnly, Mode=TwoWay}"
-                          Background="{Binding FilterUrgentOnly, Converter={StaticResource ChipBg}}"
-                          BorderBrush="{Binding FilterUrgentOnly, Converter={StaticResource ChipStroke}}"
-                          Foreground="{Binding FilterUrgentOnly, Converter={StaticResource ChipText}}" />
+                          IsChecked="{Binding FilterUrgentOnly, Mode=TwoWay}" />
         </Grid>
 
         <!-- Batch action bar -->
