@@ -5,7 +5,9 @@
 
     <!--
       The shared design layer the MAUI head had and the WinUI port lost. Merged into App.xaml
-      after AppColors.xaml. Fluent geometry: 4px control / 8px card / pill badge; 4/8/12/16 spacing.
+      after AppColors.xaml. Redesign (Sep 2026, approved direction: docs/procure-redesign
+      artifact): Notion/Vercel-ish - airy shell, dense board data, warm neutrals, Plus Jakarta
+      Sans for UI text (Segoe Fluent Icons untouched for glyphs).
     -->
 
     <x:Double x:Key="SpaceXs">4</x:Double>
@@ -13,14 +15,32 @@
     <x:Double x:Key="SpaceMd">12</x:Double>
     <x:Double x:Key="SpaceLg">16</x:Double>
     <x:Double x:Key="SpaceXl">24</x:Double>
+    <x:Double x:Key="Space2xl">32</x:Double>
     <x:Double x:Key="ControlHeightStd">36</x:Double>
+
+    <!-- Fluent geometry override: default is 4/8, softened to 6/10 for the calmer feel. -->
+    <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
+
+    <!-- UI font. Segoe UI Variable read thin/stick-like at UI weights; Plus Jakarta Sans
+         (SIL OFL, variable weight, bundled in Assets/Fonts) has more presence and pairs with
+         the Notion/Vercel direction. Icon glyphs (Segoe Fluent Icons) are untouched - see
+         IconButton below. -->
+    <FontFamily x:Key="AppFontFamily">ms-appx:///Assets/Fonts/PlusJakartaSans-Variable.ttf#Plus Jakarta Sans</FontFamily>
+    <FontFamily x:Key="ContentControlThemeFontFamily">ms-appx:///Assets/Fonts/PlusJakartaSans-Variable.ttf#Plus Jakarta Sans</FontFamily>
+
+    <!-- Applies to every plain TextBlock app-wide (Controls pick up ContentControlThemeFontFamily
+         above on their own). -->
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    </Style>
 
     <!-- Content container: board card, detail columns, modal sections, dashboard tiles, settings panes. -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
         <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="16" />
     </Style>
 

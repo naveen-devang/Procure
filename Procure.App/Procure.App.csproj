@@ -44,4 +44,12 @@
     <ProjectReference Include="..\Procure.Core\Procure.Core.csproj" />
   </ItemGroup>
 
+  <!-- UI font (redesign, Sep 2026): Plus Jakarta Sans, variable weight, referenced via
+       ms-appx:///Assets/Fonts/... in App.xaml. Segoe Fluent Icons stays untouched for glyphs. -->
+  <ItemGroup>
+    <Content Include="Assets\Fonts\*.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
