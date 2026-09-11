@@ -94,14 +94,14 @@
                 </Grid>
             </Border>
 
-            <!-- Not three equal columns: PCR carries a fixed 212px date stack per approval row, so
-                 at equal widths the role name and its status are the first things to clip. POs are
-                 the least dense of the three and can give the space up. -->
+            <!-- Not three equal columns. RFQ cards are the densest (vendor, status, actions, total,
+                 breakdown and up to ~10 term chips) so they get the most. PCR needs enough for a
+                 role name beside its fixed 212px date stack and no more. POs are the lightest. -->
             <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="1.35*" />
-                    <ColumnDefinition Width="0.9*" />
+                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="0.85*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- COLUMN 1: RFQs -->
@@ -121,50 +121,56 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:RequestForQuotation">
                                     <Border Style="{StaticResource ItemCard}" Padding="14,12">
-                                        <StackPanel Spacing="8">
-                                            <Grid>
+                                        <StackPanel Spacing="10">
+                                            <!-- Vendor, its quote status, and the row actions on one line:
+                                                 the status belongs next to the vendor it describes. -->
+                                            <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{x:Bind Vendor}" FontWeight="SemiBold" FontSize="13.5"
-                                                           TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Vendor}" FontWeight="SemiBold" FontSize="13.5"
+                                                               TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{x:Bind RfqNo}" FontSize="11"
+                                                                   Foreground="{ThemeResource AppTextTertiary}" />
+                                                        <Border Padding="5,1.5" CornerRadius="9" MinWidth="40" BorderThickness="1"
+                                                                BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
+                                                                Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{x:Bind SharedPrs, Converter={StaticResource Fmt}, ConverterParameter='Shared ({0})'}"
+                                                                       FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                                       Foreground="{ThemeResource BadgeSharedRfqText}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="{x:Bind Status}" Click="RfqStatus_Click"
+                                                        FontSize="10.5" Height="24" Padding="10,0" CornerRadius="12" MinWidth="48"
+                                                        VerticalAlignment="Center"
+                                                        Background="{ThemeResource AppSubtleFill}" Foreground="{ThemeResource AppTextPrimary}" />
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                                     <Button Style="{StaticResource IconBtn}" Content="&#xE748;" Click="SplitRfq_Click"
+                                                            ToolTipService.ToolTip="Split shared RFQ"
                                                             Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}" />
-                                                    <Button Style="{StaticResource IconBtn}" Content="&#xE70F;" Click="EditRfq_Click" />
+                                                    <Button Style="{StaticResource IconBtn}" Content="&#xE70F;" Click="EditRfq_Click"
+                                                            ToolTipService.ToolTip="Edit RFQ" />
                                                     <Button Style="{StaticResource IconBtn}" Content="&#xE74D;" Click="DeleteRfq_Click"
+                                                            ToolTipService.ToolTip="Delete RFQ"
                                                             Foreground="{ThemeResource FluentCritical}" />
                                                 </StackPanel>
                                             </Grid>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                    <TextBlock Text="{x:Bind RfqNo}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
-                                                    <Border Padding="5,1.5" CornerRadius="9" MinWidth="40" BorderThickness="1"
-                                                            BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
-                                                            Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}">
-                                                        <TextBlock Text="{x:Bind SharedPrs, Converter={StaticResource Fmt}, ConverterParameter='Shared ({0})'}"
-                                                                   FontSize="9" FontWeight="SemiBold" Foreground="{ThemeResource BadgeSharedRfqText}" />
-                                                    </Border>
-                                                </StackPanel>
-                                                <Button Grid.Column="1" Content="{x:Bind Status}" Click="RfqStatus_Click"
-                                                        FontSize="10.5" Height="24" Padding="8,0" CornerRadius="12" MinWidth="48"
-                                                        Background="{ThemeResource AppSubtleFill}" Foreground="{ThemeResource AppTextPrimary}" />
-                                            </Grid>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{x:Bind FinancialBreakdownSummary}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
-                                                <TextBlock Grid.Column="1" Text="{x:Bind FormattedDisplayAmount}" FontSize="13.5" FontWeight="SemiBold"
+
+                                            <!-- Total first, breakdown as a caption under it. Side by side these two
+                                                 collided - the breakdown has no natural length limit. -->
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="{x:Bind FormattedDisplayAmount}" FontSize="16" FontWeight="SemiBold"
                                                            Foreground="{ThemeResource AppTextPrimary}" />
-                                            </Grid>
-                                            <views:WrapPanel>
+                                                <TextBlock Text="{x:Bind FinancialBreakdownSummary}" FontSize="11" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource AppTextTertiary}" />
+                                            </StackPanel>
+
+                                            <views:WrapPanel HorizontalSpacing="6" VerticalSpacing="6">
                                                 <Border Style="{StaticResource Chip}" BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
                                                         Visibility="{x:Bind HasQuoteCompletenessBadge, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="{x:Bind QuoteCompletenessBadge}" Style="{StaticResource ChipText}" Foreground="{ThemeResource BadgeSharedRfqText}" />
@@ -258,7 +264,10 @@
                                                     <TextBlock Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
                                                                Foreground="{x:Bind StatusText, Converter={StaticResource ApprovalColor}, Mode=OneWay}" />
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="1" Spacing="4" Width="212" VerticalAlignment="Center">
+                                                <!-- 186 is the tightest that still fits "Sep 27, 2025" + the picker's
+                                                     calendar glyph + the clear button; the rest of the column goes to
+                                                     the role name and its status line. -->
+                                                <StackPanel Grid.Column="1" Spacing="4" Width="186" VerticalAlignment="Center">
                                                     <Grid ColumnSpacing="4" Visibility="{x:Bind RequiresMultipleDates, Converter={StaticResource BoolVis}}">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="34" />
