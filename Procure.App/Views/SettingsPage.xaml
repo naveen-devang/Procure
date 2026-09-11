@@ -96,9 +96,11 @@
                             <TextBlock Text="Pastel Accent Theme Palette" Style="{StaticResource RowTitle}" />
                             <TextBlock Style="{StaticResource RowHint}"
                                        Text="Choose your accent highlight color for buttons, badges, and status indicators across the entire app." />
-                            <!-- swatch tiles: the pastel fill IS the control; the GridView selection
-                                 ring marks the current choice. MinWidth (not fixed Width) so long
-                                 names ("Pastel Crimson") don't clip. -->
+                            <!-- swatch tiles: the pastel fill IS the control. The stock GridViewItem
+                                 template paints a rounded *square* plate behind the selected item,
+                                 which reads as a stray box sitting behind a pill. Retemplated so the
+                                 container is nothing but a pill-shaped ring that lights up in the
+                                 live accent - the swatch highlights itself. -->
                             <GridView x:Name="AccentGrid" ItemsSource="{Binding AvailableAccentThemes}"
                                       SelectionMode="Single" IsItemClickEnabled="False"
                                       SelectionChanged="Accent_SelectionChanged">
@@ -106,14 +108,54 @@
                                     <Style TargetType="GridViewItem">
                                         <Setter Property="Margin" Value="0,0,8,8" />
                                         <Setter Property="Padding" Value="0" />
-                                        <Setter Property="CornerRadius" Value="8" />
+                                        <Setter Property="MinWidth" Value="0" />
+                                        <Setter Property="MinHeight" Value="0" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="GridViewItem">
+                                                    <Border x:Name="Ring" CornerRadius="24" Background="Transparent"
+                                                            BorderThickness="2" BorderBrush="Transparent">
+                                                        <VisualStateManager.VisualStateGroups>
+                                                            <VisualStateGroup x:Name="CommonStates">
+                                                                <VisualState x:Name="Normal" />
+                                                                <VisualState x:Name="PointerOver">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource AppControlBorder}" />
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                                <VisualState x:Name="Pressed">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource AppControlBorder}" />
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                                <VisualState x:Name="Selected">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                                <VisualState x:Name="PointerOverSelected">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                                <VisualState x:Name="PressedSelected">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                            </VisualStateGroup>
+                                                        </VisualStateManager.VisualStateGroups>
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
                                     </Style>
                                 </GridView.ItemContainerStyle>
                                 <GridView.ItemTemplate>
                                     <DataTemplate x:DataType="models:PastelThemeOption">
-                                        <Border Width="128" Height="40" Margin="3" CornerRadius="20" BorderThickness="1"
-                                                Background="{x:Bind BgHex, Converter={StaticResource HexBrush}}"
-                                                BorderBrush="{x:Bind DarkHex, Converter={StaticResource HexBrush}}">
+                                        <Border Width="128" Height="40" Margin="3" CornerRadius="20" BorderThickness="0"
+                                                Background="{x:Bind BgHex, Converter={StaticResource HexBrush}}">
                                             <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Foreground="{ThemeResource AppTextPrimary}" />
