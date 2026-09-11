@@ -3,7 +3,9 @@ using System.ComponentModel;
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.Extensions.DependencyInjection;
+using Windows.UI;
 using Procure.Models;
 using Procure.PageModels;
 
@@ -65,11 +67,32 @@ public sealed partial class SettingsPage : Page
     {
         _syncing = true;
         Rail.SelectedItem = Sections.FirstOrDefault(s => s.Key == Vm.SelectedSection) ?? Sections[0];
-        ThemeDark.IsChecked = Vm.SelectedThemeMode is "Dark" or "";
-        ThemeLight.IsChecked = Vm.SelectedThemeMode == "Light";
-        ThemeSystem.IsChecked = Vm.SelectedThemeMode == "System";
-        AccentGrid.SelectedItem = Vm.AvailableAccentThemes.FirstOrDefault(a => a.Id == Vm.SelectedAccentTheme);
+        PaintModeChips();
+        foreach (var a in Vm.AvailableAccentThemes) a.IsSelected = a.Id == Vm.SelectedAccentTheme;
         _syncing = false;
+    }
+
+    /// <summary>Repaints the three Color Mode pills. Runs on every theme *and* accent change, so
+    /// the lit pill always carries the live accent - a plain binding would go stale on an accent
+    /// switch, and a Checked visual state goes stale on a light/dark switch.</summary>
+    private void PaintModeChips()
+    {
+        var accent = (SolidColorBrush)Application.Current.Resources["PrimaryTextBrush"];
+        var c = accent.Color;
+        // Contrast picked from the accent itself, not from a theme brush: the theme dictionaries
+        // resolve against the app's theme, which is not yet the one this page is switching to.
+        var luma = (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0;
+        var onAccent = new SolidColorBrush(luma > 0.6 ? Color.FromArgb(255, 20, 20, 20) : Microsoft.UI.Colors.White);
+
+        void Paint(Border fill, TextBlock text, bool on)
+        {
+            if (on) { fill.Background = accent; text.Foreground = onAccent; }
+            else { fill.ClearValue(Border.BackgroundProperty); text.ClearValue(TextBlock.ForegroundProperty); }
+        }
+
+        Paint(DarkFill, DarkText, Vm.SelectedThemeMode is "Dark" or "");
+        Paint(LightFill, LightText, Vm.SelectedThemeMode == "Light");
+        Paint(SystemFill, SystemText, Vm.SelectedThemeMode == "System");
     }
 
     private void Rail_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -84,10 +107,10 @@ public sealed partial class SettingsPage : Page
         Vm.SelectThemeModeCommand.Execute(mode);   // SyncFromVm re-checks the right one
     }
 
-    private void Accent_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void Swatch_Click(object sender, RoutedEventArgs e)
     {
-        if (_syncing || AccentGrid.SelectedItem is not PastelThemeOption opt) return;
-        Vm.SelectAccentThemeCommand.Execute(opt.Id);
+        if (_syncing || sender is not FrameworkElement { Tag: string id }) return;
+        Vm.SelectAccentThemeCommand.Execute(id);   // SyncFromVm flips IsSelected on the list
     }
 
     private void StageUp_Click(object sender, RoutedEventArgs e)

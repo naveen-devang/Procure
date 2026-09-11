@@ -6,6 +6,7 @@
     xmlns:models="using:Procure.Models"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:conv="using:Procure.App.Converters"
+    xmlns:views="using:Procure.App.Views"
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
@@ -81,14 +82,38 @@
 
                         <StackPanel Spacing="8">
                             <TextBlock Text="Color Mode" Style="{StaticResource RowTitle}" />
-                            <!-- separate pill toggles, not a joined segmented strip. -->
+                            <!-- Separate pill toggles, not a joined segmented strip. Painted from
+                                 code (PaintModeChips) rather than left to ToggleButton's Checked
+                                 visual state: switching light/dark retemplates these buttons and
+                                 the checked visual is not re-applied, which left two pills looking
+                                 lit at once. The fill sits on a Border behind an always-Transparent
+                                 Button - a bound Button.Background never recovers once PointerOver
+                                 has touched it. -->
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
-                                <ToggleButton x:Name="ThemeDark" Style="{StaticResource FilterChip}"
-                                              Content="Dark" Tag="Dark" Click="ThemeMode_Click" />
-                                <ToggleButton x:Name="ThemeLight" Style="{StaticResource FilterChip}"
-                                              Content="Light" Tag="Light" Click="ThemeMode_Click" />
-                                <ToggleButton x:Name="ThemeSystem" Style="{StaticResource FilterChip}"
-                                              Content="System" Tag="System" Click="ThemeMode_Click" />
+                                <Grid>
+                                    <Border x:Name="DarkFill" CornerRadius="18" Background="{ThemeResource AppSubtleFill}" />
+                                    <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
+                                            Background="Transparent" BorderThickness="0"
+                                            Tag="Dark" Click="ThemeMode_Click">
+                                        <TextBlock x:Name="DarkText" Text="Dark" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                    </Button>
+                                </Grid>
+                                <Grid>
+                                    <Border x:Name="LightFill" CornerRadius="18" Background="{ThemeResource AppSubtleFill}" />
+                                    <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
+                                            Background="Transparent" BorderThickness="0"
+                                            Tag="Light" Click="ThemeMode_Click">
+                                        <TextBlock x:Name="LightText" Text="Light" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                    </Button>
+                                </Grid>
+                                <Grid>
+                                    <Border x:Name="SystemFill" CornerRadius="18" Background="{ThemeResource AppSubtleFill}" />
+                                    <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
+                                            Background="Transparent" BorderThickness="0"
+                                            Tag="System" Click="ThemeMode_Click">
+                                        <TextBlock x:Name="SystemText" Text="System" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                    </Button>
+                                </Grid>
                             </StackPanel>
                         </StackPanel>
 
@@ -96,73 +121,36 @@
                             <TextBlock Text="Pastel Accent Theme Palette" Style="{StaticResource RowTitle}" />
                             <TextBlock Style="{StaticResource RowHint}"
                                        Text="Choose your accent highlight color for buttons, badges, and status indicators across the entire app." />
-                            <!-- swatch tiles: the pastel fill IS the control. The stock GridViewItem
-                                 template paints a rounded *square* plate behind the selected item,
-                                 which reads as a stray box sitting behind a pill. Retemplated so the
-                                 container is nothing but a pill-shaped ring that lights up in the
-                                 live accent - the swatch highlights itself. -->
-                            <GridView x:Name="AccentGrid" ItemsSource="{Binding AvailableAccentThemes}"
-                                      SelectionMode="Single" IsItemClickEnabled="False"
-                                      SelectionChanged="Accent_SelectionChanged">
-                                <GridView.ItemContainerStyle>
-                                    <Style TargetType="GridViewItem">
-                                        <Setter Property="Margin" Value="0,0,8,8" />
-                                        <Setter Property="Padding" Value="0" />
-                                        <Setter Property="MinWidth" Value="0" />
-                                        <Setter Property="MinHeight" Value="0" />
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="GridViewItem">
-                                                    <Border x:Name="Ring" CornerRadius="24" Background="Transparent"
-                                                            BorderThickness="2" BorderBrush="Transparent">
-                                                        <VisualStateManager.VisualStateGroups>
-                                                            <VisualStateGroup x:Name="CommonStates">
-                                                                <VisualState x:Name="Normal" />
-                                                                <VisualState x:Name="PointerOver">
-                                                                    <VisualState.Setters>
-                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource AppControlBorder}" />
-                                                                    </VisualState.Setters>
-                                                                </VisualState>
-                                                                <VisualState x:Name="Pressed">
-                                                                    <VisualState.Setters>
-                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource AppControlBorder}" />
-                                                                    </VisualState.Setters>
-                                                                </VisualState>
-                                                                <VisualState x:Name="Selected">
-                                                                    <VisualState.Setters>
-                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
-                                                                    </VisualState.Setters>
-                                                                </VisualState>
-                                                                <VisualState x:Name="PointerOverSelected">
-                                                                    <VisualState.Setters>
-                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
-                                                                    </VisualState.Setters>
-                                                                </VisualState>
-                                                                <VisualState x:Name="PressedSelected">
-                                                                    <VisualState.Setters>
-                                                                        <Setter Target="Ring.BorderBrush" Value="{ThemeResource PrimaryTextBrush}" />
-                                                                    </VisualState.Setters>
-                                                                </VisualState>
-                                                            </VisualStateGroup>
-                                                        </VisualStateManager.VisualStateGroups>
-                                                        <ContentPresenter />
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </GridView.ItemContainerStyle>
-                                <GridView.ItemTemplate>
+                            <!-- swatch tiles: the pastel fill IS the control and IS the selection
+                                 indicator - the chosen one is the same hue at a much higher alpha.
+                                 No ring, no plate. Driven by a binding rather than a list control's
+                                 selection state, because a visual state is not re-applied when the
+                                 app switches light/dark, which blanked the highlight until the next
+                                 click. The Button stays Transparent and the fill lives on the Border
+                                 behind it - a bound Button.Background never comes back once the
+                                 PointerOver state has touched it. -->
+                            <ItemsControl ItemsSource="{Binding AvailableAccentThemes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <views:WrapPanel HorizontalSpacing="8" VerticalSpacing="8" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:PastelThemeOption">
-                                        <Border Width="128" Height="40" Margin="3" CornerRadius="20" BorderThickness="0"
-                                                Background="{x:Bind BgHex, Converter={StaticResource HexBrush}}">
-                                            <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource AppTextPrimary}" />
-                                        </Border>
+                                        <Grid>
+                                            <Border CornerRadius="20"
+                                                    Background="{x:Bind conv:Swatch.Fill(IsSelected, LightHex), Mode=OneWay}" />
+                                            <Button Width="128" Height="40" Padding="0" CornerRadius="20"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Tag="{x:Bind Id}" Click="Swatch_Click">
+                                                <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                            </Button>
+                                        </Grid>
                                     </DataTemplate>
-                                </GridView.ItemTemplate>
-                            </GridView>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </StackPanel>
                 </Border>
