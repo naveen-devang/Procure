@@ -26,7 +26,7 @@
                 <EntranceThemeTransition FromVerticalOffset="18" />
             </TransitionCollection>
         </Grid.ChildrenTransitions>
-        <Border MaxWidth="600" MaxHeight="640" Margin="24" CornerRadius="8" BorderThickness="1"
+        <Border MaxWidth="600" MaxHeight="640" Margin="24" CornerRadius="10" BorderThickness="1"
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <Grid>

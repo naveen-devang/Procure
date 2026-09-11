@@ -32,7 +32,7 @@
                 <EntranceThemeTransition FromVerticalOffset="18" />
             </TransitionCollection>
         </Grid.ChildrenTransitions>
-        <Border Margin="28" CornerRadius="8" BorderThickness="1"
+        <Border Margin="28" CornerRadius="10" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <Grid>
                 <Grid.RowDefinitions>
