@@ -249,7 +249,12 @@
                                     ToolTipService.ToolTip="Configure Approval Stages" />
                         </Grid>
 
-                        <ScrollViewer MaxHeight="335" Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
+                        <!-- No MaxHeight/inner ScrollViewer: that capped the approvals at ~335px and
+                             made this column scroll inside itself. It existed because the panel used
+                             to expand inline inside a board row, where unbounded growth was a problem.
+                             As a slide-over the outer ScrollViewer handles it, and nesting a second
+                             scroll region here just truncated the last approval for no reason. -->
+                        <Grid Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
                             <ItemsControl ItemsSource="{Binding Pcr.Approvals}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:Approval">
@@ -322,7 +327,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </ScrollViewer>
+                        </Grid>
 
                         <Border Style="{StaticResource ItemCard}" Padding="16" Margin="0"
                                 Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
