@@ -35,6 +35,12 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
     </Style>
 
+    <!-- Plus Jakarta Sans's line box sits text higher than Segoe did, so text/placeholder in
+         every text-entry control (TextBox, PasswordBox, RichEditBox, AutoSuggestBox all share
+         this resource) crowded the top edge with a gap left below. Shifting the padding box
+         down compensates - default is 10,5,6,6. -->
+    <Thickness x:Key="TextControlThemePadding">10,8,6,3</Thickness>
+
     <!-- Content container: board card, detail columns, modal sections, dashboard tiles, settings panes. -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BorderThickness" Value="1" />
