@@ -75,13 +75,12 @@
             </StackPanel>
         </Grid>
 
-        <!-- Filter / search toolbar -->
+        <!-- Filter / search toolbar. Search is the hero; the three toggle filters live in one
+             popover with an active-count badge instead of three loose chips. -->
         <Grid Grid.Row="1" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="170" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
@@ -91,12 +90,36 @@
             <ComboBox x:Name="StatusFilterBox" Grid.Column="1" Height="36" VerticalAlignment="Center" HorizontalAlignment="Stretch"
                       SelectionChanged="StatusFilter_SelectionChanged" />
 
-            <ToggleButton Grid.Column="2" Style="{StaticResource FilterChip}" Content="Overdue SLA"
-                          IsChecked="{Binding FilterOverdueOnly, Mode=TwoWay}" />
-            <ToggleButton Grid.Column="3" Style="{StaticResource FilterChip}" Content="PCR Awaiting Sign"
-                          IsChecked="{Binding FilterPcrPendingOnly, Mode=TwoWay}" />
-            <ToggleButton Grid.Column="4" Style="{StaticResource FilterChip}" Content="Urgent Only"
-                          IsChecked="{Binding FilterUrgentOnly, Mode=TwoWay}" />
+            <Button Grid.Column="2" Height="36" Padding="14,0" VerticalAlignment="Center"
+                    ToolTipService.ToolTip="Overdue SLA, PCR awaiting sign, urgent only">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Filters" FontSize="12.5" VerticalAlignment="Center" />
+                    <Border Background="{ThemeResource AccentFillBrush}" CornerRadius="9" MinWidth="18" Height="18"
+                            Padding="6,0" VerticalAlignment="Center"
+                            Visibility="{Binding HasActiveFilters, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="{Binding ActiveFilterCount}" FontSize="10.5" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#1A1A1A" />
+                    </Border>
+                </StackPanel>
+                <Button.Flyout>
+                    <Flyout Placement="Bottom">
+                        <StackPanel Spacing="12" MinWidth="216">
+                            <TextBlock Text="Filter requisitions" FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{ThemeResource AppTextPrimary}" />
+                            <StackPanel Spacing="6">
+                                <CheckBox Content="Overdue SLA" MinWidth="0"
+                                          IsChecked="{Binding FilterOverdueOnly, Mode=TwoWay}" />
+                                <CheckBox Content="PCR awaiting sign" MinWidth="0"
+                                          IsChecked="{Binding FilterPcrPendingOnly, Mode=TwoWay}" />
+                                <CheckBox Content="Urgent only" MinWidth="0"
+                                          IsChecked="{Binding FilterUrgentOnly, Mode=TwoWay}" />
+                            </StackPanel>
+                            <Button Content="Reset all" FontSize="12" Height="30" HorizontalAlignment="Stretch"
+                                    Command="{Binding ResetFiltersCommand}" />
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
         </Grid>
 
         <!-- Batch action bar -->

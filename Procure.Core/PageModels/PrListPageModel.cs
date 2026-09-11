@@ -473,9 +473,22 @@ namespace Procure.PageModels
         }
 
         partial void OnSelectedStatusFilterChanged(string value) => ApplyFilters(true);
-        partial void OnFilterOverdueOnlyChanged(bool value) => ApplyFilters(true);
-        partial void OnFilterPcrPendingOnlyChanged(bool value) => ApplyFilters(true);
-        partial void OnFilterUrgentOnlyChanged(bool value) => ApplyFilters(true);
+        partial void OnFilterOverdueOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+        partial void OnFilterPcrPendingOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+        partial void OnFilterUrgentOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+
+        /// <summary>How many of the three toggle filters are on - drives the count badge on the
+        /// board's "Filters" button, which replaced the three loose chips.</summary>
+        public int ActiveFilterCount =>
+            (FilterOverdueOnly ? 1 : 0) + (FilterPcrPendingOnly ? 1 : 0) + (FilterUrgentOnly ? 1 : 0);
+
+        public bool HasActiveFilters => ActiveFilterCount > 0;
+
+        private void NotifyActiveFilterCount()
+        {
+            OnPropertyChanged(nameof(ActiveFilterCount));
+            OnPropertyChanged(nameof(HasActiveFilters));
+        }
 
         [RelayCommand]
         public void ToggleFilterOverdue() => FilterOverdueOnly = !FilterOverdueOnly;
