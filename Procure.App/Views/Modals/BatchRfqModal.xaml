@@ -131,9 +131,11 @@
                                                 <ColumnDefinition Width="85" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <Border Grid.Column="1" Padding="6,2" CornerRadius="10" MinWidth="46" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                            <Border Grid.Column="1" Padding="6,2,6,4" CornerRadius="10" MinWidth="46" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Left"
                                                     BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                                <TextBlock Text="{x:Bind Notes}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                <TextBlock Text="{x:Bind Notes}" FontSize="10" FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource AppTextPrimary}" />
                                             </Border>
                                             <TextBlock Grid.Column="2" Text="{x:Bind ItemName}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />

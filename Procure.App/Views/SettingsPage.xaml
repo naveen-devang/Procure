@@ -319,9 +319,10 @@
                                                                Foreground="{ThemeResource AppTextSecondary}"
                                                                Visibility="{x:Bind SelectOptions, Converter={StaticResource NullVis}}" />
                                                 </StackPanel>
-                                                <Border Grid.Column="1" Padding="8,3" CornerRadius="11" MinWidth="54" VerticalAlignment="Center"
+                                                <Border Grid.Column="1" Padding="8,3,8,5" CornerRadius="11" MinWidth="54" VerticalAlignment="Center"
                                                         Background="{ThemeResource BadgeCombinedPrBg}">
                                                     <TextBlock Text="{x:Bind DataType}" FontSize="11" FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                Foreground="{ThemeResource BadgeCombinedPrText}" />
                                                 </Border>
                                                 <Button Grid.Column="2" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"

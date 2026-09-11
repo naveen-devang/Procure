@@ -327,13 +327,13 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <TextBlock Text="{Binding ExpandedPr.PrNo}" FontSize="18" FontWeight="SemiBold"
                                        Foreground="{ThemeResource AppTextPrimary}" />
-                            <Border Padding="10,3" CornerRadius="10" MinWidth="60" BorderThickness="1"
+                            <Border Padding="10,3,10,5" CornerRadius="10" MinWidth="60" BorderThickness="1"
                                     VerticalAlignment="Center" HorizontalAlignment="Left"
                                     Visibility="{Binding ExpandedPr.PrType, Converter={StaticResource NullOrEmptyVis}}"
                                     Background="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBg}}"
                                     BorderBrush="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBorder}}">
                                 <TextBlock Text="{Binding ExpandedPr.PrType}" FontSize="9.5" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                            Foreground="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeColor}}" />
                             </Border>
                         </StackPanel>

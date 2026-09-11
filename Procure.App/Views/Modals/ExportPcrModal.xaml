@@ -59,9 +59,12 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="1. Select Suppliers to Compare" Style="{StaticResource H}" />
-                                    <Border Grid.Column="1" Padding="8,2" CornerRadius="11" MinWidth="54" BorderThickness="1"
+                                    <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="1"
+                                            VerticalAlignment="Center"
                                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                        <TextBlock Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource AppTextPrimary}" />
                                     </Border>
                                 </Grid>
                                 <TextBlock Text="Choose up to 5 supplier quotations to display side-by-side:" FontSize="11.5"

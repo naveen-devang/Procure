@@ -236,10 +236,15 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="2. PCR &amp; Approvals" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Padding="8,2" CornerRadius="11" MinWidth="54" BorderThickness="1"
+                            <!-- Asymmetric bottom padding + explicit centering, same as the other
+                                 badges: Plus Jakarta Sans sits text high in a tight pill otherwise. -->
+                            <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="1"
+                                    VerticalAlignment="Center"
                                     BorderBrush="{ThemeResource PillBorder}" Background="{ThemeResource PillBg}"
                                     Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
-                                <TextBlock Text="{Binding Pcr.ApprovalSummary}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Text="{Binding Pcr.ApprovalSummary}" FontSize="11" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Foreground="{ThemeResource AppTextPrimary}" />
                             </Border>
                             <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xEDE1;" FontSize="13" Width="28" Height="28"
                                     Click="ExportPcr_Click" Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}"
@@ -417,9 +422,12 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="{ThemeResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         <TextBlock Text="Requisition Line Items" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
-                        <Border Padding="6,2" CornerRadius="10" MinWidth="46" Background="{ThemeResource AppSubtleFill}">
+                        <Border Padding="6,2,6,4" CornerRadius="10" MinWidth="46" VerticalAlignment="Center"
+                                Background="{ThemeResource AppSubtleFill}">
                             <TextBlock Text="{Binding ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items'}"
-                                       FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
+                                       FontSize="11" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AppTextSecondary}" />
                         </Border>
                         <Border Style="{StaticResource Chip}" Background="{ThemeResource FluentCautionBg}" BorderBrush="{ThemeResource FluentCaution}"
                                 Visibility="{Binding HasPendingItemsSummary, Converter={StaticResource BoolVis}}">
