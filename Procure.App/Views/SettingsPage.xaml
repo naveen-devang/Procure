@@ -51,7 +51,7 @@
         </Grid.ColumnDefinitions>
 
         <StackPanel Grid.ColumnSpan="2" Spacing="3" Padding="28,22,28,18">
-            <TextBlock Text="Settings &amp; Configuration" FontWeight="SemiBold" FontSize="24"
+            <TextBlock Text="Settings &amp; Configuration" FontWeight="SemiBold" FontSize="28"
                        Foreground="{ThemeResource AppTextPrimary}" />
             <TextBlock Text="Appearance, navigation, procurement defaults, custom columns, updates, storage, and keyboard shortcuts."
                        FontSize="12.5" Foreground="{ThemeResource AppTextSecondary}" />
