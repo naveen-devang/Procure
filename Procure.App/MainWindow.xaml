@@ -15,38 +15,48 @@
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             PaneDisplayMode="Left"
-            OpenPaneLength="210"
+            OpenPaneLength="180"
             Background="{ThemeResource AppBackground}"
             SelectionChanged="Nav_SelectionChanged">
             <muxc:NavigationView.Resources>
                 <!-- Replace the acrylic pane fills (transparent on an unpackaged build) with a
                      solid surface. Theme-keyed so it re-resolves live when RequestedTheme flips -
-                     a plain StaticResource froze the pane to its launch-time colour. -->
+                     a plain StaticResource froze the pane to its launch-time colour. Values match
+                     AppBackground (redesign, Sep 2026). -->
                 <ResourceDictionary>
                     <ResourceDictionary.ThemeDictionaries>
                         <ResourceDictionary x:Key="Light">
-                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#F3F3F3" />
-                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F3F3F3" />
-                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#F3F3F3" />
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#FBFAF8" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#FBFAF8" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#FBFAF8" />
                         </ResourceDictionary>
                         <ResourceDictionary x:Key="Dark">
-                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#202020" />
-                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#202020" />
-                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#202020" />
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#161619" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#161619" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#161619" />
                         </ResourceDictionary>
                     </ResourceDictionary.ThemeDictionaries>
                 </ResourceDictionary>
             </muxc:NavigationView.Resources>
+
+            <!-- Wordmark, since NavigationView has no other slot above the menu items. -->
+            <muxc:NavigationView.PaneHeader>
+                <TextBlock Text="&#9670; Procure" Margin="16,16,0,8" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{ThemeResource AppTextSecondary}" />
+            </muxc:NavigationView.PaneHeader>
+
             <muxc:NavigationView.MenuItems>
-                <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></muxc:NavigationViewItem.Icon>
-                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItemHeader Content="Workspace" />
                 <muxc:NavigationViewItem Content="PR Board" Tag="Board" IsSelected="True">
                     <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="ViewAll" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="CallOff">
                     <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
+                <muxc:NavigationViewItemHeader Content="Planning" />
                 <muxc:NavigationViewItem Content="Tasks" Tag="Tasks">
                     <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="List" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
