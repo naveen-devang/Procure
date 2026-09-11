@@ -323,7 +323,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Padding="10" BorderThickness="1" CornerRadius="8"
+                        <Border Grid.Column="0" Padding="10" BorderThickness="1" CornerRadius="10"
                                 BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppBackground}">
                             <Grid RowSpacing="8">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
@@ -331,7 +331,7 @@
                                 <ListView Grid.Row="1" ItemsSource="{Binding BoardHigh}" ItemTemplate="{StaticResource BoardCard}" SelectionMode="None" />
                             </Grid>
                         </Border>
-                        <Border Grid.Column="1" Padding="10" BorderThickness="1" CornerRadius="8"
+                        <Border Grid.Column="1" Padding="10" BorderThickness="1" CornerRadius="10"
                                 BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppBackground}">
                             <Grid RowSpacing="8">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
@@ -339,7 +339,7 @@
                                 <ListView Grid.Row="1" ItemsSource="{Binding BoardMedium}" ItemTemplate="{StaticResource BoardCard}" SelectionMode="None" />
                             </Grid>
                         </Border>
-                        <Border Grid.Column="2" Padding="10" BorderThickness="1" CornerRadius="8"
+                        <Border Grid.Column="2" Padding="10" BorderThickness="1" CornerRadius="10"
                                 BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppBackground}">
                             <Grid RowSpacing="8">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
@@ -347,7 +347,7 @@
                                 <ListView Grid.Row="1" ItemsSource="{Binding BoardLow}" ItemTemplate="{StaticResource BoardCard}" SelectionMode="None" />
                             </Grid>
                         </Border>
-                        <Border Grid.Column="3" Padding="10" BorderThickness="1" CornerRadius="8"
+                        <Border Grid.Column="3" Padding="10" BorderThickness="1" CornerRadius="10"
                                 BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppBackground}">
                             <Grid RowSpacing="8">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
