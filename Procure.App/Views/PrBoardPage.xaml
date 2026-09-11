@@ -56,15 +56,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="4">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="Purchase Requisitions" FontSize="26" FontWeight="SemiBold"
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
+                    <TextBlock Text="Purchase Requisitions" FontSize="28" FontWeight="SemiBold"
                                Foreground="{ThemeResource AppTextPrimary}" />
-                    <Border Style="{StaticResource PillChip}" VerticalAlignment="Center"
-                            Visibility="{Binding ListSummaryPill, Converter={StaticResource NullOrEmptyVis}}"
-                            ToolTipService.ToolTip="{Binding ListSummary}">
-                        <TextBlock Text="{Binding ListSummaryPill}" FontSize="11.5" FontWeight="SemiBold"
-                                   Foreground="{ThemeResource AppTextSecondary}" />
-                    </Border>
+                    <TextBlock Text="{Binding ListSummaryPill}" FontSize="13" VerticalAlignment="Bottom" Margin="0,0,0,3"
+                               Foreground="{ThemeResource AppTextTertiary}"
+                               Visibility="{Binding ListSummaryPill, Converter={StaticResource NullOrEmptyVis}}"
+                               ToolTipService.ToolTip="{Binding ListSummary}" />
                 </StackPanel>
                 <TextBlock FontSize="13" Foreground="{ThemeResource AppTextSecondary}"
                            Text="Manage procurement lifecycle across vendor RFQs, multi-role PCR approvals, and purchase orders." />
@@ -147,122 +145,110 @@
                 ShowsScrollingPlaceholders="False"
                 ItemsSource="{Binding FilteredPrs}"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}, ConverterParameter=invert}"
-                ContainerContentChanging="Board_ContainerContentChanging">
+                ContainerContentChanging="Board_ContainerContentChanging"
+                BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}">
+                <ListView.Resources>
+                    <!-- Neutral hover instead of the default accent-tinted one - a calmer scan surface. -->
+                    <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="{ThemeResource AppTertiaryBackground}" />
+                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="{ThemeResource AppTertiaryBackground}" />
+                </ListView.Resources>
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                         <Setter Property="Padding" Value="0" />
-                        <Setter Property="Margin" Value="0,0,0,8" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="CornerRadius" Value="0" />
                     </Style>
                 </ListView.ItemContainerStyle>
 
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:PurchaseRequisition">
-                        <Border BorderThickness="1" CornerRadius="8"
-                                BorderBrush="{ThemeResource AppHairline}"
-                                Background="{ThemeResource AppSecondaryBackground}">
-                            <StackPanel>
-                                <!-- header row (tap to expand) -->
-                                <Grid ColumnSpacing="9" Padding="6,8,14,8" Tapped="Card_Tapped" Background="Transparent">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="3" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="128" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <!-- row (tap to expand) - borderless, hairline below, hover fill from the
+                                 container's own PointerOver state (see ListView.Resources above). -->
+                            <Grid ColumnSpacing="14" Padding="12,10" Tapped="Card_Tapped" Background="Transparent">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                                    <!-- priority accent rail -->
-                                    <Rectangle Grid.Column="0" Width="3" Margin="0,6" RadiusX="1.5" RadiusY="1.5"
-                                               Fill="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}" />
+                                <!-- priority accent rail -->
+                                <Rectangle Grid.Column="0" Width="3" Margin="0,4" RadiusX="1.5" RadiusY="1.5"
+                                           Fill="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}" />
 
-                                    <CheckBox Grid.Column="1" MinWidth="0" Padding="0" Margin="8,0,0,0" VerticalAlignment="Center"
-                                              IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
-                                              Checked="PrCheck_Toggled" Unchecked="PrCheck_Toggled" Tapped="Child_Tapped" />
+                                <CheckBox Grid.Column="1" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                                          IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                          Checked="PrCheck_Toggled" Unchecked="PrCheck_Toggled" Tapped="Child_Tapped" />
 
-                                    <Button Grid.Column="2" Content="{x:Bind Priority, Mode=OneWay}" Click="Priority_Click" Tapped="Child_Tapped"
-                                            FontSize="11" FontWeight="SemiBold" Height="26" Padding="10,0" CornerRadius="999"
-                                            BorderThickness="1" VerticalAlignment="Center"
-                                            Foreground="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}"
-                                            Background="{x:Bind Priority, Converter={StaticResource PriorityBg}, Mode=OneWay}"
-                                            BorderBrush="{x:Bind Priority, Converter={StaticResource PriorityBorder}, Mode=OneWay}" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind Priority, Mode=OneWay}" VerticalAlignment="Center"
+                                           FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{x:Bind Priority, Converter={StaticResource PriorityColor}, Mode=OneWay}" />
 
-                                    <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
+                                <!-- identity block: id + type on one line, title, dim meta line -->
+                                <StackPanel Grid.Column="3" Spacing="3" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="13"
+                                                   Foreground="{ThemeResource AppTextPrimary}" />
                                         <Border Visibility="{x:Bind PrType, Converter={StaticResource NullOrEmptyVis}}"
-                                                Padding="8,2" CornerRadius="999" BorderThickness="1" HorizontalAlignment="Left"
+                                                Padding="7,1" CornerRadius="5" BorderThickness="1" VerticalAlignment="Center"
                                                 Background="{x:Bind PrType, Converter={StaticResource PrTypeBg}}"
                                                 BorderBrush="{x:Bind PrType, Converter={StaticResource PrTypeBorder}}">
                                             <TextBlock Text="{x:Bind PrType}" FontSize="9.5" FontWeight="SemiBold"
                                                        Foreground="{x:Bind PrType, Converter={StaticResource PrTypeColor}}" />
                                         </Border>
-                                        <TextBlock Text="{x:Bind PrNo}" FontWeight="SemiBold" FontSize="13.5"
-                                                   Foreground="{ThemeResource AppTextPrimary}" />
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <TextBlock Text="{x:Bind Requestor}" FontSize="11.5" TextTrimming="CharacterEllipsis"
-                                                       MaxWidth="90" Foreground="{ThemeResource AppTextSecondary}" />
-                                            <TextBlock Text="{x:Bind Plant}" FontSize="11" FontWeight="SemiBold"
-                                                       Foreground="{ThemeResource PrimaryTextBrush}"
-                                                       Visibility="{x:Bind Plant, Converter={StaticResource NullOrEmptyVis}}" />
-                                        </StackPanel>
                                     </StackPanel>
-
-                                    <StackPanel Grid.Column="4" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontWeight="SemiBold" FontSize="12.5"
-                                                   Foreground="{ThemeResource AppTextPrimary}"
-                                                   MaxLines="2" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <Border Style="{StaticResource PillChip}"
-                                                    Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}">
-                                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}"
-                                                           Text="{x:Bind ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items', Mode=OneWay}" />
-                                            </Border>
-                                            <Border Style="{StaticResource PillChip}">
-                                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource PillTextNeutral}"
-                                                           Text="{x:Bind RfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} RFQ', Mode=OneWay}" />
-                                            </Border>
-                                            <Border Style="{StaticResource PillChip}">
-                                                <TextBlock Text="{x:Bind PcrStatusDisplay, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
-                                                           Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}, Mode=OneWay}" />
-                                            </Border>
-                                            <Border Style="{StaticResource PillChip}">
-                                                <TextBlock Text="{x:Bind FormattedTotalPoValue, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
-                                                           Foreground="{x:Bind TotalPoValue, Converter={StaticResource PoPillText}, Mode=OneWay}" />
-                                            </Border>
-                                            <TextBlock Text="{x:Bind AgeDisplay}" FontSize="10.5"
-                                                       Foreground="{ThemeResource AppTextTertiary}" VerticalAlignment="Center" />
-                                        </StackPanel>
+                                    <TextBlock Text="{x:Bind Description, Mode=OneWay}" FontSize="12.5"
+                                               Foreground="{ThemeResource AppTextPrimary}"
+                                               MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}">
+                                            <Run Text="{x:Bind Requestor}" />
+                                            <Run Text="·" />
+                                            <Run Text="{x:Bind Plant}" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{x:Bind ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items', Mode=OneWay}"
+                                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}"
+                                                   Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                        <TextBlock Text="{x:Bind RfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} RFQ', Mode=OneWay}"
+                                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
+                                        <TextBlock Text="{x:Bind PcrStatusDisplay, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{x:Bind PcrStatusDisplay, Converter={StaticResource PcrPillText}, Mode=OneWay}" />
+                                        <TextBlock Text="{x:Bind AgeDisplay}" FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
                                     </StackPanel>
+                                </StackPanel>
 
-                                    <Button Grid.Column="5" Content="{x:Bind Status, Mode=OneWay}" Click="Status_Click" Tapped="Child_Tapped"
+                                <!-- right cluster: value, status, actions (actions dim until hovered) -->
+                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Bind FormattedTotalPoValue, Mode=OneWay}" FontSize="12.5"
+                                               VerticalAlignment="Center"
+                                               Foreground="{x:Bind TotalPoValue, Converter={StaticResource PoPillText}, Mode=OneWay}" />
+                                    <Button Content="{x:Bind Status, Mode=OneWay}" Click="Status_Click" Tapped="Child_Tapped"
                                             FontSize="11.5" FontWeight="SemiBold" Height="28" Padding="12,0" CornerRadius="999"
                                             BorderThickness="0" VerticalAlignment="Center"
                                             Background="{x:Bind Status, Converter={StaticResource StatusBg}, Mode=OneWay}"
                                             Foreground="{x:Bind Status, Converter={StaticResource StatusColor}, Mode=OneWay}" />
-
-                                    <Button Grid.Column="6" Click="Edit_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
-                                            Height="28" Width="28" Padding="0" CornerRadius="4" FontSize="12"
-                                            FontFamily="Segoe Fluent Icons" Content="&#xE70F;"
-                                            ToolTipService.ToolTip="Edit PR" />
-                                    <Button Grid.Column="7" Click="Delete_Click" Tapped="Child_Tapped" VerticalAlignment="Center"
-                                            Height="28" Width="28" Padding="0" CornerRadius="4" FontSize="12"
-                                            FontFamily="Segoe Fluent Icons" Content="&#xE74D;"
-                                            Foreground="{ThemeResource FluentCritical}"
-                                            ToolTipService.ToolTip="Delete PR" />
-
-                                    <TextBlock Grid.Column="8" FontFamily="Segoe Fluent Icons" FontSize="11" Margin="0,0,10,0"
-                                               VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}"
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <Button Style="{StaticResource IconButton}" Click="Edit_Click" Tapped="Child_Tapped"
+                                                Content="&#xE70F;" ToolTipService.ToolTip="Edit PR" />
+                                        <Button Style="{StaticResource IconButton}" Click="Delete_Click" Tapped="Child_Tapped"
+                                                Content="&#xE74D;" Foreground="{ThemeResource FluentCritical}"
+                                                ToolTipService.ToolTip="Delete PR" />
+                                    </StackPanel>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" FontSize="11" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource AppTextTertiary}"
                                                Text="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource Chevron}}" />
-                                </Grid>
+                                </StackPanel>
+                            </Grid>
 
-                                <!-- expanded detail - x:Load defers building the heavy panel until the
-                                     card is expanded (the MAUI LazyExpander equivalent) -->
-                                <views:PrDetailPanel x:Name="DetailPanel" x:Load="{x:Bind IsExpanded, Mode=OneWay}" />
-                            </StackPanel>
-                        </Border>
+                            <!-- expanded detail - x:Load defers building the heavy panel until the
+                                 card is expanded (the MAUI LazyExpander equivalent) -->
+                            <views:PrDetailPanel x:Name="DetailPanel" x:Load="{x:Bind IsExpanded, Mode=OneWay}" />
+
+                            <Border Height="1" Background="{ThemeResource AppHairline}" />
+                        </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
