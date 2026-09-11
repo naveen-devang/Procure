@@ -35,6 +35,15 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
     </Style>
 
+    <!-- Native ButtonBackgroundPointerOver/Pressed default to a Fluent-grey overlay that isn't
+         one of our warm-neutral tokens. Most buttons never notice (their base isn't
+         Transparent), but custom-colored ones with a converter-bound Background - segmented
+         selectors whose "inactive" state is Transparent (Tasks' view switcher, priority picker,
+         PcrPreviewModal's layout pickers) - visibly flash that mismatched, non-theme-aware grey
+         on hover. Repoint to app tokens so hover is subtle and theme-correct everywhere. -->
+    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource AppSubtleFill}" />
+    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource AppTertiaryBackground}" />
+
     <!-- Plus Jakarta Sans's line box sits text higher than Segoe did, so text/placeholder in
          every text-entry control (TextBox, PasswordBox, RichEditBox, AutoSuggestBox all share
          this resource) crowded the top edge with a gap left below. Shifting the padding box
