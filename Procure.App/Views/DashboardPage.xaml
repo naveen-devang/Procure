@@ -20,7 +20,7 @@
             <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
             <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16,14" />
         </Style>
     </Page.Resources>
@@ -34,7 +34,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="Procurement Overview" FontSize="26" FontWeight="SemiBold"
+                    <TextBlock Text="Procurement Overview" FontSize="28" FontWeight="SemiBold"
                                Foreground="{ThemeResource AppTextPrimary}" />
                     <TextBlock Text="Real-time pipeline metrics, pending multi-role approvals, and SLA tracking."
                                FontSize="13" Foreground="{ThemeResource AppTextSecondary}" />
