@@ -67,13 +67,9 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Background="{ThemeResource AppTertiaryBackground}" Padding="18"
-            BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}">
-        <Border.Transitions>
-            <TransitionCollection>
-                <EntranceThemeTransition FromVerticalOffset="14" />
-            </TransitionCollection>
-        </Border.Transitions>
+    <!-- Chrome (top hairline, entrance transition) lived here while this was an inline row
+         expander; the slide-over container in PrBoardPage owns it now. -->
+    <Border Background="{ThemeResource AppBackground}" Padding="18">
         <StackPanel Spacing="16">
 
             <!-- consolidated-master banner -->
@@ -98,11 +94,14 @@
                 </Grid>
             </Border>
 
+            <!-- Not three equal columns: PCR carries a fixed 212px date stack per approval row, so
+                 at equal widths the role name and its status are the first things to clip. POs are
+                 the least dense of the three and can give the space up. -->
             <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1.35*" />
+                    <ColumnDefinition Width="0.9*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- COLUMN 1: RFQs -->

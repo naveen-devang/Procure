@@ -277,10 +277,6 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- expanded detail - x:Load defers building the heavy panel until the
-                                 card is expanded (the MAUI LazyExpander equivalent) -->
-                            <views:PrDetailPanel x:Name="DetailPanel" x:Load="{x:Bind IsExpanded, Mode=OneWay}" />
-
                             <Border Height="1" Background="{ThemeResource AppHairline}" />
                         </StackPanel>
                     </DataTemplate>
@@ -294,6 +290,67 @@
                 <Button Content="Reset Filters" Command="{Binding ResetFiltersCommand}" HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
+    </Grid>
+
+    <!-- Detail slide-over. Was an inline expander inside the row; as a slide-over only one PR
+         is open at a time and the board dims behind it. Stays wide (not the ~400px the audit
+         first drew) because the panel is three editable columns, not a summary. x:Load keeps
+         the old deferral - the heavy panel isn't built until a row is opened. -->
+    <Grid x:Name="DetailOverlay" Background="#99000000" Tapped="DetailBackdrop_Tapped"
+          x:Load="{x:Bind Vm.IsDetailPanelOpen, Mode=OneWay}">
+        <!-- Sized by a left margin rather than a fixed Width: leaves a strip of board visible for
+             context and never clips its own content on a smaller window (a fixed Width clips from
+             the left once the window is narrower than it). The three columns carry a 212px date
+             stack in the middle one, so the panel needs real width - at ~1000px the approval role
+             names and vendor names truncate. -->
+        <Border HorizontalAlignment="Stretch" Margin="180,0,0,0" Tapped="Child_Tapped"
+                Background="{ThemeResource AppBackground}"
+                BorderThickness="1,0,0,0" BorderBrush="{ThemeResource AppHairline}">
+            <Border.Transitions>
+                <TransitionCollection>
+                    <EntranceThemeTransition FromHorizontalOffset="140" FromVerticalOffset="0" />
+                </TransitionCollection>
+            </Border.Transitions>
+            <Grid RowSpacing="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Padding="20,16" ColumnSpacing="12" Background="{ThemeResource AppSecondaryBackground}"
+                      BorderThickness="0,0,0,1" BorderBrush="{ThemeResource AppHairline}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="{Binding ExpandedPr.PrNo}" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AppTextPrimary}" />
+                            <Border Padding="10,3" CornerRadius="10" MinWidth="60" BorderThickness="1"
+                                    VerticalAlignment="Center" HorizontalAlignment="Left"
+                                    Visibility="{Binding ExpandedPr.PrType, Converter={StaticResource NullOrEmptyVis}}"
+                                    Background="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBg}}"
+                                    BorderBrush="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBorder}}">
+                                <TextBlock Text="{Binding ExpandedPr.PrType}" FontSize="9.5" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeColor}}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding ExpandedPr.Description}" FontSize="12.5"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1"
+                                   Foreground="{ThemeResource AppTextSecondary}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE711;"
+                            VerticalAlignment="Top" ToolTipService.ToolTip="Close (Esc)"
+                            Command="{Binding CloseDetailPanelCommand}" />
+                </Grid>
+
+                <ScrollViewer Grid.Row="1">
+                    <views:PrDetailPanel x:Name="DetailPanel" DataContext="{Binding ExpandedPr}" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 
     <!-- modal layer (each x:Load-deferred on its VM visibility flag) -->

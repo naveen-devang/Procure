@@ -149,6 +149,14 @@ public sealed partial class PrBoardPage : Page
 
     private void Child_Tapped(object sender, TappedRoutedEventArgs e) => e.Handled = true;  // don't toggle expand
 
+    /// <summary>Click the dimmed board behind the detail slide-over to close it. The panel itself
+    /// swallows taps via Child_Tapped, so this only fires on the backdrop.</summary>
+    private void DetailBackdrop_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        Vm.CloseDetailPanelCommand.Execute(null);
+        e.Handled = true;
+    }
+
     private void Card_Tapped(object sender, TappedRoutedEventArgs e)
     {
         if (Pr(sender) is { } pr) Vm.ToggleExpandCommand.Execute(pr);

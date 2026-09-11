@@ -958,10 +958,31 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>The PR shown in the detail slide-over, or null when it's closed. The panel used
+        /// to expand inline inside the row, so several could be open at once; as a slide-over only
+        /// one can be, and this is it. <see cref="PurchaseRequisition.IsExpanded"/> is kept in sync
+        /// because the row's chevron still reads it.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsDetailPanelOpen))]
+        public partial PurchaseRequisition? ExpandedPr { get; set; }
+
+        public bool IsDetailPanelOpen => ExpandedPr is not null;
+
         [RelayCommand]
         public void ToggleExpand(PurchaseRequisition pr)
         {
-            pr.IsExpanded = !pr.IsExpanded;
+            if (ReferenceEquals(ExpandedPr, pr)) { CloseDetailPanel(); return; }
+
+            if (ExpandedPr is { } previous) previous.IsExpanded = false;
+            pr.IsExpanded = true;
+            ExpandedPr = pr;
+        }
+
+        [RelayCommand]
+        public void CloseDetailPanel()
+        {
+            if (ExpandedPr is { } pr) pr.IsExpanded = false;
+            ExpandedPr = null;
         }
 
         /// <summary>Esc support: closes the topmost open modal overlay through its Close command
@@ -980,6 +1001,8 @@ namespace Procure.PageModels
             if (IsBatchRfqModalVisible) { CloseBatchRfqModal(); return true; }
             if (IsBatchPoModalVisible) { CloseBatchPoModal(); return true; }
             if (IsBatchCreateModalVisible) { CloseBatchCreateModal(); return true; }
+            // The detail slide-over sits under every modal, so it closes last.
+            if (IsDetailPanelOpen) { CloseDetailPanel(); return true; }
             return false;
         }
 
