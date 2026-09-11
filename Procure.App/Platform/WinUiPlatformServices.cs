@@ -228,6 +228,13 @@ public sealed class WinUiAppHost : IAppHost
         res["AccentButtonBorderBrush"] = B(primary);
         res["AccentButtonBorderBrushPointerOver"] = B(WithAlpha(primary, 0.90));
         res["AccentButtonBorderBrushPressed"] = B(WithAlpha(primary, 0.80));
+
+        // Same story for ToggleButton's checked state (filter chips, Settings' Color Mode
+        // pills, theme toggles) - resolved at style-load too, same fix.
+        res["ToggleButtonBackgroundChecked"] = B(primary);
+        res["ToggleButtonBackgroundCheckedPointerOver"] = B(WithAlpha(primary, 0.90));
+        res["ToggleButtonBackgroundCheckedPressed"] = B(WithAlpha(primary, 0.80));
+        res["ToggleButtonBorderBrushChecked"] = B(primary);
     }
 
     private static Windows.UI.Color WithAlpha(Windows.UI.Color c, double a) =>
