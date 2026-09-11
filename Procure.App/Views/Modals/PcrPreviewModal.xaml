@@ -160,12 +160,18 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Button Style="{StaticResource Seg}" Content="Landscape"
-                                                    Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Landscape"
-                                                    Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Landscape}" />
-                                            <Button Grid.Column="1" Style="{StaticResource Seg}" Content="Portrait"
-                                                    Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Portrait"
-                                                    Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Portrait}" />
+                                            <Grid>
+                                                <Border CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Landscape}" />
+                                                <Button Style="{StaticResource Seg}" Content="Landscape" Background="Transparent"
+                                                        Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Landscape" />
+                                            </Grid>
+                                            <Grid Grid.Column="1">
+                                                <Border CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Background="{Binding PcrOrientation, Converter={StaticResource SegBg}, ConverterParameter=Portrait}" />
+                                                <Button Style="{StaticResource Seg}" Content="Portrait" Background="Transparent"
+                                                        Command="{Binding SelectPcrOrientationCommand}" CommandParameter="Portrait" />
+                                            </Grid>
                                         </Grid>
                                     </StackPanel>
 
@@ -178,15 +184,24 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Button Style="{StaticResource Seg}" Content="Normal"
-                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Normal"
-                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Normal}" />
-                                            <Button Grid.Column="1" Style="{StaticResource Seg}" Content="Narrow"
-                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Narrow"
-                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Narrow}" />
-                                            <Button Grid.Column="2" Style="{StaticResource Seg}" Content="Wide"
-                                                    Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Wide"
-                                                    Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Wide}" />
+                                            <Grid>
+                                                <Border CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Normal}" />
+                                                <Button Style="{StaticResource Seg}" Content="Normal" Background="Transparent"
+                                                        Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Normal" />
+                                            </Grid>
+                                            <Grid Grid.Column="1">
+                                                <Border CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Narrow}" />
+                                                <Button Style="{StaticResource Seg}" Content="Narrow" Background="Transparent"
+                                                        Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Narrow" />
+                                            </Grid>
+                                            <Grid Grid.Column="2">
+                                                <Border CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                        Background="{Binding PcrMarginPreset, Converter={StaticResource SegBg}, ConverterParameter=Wide}" />
+                                                <Button Style="{StaticResource Seg}" Content="Wide" Background="Transparent"
+                                                        Command="{Binding SelectPcrMarginPresetCommand}" CommandParameter="Wide" />
+                                            </Grid>
                                         </Grid>
                                     </StackPanel>
 

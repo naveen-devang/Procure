@@ -173,22 +173,34 @@
                     <Border Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Padding="3"
                             CornerRadius="8" Background="{ThemeResource AppSubtleFill}">
                         <StackPanel Orientation="Horizontal" Spacing="2">
-                            <Button Content="List" Tag="List" Click="Seg_Click" Padding="14,5" CornerRadius="6"
-                                    BorderThickness="0" FontSize="11.5" FontWeight="SemiBold"
-                                    Background="{Binding IsListView, Converter={StaticResource SegBg}}"
-                                    Foreground="{Binding IsListView, Converter={StaticResource SegText}}" />
-                            <Button Content="Board" Tag="Board" Click="Seg_Click" Padding="14,5" CornerRadius="6"
-                                    BorderThickness="0" FontSize="11.5" FontWeight="SemiBold"
-                                    Background="{Binding IsBoardView, Converter={StaticResource SegBg}}"
-                                    Foreground="{Binding IsBoardView, Converter={StaticResource SegText}}" />
-                            <Button Content="Calendar" Tag="Calendar" Click="Seg_Click" Padding="14,5" CornerRadius="6"
-                                    BorderThickness="0" FontSize="11.5" FontWeight="SemiBold"
-                                    Background="{Binding IsCalendarView, Converter={StaticResource SegBg}}"
-                                    Foreground="{Binding IsCalendarView, Converter={StaticResource SegText}}" />
-                            <Button Content="Finished" Tag="Finished" Click="Seg_Click" Padding="14,5" CornerRadius="6"
-                                    BorderThickness="0" FontSize="11.5" FontWeight="SemiBold"
-                                    Background="{Binding IsFinishedView, Converter={StaticResource SegBg}}"
-                                    Foreground="{Binding IsFinishedView, Converter={StaticResource SegText}}" />
+                            <!-- Selection fill lives on a Border behind each Button, not on the
+                                 Button itself - see the note by ButtonBackgroundPointerOver in
+                                 Styles.xaml for why a bound Button.Background breaks after the
+                                 first hover/press. -->
+                            <Grid>
+                                <Border CornerRadius="6" Background="{Binding IsListView, Converter={StaticResource SegBg}}" />
+                                <Button Content="List" Tag="List" Click="Seg_Click" Padding="14,5" CornerRadius="6"
+                                        BorderThickness="0" Background="Transparent" FontSize="11.5" FontWeight="SemiBold"
+                                        Foreground="{Binding IsListView, Converter={StaticResource SegText}}" />
+                            </Grid>
+                            <Grid>
+                                <Border CornerRadius="6" Background="{Binding IsBoardView, Converter={StaticResource SegBg}}" />
+                                <Button Content="Board" Tag="Board" Click="Seg_Click" Padding="14,5" CornerRadius="6"
+                                        BorderThickness="0" Background="Transparent" FontSize="11.5" FontWeight="SemiBold"
+                                        Foreground="{Binding IsBoardView, Converter={StaticResource SegText}}" />
+                            </Grid>
+                            <Grid>
+                                <Border CornerRadius="6" Background="{Binding IsCalendarView, Converter={StaticResource SegBg}}" />
+                                <Button Content="Calendar" Tag="Calendar" Click="Seg_Click" Padding="14,5" CornerRadius="6"
+                                        BorderThickness="0" Background="Transparent" FontSize="11.5" FontWeight="SemiBold"
+                                        Foreground="{Binding IsCalendarView, Converter={StaticResource SegText}}" />
+                            </Grid>
+                            <Grid>
+                                <Border CornerRadius="6" Background="{Binding IsFinishedView, Converter={StaticResource SegBg}}" />
+                                <Button Content="Finished" Tag="Finished" Click="Seg_Click" Padding="14,5" CornerRadius="6"
+                                        BorderThickness="0" Background="Transparent" FontSize="11.5" FontWeight="SemiBold"
+                                        Foreground="{Binding IsFinishedView, Converter={StaticResource SegText}}" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -245,18 +257,26 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Priority" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                                    <Button Content="None" Tag="None" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" FontSize="11"
-                                            Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=None}"
-                                            Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=None}" />
-                                    <Button Content="Low" Tag="Low" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" FontSize="11"
-                                            Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=Low}"
-                                            Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=Low}" />
-                                    <Button Content="Medium" Tag="Medium" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" FontSize="11"
-                                            Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=Medium}"
-                                            Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=Medium}" />
-                                    <Button Content="High" Tag="High" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" FontSize="11"
-                                            Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=High}"
-                                            Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=High}" />
+                                    <Grid>
+                                        <Border CornerRadius="6" Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=None}" />
+                                        <Button Content="None" Tag="None" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" Background="Transparent" FontSize="11"
+                                                Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=None}" />
+                                    </Grid>
+                                    <Grid>
+                                        <Border CornerRadius="6" Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=Low}" />
+                                        <Button Content="Low" Tag="Low" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" Background="Transparent" FontSize="11"
+                                                Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=Low}" />
+                                    </Grid>
+                                    <Grid>
+                                        <Border CornerRadius="6" Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=Medium}" />
+                                        <Button Content="Medium" Tag="Medium" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" Background="Transparent" FontSize="11"
+                                                Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=Medium}" />
+                                    </Grid>
+                                    <Grid>
+                                        <Border CornerRadius="6" Background="{Binding NewTaskPriority, Converter={StaticResource SegBg}, ConverterParameter=High}" />
+                                        <Button Content="High" Tag="High" Click="NewPrio_Click" Padding="12,4" CornerRadius="6" BorderThickness="0" Background="Transparent" FontSize="11"
+                                                Foreground="{Binding NewTaskPriority, Converter={StaticResource SegText}, ConverterParameter=High}" />
+                                    </Grid>
                                 </StackPanel>
                             </Grid>
                             <Grid ColumnSpacing="10">

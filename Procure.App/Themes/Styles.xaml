@@ -36,11 +36,15 @@
     </Style>
 
     <!-- Native ButtonBackgroundPointerOver/Pressed default to a Fluent-grey overlay that isn't
-         one of our warm-neutral tokens. Most buttons never notice (their base isn't
-         Transparent), but custom-colored ones with a converter-bound Background - segmented
-         selectors whose "inactive" state is Transparent (Tasks' view switcher, priority picker,
-         PcrPreviewModal's layout pickers) - visibly flash that mismatched, non-theme-aware grey
-         on hover. Repoint to app tokens so hover is subtle and theme-correct everywhere. -->
+         one of our warm-neutral tokens - repoint to app tokens so hover/press is subtle and
+         theme-correct everywhere.
+         IMPORTANT: a Button whose own Background is a live Binding (segmented selectors -
+         Tasks' view switcher, priority picker, PcrPreviewModal's layout pickers) must NOT bind
+         Button.Background directly. Once the PointerOver/Pressed VisualState Setters below have
+         touched that property, WinUI fails to restore the Binding afterwards - the button gets
+         stuck on its first-ever value (usually Transparent) and never shows "selected" again.
+         Bind the selection fill on a plain Border behind/around the Button instead (Border isn't
+         subject to Button's CommonStates VSM), and leave Button.Background a static Transparent. -->
     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource AppSubtleFill}" />
     <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource AppTertiaryBackground}" />
 
