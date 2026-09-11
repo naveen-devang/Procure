@@ -39,12 +39,6 @@
                 </ResourceDictionary>
             </muxc:NavigationView.Resources>
 
-            <!-- Wordmark, since NavigationView has no other slot above the menu items. -->
-            <muxc:NavigationView.PaneHeader>
-                <TextBlock Text="&#9670; Procure" Margin="16,16,0,8" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{ThemeResource AppTextSecondary}" />
-            </muxc:NavigationView.PaneHeader>
-
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItemHeader Content="Workspace" />
                 <muxc:NavigationViewItem Content="PR Board" Tag="Board" IsSelected="True">
