@@ -58,7 +58,10 @@
                             <ColumnDefinition Width="1.3*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="New Row Defaults" VerticalAlignment="Center" Style="{StaticResource Lbl}" />
+                        <StackPanel VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="New Row Defaults" Style="{StaticResource Lbl}" />
+                            <TextBlock Text="applied to rows you add next" FontSize="10" Foreground="{ThemeResource AppTextTertiary}" />
+                        </StackPanel>
                         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPlants}" SelectedItem="{Binding BatchSharedPlant, Mode=TwoWay}" />
                         <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPrTypes}" SelectedItem="{Binding BatchSharedPrType, Mode=TwoWay}" />
                         <ComboBox Grid.Column="3" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPriorities}" SelectedItem="{Binding BatchSharedPriority, Mode=TwoWay}" />
@@ -112,7 +115,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <ScrollViewer Grid.Column="1">
+                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Visible">
                         <StackPanel Spacing="14" Padding="0,0,16,0">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
@@ -170,6 +173,27 @@
                                     <Button Content="+ Add Item" FontSize="11" Height="28" Padding="10,0"
                                             Command="{Binding AddBatchItemToPrCommand}" CommandParameter="{Binding SelectedBatchEntry}" />
                                 </StackPanel>
+                            </Grid>
+                            <Grid ColumnSpacing="8" Padding="0,0,0,2">
+                                <Grid.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontSize" Value="10.5" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="75" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="ITEM" />
+                                <TextBlock Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="EST. UNIT PRICE" />
+                                <Border Grid.Column="4" Width="28" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding SelectedBatchEntry.Items}">
                                 <ItemsControl.ItemTemplate>

@@ -28,18 +28,27 @@
         <Border MaxWidth="950" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
                 VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
-            <ScrollViewer>
+            <Grid RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ModalRfqTitle}" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
+                            Command="{Binding CloseAddRfqModalCommand}" />
+                </Grid>
+
+                <!-- Scrollbar always drawn: the dialog cut content off at the bottom with nothing
+                     to say there was more, which reads as clipped rather than scrollable. -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Visible" Padding="0,0,4,0">
                 <StackPanel Spacing="16">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding ModalRfqTitle}" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
-                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
-                                Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
-                                Command="{Binding CloseAddRfqModalCommand}" />
-                    </Grid>
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel Spacing="12">
@@ -198,20 +207,24 @@
                                     <ColumnDefinition Width="120" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Base Quote Sum" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Base Quote Sum ({0})'}" />
                                     <TextBox Text="{Binding NewRfqQuoteAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
                                              FontSize="13" FontWeight="SemiBold" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="Freight" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Freight ({0})'}" />
                                     <TextBox Text="{Binding NewRfqFreight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
-                                    <TextBlock Text="Other Charges" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Other Charges ({0})'}" />
                                     <TextBox Text="{Binding NewRfqOtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4">
-                                    <TextBlock Text="Total Discount" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Total Discount ({0})'}" />
                                     <TextBox Text="{Binding NewRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4" Spacing="4">
@@ -229,7 +242,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
-                                        <TextBlock Text="{Binding FormattedCalculatedRfqGrandTotal}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Text="{Binding FormattedCalculatedRfqGrandTotal}" FontSize="22" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Text="{Binding CalculatedRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
                                                FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
@@ -238,12 +251,17 @@
                         </StackPanel>
                     </Border>
 
+                </StackPanel>
+                </ScrollViewer>
+
+                <Grid Grid.Row="2" Padding="0,14,0,0">
+                    <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource AppHairline}" />
                     <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
                         <Button Content="Cancel" Command="{Binding CloseAddRfqModalCommand}" />
                         <Button Content="Save RFQ" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveNewRfqCommand}" />
                     </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
+                </Grid>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

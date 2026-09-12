@@ -61,7 +61,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <ScrollViewer Grid.Row="1" Padding="20,16">
+                <ScrollViewer Grid.Row="1" Padding="20,16" VerticalScrollBarVisibility="Visible">
                     <Grid>
                         <!-- ===== STEP 1 ===== -->
                         <StackPanel Spacing="14" Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}">
@@ -81,6 +81,11 @@
                             <TextBlock Text="No RFQ or vendor quotes found for this requisition. Create and price an RFQ first."
                                        FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}"
                                        Visibility="{Binding HasPoRfqs, Converter={StaticResource BoolVis}, ConverterParameter=invert}" />
+                            <!-- One card per selected supplier, stacked down a scroll: without a
+                                 count, the PO number fields for suppliers 2..n are easy to miss
+                                 entirely before hitting Raise. -->
+                            <TextBlock FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                                       Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
                             <ItemsControl ItemsSource="{Binding PoRfqSelections}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:PoRfqSelection">
@@ -133,6 +138,11 @@
                                 <TextBlock Text="{Binding PoAllocationSummaryText}" FontSize="11.5" FontWeight="SemiBold"
                                            Foreground="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilColor}}" />
                             </Border>
+                            <!-- One card per selected supplier, stacked down a scroll: without a
+                                 count, the PO number fields for suppliers 2..n are easy to miss
+                                 entirely before hitting Raise. -->
+                            <TextBlock FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                                       Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
                             <ItemsControl ItemsSource="{Binding PoRfqSelections}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:PoRfqSelection">
