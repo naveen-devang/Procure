@@ -119,8 +119,16 @@ namespace Procure.Data
 
             // Search goes through the denormalised column; exercising it here means the metrics
             // include it and a broken blob shows up as zero matches rather than silently later.
+            // A single letter is the worst case the search box can be given: it matches most of the
+            // database, and it is what the first keystroke sends. Timed, because the cost of getting
+            // this wrong does not show up as a failure anywhere else - an earlier query plan searched
+            // the index once per candidate requisition and took 117 SECONDS here.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var search = await repo.GetPageAsync(new PrQuery("a", null, false, false, false, 10, 5, 0, 25));
+            sw.Stop();
             Assert(search.TotalCount >= 0, "search completes");
+            Assert(sw.Elapsed.TotalSeconds < 3,
+                $"a one-letter search stays interactive; took {sw.Elapsed.TotalSeconds:F1}s for {search.TotalCount} matches");
         }
 
         private static async Task PrLifecycleAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)

@@ -427,23 +427,22 @@ ORDER BY SortOrder ASC;";
             int total;
             using (var countCmd = connection.CreateCommand())
             {
-                countCmd.CommandText = "SELECT COUNT(*) FROM PurchaseRequisition" + BuildWhere(countCmd, query) + ";";
+                countCmd.CommandText = MatchesCte(query) + "SELECT COUNT(*) FROM PurchaseRequisition" + BuildWhere(countCmd, query) + ";";
                 total = Convert.ToInt32(await countCmd.ExecuteScalarAsync().ConfigureAwait(false));
             }
 
             var prs = new List<PurchaseRequisition>();
             using (var cmd = connection.CreateCommand())
             {
-                // Searching orders by relevance, browsing by date. The rank comes from a joined
-                // subquery rather than a bare MATCH so the WHERE clause above stays the same shape
-                // for the count query, which needs no ordering at all.
+                // Searching orders by relevance, browsing by date. The filter and the ordering read
+                // the same materialised CTE, so the index is searched once per query.
                 var searching = !string.IsNullOrWhiteSpace(query.Search);
                 var rankJoin = searching
-                    ? $"\nLEFT JOIN (SELECT prid, {DatabaseConstants.SqlSearchRank} AS rank FROM PrSearch WHERE PrSearch MATCH @Match) m ON m.prid = PurchaseRequisition.Id"
+                    ? "\nJOIN Matches ON Matches.rid = PurchaseRequisition.rowid"
                     : string.Empty;
-                var order = searching ? "m.rank ASC, CreatedAt DESC" : "CreatedAt DESC";
+                var order = searching ? "Matches.rank ASC, CreatedAt DESC" : "CreatedAt DESC";
 
-                cmd.CommandText = @"
+                cmd.CommandText = MatchesCte(query) + @"
 SELECT PurchaseRequisition.Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
 FROM PurchaseRequisition" + rankJoin + BuildWhere(cmd, query) + @"
 ORDER BY " + order + @"
@@ -555,6 +554,14 @@ ORDER BY CreatedAt DESC;";
             cmd.Parameters.AddWithValue("@NormalCutoff", DateTime.Today.AddDays(-normalOverdueDays).ToString("yyyy-MM-dd"));
         }
 
+        /// <summary>The one search of the index, named so both the filter and the ordering can read
+        /// it. MATERIALIZED is the point: without it SQLite inlines the subquery and searches the
+        /// index again for every requisition it considers.</summary>
+        private static string MatchesCte(PrQuery query) =>
+            string.IsNullOrWhiteSpace(query.Search)
+                ? string.Empty
+                : $"WITH Matches AS MATERIALIZED (SELECT rowid AS rid, {DatabaseConstants.SqlSearchRank} AS rank FROM PrSearch WHERE PrSearch MATCH @Match)" + "\n";
+
         /// <summary>Builds the board's filter clause and binds its parameters. Mirrors what
         /// PrListPageModel.ApplyFilters used to do in memory, including the rule that merged PRs are
         /// hidden by default but reappear once you search or pick a status.</summary>
@@ -569,7 +576,11 @@ ORDER BY CreatedAt DESC;";
                 // Matched against the FTS index rather than scanned. BuildFtsMatch turns what was
                 // typed into an FTS5 expression; the join that carries the rank is added by the
                 // caller, since only the ordering needs it.
-                clauses.Add("PurchaseRequisition.Id IN (SELECT prid FROM PrSearch WHERE PrSearch MATCH @Match)");
+                // By rowid, not by prid: the index row shares its requisition's rowid, so this is a
+                // primary-key lookup, and it reads the CTE the caller wrapped the query in - one
+                // search of the index. Matching on the prid column made SQLite search the index
+                // again for every candidate row: 117 seconds for a word 7,000 requisitions contain.
+                clauses.Add("PurchaseRequisition.rowid IN (SELECT rid FROM Matches)");
                 cmd.Parameters.AddWithValue("@Match", BuildFtsMatch(query.Search!, query.MatchAnyOf));
             }
 
