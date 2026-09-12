@@ -42,6 +42,10 @@
 
         <DataTemplate x:Key="CallOffLineRow" x:DataType="models:CallOffLine">
             <Grid Padding="8,6" Margin="0,0,2,0" CornerRadius="6" Tapped="Line_Tapped" Background="Transparent">
+                <Grid.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Grid.Resources>
                 <StackPanel Spacing="4">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -121,6 +125,10 @@
                                         </TransitionCollection>
                                     </StackPanel.ChildrenTransitions>
                                     <Grid ColumnSpacing="8" Tapped="Group_Tapped" Background="Transparent">
+                                        <Grid.Resources>
+                                            <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                                        </Grid.Resources>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />

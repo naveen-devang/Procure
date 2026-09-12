@@ -197,6 +197,10 @@
                             <!-- row (tap to expand) - borderless, hairline below, hover fill from the
                                  container's own PointerOver state (see ListView.Resources above). -->
                             <Grid ColumnSpacing="14" Padding="12,10" Tapped="Card_Tapped" Background="Transparent">
+                                <Grid.Resources>
+                                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                                </Grid.Resources>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="3" />
                                     <ColumnDefinition Width="Auto" />

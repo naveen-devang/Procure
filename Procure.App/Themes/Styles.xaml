@@ -30,9 +30,35 @@
     <FontFamily x:Key="ContentControlThemeFontFamily">ms-appx:///Assets/Fonts/PlusJakartaSans-Variable.ttf#Plus Jakarta Sans</FontFamily>
 
     <!-- Applies to every plain TextBlock app-wide (Controls pick up ContentControlThemeFontFamily
-         above on their own). -->
-    <Style TargetType="TextBlock">
+         above on their own).
+
+         IsTextSelectionEnabled restores what the MAUI build had: a PR number, a vendor name, an
+         amount or a contract number can be selected and copied from wherever it is shown, instead
+         of being read off the screen and retyped. MAUI did it by mapping every Label onto the
+         native TextBlock's own selection support; this implicit style is the same switch.
+
+         It is not free, which is why the MAUI version carried an exclusion list. A
+         selection-enabled TextBlock hit-tests its whole layout box, not just its glyphs, so inside
+         something meant to be CLICKED it swallows the press and drags out a selection instead.
+         MAUI excluded any label under a TapGestureRecognizer; the equivalent here is
+         NonSelectableText, applied as a scoped implicit style inside each Tapped container (board
+         rows, call-off lines and groups, task rows, note rows).
+
+         Named as well as implicit so the exclusion can be BasedOn it - otherwise a scoped style
+         would drop the font too, since a TextBlock takes one Style and keyed styles do not inherit
+         from the implicit one. -->
+    <Style x:Key="AppText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="IsTextSelectionEnabled" Value="True" />
+    </Style>
+
+    <Style TargetType="TextBlock" BasedOn="{StaticResource AppText}" />
+
+    <!-- For the inside of anything that is clicked rather than read. Put it in that element's
+         Resources as an implicit TextBlock style and every TextBlock under it stops competing with
+         the click. -->
+    <Style x:Key="NonSelectableText" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+        <Setter Property="IsTextSelectionEnabled" Value="False" />
     </Style>
 
     <!-- Native ButtonBackgroundPointerOver/Pressed default to a Fluent-grey overlay that isn't

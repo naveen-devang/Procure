@@ -32,6 +32,10 @@
 
         <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
             <Grid Padding="11,8" Tapped="Note_Tapped">
+                <Grid.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Grid.Resources>
                 <StackPanel Spacing="1">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <Ellipse Width="5" Height="5" VerticalAlignment="Center" Fill="{ThemeResource PrimaryTextBrush}"

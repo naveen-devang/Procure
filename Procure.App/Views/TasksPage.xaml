@@ -41,6 +41,10 @@
 
         <DataTemplate x:Key="TaskRow" x:DataType="models:TodoTask">
             <Grid Padding="6,3" ColumnSpacing="4" Tapped="Row_Tapped">
+                <Grid.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4" />
                     <ColumnDefinition Width="32" />
@@ -84,6 +88,10 @@
             <Border Padding="9,7" Margin="0,0,0,6" BorderThickness="1" CornerRadius="7"
                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}"
                     Tapped="Row_Tapped">
+                <Border.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Border.Resources>
                 <Grid ColumnSpacing="4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
@@ -107,6 +115,10 @@
             <Border Padding="6,5" Margin="0,0,0,4" BorderThickness="1" CornerRadius="6"
                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}"
                     Tapped="Row_Tapped">
+                <Border.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Border.Resources>
                 <Grid ColumnSpacing="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3" />
