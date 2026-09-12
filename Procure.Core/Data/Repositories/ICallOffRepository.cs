@@ -9,7 +9,10 @@ namespace Procure.Data.Repositories
     {
         /// <summary>One row per material, aggregated in SQL, optionally filtered by a search term
         /// that matches material, vendor or PO number.</summary>
-        Task<List<MaterialGroupSummary>> GetMaterialSummariesAsync(string? searchTerm = null);
+        /// <summary>One page of the material list, ordered by last activity in SQL - a slice sorted
+        /// afterwards would be the wrong slice.</summary>
+        Task<List<MaterialGroupSummary>> GetMaterialSummariesAsync(
+            string? searchTerm = null, bool newestFirst = true, int skip = 0, int take = int.MaxValue);
 
         /// <summary>One expanded material's lines, under the same search filter the summaries used.</summary>
         Task<List<CallOffLine>> GetLinesForMaterialAsync(string materialName, string? searchTerm = null, int skip = 0, int take = int.MaxValue);

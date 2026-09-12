@@ -43,7 +43,16 @@ JOIN PurchaseOrder po ON poi.PoId = po.Id
 JOIN PurchaseRequisition pr ON po.PrId = pr.Id
 WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
 
-        public async Task<List<MaterialGroupSummary>> GetMaterialSummariesAsync(string? searchTerm = null)
+        /// <summary>One page of the material list.
+        ///
+        /// Paged, and sorted in SQL rather than afterwards in memory: the page model used to read
+        /// every distinct material and order the lot by last activity, which is fine at a few hundred
+        /// materials and is a full list build on every open, every search keystroke and every
+        /// delivery logged. Ordering has to happen here now - a slice of rows sorted after the fact
+        /// is the wrong slice.
+        /// </summary>
+        public async Task<List<MaterialGroupSummary>> GetMaterialSummariesAsync(
+            string? searchTerm = null, bool newestFirst = true, int skip = 0, int take = int.MaxValue)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             var list = new List<MaterialGroupSummary>();
@@ -53,6 +62,7 @@ WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
 
             var term = searchTerm?.Trim();
             var filtered = !string.IsNullOrEmpty(term);
+            var direction = newestFirst ? "DESC" : "ASC";
 
             using var cmd = connection.CreateCommand();
             if (!filtered)
@@ -63,7 +73,8 @@ WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
                 cmd.CommandText = @"
 SELECT MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit, COALESCE(LastActivity, '')
 FROM MaterialAggregate
-ORDER BY MaterialName COLLATE NOCASE ASC;";
+ORDER BY COALESCE(LastActivity, '') " + direction + @", MaterialName COLLATE NOCASE ASC
+LIMIT @take OFFSET @skip;";
             }
             else
             {
@@ -76,13 +87,17 @@ SELECT TRIM(poi.ItemName) AS M,
        COALESCE(SUM(poi.Quantity), 0),
        COALESCE(SUM((SELECT COALESCE(SUM(Quantity), 0) FROM PoItemCallOff WHERE PoItemId = poi.Id)), 0),
        MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')),
-       MAX(COALESCE(po.Date, ''))
+       MAX(COALESCE(po.Date, '')) AS Last
 " + EligibleLines + @"
   AND (" + SearchMatch + @")
 GROUP BY M COLLATE NOCASE
-ORDER BY M COLLATE NOCASE ASC;";
+ORDER BY Last " + direction + @", M COLLATE NOCASE ASC
+LIMIT @take OFFSET @skip;";
                 cmd.Parameters.AddWithValue("@q", "%" + EscapeLike(term!) + "%");
             }
+
+            cmd.Parameters.AddWithValue("@take", take);
+            cmd.Parameters.AddWithValue("@skip", skip);
 
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))

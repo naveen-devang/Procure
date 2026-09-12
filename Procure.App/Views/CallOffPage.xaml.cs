@@ -51,6 +51,16 @@ public sealed partial class CallOffPage : Page
         }
     }
 
+    /// <summary>Grows the material list as the user nears the end of it - the same trigger the board
+    /// uses, on the same reasoning: a scroll event fires far more often than a container realizes.</summary>
+    private void GroupList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (!args.InRecycleQueue && args.ItemIndex >= Vm.Groups.Count - 6)
+        {
+            if (Vm.LoadMoreGroupsCommand.CanExecute(null)) Vm.LoadMoreGroupsCommand.Execute(null);
+        }
+    }
+
     private void Group_Tapped(object sender, TappedRoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is MaterialGroup g) Vm.ToggleExpandCommand.Execute(g);

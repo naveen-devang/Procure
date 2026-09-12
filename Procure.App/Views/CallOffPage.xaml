@@ -100,7 +100,9 @@
                             ToolTipService.ToolTip="Refresh" />
                 </Grid>
 
-                <ListView Grid.Row="1" x:Name="GroupList" ItemsSource="{Binding Groups}" SelectionMode="None" Margin="8">
+                <ListView Grid.Row="1" x:Name="GroupList" ItemsSource="{Binding Groups}" SelectionMode="None" Margin="8"
+                          ContainerContentChanging="GroupList_ContainerContentChanging"
+                          Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
                     <!-- MAUI animated the expand; WinUI's list does not by default. -->
                     <ListView.ItemContainerTransitions>
                         <TransitionCollection>
@@ -172,6 +174,18 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+
+                <!-- Materials arrive a page at a time now, so the first open goes from a full list to
+                     an empty one that fills. Only the first fill - scrolling for more happens below
+                     the fold and needs nothing. -->
+                <StackPanel Grid.Row="1" Margin="8,8,8,0" Spacing="8"
+                            Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}}">
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                </StackPanel>
             </Grid>
         </Border>
 

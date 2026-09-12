@@ -196,28 +196,73 @@ namespace Procure.PageModels
         // once - on a common term that was ~48,000 rows in one pass, which never finished.
         private async Task RebuildGroupsAsync(int? generation = null)
         {
-            var term = SearchText?.Trim();
             try
             {
-                var summaries = await _repo.GetMaterialSummariesAsync(term).ConfigureAwait(true);
+                var page = await LoadGroupsPageAsync(0).ConfigureAwait(true);
                 if (generation.HasValue && generation.Value != _searchGeneration) return;
 
-                // Ordered by the newest PO the material appears on, not by how complete it is:
-                // sorting by PercentComplete meant logging a delivery moved the row you had just
-                // logged against out from under you.
-                var ordered = SortNewestFirst
-                    ? summaries.OrderByDescending(s => s.LastActivity, StringComparer.Ordinal).ThenBy(s => s.MaterialName, StringComparer.OrdinalIgnoreCase)
-                    : summaries.OrderBy(s => s.LastActivity, StringComparer.Ordinal).ThenBy(s => s.MaterialName, StringComparer.OrdinalIgnoreCase);
-
-                var groups = ordered
-                    .Select(s => new MaterialGroup(s) { PageRequested = LoadGroupPageAsync })
-                    .ToList();
-
-                Groups = new ObservableCollection<MaterialGroup>(groups);
+                Groups = new ObservableCollection<MaterialGroup>(page);
+                _allGroupsLoaded = page.Count < GroupPageSize;
             }
             catch (Exception ex)
             {
                 _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>Materials arrive a page at a time now. The list used to be every distinct material
+        /// in the database, built on every open, every search keystroke and every delivery logged -
+        /// bounded by the catalogue rather than by the viewport.
+        ///
+        /// Ordering moved into SQL with it. Sorting a slice after the fact sorts the wrong rows.</summary>
+        /// <summary>The first fill only: an empty list that is about to have materials in it. Scrolling
+        /// for more pages happens below the fold, where nothing needs to be said.</summary>
+        public bool IsFirstFill => IsBusy && Groups.Count == 0;
+
+        partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(IsFirstFill));
+
+        private const int GroupPageSize = 40;
+        private bool _allGroupsLoaded;
+        private bool _loadingGroups;
+
+        private async Task<List<MaterialGroup>> LoadGroupsPageAsync(int skip)
+        {
+            // Task.Run, and not for politeness. Microsoft.Data.Sqlite's *Async methods run
+            // synchronously, so awaiting one from inside a list's container-realization callback
+            // resumes INLINE: adding the rows realizes more containers, which asks for more rows,
+            // which adds more. That recursion is a stack overflow - the process dies instantly with
+            // nothing in the crash log, because a StackOverflowException cannot be caught or logged.
+            // The board's own load-more has always hopped threads for the same reason.
+            var summaries = await Task.Run(() => _repo
+                .GetMaterialSummariesAsync(SearchText?.Trim(), SortNewestFirst, skip, GroupPageSize))
+                .ConfigureAwait(true);
+
+            return summaries.Select(s => new MaterialGroup(s) { PageRequested = LoadGroupPageAsync }).ToList();
+        }
+
+        /// <summary>Grows the list as the user nears the end of it, the way the board does.</summary>
+        [RelayCommand]
+        public async Task LoadMoreGroupsAsync()
+        {
+            if (_loadingGroups || _allGroupsLoaded || IsBusy) return;
+
+            try
+            {
+                _loadingGroups = true;
+                var generation = _searchGeneration;
+                var page = await LoadGroupsPageAsync(Groups.Count).ConfigureAwait(true);
+                if (generation != _searchGeneration) return;   // a search superseded this
+
+                foreach (var g in page) Groups.Add(g);
+                if (page.Count < GroupPageSize) _allGroupsLoaded = true;
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                _loadingGroups = false;
             }
         }
 
