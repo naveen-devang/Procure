@@ -194,47 +194,70 @@ public sealed class WinUiAppHost : IAppHost
 
     public event EventHandler? ThemeChanged;
 
-    /// <summary>Startup + accent-picker hook. Rewrites AccentFillBrush / PrimaryTextBrush
-    /// (App.xaml keeps them out of the theme dictionaries for exactly this).</summary>
+    /// <summary>Startup + accent-picker hook. Recolours the accent brushes in place.
+    ///
+    /// It must RECOLOUR, never replace: assigning a new SolidColorBrush into the resource
+    /// dictionary leaves every element that already resolved the key holding the old brush
+    /// object - a ThemeResource re-resolves on a theme change, not when a dictionary entry is
+    /// swapped - so the dictionary was right and the screen never moved (picking Coral left
+    /// the pills green). Setting .Color on the brush that is already there repaints every
+    /// element pointing at it on the next frame, with no rebind pass anywhere.</summary>
     public void ApplyAccentColor(string accentId)
     {
         var p = Procure.Models.AccentPalettes.All.FirstOrDefault(
                     x => string.Equals(x.Id, accentId, StringComparison.OrdinalIgnoreCase))
                 ?? Procure.Models.AccentPalettes.All[0];
 
-        var isDark = _shell.Window?.Content is FrameworkElement fe
-                     && fe.ActualTheme == ElementTheme.Dark;
+        // From the chosen mode, not ActualTheme: ActualTheme lags a RequestedTheme change by a
+        // layout pass, so reading it here picked the shade for the theme we just left.
+        var isDark = _settings.AppTheme switch
+        {
+            "Light" => false,
+            "Dark" => true,
+            _ => Microsoft.UI.Xaml.Application.Current.RequestedTheme == ApplicationTheme.Dark,
+        };
 
         var fill = ParseHex(p.DarkHex);                       // pastel fill, both modes
         var primary = ParseHex(isDark ? p.DarkHex : p.LightHex);   // text/icons on plain bg
 
-        var res = Microsoft.UI.Xaml.Application.Current.Resources;
-        res["AccentFillBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(fill);
-        res["PrimaryTextBrush"] = new Microsoft.UI.Xaml.Media.SolidColorBrush(primary);
+        SetAccent("AccentFillBrush", fill);
+        SetAccent("PrimaryTextBrush", primary);
 
         // Repoint the Fluent accent brushes so AccentButtonStyle, ToggleButton-checked,
         // NavigationView selection etc. use the app's pastel accent instead of the bright
         // Windows system accent. 'primary' pairs with TextOnAccentFillColorPrimaryBrush
         // (white in light, near-black in dark) - deep accent in light, pastel in dark.
-        Microsoft.UI.Xaml.Media.SolidColorBrush B(Windows.UI.Color c) => new(c);
-        res["AccentFillColorDefaultBrush"] = B(primary);
-        res["AccentFillColorSecondaryBrush"] = B(WithAlpha(primary, 0.90));
-        res["AccentFillColorTertiaryBrush"] = B(WithAlpha(primary, 0.80));
+        SetAccent("AccentFillColorDefaultBrush", primary);
+        SetAccent("AccentFillColorSecondaryBrush", WithAlpha(primary, 0.90));
+        SetAccent("AccentFillColorTertiaryBrush", WithAlpha(primary, 0.80));
         // AccentButtonStyle resolves these at style-load from generic.xaml, so the
         // AccentFillColor* swap above doesn't reach it - set them directly too.
-        res["AccentButtonBackground"] = B(primary);
-        res["AccentButtonBackgroundPointerOver"] = B(WithAlpha(primary, 0.90));
-        res["AccentButtonBackgroundPressed"] = B(WithAlpha(primary, 0.80));
-        res["AccentButtonBorderBrush"] = B(primary);
-        res["AccentButtonBorderBrushPointerOver"] = B(WithAlpha(primary, 0.90));
-        res["AccentButtonBorderBrushPressed"] = B(WithAlpha(primary, 0.80));
+        SetAccent("AccentButtonBackground", primary);
+        SetAccent("AccentButtonBackgroundPointerOver", WithAlpha(primary, 0.90));
+        SetAccent("AccentButtonBackgroundPressed", WithAlpha(primary, 0.80));
+        SetAccent("AccentButtonBorderBrush", primary);
+        SetAccent("AccentButtonBorderBrushPointerOver", WithAlpha(primary, 0.90));
+        SetAccent("AccentButtonBorderBrushPressed", WithAlpha(primary, 0.80));
 
         // Same story for ToggleButton's checked state (filter chips, Settings' Color Mode
         // pills, theme toggles) - resolved at style-load too, same fix.
-        res["ToggleButtonBackgroundChecked"] = B(primary);
-        res["ToggleButtonBackgroundCheckedPointerOver"] = B(WithAlpha(primary, 0.90));
-        res["ToggleButtonBackgroundCheckedPressed"] = B(WithAlpha(primary, 0.80));
-        res["ToggleButtonBorderBrushChecked"] = B(primary);
+        SetAccent("ToggleButtonBackgroundChecked", primary);
+        SetAccent("ToggleButtonBackgroundCheckedPointerOver", WithAlpha(primary, 0.90));
+        SetAccent("ToggleButtonBackgroundCheckedPressed", WithAlpha(primary, 0.80));
+        SetAccent("ToggleButtonBorderBrushChecked", primary);
+    }
+
+    /// <summary>Recolour the brush already under this key; only insert one the first time,
+    /// which has to happen before any element resolves the key (App.OnLaunched does it).</summary>
+    private static void SetAccent(string key, Windows.UI.Color c)
+    {
+        var res = Microsoft.UI.Xaml.Application.Current.Resources;
+        object? existing = null;
+        try { existing = res[key]; } catch { }   // indexer, not TryGetValue: it searches merged dictionaries
+        if (existing is Microsoft.UI.Xaml.Media.SolidColorBrush b)
+            b.Color = c;
+        else
+            res[key] = new Microsoft.UI.Xaml.Media.SolidColorBrush(c);
     }
 
     private static Windows.UI.Color WithAlpha(Windows.UI.Color c, double a) =>

@@ -288,8 +288,12 @@ namespace Procure.PageModels
         [RelayCommand]
         public void SelectAccentTheme(string accentId)
         {
-            SelectedAccentTheme = accentId;
+            // Service first. Writing it raises SettingsChanged, which is what recolours the accent
+            // brushes; setting the property first fired PropertyChanged - and every view repaint
+            // hanging off it - while the old accent was still live, so the page painted one
+            // accent behind (picked Coral, pills stayed green).
             _settingsService.AccentTheme = accentId;
+            SelectedAccentTheme = accentId;
         }
 
         private void OnUpdateServiceStateChanged(object? sender, EventArgs e)
@@ -544,7 +548,8 @@ namespace Procure.PageModels
             }
             Environment.Exit(0);
         }
-
+
+
         [RelayCommand]
         public void AddNewDefaultStage()
         {

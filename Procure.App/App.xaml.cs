@@ -72,6 +72,12 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // Before any window exists: the first ApplyAccentColor is the only one that may INSERT
+        // a brush (later ones recolour it in place). Anything that resolved an accent key before
+        // that insert would be holding the framework's brush and would never repaint.
+        (Services.GetRequiredService<IAppHost>() as WinUiAppHost)?
+            .ApplyAccentColor(Services.GetRequiredService<ISettingsService>().AccentTheme);
+
         _window = Services.GetRequiredService<MainWindow>();
         _window.Activate();
     }
