@@ -153,8 +153,26 @@
             </Grid>
         </Border>
 
-        <!-- RIGHT: detail -->
-        <Grid Grid.Column="1" RowSpacing="14" Visibility="{Binding SelectedLine, Converter={StaticResource NullVis}}">
+        <!-- RIGHT: detail. Toggling Visibility animates nothing in WinUI, so picking a vendor
+             swapped the pane in with a hard cut; the page code runs DetailEntrance on every
+             selection change instead. -->
+        <Grid x:Name="DetailPane" Grid.Column="1" RowSpacing="14"
+              Visibility="{Binding SelectedLine, Converter={StaticResource NullVis}}">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="DetailShift" />
+            </Grid.RenderTransform>
+            <Grid.Resources>
+                <Storyboard x:Name="DetailEntrance">
+                    <DoubleAnimation Storyboard.TargetName="DetailPane" Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.18" />
+                    <DoubleAnimation Storyboard.TargetName="DetailShift" Storyboard.TargetProperty="Y"
+                                     From="14" To="0" Duration="0:0:0.22" EnableDependentAnimation="True">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </Grid.Resources>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

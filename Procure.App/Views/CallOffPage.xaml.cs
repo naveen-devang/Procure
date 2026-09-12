@@ -19,11 +19,20 @@ public sealed partial class CallOffPage : Page
         Vm = App.Services.GetRequiredService<CallOffPageModel>();
         DataContext = Vm;
         Loaded += OnLoaded;
+        Vm.PropertyChanged += OnVmPropertyChanged;
         Unloaded += (_, _) =>
         {
             Vm.IsVisible = false;
             Vm.ReleaseLines();   // collapse every group -> drop the loaded CallOffLine rows
         };
+    }
+
+    /// <summary>Runs the detail pane's entrance on every selection, not just the first: the pane
+    /// is shown by a Visibility binding, and WinUI does not animate a visibility change.</summary>
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(Vm.SelectedLine) || Vm.SelectedLine is null) return;
+        DispatcherQueue.TryEnqueue(() => DetailEntrance.Begin());
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
