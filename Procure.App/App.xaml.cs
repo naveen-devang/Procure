@@ -38,11 +38,12 @@ public partial class App : Application
             e.SetObserved();
         };
 
-        // Point at the real 20k test DB unless PROCURE_DB_DIR is already set. A real install
-        // would fall through to DatabaseConstants' AppPaths default.
-        var dbDir = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
-                    ?? @"E:\Procure\Procure\TestData\procure-20k";
-        Environment.SetEnvironmentVariable("PROCURE_DB_DIR", dbDir);
+        // No default database path here. This used to point at the 20,000-PR test folder unless
+        // PROCURE_DB_DIR said otherwise, which on any machine but this one is a path that does not
+        // exist - so the app would create a new empty database somewhere the user would never look,
+        // and every requisition they had ever entered would appear to be gone. The saved location,
+        // or AppPaths' default, is resolved by DatabaseConstants; PROCURE_DB_DIR still overrides it
+        // for a test run (see Tools/generate-test-db.py).
 
         // WinUI x:Bind invokes PropertyChanged on the raising thread and throws cross-thread;
         // several repo writes mutate models from Task.Run. Marshal those notifications.
@@ -80,6 +81,13 @@ public partial class App : Application
 
         _window = Services.GetRequiredService<MainWindow>();
         _window.Activate();
+
+#if DEBUG
+        // The same suite the MAUI head runs, from Procure.Core - opt-in per environment variable
+        // (PROCURE_SELFCHECK, PROCURE_FLOW_SELFCHECK, ...). After Activate so a check that takes
+        // half a minute is not sitting between launch and the first window.
+        _ = Procure.Data.SelfCheckSuite.RunAsync(Services);
+#endif
     }
 
     private static IServiceProvider BuildServices()

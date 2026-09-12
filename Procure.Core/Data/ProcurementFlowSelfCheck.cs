@@ -8,7 +8,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Maui;
 using Procure.Data.Repositories;
 using Procure.Models;
 using Procure.PageModels;
@@ -47,6 +46,12 @@ namespace Procure.Data
         private const string Brush = "CARBON BRUSH,25X50X50MM F/FRAME:M15E";
         private const string Gasket = "GASKET,SPIRAL WOUND,DN50,CL150";
         private const string Gypsum = "GYPSUM";
+
+        /// <summary>The host's container. Set by whichever head is running the check - this used to
+        /// read MAUI's IPlatformApplication.Current directly, which is why the whole suite could only
+        /// ever run from the MAUI app. One phase needs the board's page model; the rest are pure
+        /// repository work.</summary>
+        public static IServiceProvider? HostServices { get; set; }
 
         private static readonly List<Phase> Phases = new();
         private static readonly List<string> Failures = new();
@@ -497,7 +502,7 @@ namespace Procure.Data
 
         private static async Task QuoteSyncFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
         {
-            var model = IPlatformApplication.Current?.Services?.GetService<PrListPageModel>();
+            var model = HostServices?.GetService<PrListPageModel>();
             if (model == null)
             {
                 Failures.Add("SKIPPED 09: the PR board page model was not available from the container.");

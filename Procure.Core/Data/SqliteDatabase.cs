@@ -2,6 +2,9 @@
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
+using Procure.Utilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -16,6 +19,106 @@ namespace Procure.Data
         public SqliteDatabase(ILogger<SqliteDatabase>? logger = null)
         {
             _logger = logger;
+        }
+
+        /// <summary>How many migration backups to keep. Enough to step back through a couple of
+        /// upgrades; not so many that a large database quietly fills the disk.</summary>
+        private const int BackupsToKeep = 3;
+
+        /// <summary>Copies the database before a migration touches it, and proves the copy is
+        /// readable before letting the migration proceed.
+        ///
+        /// VACUUM INTO rather than a file copy: the live database has a WAL sidecar holding commits
+        /// that are not in the main file yet, so copying the one file can capture a database that is
+        /// missing its most recent writes. VACUUM INTO writes a single consistent file with
+        /// everything in it.
+        ///
+        /// If the backup cannot be made or cannot be read back, the migration does NOT run. An app
+        /// that refuses to start until there is disk space is a bad morning; a half-migrated database
+        /// with no copy of the original is a catastrophe.</summary>
+        private static async Task BackupBeforeMigrationAsync(SqliteConnection connection, int storedVersion)
+        {
+            // A database this app has never stamped is either brand new or empty - nothing to lose,
+            // and no reason to make a new user wait on a pointless copy.
+            if (storedVersion == 0 && !await HasAnyDataAsync(connection).ConfigureAwait(false)) return;
+
+            var dir = DatabaseConstants.DatabaseDirectory;
+            var path = Path.Combine(dir,
+                $"procure_tracker.pre-v{DatabaseConstants.SchemaVersion}-{DateTime.Now:yyyyMMdd-HHmmss}.backup.db3");
+
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    // The path is quoted as an SQL string literal - VACUUM INTO takes an expression,
+                    // not a parameter.
+                    cmd.CommandText = "VACUUM INTO '" + path.Replace("'", "''") + "';";
+                    cmd.CommandTimeout = 0;   // a large database can take a while; it is once per upgrade
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
+
+                await VerifyBackupAsync(path).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort */ }
+                CrashLog.Write($"Migration backup failed ({storedVersion} -> {DatabaseConstants.SchemaVersion})", ex);
+                throw new InvalidOperationException(
+                    "Procure needs to update its database, and could not first save a backup copy of it at " +
+                    dir + ". The update has not been made and your data has not been changed. " +
+                    "Free up disk space (a copy of the database needs about as much room as the database itself) " +
+                    "and start Procure again. Details: " + ex.Message, ex);
+            }
+
+            CrashLog.Write($"Migration backup written: {Path.GetFileName(path)} " +
+                           $"({new FileInfo(path).Length / (1024 * 1024)} MB, schema {storedVersion} -> {DatabaseConstants.SchemaVersion})");
+            PruneOldBackups(dir);
+        }
+
+        /// <summary>Opens the copy and reads from it. A file of the right size that SQLite cannot open
+        /// is not a backup, and finding that out now - while the original is still untouched - is the
+        /// whole point.</summary>
+        private static async Task VerifyBackupAsync(string path)
+        {
+            var readOnly = new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly }.ToString();
+            using var check = new SqliteConnection(readOnly);
+            await check.OpenAsync().ConfigureAwait(false);
+
+            using var cmd = check.CreateCommand();
+            cmd.CommandText = "PRAGMA quick_check;";
+            var result = (await cmd.ExecuteScalarAsync().ConfigureAwait(false))?.ToString();
+            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("the backup copy did not pass SQLite's integrity check: " + result);
+        }
+
+        private static async Task<bool> HasAnyDataAsync(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText =
+                "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='PurchaseRequisition');";
+            if (Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) == 0) return false;
+
+            cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM PurchaseRequisition);";
+            return Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) == 1;
+        }
+
+        /// <summary>Keeps the newest <see cref="BackupsToKeep"/> and removes the rest.</summary>
+        private static void PruneOldBackups(string dir)
+        {
+            try
+            {
+                var old = new DirectoryInfo(dir)
+                    .GetFiles("procure_tracker.pre-v*.backup.db3")
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .Skip(BackupsToKeep);
+                foreach (var f in old) f.Delete();
+            }
+            catch
+            {
+                // Housekeeping only - never worth failing a launch over.
+            }
         }
 
         public SqliteConnection CreateConnection()
@@ -59,6 +162,14 @@ namespace Procure.Data
                 var storedVersion = await ReadSchemaVersionAsync(connection).ConfigureAwait(false);
                 if (storedVersion != DatabaseConstants.SchemaVersion)
                 {
+                    // Before anything is altered: a copy of the database as it is right now. A
+                    // migration rewrites tables and, from v19, drops a column - all irreversible on
+                    // the file itself, and a machine that loses power or runs out of disk halfway
+                    // through leaves it in a state nobody can reason about. This is the only thing
+                    // standing between an upgrade going wrong and a colleague losing years of
+                    // procurement history.
+                    await BackupBeforeMigrationAsync(connection, storedVersion).ConfigureAwait(false);
+
                     using (var cmd = connection.CreateCommand())
                     {
                         cmd.CommandText = DatabaseConstants.SqlCreateTables;

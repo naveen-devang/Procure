@@ -77,7 +77,9 @@
 
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
              Bottom-right so it clears the caption buttons reserved by ExtendsContentIntoTitleBar. -->
-        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+        <!-- Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
+        <Border x:Name="Hud" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,12,10" Padding="8,4"
                 CornerRadius="4" IsHitTestVisible="False"
                 Background="#99000000">

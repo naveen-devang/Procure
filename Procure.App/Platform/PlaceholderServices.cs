@@ -28,7 +28,7 @@ public sealed class WinUiErrorHandler : IErrorHandler
             var dialog = new ContentDialog
             {
                 Title = "Something went wrong",
-                Content = ex.Message,
+                Content = UserFacingError.Describe(ex),
                 CloseButtonText = "OK",
                 XamlRoot = _shell.XamlRoot,
             };

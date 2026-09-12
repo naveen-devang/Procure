@@ -255,26 +255,26 @@ namespace Procure.Utilities
         private static void BadgeTextGetsTheRightColour()
         {
             void Expect(string text, int state, string what)
-                => Assert(PoFulfillmentPalette.Classify(text) == state,
-                    $"{what} - '{text}' classified as {PoFulfillmentPalette.Classify(text)}, expected {state}");
+                => Assert(PoFulfillmentState.Classify(text) == state,
+                    $"{what} - '{text}' classified as {PoFulfillmentState.Classify(text)}, expected {state}");
 
             // Red: more has been committed than the requisition asks for.
-            Expect("Over-ordered by 15 NOS (Ordered: 40, PR asks for 25)", PoFulfillmentPalette.Over, "an over-ordered line is red");
-            Expect("PO: Over-ordered (1 of 2 items - 15 more than the PR asks for)", PoFulfillmentPalette.Over, "so is the PR badge");
-            Expect("Exceeds PR target by 12 NOS", PoFulfillmentPalette.Over, "and an over-allocated wizard row");
+            Expect("Over-ordered by 15 NOS (Ordered: 40, PR asks for 25)", PoFulfillmentState.Over, "an over-ordered line is red");
+            Expect("PO: Over-ordered (1 of 2 items - 15 more than the PR asks for)", PoFulfillmentState.Over, "so is the PR badge");
+            Expect("Exceeds PR target by 12 NOS", PoFulfillmentState.Over, "and an over-allocated wizard row");
 
             // Amber: not settled yet.
-            Expect("Missing 1 item", PoFulfillmentPalette.Pending, "a quote missing a PR line is amber");
-            Expect("Qty changed since quote (1 item)", PoFulfillmentPalette.Pending, "so is a drifted quantity");
-            Expect("Not on the requisition - extra line (33 NOS)", PoFulfillmentPalette.Pending, "and an unbudgeted row");
-            Expect("PR Target: 12 NOS - 5 NOS Pending", PoFulfillmentPalette.Pending, "and a pending quantity");
+            Expect("Missing 1 item", PoFulfillmentState.Pending, "a quote missing a PR line is amber");
+            Expect("Qty changed since quote (1 item)", PoFulfillmentState.Pending, "so is a drifted quantity");
+            Expect("Not on the requisition - extra line (33 NOS)", PoFulfillmentState.Pending, "and an unbudgeted row");
+            Expect("PR Target: 12 NOS - 5 NOS Pending", PoFulfillmentState.Pending, "and a pending quantity");
 
             // Green: done.
-            Expect("PR Target: 12 NOS (This PO: 12) - Fully Allocated", PoFulfillmentPalette.Complete, "a fully allocated row is green");
-            Expect("Ordered: 12/12 NOS (Complete)", PoFulfillmentPalette.Complete, "so is a completed line");
+            Expect("PR Target: 12 NOS (This PO: 12) - Fully Allocated", PoFulfillmentState.Complete, "a fully allocated row is green");
+            Expect("Ordered: 12/12 NOS (Complete)", PoFulfillmentState.Complete, "so is a completed line");
 
             // And "Over-ordered" must not be read as "ordered/complete" just because it contains it.
-            Assert(PoFulfillmentPalette.Classify("Over-ordered by 15 NOS") != PoFulfillmentPalette.Complete,
+            Assert(PoFulfillmentState.Classify("Over-ordered by 15 NOS") != PoFulfillmentState.Complete,
                 "an over-ordered line is never shown as complete");
         }
 

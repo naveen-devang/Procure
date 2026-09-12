@@ -57,7 +57,15 @@ public sealed partial class MainWindow : Window
             _reboundSeq[_current] = _themeSeq;
         };
         Activated += OnFirstActivated;
-        CompositionTarget.Rendering += OnRendering;
+
+        // The frame/RAM overlay is a development instrument, not a feature: it is a green box over
+        // the corner of someone's procurement app, and its Rendering handler makes the UI thread
+        // compose a frame continuously whether or not anything changed. Opt in with PROCURE_HUD=1.
+        if (Environment.GetEnvironmentVariable("PROCURE_HUD") == "1")
+        {
+            Hud.Visibility = Visibility.Visible;
+            CompositionTarget.Rendering += OnRendering;
+        }
 
         // Before first render: the pane does not re-theme reliably once it has loaded.
         (_appHost as WinUiAppHost)?.ApplyCurrentTheme();

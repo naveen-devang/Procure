@@ -306,24 +306,14 @@ namespace Procure.Utilities
     // wizard's banner runs four of these converters on every recalculation.
     internal static class PoFulfillmentPalette
     {
-        internal const int Over = 0, Pending = 1, Complete = 2, Neutral = 3;
+        internal const int Over = Procure.Utilities.PoFulfillmentState.Over;
+        internal const int Pending = Procure.Utilities.PoFulfillmentState.Pending;
+        internal const int Complete = Procure.Utilities.PoFulfillmentState.Complete;
+        internal const int Neutral = Procure.Utilities.PoFulfillmentState.Neutral;
 
-        internal static int Classify(object? value)
-        {
-            var text = value as string ?? string.Empty;
-            if (text.Contains("Exceeds", StringComparison.OrdinalIgnoreCase) || text.Contains("Over-allocated", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("Over-ordered", StringComparison.OrdinalIgnoreCase))
-                return Over;
-            // "Missing" and "Qty changed" are the coverage warnings: same amber as a pending
-            // quantity, since both mean "this quote does not yet match the requisition".
-            if (text.Contains("Pending", StringComparison.OrdinalIgnoreCase) || text.Contains("Partial", StringComparison.OrdinalIgnoreCase) || text.Contains("Unordered", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("Missing", StringComparison.OrdinalIgnoreCase) || text.Contains("Qty changed", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("Not on the requisition", StringComparison.OrdinalIgnoreCase))
-                return Pending;
-            if (text.Contains("Complete", StringComparison.OrdinalIgnoreCase) || text.Contains("Fully Allocated", StringComparison.OrdinalIgnoreCase))
-                return Complete;
-            return Neutral;
-        }
+        // The classification itself lives in Procure.Core so both heads - and the self-check -
+        // share one definition; only the colours below are per-framework.
+        internal static int Classify(object? value) => Procure.Utilities.PoFulfillmentState.Classify(value);
 
         internal static readonly Color[] TextDark = { Color.FromArgb("#FF99A4"), Color.FromArgb("#FFC83B"), Color.FromArgb("#6CCB5F"), Color.FromArgb("#D2D0CE") };
         internal static readonly Color[] TextLight = { Color.FromArgb("#A80000"), Color.FromArgb("#8A5700"), Color.FromArgb("#107C41"), Color.FromArgb("#494847") };
