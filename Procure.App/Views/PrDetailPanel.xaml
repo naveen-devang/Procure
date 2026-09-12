@@ -275,7 +275,10 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Spacing="2" VerticalAlignment="Center">
                                                     <TextBlock Text="{x:Bind RoleDisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <!-- Wraps: "Sent Sep 10, 2026 (Pending)" is longer than the column
+                                                         the date pickers leave, and it was being cut mid-word. -->
                                                     <TextBlock Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
                                                                Foreground="{x:Bind StatusText, Converter={StaticResource ApprovalColor}, Mode=OneWay}" />
                                                 </StackPanel>
                                                 <!-- 186 is the tightest that still fits "Sep 27, 2025" + the picker's
