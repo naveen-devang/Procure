@@ -58,11 +58,22 @@ namespace Procure.PageModels
         public partial string NewRfqWarranty { get; set; } = string.Empty;
 
         [ObservableProperty]
-        public partial string NewRfqTechnicalApproval { get; set; } = string.Empty;
+        public partial string NewRfqTechnicalApproval { get; set; } = TechnicalApprovalNotSet;
 
         // Blank first entry = "no technical approval recorded". Stored as an empty string, which
         // both PCR exporters already render as "-". Shared by the Add RFQ and Batch RFQ pickers.
-        public List<string> AvailableTechnicalApprovals { get; } = new() { string.Empty, "Approved", "Not Approved" };
+        // "Not set" rather than an empty first entry: a ComboBox whose selected item is an empty
+        // string leaves its ContentPresenter with no content, and a ContentPresenter with null
+        // content renders its DataContext - the box read "Procure.PageModels.PrListPageModel".
+        // Stored as an empty string either way; see TechnicalApprovalNotSet.
+        public const string TechnicalApprovalNotSet = "Not set";
+        public List<string> AvailableTechnicalApprovals { get; } = new() { TechnicalApprovalNotSet, "Approved", "Not Approved" };
+
+        private static string StoredApproval(string? shown) =>
+            string.IsNullOrWhiteSpace(shown) || shown == TechnicalApprovalNotSet ? string.Empty : shown.Trim();
+
+        private static string ShownApproval(string? stored) =>
+            string.IsNullOrWhiteSpace(stored) ? TechnicalApprovalNotSet : stored;
 
         [ObservableProperty]
         public partial ObservableCollection<RfqItem> EditingRfqItems { get; set; } = new();
@@ -356,7 +367,7 @@ namespace Procure.PageModels
             NewRfqIncoterms = "DDP";
             NewRfqDeliveryLeadTime = string.Empty;
             NewRfqWarranty = string.Empty;
-            NewRfqTechnicalApproval = string.Empty;
+            NewRfqTechnicalApproval = TechnicalApprovalNotSet;
 
             foreach (var item in EditingRfqItems)
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
@@ -413,7 +424,7 @@ namespace Procure.PageModels
             NewRfqIncoterms = string.IsNullOrWhiteSpace(rfq.Incoterms) ? "DDP" : rfq.Incoterms;
             NewRfqDeliveryLeadTime = rfq.DeliveryLeadTime ?? string.Empty;
             NewRfqWarranty = rfq.Warranty ?? string.Empty;
-            NewRfqTechnicalApproval = rfq.TechnicalApproval ?? string.Empty;
+            NewRfqTechnicalApproval = ShownApproval(rfq.TechnicalApproval);
 
             foreach (var item in EditingRfqItems)
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;
@@ -520,7 +531,7 @@ namespace Procure.PageModels
                     EditingRfq.Incoterms = string.IsNullOrWhiteSpace(NewRfqIncoterms) ? "DDP" : NewRfqIncoterms;
                     EditingRfq.DeliveryLeadTime = NewRfqDeliveryLeadTime?.Trim() ?? string.Empty;
                     EditingRfq.Warranty = NewRfqWarranty?.Trim() ?? string.Empty;
-                    EditingRfq.TechnicalApproval = NewRfqTechnicalApproval?.Trim() ?? string.Empty;
+                    EditingRfq.TechnicalApproval = StoredApproval(NewRfqTechnicalApproval);
 
                     // Update items
                     EditingRfq.Items = new ObservableCollection<RfqItem>(savedRfqItems);
@@ -571,7 +582,7 @@ namespace Procure.PageModels
                     Incoterms = string.IsNullOrWhiteSpace(NewRfqIncoterms) ? "DDP" : NewRfqIncoterms,
                     DeliveryLeadTime = NewRfqDeliveryLeadTime?.Trim() ?? string.Empty,
                     Warranty = NewRfqWarranty?.Trim() ?? string.Empty,
-                    TechnicalApproval = NewRfqTechnicalApproval?.Trim() ?? string.Empty,
+                    TechnicalApproval = StoredApproval(NewRfqTechnicalApproval),
                     SentDate = DateTime.Today,
                     Items = new ObservableCollection<RfqItem>(savedRfqItems)
                 };

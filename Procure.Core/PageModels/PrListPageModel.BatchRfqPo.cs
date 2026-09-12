@@ -61,7 +61,7 @@ namespace Procure.PageModels
         public partial string BatchRfqWarranty { get; set; } = string.Empty;
 
         [ObservableProperty]
-        public partial string BatchRfqTechnicalApproval { get; set; } = string.Empty;
+        public partial string BatchRfqTechnicalApproval { get; set; } = TechnicalApprovalNotSet;
 
         [ObservableProperty]
         public partial string BatchRfqPrsSummary { get; set; } = string.Empty;
@@ -311,7 +311,7 @@ namespace Procure.PageModels
             BatchRfqIncoterms = "DDP";
             BatchRfqDeliveryLeadTime = string.Empty;
             BatchRfqWarranty = string.Empty;
-            BatchRfqTechnicalApproval = string.Empty;
+            BatchRfqTechnicalApproval = TechnicalApprovalNotSet;
 
             foreach (var item in BatchEditingRfqItems)
                 item.PropertyChanged -= OnBatchEditingRfqItemPropertyChanged;
@@ -395,7 +395,7 @@ namespace Procure.PageModels
                     Incoterms = string.IsNullOrWhiteSpace(BatchRfqIncoterms) ? "DDP" : BatchRfqIncoterms,
                     DeliveryLeadTime = BatchRfqDeliveryLeadTime?.Trim() ?? string.Empty,
                     Warranty = BatchRfqWarranty?.Trim() ?? string.Empty,
-                    TechnicalApproval = BatchRfqTechnicalApproval?.Trim() ?? string.Empty,
+                    TechnicalApproval = StoredApproval(BatchRfqTechnicalApproval),
                     SentDate = DateTime.Today
                 };
 

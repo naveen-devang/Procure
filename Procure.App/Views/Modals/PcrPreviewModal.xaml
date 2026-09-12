@@ -124,13 +124,13 @@
                                     <StackPanel Spacing="6">
                                         <TextBlock Text="Printer" Style="{StaticResource H}" />
                                         <ComboBox ItemsSource="{Binding PcrAvailablePrinters}"
-                                                  SelectedValue="{Binding PcrSelectedPrinter, Mode=TwoWay}"
+                                                  SelectedItem="{Binding PcrSelectedPrinter, Mode=TwoWay}"
                                                   PlaceholderText="No printers found" HorizontalAlignment="Stretch" FontSize="12" />
                                     </StackPanel>
                                     <StackPanel Spacing="6">
                                         <TextBlock Text="Paper Size" Style="{StaticResource H}" />
                                         <ComboBox ItemsSource="{Binding PcrPaperSizeOptions}"
-                                                  SelectedValue="{Binding PcrPaperSize, Mode=TwoWay}"
+                                                  SelectedItem="{Binding PcrPaperSize, Mode=TwoWay}"
                                                   HorizontalAlignment="Stretch" FontSize="12" />
                                     </StackPanel>
                                     <StackPanel Spacing="6">

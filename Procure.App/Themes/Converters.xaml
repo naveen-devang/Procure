@@ -28,4 +28,12 @@
     <conv:PoFulfillmentStrokeConverter x:Key="FulfilStroke" />
     <conv:BytesToImageConverter x:Key="PngImg" />
     <conv:SegmentedSelectionBrushConverter x:Key="SegBg" />
+
+    <!-- For ComboBoxes over string lists that can contain an empty entry. Without an explicit
+         template, selecting the empty string leaves the ContentPresenter with no content and it
+         falls back to printing the DataContext - the Technical Approval box read
+         "Procure.PageModels.PrListPageModel". -->
+    <DataTemplate x:Key="StringItemTemplate">
+        <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+    </DataTemplate>
 </ResourceDictionary>

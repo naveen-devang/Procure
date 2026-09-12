@@ -341,8 +341,10 @@
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
+                    <!-- Centred, not Top: aligned to the top it sat a few pixels under the window's
+                         own Close button on a maximised window, and aiming for this one quit the app. -->
                     <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE711;"
-                            VerticalAlignment="Top" ToolTipService.ToolTip="Close (Esc)"
+                            VerticalAlignment="Center" Margin="0,8,0,0" ToolTipService.ToolTip="Close (Esc)"
                             Command="{Binding CloseDetailPanelCommand}" />
                 </Grid>
 

@@ -26,7 +26,7 @@
             </TransitionCollection>
         </Grid.ChildrenTransitions>
         <Border MaxWidth="950" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
-                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <ScrollViewer>
                 <StackPanel Spacing="16">
@@ -59,8 +59,8 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
-                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableTechnicalApprovals}"
-                                              SelectedValue="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
+                                    <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{Binding AvailableTechnicalApprovals}"
+                                              SelectedItem="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <Grid ColumnSpacing="10">
@@ -74,7 +74,7 @@
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="Currency" Style="{StaticResource Lbl}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
-                                              SelectedValue="{Binding NewRfqCurrency, Mode=TwoWay}" />
+                                              SelectedItem="{Binding NewRfqCurrency, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
@@ -83,7 +83,7 @@
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableIncoterms}"
-                                              SelectedValue="{Binding NewRfqIncoterms, Mode=TwoWay}" />
+                                              SelectedItem="{Binding NewRfqIncoterms, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4">
                                     <TextBlock Text="Delivery / Lead Time" Style="{StaticResource Lbl}" />
@@ -116,6 +116,38 @@
                                             Command="{Binding CopySelectedRfqItemsForEmailCommand}" />
                                 </StackPanel>
                             </Grid>
+                            <!-- Header row. Without it these are five unlabelled number boxes per
+                                 line - unit price, discount, computed total, last price - and
+                                 typing a price into the discount column is a money error. -->
+                            <Grid ColumnSpacing="8" Padding="4,0,4,2">
+                                <Grid.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontSize" Value="10.5" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                        <Setter Property="VerticalAlignment" Value="Bottom" />
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="64" />
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="ITEM" />
+                                <TextBlock Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="3" Text="UNIT" />
+                                <TextBlock Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Border Height="1" Background="{ThemeResource AppHairline}" />
                             <ItemsControl ItemsSource="{Binding EditingRfqItems}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:RfqItem">
@@ -132,18 +164,18 @@
                                                 <ColumnDefinition Width="34" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" Height="44"
+                                            <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" Height="36"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
+                                            <TextBox Height="36" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Right" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Height="36" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" VerticalAlignment="Center" />
+                                            <TextBox Height="36" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" VerticalAlignment="Center" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
-                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Height="36" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" VerticalAlignment="Center" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
-                                            <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                                            <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay}" PlaceholderText="0.00" FontSize="12"
+                                            <TextBox Height="36" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay}" PlaceholderText="0.00" FontSize="12"
                                                      TextAlignment="Right" VerticalAlignment="Center" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <Button Grid.Column="8" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28"
                                                     Padding="0" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}"
@@ -185,7 +217,7 @@
                                 <StackPanel Grid.Column="4" Spacing="4">
                                     <TextBlock Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableVatTypes}"
-                                              SelectedValue="{Binding NewRfqVatType, Mode=TwoWay}" />
+                                              SelectedItem="{Binding NewRfqVatType, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <Border Padding="12,10" CornerRadius="6" BorderThickness="1"

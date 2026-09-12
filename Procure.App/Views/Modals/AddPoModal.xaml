@@ -19,7 +19,7 @@
             </TransitionCollection>
         </Grid.ChildrenTransitions>
         <Border MaxWidth="980" MaxHeight="860" Margin="24" CornerRadius="10" BorderThickness="1"
-                VerticalAlignment="Center" HorizontalAlignment="Center"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -204,6 +204,33 @@
                                                 </Border>
 
                                                 <StackPanel Spacing="8" Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}}">
+                                                    <!-- Header row: without it these are four unlabelled number boxes
+                                                         per line and the computed total looks like another input. -->
+                                                    <Grid ColumnSpacing="8" Padding="10,0">
+                                                        <Grid.Resources>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="FontSize" Value="10" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                                            </Style>
+                                                        </Grid.Resources>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="36" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="75" />
+                                                            <ColumnDefinition Width="45" />
+                                                            <ColumnDefinition Width="95" />
+                                                            <ColumnDefinition Width="85" />
+                                                            <ColumnDefinition Width="100" />
+                                                            <ColumnDefinition Width="28" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="1" Text="ITEM" />
+                                                        <TextBlock Grid.Column="2" Text="QTY" />
+                                                        <TextBlock Grid.Column="3" Text="UNIT" />
+                                                        <TextBlock Grid.Column="4" Text="UNIT RATE" />
+                                                        <TextBlock Grid.Column="5" Text="DISCOUNT" />
+                                                        <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                                    </Grid>
                                                     <ItemsControl ItemsSource="{x:Bind Items}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate x:DataType="models:PoRfqItemSelection">
@@ -227,10 +254,10 @@
                                                                             <TextBlock Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
                                                                                        Foreground="{x:Bind AllocationStatusText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
                                                                         </StackPanel>
-                                                                        <TextBox Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontSize="11.5" VerticalAlignment="Center" />
                                                                         <TextBlock Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                                                                        <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
-                                                                        <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
                                                                         <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                                                    HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                                         <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
@@ -273,7 +300,7 @@
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="4" Spacing="2">
                                                                 <TextBlock Text="VAT Type" Style="{StaticResource Lbl}" />
-                                                                <ComboBox HorizontalAlignment="Stretch" FontSize="11.5" SelectedValue="{x:Bind VatType, Mode=TwoWay}">
+                                                                <ComboBox HorizontalAlignment="Stretch" FontSize="11.5" SelectedItem="{x:Bind VatType, Mode=TwoWay}">
                                                                     <x:String>5%</x:String>
                                                                     <x:String>RC</x:String>
                                                                     <x:String>V0</x:String>

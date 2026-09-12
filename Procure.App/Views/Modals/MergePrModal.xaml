@@ -12,7 +12,7 @@
             </TransitionCollection>
         </Grid.ChildrenTransitions>
         <Border MaxWidth="660" MaxHeight="760" Margin="24" Padding="26" CornerRadius="10"
-                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <ScrollViewer>
                 <StackPanel Spacing="16">
@@ -72,7 +72,7 @@
                         <StackPanel Grid.Column="1" Spacing="4">
                             <TextBlock Text="Priority" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                             <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
-                                      SelectedValue="{Binding MergePriority, Mode=TwoWay}" />
+                                      SelectedItem="{Binding MergePriority, Mode=TwoWay}" />
                         </StackPanel>
                     </Grid>
 

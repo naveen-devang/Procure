@@ -212,7 +212,7 @@
                                     <TextBlock Style="{StaticResource RowHint}" Text="Applied when creating new RFQs and purchase requisitions." />
                                 </StackPanel>
                                 <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
-                                          SelectedValue="{Binding DefaultCurrency, Mode=TwoWay}" />
+                                          SelectedItem="{Binding DefaultCurrency, Mode=TwoWay}" />
                             </Grid>
                             <Border Height="1" Background="{ThemeResource AppHairline}" />
                             <TextBlock Text="SLA Overdue Thresholds" Style="{StaticResource RowTitle}" />
@@ -318,7 +318,7 @@
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Data Type" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableDataTypes}"
-                                              SelectedValue="{Binding NewColumnDataType, Mode=TwoWay}" />
+                                              SelectedItem="{Binding NewColumnDataType, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <StackPanel Spacing="4" Visibility="{Binding ShowOptionsField, Converter={StaticResource BoolVis}}">

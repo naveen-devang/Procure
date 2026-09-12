@@ -12,7 +12,7 @@
             </TransitionCollection>
         </Grid.ChildrenTransitions>
         <Border MaxWidth="660" MaxHeight="680" Margin="24" Padding="24" CornerRadius="10"
-                VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="1"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <StackPanel Spacing="16">
                 <Grid>

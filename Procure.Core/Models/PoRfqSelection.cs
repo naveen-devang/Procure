@@ -321,9 +321,10 @@ namespace Procure.Models
         {
             get
             {
-                if (!TransportTotal.HasValue) return string.Empty;
+                // Empty read as a heading with no field under it in the PO dialog's Transport
+                // block; no rate entered is a transport total of zero, so say so.
                 var cur = string.IsNullOrWhiteSpace(Currency) ? "AED" : Currency;
-                return $"{cur} {TransportTotal.Value:N2}";
+                return $"{cur} {(TransportTotal ?? 0m):N2}";
             }
         }
 
