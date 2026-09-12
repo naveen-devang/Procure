@@ -66,6 +66,26 @@
             <SolidColorBrush x:Key="AlertWarningBg"     Color="#FFF8F0" />
             <SolidColorBrush x:Key="AlertWarningBorder" Color="#F6D3A0" />
             <SolidColorBrush x:Key="AlertWarningIcon"   Color="#8A5700" />
+
+            <!-- Accent overrides for the FRAMEWORK's own keys. They must live in a theme
+                 dictionary, not at the top level: on a light/dark switch WinUI re-resolves
+                 every ThemeResource against the theme dictionaries, where generic.xaml's
+                 versions would otherwise win and the accent buttons snapped back to the
+                 Windows system accent. WinUiAppHost.ApplyAccentColor recolours both copies
+                 (Light gets the light shade of the chosen palette). Defaults = "Blue". -->
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush"           Color="#005FB8" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"         Color="#005FB8" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"          Color="#005FB8" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentButtonBackground"                Color="#005FB8" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver"     Color="#005FB8" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed"         Color="#005FB8" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrush"               Color="#005FB8" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver"    Color="#005FB8" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPressed"        Color="#005FB8" Opacity="0.8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked"         Color="#005FB8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#005FB8" Opacity="0.9" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#005FB8" Opacity="0.8" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#005FB8" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Default">
@@ -120,6 +140,26 @@
             <SolidColorBrush x:Key="AlertWarningBg"     Color="#2D2312" />
             <SolidColorBrush x:Key="AlertWarningBorder" Color="#5A3F10" />
             <SolidColorBrush x:Key="AlertWarningIcon"   Color="#FFC83B" />
+
+            <!-- Accent overrides for the FRAMEWORK's own keys. They must live in a theme
+                 dictionary, not at the top level: on a light/dark switch WinUI re-resolves
+                 every ThemeResource against the theme dictionaries, where generic.xaml's
+                 versions would otherwise win and the accent buttons snapped back to the
+                 Windows system accent. WinUiAppHost.ApplyAccentColor recolours both copies
+                 (Default gets the default shade of the chosen palette). Defaults = "Blue". -->
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush"           Color="#60CDFF" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"         Color="#60CDFF" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"          Color="#60CDFF" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentButtonBackground"                Color="#60CDFF" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver"     Color="#60CDFF" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed"         Color="#60CDFF" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrush"               Color="#60CDFF" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver"    Color="#60CDFF" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPressed"        Color="#60CDFF" Opacity="0.8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked"         Color="#60CDFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#60CDFF" Opacity="0.9" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#60CDFF" Opacity="0.8" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#60CDFF" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

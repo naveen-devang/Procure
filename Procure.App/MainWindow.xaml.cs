@@ -47,9 +47,10 @@ public sealed partial class MainWindow : Window
             _lastLoadMs = ms;
         });
 
+        _shell.ApplyThemeToNav = t => { if (Nav.RequestedTheme != t) Nav.RequestedTheme = t; };
+
         _shell.ThemeChanged += (_, _) =>
         {
-            ApplyRootTheme();
             RefreshThemeState();                       // BoardTheme.IsDark, from the mode string
             _themeSeq++;
             RebindItemColors(ContentFrame.Content as DependencyObject);   // the visible page now
@@ -58,25 +59,11 @@ public sealed partial class MainWindow : Window
         Activated += OnFirstActivated;
         CompositionTarget.Rendering += OnRendering;
 
-        // Set the theme BEFORE first render. NavigationView does not re-theme its pane
-        // reliably once it has loaded, so a saved "Light" applied later (OnFirstActivated)
-        // left the tab bar dark. Also pin it on Nav itself, which is more reliable than
-        // letting it inherit.
-        ApplyRootTheme();
+        // Before first render: the pane does not re-theme reliably once it has loaded.
+        (_appHost as WinUiAppHost)?.ApplyCurrentTheme();
+        if (Content is FrameworkElement c) _shell.WatchOsTheme?.Invoke(c);
 
         NavigateTo(AppRoute.Board, null);
-    }
-
-    private void ApplyRootTheme()
-    {
-        var t = _settings.AppTheme switch
-        {
-            "Light" => ElementTheme.Light,
-            "Dark" => ElementTheme.Dark,
-            _ => ElementTheme.Default,
-        };
-        if (Content is FrameworkElement root && root.RequestedTheme != t) root.RequestedTheme = t;
-        if (Nav.RequestedTheme != t) Nav.RequestedTheme = t;
     }
 
     private bool _themeApplied;
@@ -84,8 +71,9 @@ public sealed partial class MainWindow : Window
     {
         if (_themeApplied) return;
         _themeApplied = true;
-        _ = _appHost.ApplyThemeAsync(_settings.AppTheme);
-        (_appHost as WinUiAppHost)?.ApplyAccentColor(_settings.AccentTheme);
+        // The constructor already applied the theme and App.OnLaunched the accent; this only has
+        // to settle BoardTheme.IsDark. It used to re-run ApplyThemeAsync, which wrote the setting
+        // back and raised a change - a third apply, and a full rebind, before the first frame.
         RefreshThemeState();
     }
 

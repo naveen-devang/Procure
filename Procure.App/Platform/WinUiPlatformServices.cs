@@ -89,7 +89,23 @@ public sealed class WinUiNavigationService : INavigationService
 public sealed class WinUiDialogService : IDialogService
 {
     private readonly ShellContext _shell;
-    public WinUiDialogService(ShellContext shell) => _shell = shell;
+    private readonly ISettingsService _settings;
+    public WinUiDialogService(ShellContext shell, ISettingsService settings)
+    {
+        _shell = shell;
+        _settings = settings;
+    }
+
+    /// <summary>A ContentDialog is rooted in the XamlRoot's popup root, not under the window
+    /// content, so it does not inherit the element-level theme the app switches at runtime -
+    /// it followed the application theme, fixed at startup, and stayed in the old theme until
+    /// the app was restarted.</summary>
+    private ElementTheme Theme => _settings.AppTheme switch
+    {
+        "Light" => ElementTheme.Light,
+        "Dark" => ElementTheme.Dark,
+        _ => ElementTheme.Default,
+    };
 
     private async Task<ContentDialogResult> ShowAsync(string title, object content, string? primary, string? secondary, string close)
     {
@@ -99,6 +115,7 @@ public sealed class WinUiDialogService : IDialogService
             Content = content,
             CloseButtonText = close,
             XamlRoot = _shell.XamlRoot,
+            RequestedTheme = Theme,
         };
         if (primary is not null) dialog.PrimaryButtonText = primary;
         if (secondary is not null) dialog.SecondaryButtonText = secondary;
@@ -135,6 +152,7 @@ public sealed class WinUiDialogService : IDialogService
             Content = list,
             CloseButtonText = cancel,
             XamlRoot = _shell.XamlRoot,
+            RequestedTheme = Theme,
         };
         list.ItemClick += (_, _) => dialog.Hide();
         await dialog.ShowAsync();
@@ -190,18 +208,32 @@ public sealed class WinUiAppHost : IAppHost
             if (e.Key == nameof(ISettingsService.AccentTheme))
                 ApplyAccentColor(_settings.AccentTheme);
         };
+
+        // "System" has to follow Windows while the app is running. Application.RequestedTheme is
+        // fixed once the app has launched, so nothing was watching: changing the OS theme did
+        // nothing until restart. ActualThemeChanged on the root fires when the OS flips and the
+        // root is on ElementTheme.Default, which is exactly the System case.
+        _shell.WatchOsTheme = root => root.ActualThemeChanged += (_, _) =>
+        {
+            if (_settings.AppTheme is "Light" or "Dark") return;
+            ApplyAccentColor(_settings.AccentTheme);   // PrimaryTextBrush is deep-in-light / pastel-in-dark
+            _shell.RaiseThemeChanged();
+        };
     }
 
     public event EventHandler? ThemeChanged;
 
     /// <summary>Startup + accent-picker hook. Recolours the accent brushes in place.
     ///
-    /// It must RECOLOUR, never replace: assigning a new SolidColorBrush into the resource
-    /// dictionary leaves every element that already resolved the key holding the old brush
-    /// object - a ThemeResource re-resolves on a theme change, not when a dictionary entry is
-    /// swapped - so the dictionary was right and the screen never moved (picking Coral left
-    /// the pills green). Setting .Color on the brush that is already there repaints every
-    /// element pointing at it on the next frame, with no rebind pass anywhere.</summary>
+    /// Two rules, both learned the hard way:
+    /// 1. RECOLOUR, never replace. Assigning a new SolidColorBrush into the dictionary leaves
+    ///    every element that already resolved the key holding the old brush - a ThemeResource
+    ///    re-resolves on a theme change, not on a dictionary swap - so the dictionary was right
+    ///    and the screen never moved (picking Coral left the pills green).
+    /// 2. The framework's own accent keys live in AppColors' THEME dictionaries, and both copies
+    ///    are recoloured here. A top-level override loses to generic.xaml's theme dictionary
+    ///    during a light/dark re-resolve, which snapped the accent buttons back to the Windows
+    ///    system accent the moment you switched mode.</summary>
     public void ApplyAccentColor(string accentId)
     {
         var p = Procure.Models.AccentPalettes.All.FirstOrDefault(
@@ -217,51 +249,63 @@ public sealed class WinUiAppHost : IAppHost
             _ => Microsoft.UI.Xaml.Application.Current.RequestedTheme == ApplicationTheme.Dark,
         };
 
-        var fill = ParseHex(p.DarkHex);                       // pastel fill, both modes
-        var primary = ParseHex(isDark ? p.DarkHex : p.LightHex);   // text/icons on plain bg
+        var light = ParseHex(p.LightHex);   // deep accent, for text/fills on a light ground
+        var dark = ParseHex(p.DarkHex);     // pastel accent, same on a dark ground
 
-        SetAccent("AccentFillBrush", fill);
-        SetAccent("PrimaryTextBrush", primary);
+        // Not theme-scoped (AppColors keeps them top-level), so they follow the current mode.
+        Recolour(Microsoft.UI.Xaml.Application.Current.Resources, "AccentFillBrush", dark);
+        Recolour(Microsoft.UI.Xaml.Application.Current.Resources, "PrimaryTextBrush", isDark ? dark : light);
 
-        // Repoint the Fluent accent brushes so AccentButtonStyle, ToggleButton-checked,
-        // NavigationView selection etc. use the app's pastel accent instead of the bright
-        // Windows system accent. 'primary' pairs with TextOnAccentFillColorPrimaryBrush
-        // (white in light, near-black in dark) - deep accent in light, pastel in dark.
-        SetAccent("AccentFillColorDefaultBrush", primary);
-        SetAccent("AccentFillColorSecondaryBrush", WithAlpha(primary, 0.90));
-        SetAccent("AccentFillColorTertiaryBrush", WithAlpha(primary, 0.80));
-        // AccentButtonStyle resolves these at style-load from generic.xaml, so the
-        // AccentFillColor* swap above doesn't reach it - set them directly too.
-        SetAccent("AccentButtonBackground", primary);
-        SetAccent("AccentButtonBackgroundPointerOver", WithAlpha(primary, 0.90));
-        SetAccent("AccentButtonBackgroundPressed", WithAlpha(primary, 0.80));
-        SetAccent("AccentButtonBorderBrush", primary);
-        SetAccent("AccentButtonBorderBrushPointerOver", WithAlpha(primary, 0.90));
-        SetAccent("AccentButtonBorderBrushPressed", WithAlpha(primary, 0.80));
-
-        // Same story for ToggleButton's checked state (filter chips, Settings' Color Mode
-        // pills, theme toggles) - resolved at style-load too, same fix.
-        SetAccent("ToggleButtonBackgroundChecked", primary);
-        SetAccent("ToggleButtonBackgroundCheckedPointerOver", WithAlpha(primary, 0.90));
-        SetAccent("ToggleButtonBackgroundCheckedPressed", WithAlpha(primary, 0.80));
-        SetAccent("ToggleButtonBorderBrushChecked", primary);
+        // AccentButtonStyle, checked ToggleButtons, NavigationView selection. Each theme
+        // dictionary holds its own brush objects, so a mode switch then needs no re-apply.
+        var lightDict = ThemeDict("Light");
+        var darkDict = ThemeDict("Default");
+        foreach (var (dict, c) in new[] { (lightDict, light), (darkDict, dark) })
+        {
+            if (dict is null) continue;
+            foreach (var key in AccentKeys) Recolour(dict, key, c);
+        }
     }
 
-    /// <summary>Recolour the brush already under this key; only insert one the first time,
-    /// which has to happen before any element resolves the key (App.OnLaunched does it).</summary>
-    private static void SetAccent(string key, Windows.UI.Color c)
+    private static readonly string[] AccentKeys =
     {
-        var res = Microsoft.UI.Xaml.Application.Current.Resources;
-        object? existing = null;
-        try { existing = res[key]; } catch { }   // indexer, not TryGetValue: it searches merged dictionaries
-        if (existing is Microsoft.UI.Xaml.Media.SolidColorBrush b)
-            b.Color = c;
-        else
-            res[key] = new Microsoft.UI.Xaml.Media.SolidColorBrush(c);
+        "AccentFillColorDefaultBrush", "AccentFillColorSecondaryBrush", "AccentFillColorTertiaryBrush",
+        "AccentButtonBackground", "AccentButtonBackgroundPointerOver", "AccentButtonBackgroundPressed",
+        "AccentButtonBorderBrush", "AccentButtonBorderBrushPointerOver", "AccentButtonBorderBrushPressed",
+        "ToggleButtonBackgroundChecked", "ToggleButtonBackgroundCheckedPointerOver",
+        "ToggleButtonBackgroundCheckedPressed", "ToggleButtonBorderBrushChecked",
+    };
+
+    /// <summary>AppColors.xaml's Light / Default theme dictionary (it is a merged dictionary,
+    /// so the theme dictionaries hang off it, not off Application.Resources).</summary>
+    private static Microsoft.UI.Xaml.ResourceDictionary? ThemeDict(string key)
+    {
+        foreach (var d in Microsoft.UI.Xaml.Application.Current.Resources.MergedDictionaries)
+            // AppBackground identifies AppColors.xaml. Matching on an accent key instead would
+            // find XamlControlsResources' own Light/Default dictionaries first (merged earlier),
+            // and recolouring those does nothing: ours are merged later and win the lookup.
+            if (d.ThemeDictionaries.TryGetValue(key, out var td) && td is Microsoft.UI.Xaml.ResourceDictionary rd
+                && rd.ContainsKey("AppBackground"))
+                return rd;
+        return null;
     }
 
-    private static Windows.UI.Color WithAlpha(Windows.UI.Color c, double a) =>
-        Windows.UI.Color.FromArgb((byte)(a * 255), c.R, c.G, c.B);
+    /// <summary>Recolour the brush declared under this key, wherever in the merged tree it was
+    /// declared. Never inserts: a ResourceDictionary that is already in use rejects new entries
+    /// (COMException 0x800F0902), and every key we touch is declared in AppColors.xaml anyway -
+    /// a miss means the XAML and this list drifted apart, not that we should add one.</summary>
+    private static void Recolour(Microsoft.UI.Xaml.ResourceDictionary res, string key, Windows.UI.Color c)
+    {
+        if (Find(res, key) is { } b) b.Color = c;   // alpha stays on the brush's Opacity, set in XAML
+
+        static Microsoft.UI.Xaml.Media.SolidColorBrush? Find(Microsoft.UI.Xaml.ResourceDictionary d, string k)
+        {
+            if (d.TryGetValue(k, out var v) && v is Microsoft.UI.Xaml.Media.SolidColorBrush hit) return hit;
+            foreach (var m in d.MergedDictionaries)
+                if (Find(m, k) is { } deeper) return deeper;
+            return null;
+        }
+    }
 
     private static Windows.UI.Color ParseHex(string hex)
     {
@@ -283,19 +327,32 @@ public sealed class WinUiAppHost : IAppHost
     public Task OpenFileAsync(string path) =>
         Windows.System.Launcher.LaunchUriAsync(new Uri(path)).AsTask();
 
+    /// <summary>The one place that turns a mode string into an applied theme. MainWindow used to
+    /// do it as well, from its own copy of the switch; two owners meant a change could land twice
+    /// or, at startup, three times.</summary>
     public Task ApplyThemeAsync(string mode)
     {
         _settings.AppTheme = mode;
-        if (_shell.Window?.Content is FrameworkElement root)
-        {
-            root.RequestedTheme = mode switch
-            {
-                "Light" => ElementTheme.Light,
-                "Dark" => ElementTheme.Dark,
-                _ => ElementTheme.Default,
-            };
-        }
+        ApplyCurrentTheme();
         _shell.RaiseThemeChanged();
         return Task.CompletedTask;
     }
+
+    /// <summary>Pushes the saved mode onto the live tree. Also the startup path, so the theme is
+    /// right before first render (NavigationView does not re-theme its pane reliably once it has
+    /// loaded, which left a light-mode tab bar dark).</summary>
+    public void ApplyCurrentTheme()
+    {
+        if (_shell.Window?.Content is not FrameworkElement root) return;
+        var t = CurrentTheme;
+        if (root.RequestedTheme != t) root.RequestedTheme = t;
+        _shell.ApplyThemeToNav?.Invoke(t);
+    }
+
+    public ElementTheme CurrentTheme => _settings.AppTheme switch
+    {
+        "Light" => ElementTheme.Light,
+        "Dark" => ElementTheme.Dark,
+        _ => ElementTheme.Default,
+    };
 }
