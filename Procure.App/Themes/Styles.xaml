@@ -106,6 +106,21 @@
         <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
+    <!-- Square glyph button that sits beside a 34px input: same footprint and fill as the field
+         it accompanies, so a toolbar row reads as one control group. -->
+    <Style x:Key="ToolbarIcon" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+        <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
     <!-- edit / delete / chevron / expander glyphs - keeps the subtle-fill hover, 32px target. -->
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
         <Setter Property="Background" Value="Transparent" />
