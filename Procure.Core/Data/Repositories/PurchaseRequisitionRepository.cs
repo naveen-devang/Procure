@@ -434,10 +434,19 @@ ORDER BY SortOrder ASC;";
             var prs = new List<PurchaseRequisition>();
             using (var cmd = connection.CreateCommand())
             {
+                // Searching orders by relevance, browsing by date. The rank comes from a joined
+                // subquery rather than a bare MATCH so the WHERE clause above stays the same shape
+                // for the count query, which needs no ordering at all.
+                var searching = !string.IsNullOrWhiteSpace(query.Search);
+                var rankJoin = searching
+                    ? $"\nLEFT JOIN (SELECT prid, {DatabaseConstants.SqlSearchRank} AS rank FROM PrSearch WHERE PrSearch MATCH @Match) m ON m.prid = PurchaseRequisition.Id"
+                    : string.Empty;
+                var order = searching ? "m.rank ASC, CreatedAt DESC" : "CreatedAt DESC";
+
                 cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
-FROM PurchaseRequisition" + BuildWhere(cmd, query) + @"
-ORDER BY CreatedAt DESC
+SELECT PurchaseRequisition.Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+FROM PurchaseRequisition" + rankJoin + BuildWhere(cmd, query) + @"
+ORDER BY " + order + @"
 LIMIT @Take OFFSET @Skip;";
                 cmd.Parameters.AddWithValue("@Take", query.Take);
                 cmd.Parameters.AddWithValue("@Skip", query.Skip);
@@ -557,22 +566,11 @@ ORDER BY CreatedAt DESC;";
 
             if (hasSearch)
             {
-                // Whitespace splits the term, and every word has to match: adding a word narrows,
-                // the way every other search box behaves. It used to OR them, so "gasket urgent"
-                // returned more rows than "gasket" alone. Capped so a pasted paragraph cannot
-                // explode the SQL.
-                //
-                // The one caller that wanted OR - a task's several PR/RFQ/PO links - passes them
-                // through MatchAnyOf below instead.
-                var terms = query.Search!.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-                var likes = new List<string>();
-                for (var i = 0; i < terms.Length && i < 12; i++)
-                {
-                    likes.Add($"SearchBlob LIKE @Search{i}");
-                    cmd.Parameters.AddWithValue($"@Search{i}", "%" + terms[i].ToLowerInvariant() + "%");
-                }
-                var joiner = query.MatchAnyOf ? " OR " : " AND ";
-                clauses.Add(likes.Count == 1 ? likes[0] : "(" + string.Join(joiner, likes) + ")");
+                // Matched against the FTS index rather than scanned. BuildFtsMatch turns what was
+                // typed into an FTS5 expression; the join that carries the rank is added by the
+                // caller, since only the ordering needs it.
+                clauses.Add("PurchaseRequisition.Id IN (SELECT prid FROM PrSearch WHERE PrSearch MATCH @Match)");
+                cmd.Parameters.AddWithValue("@Match", BuildFtsMatch(query.Search!, query.MatchAnyOf));
             }
 
             if (hasStatus)
@@ -599,6 +597,35 @@ ORDER BY CreatedAt DESC;";
                 clauses.Add("Priority = 'Urgent' COLLATE NOCASE");
 
             return clauses.Count == 0 ? string.Empty : "\nWHERE " + string.Join("\n  AND ", clauses);
+        }
+
+        /// <summary>Turns what someone typed into an FTS5 MATCH expression.
+        ///
+        /// Every word is quoted, so punctuation a person types ("PR-100043", "3in 150#") cannot be
+        /// read as FTS5 operators, and given a trailing * so a partial word still matches - typing
+        /// "gask" finds gaskets while you are still typing. Words are ANDed, which is what adding a
+        /// word means to everyone; MatchAnyOf is the one caller that means "any of these".
+        ///
+        /// Capped at 12 words so a pasted paragraph cannot build an enormous query.
+        /// </summary>
+        internal static string BuildFtsMatch(string search, bool matchAnyOf)
+        {
+            var words = search.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var parts = new List<string>();
+
+            for (var i = 0; i < words.Length && i < 12; i++)
+            {
+                // A quoted FTS5 string escapes an inner quote by doubling it. Everything else -
+                // hyphens, hashes, slashes - is literal inside the quotes.
+                var word = words[i].ToLowerInvariant().Replace("\"", "\"\"");
+                if (word.Length == 0) continue;
+                parts.Add($"\"{word}\"*");
+            }
+
+            // Nothing usable (someone typed only punctuation): match nothing rather than everything.
+            if (parts.Count == 0) return "\"\"";
+
+            return string.Join(matchAnyOf ? " OR " : " AND ", parts);
         }
 
         /// <summary>Materialises one PurchaseRequisition row. The column list appears once rather than

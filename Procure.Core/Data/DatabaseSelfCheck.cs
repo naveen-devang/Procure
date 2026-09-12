@@ -128,6 +128,19 @@ namespace Procure.Data
             // The material aggregates are derived the same way and carry the same hazard: a write
             // path that changes a PO item, a call-off or a PR's type without refreshing them leaves
             // the Raw & Packing tab showing a stale count or balance, with nothing else going wrong.
+            // One index row per requisition. A write path that changes a PR without re-indexing it
+            // makes that PR unfindable, which is silent - nobody notices a result that is missing.
+            using (var ftsCmd = connection.CreateCommand())
+            {
+                ftsCmd.CommandText = DatabaseConstants.SqlSearchIndexDriftCount;
+                var drift = Convert.ToInt32(await ftsCmd.ExecuteScalarAsync());
+                if (drift != 0)
+                    throw new InvalidOperationException(
+                        $"The search index is {Math.Abs(drift)} row(s) {(drift > 0 ? "short of" : "ahead of")} " +
+                        $"the requisitions {step}. A write path changed a PR without re-indexing it, " +
+                        "so it will not be findable.");
+            }
+
             using var aggCmd = connection.CreateCommand();
             aggCmd.CommandText = DatabaseConstants.SqlStaleMaterialAggregateCount;
             var staleMaterials = Convert.ToInt32(await aggCmd.ExecuteScalarAsync());

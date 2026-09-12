@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 17;
+        public const int SchemaVersion = 18;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -99,9 +99,85 @@ namespace Procure.Data
     COALESCE((SELECT group_concat(COALESCE(Vendor,'') || ' ' || COALESCE(PoNo,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')
 )";
 
+        // ---- v18: ranked search ----------------------------------------------------------------
+        //
+        // The blob above answers "does this PR contain that substring" and nothing else: it cannot
+        // be indexed (a leading wildcard scans every row - 148ms at 20,000 PRs and linear from
+        // there) and it carries no notion of a better or worse match, so results could only ever be
+        // ordered by date. An exact PR number ranked the same as a passing mention in an item note.
+        //
+        // FTS5 gives both: an index, and bm25() relevance. The columns are separate so they can be
+        // weighted - a hit on the PR number means far more than one in a note.
+        //
+        // Standalone rather than external-content: the text is assembled across four tables, so
+        // there is no single content table for FTS5 to point at.
+        public const string SqlCreateSearchIndex = @"
+CREATE VIRTUAL TABLE IF NOT EXISTS PrSearch USING fts5(
+    prno, refs, description, requestor, items, vendors, meta,
+    prid UNINDEXED,
+    tokenize = 'unicode61 remove_diacritics 2'
+);";
+
+        /// <summary>The searchable text, one column per weightable field. Same four tables the blob
+        /// reads, plus the fields it never covered: status, priority, plant and PR type, so "urgent"
+        /// and "capex" become searchable words.</summary>
+        private const string SqlSearchRowExpression = @"
+SELECT
+    lower(COALESCE(PrNo,'')),
+    lower(COALESCE(ConsolidatedFrom,'') || ' ' ||
+        COALESCE((SELECT group_concat(COALESCE(RfqNo,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
+        COALESCE((SELECT group_concat(COALESCE(PoNo,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')),
+    lower(COALESCE(Description,'')),
+    lower(COALESCE(Requestor,'')),
+    lower(COALESCE((SELECT group_concat(COALESCE(ItemName,'') || ' ' || COALESCE(Notes,''), ' ') FROM PrItem WHERE PrId = PurchaseRequisition.Id), '')),
+    lower(COALESCE((SELECT group_concat(COALESCE(Vendor,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
+          COALESCE((SELECT group_concat(COALESCE(Vendor,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')),
+    lower(COALESCE(Status,'') || ' ' || COALESCE(Priority,'') || ' ' || COALESCE(Plant,'') || ' ' || COALESCE(PrType,'')),
+    Id,
+    -- The index row is keyed to the requisition's rowid. prid is UNINDEXED - stored but not
+    -- searchable - so deleting by it scanned all 20,000 rows and made re-indexing one PR cost
+    -- 28ms on every save. By rowid it is a primary-key lookup.
+    PurchaseRequisition.rowid
+FROM PurchaseRequisition";
+
+        /// <summary>Re-indexes one PR: delete then insert, which is how FTS5 updates a row.
+        /// Append " WHERE Id = @Id" to both halves for a single PR.</summary>
+        public const string SqlDeleteSearchRow =
+            "DELETE FROM PrSearch WHERE rowid = (SELECT rowid FROM PurchaseRequisition WHERE Id = @SearchPrId);";
+
+        public const string SqlInsertSearchRow =
+            "INSERT INTO PrSearch (prno, refs, description, requestor, items, vendors, meta, prid, rowid) " +
+            SqlSearchRowExpression + " WHERE Id = @SearchPrId;";
+
+        /// <summary>Used on the version bump and by the restructure operations, which move rows in
+        /// bulk. A plain DELETE, not the 'delete-all' command - that one is only accepted on a
+        /// contentless or external-content table, and this one is standalone.</summary>
+        public const string SqlRebuildSearchIndex =
+            "DELETE FROM PrSearch;" +
+            "INSERT INTO PrSearch (prno, refs, description, requestor, items, vendors, meta, prid, rowid) " +
+            SqlSearchRowExpression + ";";
+
+        /// <summary>Must be 0: one index row per requisition. Catches a write path that changed a PR
+        /// without re-indexing it, the same way the blob's staleness count does.</summary>
+        public const string SqlSearchIndexDriftCount = @"
+SELECT (SELECT COUNT(*) FROM PurchaseRequisition) - (SELECT COUNT(*) FROM PrSearch);";
+
+        /// <summary>Field weights for bm25(), in the column order above. A hit on the PR number or a
+        /// document reference outranks one in a description, which outranks one buried in an item
+        /// note. bm25 returns lower-is-better, so this sorts ascending.</summary>
+        public const string SqlSearchRank = "bm25(PrSearch, 12.0, 8.0, 4.0, 3.0, 1.0, 3.0, 2.0)";
+
         /// <summary>Append "WHERE Id = @Id" for a single PR; run it bare to rebuild the whole table.</summary>
         public const string SqlRebuildSearchBlob =
             "UPDATE PurchaseRequisition SET SearchBlob = " + SqlSearchBlobExpression;
+
+        /// <summary>The bulk rebuild, but touching only the rows whose text actually changed and
+        /// naming them. The restructure operations move a handful of PRs; re-indexing all 20,000
+        /// afterwards cost 1.7 seconds each. RETURNING makes the follow-up work proportional to
+        /// what moved instead of to the size of the database.</summary>
+        public const string SqlRebuildChangedSearchBlobs =
+            "UPDATE PurchaseRequisition SET SearchBlob = " + SqlSearchBlobExpression +
+            " WHERE COALESCE(SearchBlob,'') <> " + SqlSearchBlobExpression + " RETURNING Id;";
 
         /// <summary>Counts PRs whose stored search text no longer matches what it should be - i.e. rows
         /// some write path changed without refreshing the blob. Must always be 0; see DatabaseSelfCheck.</summary>

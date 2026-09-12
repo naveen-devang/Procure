@@ -65,6 +65,14 @@ namespace Procure.Data
                         await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
 
+                    // Separate statement: a virtual table cannot be created inside the same batch
+                    // that defines the tables it reads.
+                    using (var ftsCreate = connection.CreateCommand())
+                    {
+                        ftsCreate.CommandText = DatabaseConstants.SqlCreateSearchIndex;
+                        await ftsCreate.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
                     // Run safe incremental migrations for existing tables
                     await MigrateSchemaAsync(connection, storedVersion).ConfigureAwait(false);
 
@@ -77,6 +85,15 @@ namespace Procure.Data
                         using var aggCmd = connection.CreateCommand();
                         aggCmd.CommandText = DatabaseConstants.SqlRebuildAllMaterialAggregates;
                         await aggCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
+                    // v18: the ranked search index. Derived like the aggregate above, so an existing
+                    // database has to have it built once here.
+                    if (storedVersion < 18)
+                    {
+                        using var ftsCmd = connection.CreateCommand();
+                        ftsCmd.CommandText = DatabaseConstants.SqlRebuildSearchIndex;
+                        await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
 
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);

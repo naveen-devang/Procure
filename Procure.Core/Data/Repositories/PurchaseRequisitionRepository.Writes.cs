@@ -84,8 +84,17 @@ ON CONFLICT(Id) DO UPDATE SET
             using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = DatabaseConstants.SqlRebuildSearchBlob + " WHERE Id = @BlobPrId;";
+            // The FTS index is refreshed from the same place, so a write path can only forget both
+            // at once - and the self-check catches that.
             cmd.Parameters.AddWithValue("@BlobPrId", prId.ToString());
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+            // FTS5 has no UPDATE: a row is re-indexed by deleting and re-inserting it.
+            using var ftsCmd = connection.CreateCommand();
+            ftsCmd.Transaction = tx;
+            ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
+            ftsCmd.Parameters.AddWithValue("@SearchPrId", prId.ToString());
+            await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
         /// <summary>Rebuilds the search text for every PR. The restructure operations move rows between
@@ -104,9 +113,24 @@ ON CONFLICT(Id) DO UPDATE SET
 
         private static async Task RebuildAllSearchBlobsAsync(SqliteConnection connection)
         {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = DatabaseConstants.SqlRebuildSearchBlob + ";";
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            // Rebuild every blob, but collect the ids of the rows that actually changed - a
+            // restructure moves a handful of PRs - and re-index only those. Re-indexing the whole
+            // table instead cost 1.7 seconds per operation at 20,000 PRs.
+            var changed = new List<string>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = DatabaseConstants.SqlRebuildChangedSearchBlobs;
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false)) changed.Add(reader.GetString(0));
+            }
+
+            foreach (var id in changed)
+            {
+                using var ftsCmd = connection.CreateCommand();
+                ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
+                ftsCmd.Parameters.AddWithValue("@SearchPrId", id);
+                await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
         }
 
 
@@ -230,6 +254,16 @@ ON CONFLICT(Id) DO UPDATE SET
             // the one path this was originally missing, and the staleness guard in DatabaseSelfCheck
             // is what caught it.
             var materialKeysBefore = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, id).ConfigureAwait(false);
+
+            // Before the requisition itself: a virtual table has no foreign key so the index row
+            // does not cascade, and it is addressed by the PR's rowid - which stops existing the
+            // moment the PR does.
+            using (var ftsCmd = connection.CreateCommand())
+            {
+                ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRow;
+                ftsCmd.Parameters.AddWithValue("@SearchPrId", id.ToString());
+                await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "DELETE FROM PurchaseRequisition WHERE Id = @Id;";
@@ -604,12 +638,12 @@ ON CONFLICT(Id) DO UPDATE SET
 
                         await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
-                        // Transport allocations, line-transport orders only. A whole-order PO keeps
-                        // its single contract on the PurchaseOrder row above and owns no rows here,
-                        // so switching an order back to whole-order clears them.
-                        var allocations = po.IsLineTransport
-                            ? (item.Transports?.ToList() ?? new List<PoItemTransport>())
-                            : new List<PoItemTransport>();
+                        // Transport allocations, line-transport orders only. A whole-order PO owns
+                        // none, and is cleared in one statement after the loop rather than paying a
+                        // delete per item on every save.
+                        if (!po.IsLineTransport) continue;
+
+                        var allocations = item.Transports?.ToList() ?? new List<PoItemTransport>();
 
                         await DeleteDepartedChildrenAsync(connection, tx, "PoItemTransport", "PoItemId", item.Id,
                             allocations.Select(t => t.Id).ToList()).ConfigureAwait(false);
@@ -641,6 +675,18 @@ ON CONFLICT(Id) DO UPDATE SET
                             await tCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                         }
                     }
+                }
+
+                // One statement for a whole-order PO instead of one per line. This is the common
+                // case, and the per-line version was costing a query per item on every save.
+                if (!po.IsLineTransport)
+                {
+                    using var clearCmd = connection.CreateCommand();
+                    clearCmd.Transaction = tx;
+                    clearCmd.CommandText =
+                        "DELETE FROM PoItemTransport WHERE PoItemId IN (SELECT Id FROM PurchaseOrderItem WHERE PoId = @ClearPoId);";
+                    clearCmd.Parameters.AddWithValue("@ClearPoId", po.Id.ToString());
+                    await clearCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
 
                 await RefreshSearchBlobAsync(connection, tx, po.PrId).ConfigureAwait(false);
