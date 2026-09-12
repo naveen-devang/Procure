@@ -21,8 +21,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Configure Approval Stages" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock Text="Add, remove, rename, and drag to reorder approval stages."
+                        <TextBlock Style="{StaticResource AppText}" Text="Configure Approval Stages" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="Add, remove, rename, and drag to reorder approval stages."
                                    FontSize="12" Foreground="{ThemeResource AppTextTertiary}" />
                     </StackPanel>
                     <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"

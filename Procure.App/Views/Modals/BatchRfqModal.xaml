@@ -13,7 +13,7 @@
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="14" />
         </Style>
-        <Style x:Key="Lbl" TargetType="TextBlock">
+        <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
         </Style>
@@ -36,8 +36,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Create Shared RFQ across Selected PRs" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBlock Text="{Binding BatchRfqPrsSummary}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="Create Shared RFQ across Selected PRs" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding BatchRfqPrsSummary}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                         </StackPanel>
                         <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                 Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
@@ -106,8 +106,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2">
-                                    <TextBlock Text="Consolidated Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBlock Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Consolidated Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Content="{Binding AllBatchRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
@@ -133,19 +133,19 @@
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             <Border Grid.Column="1" Padding="6,2,6,4" CornerRadius="10" MinWidth="46" BorderThickness="0" VerticalAlignment="Center" HorizontalAlignment="Left"
                                                     BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                                <TextBlock Text="{x:Bind Notes}" FontSize="10" FontWeight="SemiBold"
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Notes}" FontSize="10" FontWeight="SemiBold"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                                            Foreground="{ThemeResource AppTextPrimary}" />
                                             </Border>
-                                            <TextBlock Grid.Column="2" Text="{x:Bind ItemName}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="{x:Bind ItemName}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBlock Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                             <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                             <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                             <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right"
                                                      IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
@@ -167,23 +167,23 @@
                                     <ColumnDefinition Width="120" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Base Quote Sum" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Base Quote Sum" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <TextBox Text="{Binding BatchRfqQuoteAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="13" FontWeight="SemiBold" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="Freight" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Freight" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <TextBox Text="{Binding BatchRfqFreight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
-                                    <TextBlock Text="Other Charges" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Other Charges" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <TextBox Text="{Binding BatchRfqOtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4">
-                                    <TextBlock Text="Total Discount" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Total Discount" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <TextBox Text="{Binding BatchRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4" Spacing="4">
-                                    <TextBlock Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableVatTypes}" SelectedItem="{Binding BatchRfqVatType, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
@@ -195,10 +195,10 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="2">
-                                        <TextBlock Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
-                                        <TextBlock Text="{Binding FormattedCalculatedBatchRfqGrandTotal}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding FormattedCalculatedBatchRfqGrandTotal}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding CalculatedBatchRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
+                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{Binding CalculatedBatchRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
                                                FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                 </Grid>
                             </Border>

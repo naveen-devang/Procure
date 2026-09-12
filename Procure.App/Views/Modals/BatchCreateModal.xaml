@@ -7,7 +7,7 @@
     xmlns:views="using:Procure.App.Views">
 
     <UserControl.Resources>
-        <Style x:Key="Lbl" TargetType="TextBlock">
+        <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
@@ -38,8 +38,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
-                        <TextBlock Text="{Binding ModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock Text="{Binding ModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding ModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding ModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
                     <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
@@ -60,7 +60,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="1">
                             <TextBlock Text="New Row Defaults" Style="{StaticResource Lbl}" />
-                            <TextBlock Text="applied to rows you add next" FontSize="10" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="applied to rows you add next" FontSize="10" Foreground="{ThemeResource AppTextTertiary}" />
                         </StackPanel>
                         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPlants}" SelectedItem="{Binding BatchSharedPlant, Mode=TwoWay}" />
                         <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPrTypes}" SelectedItem="{Binding BatchSharedPrType, Mode=TwoWay}" />
@@ -77,7 +77,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding RequisitionsSectionLabel}" FontWeight="SemiBold" FontSize="14"
+                    <TextBlock Style="{StaticResource AppText}" Text="{Binding RequisitionsSectionLabel}" FontWeight="SemiBold" FontSize="14"
                                VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <Button Content="Paste rows from Excel" FontSize="11" Height="28" Padding="12,0" Command="{Binding PasteBatchPrRowsFromClipboardCommand}" />
@@ -102,10 +102,10 @@
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:BatchPrEntry">
                                 <StackPanel Spacing="3" Padding="4,6">
-                                    <TextBlock Text="{x:Bind PrNo, Mode=OneWay}" FontWeight="SemiBold" FontSize="11.5"
+                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind PrNo, Mode=OneWay}" FontWeight="SemiBold" FontSize="11.5"
                                                TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="{x:Bind ItemsCount, Mode=OneWay}" FontSize="9.5" Foreground="{ThemeResource AppTextSecondary}"
+                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ItemsCount, Mode=OneWay}" FontSize="9.5" Foreground="{ThemeResource AppTextSecondary}"
                                                    Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                                         <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="{ThemeResource AccentFillBrush}"
                                                  Visibility="{x:Bind HasCustomizations, Converter={StaticResource BoolVis}, Mode=OneWay}" />
@@ -166,7 +166,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Line Items" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Line Items" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Content="Paste items from Excel" FontSize="11" Height="28" Padding="10,0"
                                             Command="{Binding PasteBatchItemsFromClipboardCommand}" CommandParameter="{Binding SelectedBatchEntry}" />
@@ -189,10 +189,10 @@
                                     <ColumnDefinition Width="95" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="ITEM" />
-                                <TextBlock Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
-                                <TextBlock Grid.Column="3" Text="EST. UNIT PRICE" />
+                                <TextBlock Style="{StaticResource AppText}" Text="ITEM" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="EST. UNIT PRICE" />
                                 <Border Grid.Column="4" Width="28" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding SelectedBatchEntry.Items}">
@@ -221,7 +221,7 @@
 
                             <StackPanel Spacing="8" Visibility="{Binding CustomColumnDefinitions.Count, Converter={StaticResource CountVis}}">
                                 <Border Height="1" Background="{ThemeResource AppHairline}" />
-                                <TextBlock Text="Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ItemsControl ItemsSource="{Binding SelectedBatchEntry.CustomValues}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -257,7 +257,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Border Grid.ColumnSpan="2" Height="1" Background="{ThemeResource AppHairline}" />
-                    <TextBlock Grid.Row="1" Text="{Binding BatchEntriesSummary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                    <TextBlock Style="{StaticResource AppText}" Grid.Row="1" Text="{Binding BatchEntriesSummary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                                Foreground="{ThemeResource AppTextSecondary}"
                                Visibility="{Binding IsBulkMode, Converter={StaticResource BoolVis}}" />
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10">

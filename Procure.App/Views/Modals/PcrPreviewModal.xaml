@@ -12,7 +12,7 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="14" />
         </Style>
-        <Style x:Key="H" TargetType="TextBlock">
+        <Style x:Key="H" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
@@ -48,9 +48,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Preview Price Comparison Sheet" FontSize="16" FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource AppText}" Text="Preview Price Comparison Sheet" FontSize="16" FontWeight="SemiBold"
                                    Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock Text="{Binding PcrPreviewPageSummary}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPageSummary}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
                     <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
@@ -91,7 +91,7 @@
                                         Background="{ThemeResource AppSubtleFill}" Padding="18,14"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
                                 <ProgressRing IsActive="{Binding IsPcrPreviewBusy}" />
-                                <TextBlock Text="Rendering preview…" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Rendering preview…" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                             </StackPanel>
                         </Grid>
 
@@ -105,12 +105,12 @@
                                         Visibility="{Binding IsPcrPagerVisible, Converter={StaticResource BoolVis}}">
                                 <Button Content="&#x2039;" Command="{Binding PreviousPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
-                                <TextBlock Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalAlignment="Center"
+                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalAlignment="Center"
                                            Foreground="{ThemeResource AppTextPrimary}" />
                                 <Button Content="&#x203A;" Command="{Binding NextPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
+                            <TextBlock Style="{StaticResource AppText}" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
                                        Foreground="{ThemeResource AppTextSecondary}"
                                        Text="{Binding PcrPreviewZoomLabel}" />
                         </Grid>
@@ -153,7 +153,7 @@
                                     <CheckBox Content="Fit sheet to one page" IsChecked="{Binding PcrShrinkToFit, Mode=TwoWay}" />
 
                                     <StackPanel Spacing="6">
-                                        <TextBlock Text="Orientation" FontSize="11.5" FontWeight="SemiBold"
+                                        <TextBlock Style="{StaticResource AppText}" Text="Orientation" FontSize="11.5" FontWeight="SemiBold"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                         <Grid ColumnSpacing="6">
                                             <Grid.ColumnDefinitions>
@@ -176,7 +176,7 @@
                                     </StackPanel>
 
                                     <StackPanel Spacing="6">
-                                        <TextBlock Text="Margins" FontSize="11.5" FontWeight="SemiBold"
+                                        <TextBlock Style="{StaticResource AppText}" Text="Margins" FontSize="11.5" FontWeight="SemiBold"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                         <Grid ColumnSpacing="6">
                                             <Grid.ColumnDefinitions>

@@ -31,7 +31,36 @@ public sealed partial class PrDetailPanel : UserControl
         Procure.Utilities.TodoChangeNotifier.Changed -= OnTodoChanged;
         Procure.Utilities.TodoChangeNotifier.Changed += OnTodoChanged;
         _ = LoadLinkedTasks();
+#if DEBUG
+        if (Environment.GetEnvironmentVariable("PROCURE_SELECTION_PROBE") == "1") ReportTextSelection();
+#endif
     }
+
+#if DEBUG
+    /// <summary>Counts how many TextBlocks in this panel actually have text selection turned on at
+    /// runtime. "The style should apply" is a guess; this is the answer.</summary>
+    private void ReportTextSelection()
+    {
+        var on = 0; var off = 0; var samples = new System.Text.StringBuilder();
+        void Walk(DependencyObject node)
+        {
+            var n = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node);
+            for (var i = 0; i < n; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i);
+                if (child is TextBlock tb)
+                {
+                    if (tb.IsTextSelectionEnabled) on++; else off++;
+                    if (samples.Length < 600)
+                        samples.Append($"  [{(tb.IsTextSelectionEnabled ? "ON " : "off")}] {tb.FontFamily?.Source?.Split('#')[^1]} | {(tb.Text.Length > 30 ? tb.Text[..30] : tb.Text)}\n");
+                }
+                Walk(child);
+            }
+        }
+        Walk(this);
+        Procure.Utilities.CrashLog.Write($"SELECTION PROBE: {on} TextBlocks selectable, {off} not\n{samples}");
+    }
+#endif
 
     private void OnTodoChanged() => DispatcherQueue.TryEnqueue(() => _ = LoadLinkedTasks(force: true));
 

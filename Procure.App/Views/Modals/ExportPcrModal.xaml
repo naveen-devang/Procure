@@ -13,7 +13,7 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="14" />
         </Style>
-        <Style x:Key="H" TargetType="TextBlock">
+        <Style x:Key="H" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
@@ -41,8 +41,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Export Price Comparison Sheet" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock Text="{Binding ExportPcrSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="Export Price Comparison Sheet" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding ExportPcrSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
                     <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
@@ -62,12 +62,12 @@
                                     <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="0"
                                             VerticalAlignment="Center"
                                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                        <TextBlock Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold"
+                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                     </Border>
                                 </Grid>
-                                <TextBlock Text="Choose up to 5 supplier quotations to display side-by-side:" FontSize="11.5"
+                                <TextBlock Style="{StaticResource AppText}" Text="Choose up to 5 supplier quotations to display side-by-side:" FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <ItemsControl ItemsSource="{Binding ExportRfqSelections}">
                                     <ItemsControl.ItemTemplate>
@@ -75,7 +75,7 @@
                                             <Border Padding="10,6" Margin="0,0,0,6" CornerRadius="4" BorderThickness="1"
                                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
                                                 <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}">
-                                                    <TextBlock Text="{x:Bind DisplaySummary}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind DisplaySummary}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
                                                                Foreground="{ThemeResource AppTextPrimary}" />
                                                 </CheckBox>
                                             </Border>
@@ -88,7 +88,7 @@
                         <Border Style="{StaticResource Sec}">
                             <StackPanel Spacing="8">
                                 <TextBlock Text="2. Collective Number" Style="{StaticResource H}" />
-                                <TextBlock Text="Optional. Printed on the sheet as-is; blank shows a dash." FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Optional. Printed on the sheet as-is; blank shows a dash." FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
                                 <TextBox Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay}" PlaceholderText="e.g. PCR-2026-014" FontSize="12" />
                             </StackPanel>
                         </Border>
@@ -96,7 +96,7 @@
                         <Border Style="{StaticResource Sec}">
                             <StackPanel Spacing="8">
                                 <TextBlock Text="3. Remarks / Justification" Style="{StaticResource H}" />
-                                <TextBlock Text="Additional justification for the approvers. Saved for future exports." FontSize="11.5"
+                                <TextBlock Style="{StaticResource AppText}" Text="Additional justification for the approvers. Saved for future exports." FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <TextBox Text="{Binding ExportPcrRemarks, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
                                          PlaceholderText="e.g. Required by Electrical Dept. on urgent basis" FontSize="12" />

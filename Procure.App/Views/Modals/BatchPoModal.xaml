@@ -14,18 +14,18 @@
                 VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <StackPanel Spacing="14">
-                <TextBlock Text="Create Master Combined Purchase Order" FontWeight="SemiBold" FontSize="16"
+                <TextBlock Style="{StaticResource AppText}" Text="Create Master Combined Purchase Order" FontWeight="SemiBold" FontSize="16"
                            Foreground="{ThemeResource AppTextPrimary}" />
                 <StackPanel Spacing="4">
-                    <TextBlock Text="PO Number *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                    <TextBlock Style="{StaticResource AppText}" Text="PO Number *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                     <TextBox Text="{Binding BatchPoNo, Mode=TwoWay}" PlaceholderText="e.g. PO-2026-901" />
                 </StackPanel>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Vendor Name *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                    <TextBlock Style="{StaticResource AppText}" Text="Vendor Name *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                     <TextBox Text="{Binding BatchPoVendor, Mode=TwoWay}" PlaceholderText="Vendor Name" />
                 </StackPanel>
                 <StackPanel Spacing="4">
-                    <TextBlock FontSize="12" Foreground="{ThemeResource AppTextPrimary}"
+                    <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextPrimary}"
                                Text="{Binding BatchPoCurrency, Converter={StaticResource Fmt}, ConverterParameter='Total Combined PO Value ({0}) *'}" />
                     <TextBox Text="{Binding BatchPoTotalValue, Mode=TwoWay}" PlaceholderText="0.00" />
                 </StackPanel>

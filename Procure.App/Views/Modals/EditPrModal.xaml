@@ -26,7 +26,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding EditModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
+                    <TextBlock Style="{StaticResource AppText}" Text="{Binding EditModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
                     <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
                             Command="{Binding CloseEditModalCommand}" />
@@ -42,27 +42,27 @@
                                 <ColumnDefinition Width="170" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="4">
-                                <TextBlock Text="PR Number *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="PR Number *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <TextBox Text="{Binding EditingPrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
-                                <TextBlock Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <TextBox Text="{Binding EditingPrRequestor, Mode=TwoWay}" PlaceholderText="e.g. Sarah Lin" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPlants}"
                                           SelectedItem="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" />
                             </StackPanel>
                             <StackPanel Grid.Column="3" Spacing="4">
-                                <TextBlock Text="PR Type *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="PR Type *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPrTypes}"
                                           SelectedItem="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" />
                             </StackPanel>
                         </Grid>
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="Description" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="Description" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                             <TextBox Text="{Binding EditingPrDescription, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
                                      PlaceholderText="Item or service requested..." />
                         </StackPanel>
@@ -73,7 +73,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Line Items &amp; Quantities" FontWeight="SemiBold" FontSize="14"
+                                <TextBlock Style="{StaticResource AppText}" Text="Line Items &amp; Quantities" FontWeight="SemiBold" FontSize="14"
                                            VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Content="Paste from Excel" FontSize="11" Height="28" Padding="10,0"
@@ -97,10 +97,10 @@
                                     <ColumnDefinition Width="95" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="ITEM" />
-                                <TextBlock Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
-                                <TextBlock Grid.Column="3" Text="EST. UNIT PRICE" />
+                                <TextBlock Style="{StaticResource AppText}" Text="ITEM" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="EST. UNIT PRICE" />
                                 <Border Grid.Column="4" Width="28" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding EditingPrItems}">
@@ -138,25 +138,25 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Priority" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Priority" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPriorities}"
                                           SelectedItem="{Binding CurrentEditingPr.Priority, Mode=TwoWay}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
-                                <TextBlock Text="Status" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBlock Style="{StaticResource AppText}" Text="Status" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SelectableStatuses}"
                                           SelectedItem="{Binding CurrentEditingPr.Status, Mode=TwoWay}" />
                             </StackPanel>
                         </Grid>
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="Notes &amp; Justification" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="Notes &amp; Justification" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                             <TextBox Text="{Binding EditingPrNotes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
                                      PlaceholderText="Additional procurement details or notes..." />
                         </StackPanel>
 
                         <StackPanel Spacing="8" Visibility="{Binding EditingCustomValues.Count, Converter={StaticResource CountVis}}">
-                            <TextBlock Text="Team Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="Team Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
                             <ItemsControl ItemsSource="{Binding EditingCustomValues}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -166,7 +166,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:CustomFieldValue">
                                         <StackPanel Spacing="4" Margin="0,0,0,8" Width="300">
-                                            <TextBlock Text="{x:Bind ColumnName}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ColumnName}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                             <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{x:Bind OptionsList}" SelectedItem="{x:Bind Value, Mode=TwoWay}"
                                                       Visibility="{x:Bind IsSelect, Converter={StaticResource BoolVis}}" />
                                             <CalendarDatePicker Date="{x:Bind DateValue, Converter={StaticResource Dto}, Mode=TwoWay}"

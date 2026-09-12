@@ -6,7 +6,7 @@
     xmlns:models="using:Procure.Models">
 
     <UserControl.Resources>
-        <Style x:Key="Lbl" TargetType="TextBlock">
+        <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
         </Style>
@@ -36,8 +36,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
-                            <TextBlock Text="{Binding PoModalTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBlock Text="{Binding AddPoModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding PoModalTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding AddPoModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                         </StackPanel>
                         <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                 Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
@@ -48,14 +48,14 @@
                         <Border Padding="10,4" CornerRadius="12" BorderThickness="0"
                                 Background="{Binding IsPoModalStep1, Converter={StaticResource ChipBg}}"
                                 BorderBrush="{Binding IsPoModalStep1, Converter={StaticResource ChipStroke}}">
-                            <TextBlock Text="1  Select Supplier Quotes" FontSize="11.5" FontWeight="SemiBold"
+                            <TextBlock Style="{StaticResource AppText}" Text="1  Select Supplier Quotes" FontSize="11.5" FontWeight="SemiBold"
                                        Foreground="{Binding IsPoModalStep1, Converter={StaticResource ChipText}}" />
                         </Border>
-                        <TextBlock Text="&#x2192;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="&#x2192;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
                         <Border Padding="10,4" CornerRadius="12" BorderThickness="0"
                                 Background="{Binding IsPoModalStep2, Converter={StaticResource ChipBg}}"
                                 BorderBrush="{Binding IsPoModalStep2, Converter={StaticResource ChipStroke}}">
-                            <TextBlock Text="2  Configure PO Details &amp; Quantities" FontSize="11.5" FontWeight="SemiBold"
+                            <TextBlock Style="{StaticResource AppText}" Text="2  Configure PO Details &amp; Quantities" FontSize="11.5" FontWeight="SemiBold"
                                        Foreground="{Binding IsPoModalStep2, Converter={StaticResource ChipText}}" />
                         </Border>
                     </StackPanel>
@@ -71,20 +71,20 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2">
-                                    <TextBlock Text="Select Supplier Quotation(s) to Award" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBlock Text="Select one or more quotes. A separate PO is created for each selected supplier in the next step."
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select Supplier Quotation(s) to Award" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select one or more quotes. A separate PO is created for each selected supplier in the next step."
                                                FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="{Binding AllPoRfqsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="10,0"
                                         Command="{Binding ToggleAllPoRfqsCommand}" />
                             </Grid>
-                            <TextBlock Text="No RFQ or vendor quotes found for this requisition. Create and price an RFQ first."
+                            <TextBlock Style="{StaticResource AppText}" Text="No RFQ or vendor quotes found for this requisition. Create and price an RFQ first."
                                        FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}"
                                        Visibility="{Binding HasPoRfqs, Converter={StaticResource BoolVis}, ConverterParameter=invert}" />
                             <!-- One card per selected supplier, stacked down a scroll: without a
                                  count, the PO number fields for suppliers 2..n are easy to miss
                                  entirely before hitting Raise. -->
-                            <TextBlock FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                            <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
                                        Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
                             <ItemsControl ItemsSource="{Binding PoRfqSelections}">
                                 <ItemsControl.ItemTemplate>
@@ -100,26 +100,26 @@
                                                 <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Center" />
                                                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <TextBlock Text="{x:Bind VendorName}" FontSize="13.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="13.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                                         <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}"
                                                                 Background="{ThemeResource AppSubtleFill}"
                                                                 Visibility="{x:Bind HasRfqNumber, Converter={StaticResource BoolVis}}">
-                                                            <TextBlock Text="{x:Bind RfqNumber}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RfqNumber}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
                                                         </Border>
                                                         <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource FluentSuccess}"
                                                                 Background="{ThemeResource FluentSuccessBg}"
                                                                 Visibility="{x:Bind HasTechnicalApproval, Converter={StaticResource BoolVis}}">
-                                                            <TextBlock Text="{x:Bind TechnicalApproval}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind TechnicalApproval}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
                                                         </Border>
                                                     </StackPanel>
-                                                    <TextBlock FontSize="11" Foreground="{ThemeResource AppTextSecondary}">
+                                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}">
                                                         <Run Text="{x:Bind SelectedItemsSummary}" /><Run Text="  ·  " /><Run Text="{x:Bind Incoterms}" /><Run Text="  ·  " /><Run Text="{x:Bind PaymentTerms}" />
                                                     </TextBlock>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                                    <TextBlock Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold"
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold"
                                                                HorizontalAlignment="Right" Foreground="{ThemeResource FluentSuccess}" />
-                                                    <TextBlock Text="Total Landed Cost" FontSize="10" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
+                                                    <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost" FontSize="10" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -135,13 +135,13 @@
                                     Visibility="{Binding PoAllocationSummaryText, Converter={StaticResource NullVis}}"
                                     BorderBrush="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilStroke}}"
                                     Background="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilBg}}">
-                                <TextBlock Text="{Binding PoAllocationSummaryText}" FontSize="11.5" FontWeight="SemiBold"
+                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PoAllocationSummaryText}" FontSize="11.5" FontWeight="SemiBold"
                                            Foreground="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilColor}}" />
                             </Border>
                             <!-- One card per selected supplier, stacked down a scroll: without a
                                  count, the PO number fields for suppliers 2..n are easy to miss
                                  entirely before hitting Raise. -->
-                            <TextBlock FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                            <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
                                        Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
                             <ItemsControl ItemsSource="{Binding PoRfqSelections}">
                                 <ItemsControl.ItemTemplate>
@@ -157,15 +157,15 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                         <Rectangle Width="6" Height="18" RadiusX="2" RadiusY="2" Fill="{ThemeResource FluentSuccess}" />
-                                                        <TextBlock Text="{x:Bind VendorName}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                                         <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                                            <TextBlock Text="{x:Bind Currency, Converter={StaticResource Fmt}, ConverterParameter='Currency: {0}'}" FontSize="10" FontWeight="SemiBold"
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Currency, Converter={StaticResource Fmt}, ConverterParameter='Currency: {0}'}" FontSize="10" FontWeight="SemiBold"
                                                                        Foreground="{ThemeResource AppTextPrimary}" />
                                                         </Border>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                        <TextBlock Text="PO Amount:" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
-                                                        <TextBlock Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="PO Amount:" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
                                                     </StackPanel>
                                                 </Grid>
 
@@ -175,9 +175,9 @@
                                                         <ColumnDefinition Width="240" />
                                                         <ColumnDefinition Width="*" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="PO Number *" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <TextBlock Style="{StaticResource AppText}" Text="PO Number *" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                     <TextBox Grid.Column="1" Text="{x:Bind PoNo, Mode=TwoWay}" PlaceholderText="e.g. PO-2026-101" FontSize="12" FontWeight="SemiBold" />
-                                                    <TextBlock Grid.Column="2" Text="Enter a unique PO reference for this supplier" FontSize="11"
+                                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="Enter a unique PO reference for this supplier" FontSize="11"
                                                                VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                                 </Grid>
 
@@ -189,7 +189,7 @@
                                                                 <ColumnDefinition Width="Auto" />
                                                                 <ColumnDefinition Width="*" />
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="Transport" FontSize="12" FontWeight="SemiBold"
+                                                            <TextBlock Style="{StaticResource AppText}" Text="Transport" FontSize="12" FontWeight="SemiBold"
                                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                             <!-- Two ways to arrange transport, chosen per order. Whole-order is the
                                                                  default and is exactly what this dialog did before. -->
@@ -236,7 +236,7 @@
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="3" Spacing="4">
                                                                 <TextBlock Text="Transport Total" Style="{StaticResource Lbl}" />
-                                                                <TextBlock Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
                                                                            VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                             </StackPanel>
                                                         </Grid>
@@ -248,9 +248,9 @@
                                                                 <ColumnDefinition Width="Auto" />
                                                             </Grid.ColumnDefinitions>
                                                             <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                                <TextBlock Text="Each line carries its own contract - set it in the Transport column."
+                                                                <TextBlock Style="{StaticResource AppText}" Text="Each line carries its own contract - set it in the Transport column."
                                                                            FontSize="11.5" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
-                                                                <TextBlock Text="{x:Bind UnallocatedLineText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind UnallocatedLineText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
                                                                            Foreground="{ThemeResource FluentCaution}"
                                                                            Visibility="{x:Bind HasUnallocatedLines, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                                                             </StackPanel>
@@ -260,7 +260,7 @@
                                                                     Click="FillLines_Click" />
                                                             <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" MinWidth="120" Margin="16,0,0,0">
                                                                 <TextBlock Text="Transport Total" Style="{StaticResource Lbl}" HorizontalAlignment="Right" />
-                                                                <TextBlock Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
                                                                            HorizontalAlignment="Right" Foreground="{ThemeResource AppTextPrimary}" />
                                                             </StackPanel>
                                                         </Grid>
@@ -289,13 +289,13 @@
                                                             <ColumnDefinition Width="28" />
                                                             <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="1" Text="ITEM" />
-                                                        <TextBlock Grid.Column="2" Text="QTY" />
-                                                        <TextBlock Grid.Column="3" Text="UNIT" />
-                                                        <TextBlock Grid.Column="4" Text="UNIT RATE" />
-                                                        <TextBlock Grid.Column="5" Text="DISCOUNT" />
-                                                        <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
-                                                        <TextBlock Grid.Column="8" Text="TRANSPORT"
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="ITEM" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="QTY" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="UNIT" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="UNIT RATE" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="5" Text="DISCOUNT" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="8" Text="TRANSPORT"
                                                                    Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                                                     </Grid>
                                                     <ItemsControl ItemsSource="{x:Bind Items}">
@@ -318,16 +318,16 @@
                                                                         </Grid.ColumnDefinitions>
                                                                         <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                                                            <TextBlock Text="{x:Bind ItemName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ItemName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                                                        Foreground="{ThemeResource AppTextPrimary}" />
-                                                                            <TextBlock Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
                                                                                        Foreground="{x:Bind AllocationStatusText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
                                                                         </StackPanel>
                                                                         <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
-                                                                        <TextBlock Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                                                         <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
                                                                         <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
-                                                                        <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                                                    HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                                         <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
                                                                                 Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AppTextSecondary}"
@@ -365,11 +365,11 @@
                                                                                     <ColumnDefinition Width="100" />
                                                                                     <ColumnDefinition Width="28" />
                                                                                 </Grid.ColumnDefinitions>
-                                                                                <TextBlock Text="QTY" />
-                                                                                <TextBlock Grid.Column="1" Text="CONTRACT" />
-                                                                                <TextBlock Grid.Column="2" Text="TRANSPORTER" />
-                                                                                <TextBlock Grid.Column="3" Text="RATE / UNIT" />
-                                                                                <TextBlock Grid.Column="4" Text="TOTAL" HorizontalAlignment="Right" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Text="QTY" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="CONTRACT" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="TRANSPORTER" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="RATE / UNIT" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="TOTAL" HorizontalAlignment="Right" />
                                                                             </Grid>
                                                                             <ItemsControl ItemsSource="{x:Bind Transports}">
                                                                                 <ItemsControl.ItemTemplate>
@@ -395,7 +395,7 @@
                                                                                             <TextBox Grid.Column="3" Height="30" FontSize="11.5" TextAlignment="Right" PlaceholderText="0.00"
                                                                                                      Text="{x:Bind RatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}"
                                                                                                      TextChanged="TransportEdited" />
-                                                                                            <TextBlock Grid.Column="4" Text="{x:Bind FormattedTotal, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold"
+                                                                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="{x:Bind FormattedTotal, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold"
                                                                                                        HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                                                        Foreground="{ThemeResource AppTextPrimary}" />
                                                                                             <Button Grid.Column="5" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
@@ -413,7 +413,7 @@
                                                                                 </Grid.ColumnDefinitions>
                                                                                 <Button Content="+ Split this line" FontSize="11" Height="26" Padding="10,0"
                                                                                         Click="AddTransport_Click" />
-                                                                                <TextBlock Grid.Column="1" Text="{x:Bind TransportAllocationText, Mode=OneWay}"
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{x:Bind TransportAllocationText, Mode=OneWay}"
                                                                                            FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"
                                                                                            VerticalAlignment="Center"
                                                                                            Foreground="{x:Bind UnallocatedQuantity, Converter={StaticResource AllocColor}, Mode=OneWay}" />
@@ -430,7 +430,7 @@
                                                 <Border Padding="14,10" CornerRadius="6" BorderThickness="1"
                                                         BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSubtleFill}">
                                                     <StackPanel Spacing="10">
-                                                        <TextBlock Text="Commercial Terms &amp; Landed Cost Breakdown" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="Commercial Terms &amp; Landed Cost Breakdown" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                                         <Grid ColumnSpacing="10">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
@@ -469,11 +469,11 @@
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{x:Bind FormattedVatAmount, Converter={StaticResource Fmt}, ConverterParameter='Calculated VAT: +{0}', Mode=OneWay}"
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedVatAmount, Converter={StaticResource Fmt}, ConverterParameter='Calculated VAT: +{0}', Mode=OneWay}"
                                                                        FontSize="11" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                                <TextBlock Text="Total PO Value:" FontSize="12.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                                                <TextBlock Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="Total PO Value:" FontSize="12.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
                                                             </StackPanel>
                                                         </Grid>
                                                     </StackPanel>
@@ -501,10 +501,10 @@
                     <Border Grid.Column="1" Padding="12,6" CornerRadius="16" MinWidth="70" BorderThickness="0" HorizontalAlignment="Left" VerticalAlignment="Center"
                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='Selected: {0} quote(s)'}"
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='Selected: {0} quote(s)'}"
                                        FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBlock Text="·" FontSize="11.5" Foreground="{ThemeResource AppTextTertiary}" />
-                            <TextBlock Text="{Binding TotalPoAmountSummary}" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="·" FontSize="11.5" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding TotalPoAmountSummary}" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
                         </StackPanel>
                     </Border>
                     <Button Grid.Column="2" Content="Next: Configure PO(s) →" Style="{StaticResource AccentButtonStyle}"
