@@ -44,6 +44,9 @@ namespace Procure.Data
                 UpdateStateStoreSelfCheck.Run();
             }
 
+            // Drives the live board, so it is never mixed with anything else.
+            if (On("PROCURE_BOARD_MEMORY")) return BoardRetentionProbe.RunAsync(services);
+
             var databaseSuites = RunDatabaseSuitesAsync(services);
 
             if (On("PROCURE_TODO_SELFCHECK")) _ = RunTodoSelfChecksAsync(services);

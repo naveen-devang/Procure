@@ -283,6 +283,8 @@ namespace Procure.PageModels
         {
             if (_loadInFlight) return;
 
+            var released = _loadedPrs.Count;
+
             foreach (var pr in _loadedPrs) pr.PropertyChanged -= OnPrItemPropertyChanged;
             _loadedPrs = new List<PurchaseRequisition>();
             FilteredPrs.Clear();
@@ -293,6 +295,21 @@ namespace Procure.PageModels
             UpdateListSummary();
 
             await LoadCoreAsync(fillUi: true);
+
+            // Refreshing after a long scroll drops hundreds of PRs with their whole item/RFQ/PO
+            // graphs. Measured with the retention probe, they are genuinely released - but the
+            // runtime keeps the pages, so Task Manager shows the same number it did before and the
+            // refresh looks like it freed nothing. Same deliberate compaction BoardDisappearing
+            // already does for the same reason, on the same threshold, off the UI thread so the
+            // reload is not waiting on it.
+            if (released > ReleaseThreshold)
+            {
+                _ = Task.Run(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                    GC.WaitForPendingFinalizers();
+                });
+            }
         }
 
         /// <summary>Warms the data before the board's XAML has ever been built. The card fill waits for
