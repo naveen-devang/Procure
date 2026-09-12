@@ -45,6 +45,45 @@ ORDER BY CreatedAt DESC;";
             return prs;
         }
 
+        /// <summary>Every PR, in batches, for the one caller that genuinely wants the whole table -
+        /// the CSV export. Same rows and same order as GetAllAsync, but only one batch is in memory
+        /// at a time, so the export no longer needs the entire object graph resident before it can
+        /// write its first line.
+        ///
+        /// ponytail: OFFSET paging, one connection held open for the walk. 40 batches at 20,000 PRs;
+        /// switch to a keyset cursor on (CreatedAt, Id) if the table grows far past that.</summary>
+        public async IAsyncEnumerable<List<PurchaseRequisition>> StreamAllAsync(int batchSize = 500)
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+
+            for (var skip = 0; ; skip += batchSize)
+            {
+                var batch = new List<PurchaseRequisition>(batchSize);
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+FROM PurchaseRequisition
+ORDER BY CreatedAt DESC
+LIMIT @Take OFFSET @Skip;";
+                    cmd.Parameters.AddWithValue("@Take", batchSize);
+                    cmd.Parameters.AddWithValue("@Skip", skip);
+
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false)) batch.Add(ReadPr(reader));
+                }
+
+                if (batch.Count == 0) yield break;
+
+                await LoadChildrenAsync(connection, batch, scoped: true).ConfigureAwait(false);
+                yield return batch;
+
+                if (batch.Count < batchSize) yield break;
+            }
+        }
+
         /// <summary>
         /// Loads every child collection for <paramref name="prs"/> and attaches it. Eight flat queries,
         /// no N+1. When <paramref name="scoped"/> is true each one is narrowed to the PRs actually

@@ -22,7 +22,6 @@ namespace Procure.PageModels
         private readonly IErrorHandler _errorHandler;
 
         private List<NoteListItem> _all = new();
-        private readonly Dictionary<Guid, Note> _bodyCache = new();
         private bool _loaded;
 
         public ObservableCollection<NoteListItem> Notes { get; } = new();
@@ -127,12 +126,17 @@ namespace Procure.PageModels
 
             try
             {
-                Note? note = _bodyCache.TryGetValue(item.Id, out var cached)
-                    ? cached
-                    : await _repo.GetAsync(item.Id);
+                // Read it fresh rather than from a cache of every note opened this session. That
+                // cache had no ceiling and held whole RTF bodies - forty notes with pasted tables
+                // stayed resident until the app closed. FlushPendingAsync above has already written
+                // any unsaved edit, so the row on disk is the current one, and a note is a single
+                // indexed read.
+                var note = await _repo.GetAsync(item.Id);
                 if (note is null) return;
 
-                _bodyCache[note.Id] = note;
+                // The note being left is no longer referenced by anything here; unhooking it means
+                // nothing keeps listening to a note the user has navigated away from.
+                if (SelectedNote is { } leaving) UnhookNote(leaving);
                 await ResolveLinkLabelsAsync(note);
                 HookNote(note);
                 SelectedNote = note;
@@ -247,7 +251,6 @@ namespace Procure.PageModels
 
             var row = new NoteListItem { Id = note.Id, Title = string.Empty, UpdatedAt = note.UpdatedAt, SortOrder = note.SortOrder };
             _all.Insert(0, row);
-            _bodyCache[note.Id] = note;
             HookNote(note);
 
             try { await _repo.UpsertAsync(note, string.Empty); }
@@ -278,7 +281,6 @@ namespace Procure.PageModels
             try
             {
                 await _repo.DeleteAsync(item.Id);
-                _bodyCache.Remove(item.Id);
                 _all.Remove(item);
                 if (SelectedNote?.Id == item.Id)
                 {
@@ -318,7 +320,7 @@ namespace Procure.PageModels
 
             try
             {
-                var source = _bodyCache.TryGetValue(item.Id, out var c) ? c : await _repo.GetAsync(item.Id);
+                var source = SelectedNote?.Id == item.Id ? SelectedNote : await _repo.GetAsync(item.Id);
                 if (source is null) return;
 
                 var copy = new Note
@@ -334,7 +336,6 @@ namespace Procure.PageModels
                     copy.Links.Add(new NoteLink { EntityType = l.EntityType, EntityId = l.EntityId, Label = l.Label });
                 await _repo.UpsertAsync(copy, source.Snippet ?? string.Empty);
 
-                _bodyCache[copy.Id] = copy;
                 HookNote(copy);
                 var row = new NoteListItem
                 {

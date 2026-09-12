@@ -684,6 +684,45 @@ namespace Procure.Data
             Assert(failure == null, $"concurrent saves on a Raw Material PR do not collide; got {failure?.Message}");
             await AssertDerivedDataFreshAsync(db, "after eight concurrent saves");
 
+            // The search index has the same shape of hazard and needed its own teeth: re-indexing a
+            // PR is a DELETE then an INSERT of the same rowid, so a second save of the SAME PR that
+            // slips between them fails on the insert - "constraint failed", surfaced to the user as
+            // a save that did not work. Two approvals signed together did it, because
+            // UpdateParentPrApprovalState fires once per approval.
+            //
+            // Eight parallel saves above do not reproduce it: SQLite serialises writers, and the
+            // window is narrow. Holding a write transaction open forces the interleave every time -
+            // the second saver must wait for the first to commit and then see its row.
+            using (var blocker = db.CreateConnection())
+            {
+                await blocker.OpenAsync();
+                var held = (Microsoft.Data.Sqlite.SqliteTransaction)await blocker.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                using (var del = blocker.CreateCommand())
+                {
+                    del.Transaction = held;
+                    del.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
+                    del.Parameters.AddWithValue("@SearchPrId", live.Id.ToString());
+                    await del.ExecuteNonQueryAsync();
+                }
+
+                Exception? raced = null;
+                var second = Task.Run(async () =>
+                {
+                    try { await repo.SavePrFieldsAsync(live); }
+                    catch (Exception ex) { raced = ex; }
+                });
+
+                await Task.Delay(150);              // the second saver is now inside the window
+                await held.CommitAsync();
+                await second;
+
+                Assert(raced == null,
+                    $"re-indexing a PR while another save of it is in flight does not collide; got {raced?.Message}");
+            }
+
+            await AssertDerivedDataFreshAsync(db, "after an interleaved re-index");
+
             // The part with teeth: run the write half twice over a key that is already there, which
             // is exactly what the interleave produces and what used to throw. Written against the
             // shipped SQL, so it fails the moment the upsert is taken back out - checked by removing
@@ -918,7 +957,7 @@ namespace Procure.Data
 
             using (var cmd = connection.CreateCommand())
             {
-                cmd.CommandText = DatabaseConstants.SqlStaleSearchBlobCount + ";";
+                cmd.CommandText = DatabaseConstants.SqlStaleSearchRowCount;
                 var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert(stale == 0, $"search text is current {step} ({stale} stale row(s))");
             }

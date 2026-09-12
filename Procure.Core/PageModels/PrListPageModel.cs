@@ -323,6 +323,34 @@ namespace Procure.PageModels
         /// keeping your place is worth more than the RAM.</summary>
         private const int ReleaseThreshold = 500;
 
+        /// <summary>Drops the oldest rows once the window passes <see cref="MaxLoadedRows"/>.
+        ///
+        /// Appending used to drop nothing at all: a user who scrolled to the bottom of a large result
+        /// was holding every PR they had passed, with its full item/RFQ/PO graph, and the only thing
+        /// that ever released them was leaving the board. Now the window slides.
+        ///
+        /// Unsubscribing before dropping the reference is the part that matters - PropertyChanged
+        /// keeps a row alive otherwise, which is the leak this is supposed to fix. A row the user has
+        /// selected is kept: the selection has to be able to act on it wherever it has scrolled to.</summary>
+        private void TrimLoadedHead()
+        {
+            var excess = FilteredPrs.Count - MaxLoadedRows;
+            if (excess <= 0) return;
+
+            var dropped = new HashSet<Guid>();
+            for (var i = 0; i < excess && FilteredPrs.Count > 0; i++)
+            {
+                var pr = FilteredPrs[0];
+                if (_selectedIds.Contains(pr.Id)) break;   // keep it, and stop - order must hold
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+                dropped.Add(pr.Id);
+                FilteredPrs.RemoveAt(0);
+            }
+
+            if (dropped.Count > 0)
+                _loadedPrs = _loadedPrs.Where(p => !dropped.Contains(p.Id)).ToList();
+        }
+
         /// <summary>Called from PrListPage.OnDisappearing. Below <see cref="ReleaseThreshold"/> loaded
         /// rows, nothing is torn down: the CollectionView recycles containers, so what is realised is
         /// bounded by the viewport however far the user scrolled, and the board keeps its place exactly
@@ -603,6 +631,17 @@ namespace Procure.PageModels
         // RemainingItemsThresholdReached immediately tops the window up to PageSize and beyond.
         private const int FirstPaintPageSize = 16;
 
+        // The furthest back infinite scroll keeps rows. Past this, appending a page trims the same
+        // number from the head: the loaded window slides instead of growing, so scrolling deep into
+        // a large result stops being an open-ended memory cost. 1,500 rows is 30 pages - far more
+        // than anyone scrolls back through - and the rows behind it are one query away if the user
+        // does scroll up that far.
+        //
+        // ponytail: a sliding window, not full data virtualization. Scrolling back past the trim
+        // point re-reads from the top rather than restoring the exact rows; a proper windowed source
+        // (ISupportIncrementalLoading both ways) is the real answer if that ever gets in the way.
+        private const int MaxLoadedRows = 1500;
+
         // Bounds the re-read after an edit. Only a database cost now - the CollectionView realises a
         // screenful whatever the number is - so it is set high enough that normal use never trims the
         // board. Roughly 250ms of background materialisation at this size.
@@ -640,6 +679,7 @@ namespace Procure.PageModels
                 if (generation != _pageGeneration) return;   // a filter change superseded this
 
                 foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
+                TrimLoadedHead();
                 TotalFilteredCount = page.TotalCount;
                 UpdateListSummary();
                 if (Procure.Utilities.BoardTrace.IsEnabled)

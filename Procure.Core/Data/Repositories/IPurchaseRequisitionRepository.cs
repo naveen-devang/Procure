@@ -41,6 +41,10 @@ namespace Procure.Data.Repositories
         Task<List<PurchaseRequisition>> GetChildPrsAsync(Guid masterPrId, IReadOnlyCollection<string> fallbackPrNos);
 
         Task<List<PurchaseRequisition>> GetAllAsync();
+
+        /// <summary>The same rows, a batch at a time, so a caller that has to visit all of them does
+        /// not have to hold all of them. The CSV export writes each batch out and drops it.</summary>
+        IAsyncEnumerable<List<PurchaseRequisition>> StreamAllAsync(int batchSize = 500);
         Task SaveAsync(PurchaseRequisition pr);
         /// <summary>UPSERTs the PurchaseRequisition row only - no PrItem, no CustomFieldValue writes.</summary>
         Task SavePrFieldsAsync(PurchaseRequisition pr);

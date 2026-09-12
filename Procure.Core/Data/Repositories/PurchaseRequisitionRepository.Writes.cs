@@ -68,67 +68,79 @@ ON CONFLICT(Id) DO UPDATE SET
             // names in or out of the Raw & Packing tab.
             var materialKeys = await MaterialAggregateMaintenance.KeysForPrAsync(connection, null, pr.Id).ConfigureAwait(false);
             await UpsertPrRowAsync(connection, null, pr).ConfigureAwait(false);
-            await RefreshSearchBlobAsync(connection, null, pr.Id).ConfigureAwait(false);
+            await RefreshSearchIndexAsync(connection, null, pr.Id).ConfigureAwait(false);
             await MaterialAggregateMaintenance.RefreshForPrAsync(connection, null, pr.Id, materialKeys).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Recomputes one PR's denormalised search text after a write that could have changed anything
-        /// it covers. A single statement over three indexed child lookups - sub-millisecond. Every write
-        /// path that touches a PR, its items, its RFQs or its POs has to end in one of these or search
-        /// silently goes stale for that PR; SearchBlobStaysFresh in DatabaseSelfCheck is what catches it.
-        /// PCR and approval writes deliberately do not, because the blob does not cover them.
+        /// Re-indexes one PR for search after a write that could have changed anything the index
+        /// covers. Three indexed child lookups - about 2ms. Every write path that touches a PR, its
+        /// items, its RFQs or its POs has to end in one of these or search silently goes stale for
+        /// that PR; SearchIndexStaysFresh in DatabaseSelfCheck is what catches it. PCR and approval
+        /// writes deliberately do not, because the index does not cover them.
         /// </summary>
-        private static async Task RefreshSearchBlobAsync(SqliteConnection connection, SqliteTransaction? tx, Guid prId)
+        private static async Task RefreshSearchIndexAsync(SqliteConnection connection, SqliteTransaction? tx, Guid prId)
         {
-            using var cmd = connection.CreateCommand();
-            cmd.Transaction = tx;
-            cmd.CommandText = DatabaseConstants.SqlRebuildSearchBlob + " WHERE Id = @BlobPrId;";
-            // The FTS index is refreshed from the same place, so a write path can only forget both
-            // at once - and the self-check catches that.
-            cmd.Parameters.AddWithValue("@BlobPrId", prId.ToString());
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            // FTS5 has no UPDATE: a row is re-indexed by deleting and re-inserting it. Those two
+            // statements have to be one atomic step. Without a transaction around them, two saves of
+            // the SAME PR arriving together - which is exactly what happens when two approvals are
+            // signed at once and UpdateParentPrApprovalState fires twice - interleave as
+            // delete/delete/insert/insert, and the second insert collides with the first on the
+            // rowid: "SQLite Error 19: constraint failed", shown to the user as a failed save.
+            //
+            // IMMEDIATE takes the write lock up front rather than on the first write, so the second
+            // saver waits at BEGIN (busy_timeout, 5s) instead of getting partway in and failing.
+            var owned = tx is null ? (SqliteTransaction)await connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable).ConfigureAwait(false) : null;
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx ?? owned;
+                    cmd.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
+                    cmd.Parameters.AddWithValue("@SearchPrId", prId.ToString());
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
 
-            // FTS5 has no UPDATE: a row is re-indexed by deleting and re-inserting it.
-            using var ftsCmd = connection.CreateCommand();
-            ftsCmd.Transaction = tx;
-            ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
-            ftsCmd.Parameters.AddWithValue("@SearchPrId", prId.ToString());
-            await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                if (owned is not null) await owned.CommitAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                if (owned is not null) await owned.DisposeAsync().ConfigureAwait(false);
+            }
         }
 
-        /// <summary>Rebuilds the search text for every PR. The restructure operations move rows between
-        /// several PRs at once, so this is one statement instead of each of them having to enumerate
-        /// exactly which PRs it touched - the kind of list that goes stale silently.
-        /// ponytail: whole-table rebuild, ~240ms at 20,000 PRs. These are deliberate operations behind a
-        /// confirmation dialog, so the simpler form wins; narrow it to the affected ids if that bites.</summary>
-        /// <summary>Also rebuilds the material aggregates. The restructure operations move POs
-        /// between PRs in bulk, so both derived stores are rebuilt wholesale rather than each
-        /// operation listing the PRs and materials it touched.</summary>
+        /// <summary>Re-indexes whatever a restructure moved, and rebuilds the material aggregates.
+        /// The restructure operations move rows between several PRs at once, so both derived stores
+        /// are reconciled from the data rather than each operation listing what it touched - the kind
+        /// of list that goes stale silently.</summary>
         private static async Task RebuildAllDerivedDataAsync(SqliteConnection connection)
         {
-            await RebuildAllSearchBlobsAsync(connection).ConfigureAwait(false);
+            await ReindexChangedSearchRowsAsync(connection).ConfigureAwait(false);
             await MaterialAggregateMaintenance.RebuildAllAsync(connection).ConfigureAwait(false);
         }
 
-        private static async Task RebuildAllSearchBlobsAsync(SqliteConnection connection)
+        private static async Task ReindexChangedSearchRowsAsync(SqliteConnection connection)
         {
-            // Rebuild every blob, but collect the ids of the rows that actually changed - a
+            // Ask the database which index rows no longer match the text they should hold - a
             // restructure moves a handful of PRs - and re-index only those. Re-indexing the whole
             // table instead cost 1.7 seconds per operation at 20,000 PRs.
-            var changed = new List<string>();
+            var stale = new List<long>();
             using (var cmd = connection.CreateCommand())
             {
-                cmd.CommandText = DatabaseConstants.SqlRebuildChangedSearchBlobs;
+                cmd.CommandText = DatabaseConstants.SqlStaleSearchRowIds;
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false)) changed.Add(reader.GetString(0));
+                while (await reader.ReadAsync().ConfigureAwait(false)) stale.Add(reader.GetInt64(0));
             }
 
-            foreach (var id in changed)
+            if (stale.Count == 0) return;
+
+            // One prepared statement reused across the rows, rather than a new command each time.
+            using var ftsCmd = connection.CreateCommand();
+            ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRowByRowId + DatabaseConstants.SqlInsertSearchRowByRowId;
+            var rowid = ftsCmd.Parameters.Add("@Rowid", Microsoft.Data.Sqlite.SqliteType.Integer);
+            foreach (var id in stale)
             {
-                using var ftsCmd = connection.CreateCommand();
-                ftsCmd.CommandText = DatabaseConstants.SqlDeleteSearchRow + DatabaseConstants.SqlInsertSearchRow;
-                ftsCmd.Parameters.AddWithValue("@SearchPrId", id);
+                rowid.Value = id;
                 await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
@@ -207,7 +219,7 @@ ON CONFLICT(Id) DO UPDATE SET
             {
                 await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
             }
-            await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
+            await RefreshSearchIndexAsync(connection, tx, pr.Id).ConfigureAwait(false);
             await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, pr.Id, materialKeysBefore).ConfigureAwait(false);
 
             await tx.CommitAsync().ConfigureAwait(false);
@@ -234,7 +246,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 {
                     await CustomColumnRepository.WriteValuesForPrAsync(connection, tx, pr.Id, pr.CustomValues).ConfigureAwait(false);
                 }
-                await RefreshSearchBlobAsync(connection, tx, pr.Id).ConfigureAwait(false);
+                await RefreshSearchIndexAsync(connection, tx, pr.Id).ConfigureAwait(false);
                 await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, pr.Id, materialKeysBefore).ConfigureAwait(false);
             }
 
@@ -389,7 +401,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 }
             }
 
-            await RefreshSearchBlobAsync(connection, tx, rfq.PrId).ConfigureAwait(false);
+            await RefreshSearchIndexAsync(connection, tx, rfq.PrId).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);
         }
 
@@ -421,7 +433,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await RefreshSearchBlobAsync(connection, tx, prId).ConfigureAwait(false);
+            await RefreshSearchIndexAsync(connection, tx, prId).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);
         }
 
@@ -689,7 +701,7 @@ ON CONFLICT(Id) DO UPDATE SET
                     await clearCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
 
-                await RefreshSearchBlobAsync(connection, tx, po.PrId).ConfigureAwait(false);
+                await RefreshSearchIndexAsync(connection, tx, po.PrId).ConfigureAwait(false);
                 await MaterialAggregateMaintenance.RefreshForPrAsync(connection, tx, po.PrId, materialKeysBefore).ConfigureAwait(false);
                 await tx.CommitAsync().ConfigureAwait(false);
             }
@@ -731,7 +743,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            await RefreshSearchBlobAsync(connection, tx, prId).ConfigureAwait(false);
+            await RefreshSearchIndexAsync(connection, tx, prId).ConfigureAwait(false);
             await MaterialAggregateMaintenance.RefreshKeysAsync(connection, tx, materialKeysBefore).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);
         }

@@ -9,13 +9,13 @@ namespace Procure.Data.Repositories
     /// <summary>
     /// Keeps <c>MaterialAggregate</c> in step with the PO items and call-offs it summarises.
     ///
-    /// Same arrangement, and the same hazard, as the denormalised SearchBlob column: it is derived
+    /// Same arrangement, and the same hazard, as the search index: it is derived
     /// data maintained by hand, so every write path that touches a PR's POs, its PO items, or a
     /// call-off has to end here. Miss one and nothing breaks loudly - the Raw &amp; Packing tab just
     /// shows a stale count or balance. <see cref="DatabaseConstants.SqlStaleMaterialAggregateCount"/>
     /// is the guard against that, asserted by DatabaseSelfCheck.
     ///
-    /// The calls are deliberately placed next to the existing RefreshSearchBlobAsync calls, because
+    /// The calls are deliberately placed next to the existing RefreshSearchIndexAsync calls, because
     /// those already mark every write that can affect this.
     /// </summary>
     internal static class MaterialAggregateMaintenance
@@ -82,7 +82,7 @@ namespace Procure.Data.Repositories
         }
 
         /// <summary>Rebuilds the whole table. Used by the migration and by the restructure operations,
-        /// which move POs between several PRs at once - the same call the SearchBlob rebuild makes
+        /// which move POs between several PRs at once - the same call the search re-index makes
         /// there, and for the same reason: enumerating exactly which materials moved is the kind of
         /// list that goes stale silently.</summary>
         public static async Task RebuildAllAsync(SqliteConnection connection, SqliteTransaction? tx = null)

@@ -20,7 +20,6 @@ public sealed partial class NoteEditor : UserControl
 
     private bool _suppress;
     private string _baseline = string.Empty;
-    private int _generation;
     private readonly DispatcherQueue _queue = DispatcherQueue.GetForCurrentThread();
 
     public NoteEditor()
@@ -74,21 +73,32 @@ public sealed partial class NoteEditor : UserControl
     private void OnTextChanged(object? sender, RoutedEventArgs e)
     {
         if (_suppress) return;
-        var generation = ++_generation;
+        // Restart the one timer instead of building a new one per keystroke. The old version left
+        // every timer it created running: typing a hundred characters meant a hundred live timer
+        // objects, each holding the editor and each waking the UI thread once to discard its work.
+        _editDebounce ??= CreateEditDebounce();
+        _editDebounce.Stop();
+        _editDebounce.Start();
+    }
+
+    private DispatcherQueueTimer? _editDebounce;
+
+    private DispatcherQueueTimer CreateEditDebounce()
+    {
         var timer = _queue.CreateTimer();
         timer.Interval = TimeSpan.FromMilliseconds(150);
         timer.IsRepeating = false;
         timer.Tick += (t, _) =>
         {
             t.Stop();
-            if (generation != _generation || _suppress) return;
+            if (_suppress) return;
             var stripped = CurrentStrippedRtf();
             if (stripped == _baseline) return;
             _baseline = stripped;
             Rich.Document.GetText(TextGetOptions.None, out var plain);
             ContentChanged?.Invoke(this, (stripped, plain.TrimEnd('\r', '\n')));
         };
-        timer.Start();
+        return timer;
     }
 
     // ---- formatting ----

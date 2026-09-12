@@ -17,7 +17,10 @@ public sealed partial class PrBoardPage : Page
 {
     public PrListPageModel Vm { get; }
 
-    private DispatcherTimer? _searchDebounce;
+    // One timer for the life of the page, restarted on each keystroke. Allocating a fresh
+    // DispatcherTimer per character meant a system timer object and a closure for every letter
+    // typed into the search box.
+    private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private bool _loaded;
 
     public PrBoardPage()
@@ -29,6 +32,12 @@ public sealed partial class PrBoardPage : Page
         // (the modal x:Load flags) evaluated against a null Vm. Re-run them now that Vm is set,
         // which also subscribes them to Vm.PropertyChanged.
         Bindings.Update();
+        _searchDebounce.Tick += (_, _) =>
+        {
+            _searchDebounce.Stop();
+            Vm.SearchText = SearchBox.Text;   // the VM debounces + reloads FilteredPrs itself
+        };
+
         Loaded += OnLoaded;
         // Leaving the board releases its loaded PR window (only above the VM's 500-row
         // threshold - a light session keeps its place and this is a no-op). The next
@@ -118,13 +127,9 @@ public sealed partial class PrBoardPage : Page
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        _searchDebounce?.Stop();
-        _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        _searchDebounce.Tick += (_, _) =>
-        {
-            _searchDebounce!.Stop();
-            Vm.SearchText = SearchBox.Text;   // the VM debounces + reloads FilteredPrs itself
-        };
+        // Stop-then-start restarts the interval, so the tick only lands 250ms after the last
+        // keystroke - the same trailing debounce, without building a new timer each time.
+        _searchDebounce.Stop();
         _searchDebounce.Start();
     }
 

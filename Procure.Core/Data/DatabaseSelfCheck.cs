@@ -10,8 +10,8 @@ namespace Procure.Data
     /// <summary>
     /// The one runnable check behind the denormalised search column.
     ///
-    /// SearchBlob is derived data kept in sync by hand: every write path that touches a PR, its items,
-    /// its RFQs or its POs has to end in RefreshSearchBlobAsync. Miss one and nothing breaks loudly -
+    /// The search index is derived data kept in sync by hand: every write path that touches a PR, its
+    /// items, its RFQs or its POs has to end in RefreshSearchIndexAsync. Miss one and nothing breaks loudly -
     /// search just quietly stops finding whatever that path changed. This asserts the invariant that
     /// catches it: no PR's stored blob may differ from what the expression would produce right now.
     ///
@@ -115,15 +115,15 @@ namespace Procure.Data
             using var connection = db.CreateConnection();
             await connection.OpenAsync();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = DatabaseConstants.SqlStaleSearchBlobCount + ";";
+            cmd.CommandText = DatabaseConstants.SqlStaleSearchRowCount;
             var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
 
             // Throws rather than Debug.Assert: an assert only raises a dialog, which a headless or
             // unattended run never sees, so the failure would pass silently.
             if (stale != 0)
                 throw new InvalidOperationException(
-                    $"{stale} PR(s) have a stale SearchBlob {step}. A write path changed a PR, item, " +
-                    "RFQ or PO without calling RefreshSearchBlobAsync, so search will not find it.");
+                    $"{stale} PR(s) have a stale search index row {step}. A write path changed a PR, " +
+                    "item, RFQ or PO without calling RefreshSearchIndexAsync, so search will not find it.");
 
             // The material aggregates are derived the same way and carry the same hazard: a write
             // path that changes a PO item, a call-off or a PR's type without refreshing them leaves

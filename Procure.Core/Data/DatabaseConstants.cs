@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 18;
+        public const int SchemaVersion = 19;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -80,25 +80,6 @@ namespace Procure.Data
         /// clear.</summary>
         public const string SqlConnectionPragmas = "PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY; PRAGMA busy_timeout=5000;";
 
-        /// <summary>
-        /// Recomputes the denormalised search text for one PR. Search has to match item names, vendor
-        /// names and RFQ/PO numbers as well as the PR's own fields; doing that with correlated EXISTS
-        /// subqueries measured 241-330ms at 20,000 PRs, while a LIKE scan of this single column
-        /// measures 4.7ms - faster than the in-memory scan it replaces, with identical substring
-        /// semantics and no FTS5 tokenizer to reason about.
-        ///
-        /// Written as SQL rather than assembled in C# so the list of searched fields exists once - and
-        /// the staleness check below is built from the same expression, so it can never drift from the
-        /// rebuild it is checking.
-        /// Custom field values are deliberately absent - search does not cover them today either.
-        /// </summary>
-        private const string SqlSearchBlobExpression = @"lower(
-    COALESCE(PrNo,'') || ' ' || COALESCE(Description,'') || ' ' || COALESCE(Requestor,'') || ' ' || COALESCE(ConsolidatedFrom,'') || ' ' ||
-    COALESCE((SELECT group_concat(COALESCE(ItemName,'') || ' ' || COALESCE(Notes,''), ' ') FROM PrItem WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
-    COALESCE((SELECT group_concat(COALESCE(Vendor,'') || ' ' || COALESCE(RfqNo,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
-    COALESCE((SELECT group_concat(COALESCE(Vendor,'') || ' ' || COALESCE(PoNo,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')
-)";
-
         // ---- v18: ranked search ----------------------------------------------------------------
         //
         // The blob above answers "does this PR contain that substring" and nothing else: it cannot
@@ -118,25 +99,31 @@ CREATE VIRTUAL TABLE IF NOT EXISTS PrSearch USING fts5(
     tokenize = 'unicode61 remove_diacritics 2'
 );";
 
-        /// <summary>The searchable text, one column per weightable field. Same four tables the blob
-        /// reads, plus the fields it never covered: status, priority, plant and PR type, so "urgent"
-        /// and "capex" become searchable words.</summary>
-        private const string SqlSearchRowExpression = @"
-SELECT
-    lower(COALESCE(PrNo,'')),
-    lower(COALESCE(ConsolidatedFrom,'') || ' ' ||
+        /// <summary>The searchable text, one column per weightable field, in the index's column
+        /// order. Named separately from the SELECT below because the staleness check compares these
+        /// same seven expressions against what the index currently holds - one definition, so the
+        /// check can never drift from the thing it is checking.
+        ///
+        /// The table is not aliased anywhere these are used: the correlated subqueries say
+        /// "WHERE PrId = PurchaseRequisition.Id", which an alias would break.</summary>
+        private const string SqlSearchColumns = @"
+    lower(COALESCE(PurchaseRequisition.PrNo,'')),
+    lower(COALESCE(PurchaseRequisition.ConsolidatedFrom,'') || ' ' ||
         COALESCE((SELECT group_concat(COALESCE(RfqNo,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
         COALESCE((SELECT group_concat(COALESCE(PoNo,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')),
-    lower(COALESCE(Description,'')),
-    lower(COALESCE(Requestor,'')),
+    lower(COALESCE(PurchaseRequisition.Description,'')),
+    lower(COALESCE(PurchaseRequisition.Requestor,'')),
     lower(COALESCE((SELECT group_concat(COALESCE(ItemName,'') || ' ' || COALESCE(Notes,''), ' ') FROM PrItem WHERE PrId = PurchaseRequisition.Id), '')),
     lower(COALESCE((SELECT group_concat(COALESCE(Vendor,''), ' ') FROM RequestForQuotation WHERE PrId = PurchaseRequisition.Id), '') || ' ' ||
           COALESCE((SELECT group_concat(COALESCE(Vendor,''), ' ') FROM PurchaseOrder WHERE PrId = PurchaseRequisition.Id), '')),
-    lower(COALESCE(Status,'') || ' ' || COALESCE(Priority,'') || ' ' || COALESCE(Plant,'') || ' ' || COALESCE(PrType,'')),
-    Id,
-    -- The index row is keyed to the requisition's rowid. prid is UNINDEXED - stored but not
-    -- searchable - so deleting by it scanned all 20,000 rows and made re-indexing one PR cost
-    -- 28ms on every save. By rowid it is a primary-key lookup.
+    lower(COALESCE(PurchaseRequisition.Status,'') || ' ' || COALESCE(PurchaseRequisition.Priority,'') || ' ' || COALESCE(PurchaseRequisition.Plant,'') || ' ' || COALESCE(PurchaseRequisition.PrType,''))";
+
+        /// <summary>One index row: the seven searchable columns, the requisition's Id, and its rowid.
+        /// The row is keyed to that rowid - prid is UNINDEXED, stored but not searchable, so deleting
+        /// by it scanned all 20,000 rows and made re-indexing one PR cost 28ms on every save. By rowid
+        /// it is a primary-key lookup.</summary>
+        private const string SqlSearchRowExpression = "SELECT " + SqlSearchColumns + @",
+    PurchaseRequisition.Id,
     PurchaseRequisition.rowid
 FROM PurchaseRequisition";
 
@@ -148,6 +135,14 @@ FROM PurchaseRequisition";
         public const string SqlInsertSearchRow =
             "INSERT INTO PrSearch (prno, refs, description, requestor, items, vendors, meta, prid, rowid) " +
             SqlSearchRowExpression + " WHERE Id = @SearchPrId;";
+
+        /// <summary>The same pair keyed by rowid, for the bulk path - which finds stale rows by
+        /// rowid and never has the Guid in hand.</summary>
+        public const string SqlDeleteSearchRowByRowId = "DELETE FROM PrSearch WHERE rowid = @Rowid;";
+
+        public const string SqlInsertSearchRowByRowId =
+            "INSERT INTO PrSearch (prno, refs, description, requestor, items, vendors, meta, prid, rowid) " +
+            SqlSearchRowExpression + " WHERE PurchaseRequisition.rowid = @Rowid;";
 
         /// <summary>Used on the version bump and by the restructure operations, which move rows in
         /// bulk. A plain DELETE, not the 'delete-all' command - that one is only accepted on a
@@ -167,22 +162,34 @@ SELECT (SELECT COUNT(*) FROM PurchaseRequisition) - (SELECT COUNT(*) FROM PrSear
         /// note. bm25 returns lower-is-better, so this sorts ascending.</summary>
         public const string SqlSearchRank = "bm25(PrSearch, 12.0, 8.0, 4.0, 3.0, 1.0, 3.0, 2.0)";
 
-        /// <summary>Append "WHERE Id = @Id" for a single PR; run it bare to rebuild the whole table.</summary>
-        public const string SqlRebuildSearchBlob =
-            "UPDATE PurchaseRequisition SET SearchBlob = " + SqlSearchBlobExpression;
+        /// <summary>Requisitions whose index row is missing or no longer matches the text it should
+        /// hold, named by rowid. This replaces a denormalised SearchBlob column that did the same job:
+        /// the column had to be written on every PR write, stored a second copy of every searchable
+        /// word, and the changed-rows rebuild evaluated the whole expression TWICE per row - about
+        /// 600ms of pure comparison on every restructure at 20,000 PRs. Comparing against the index
+        /// itself evaluates it once and stores nothing.
+        ///
+        /// Row values ("IS NOT" over a tuple) so one comparison covers all seven columns and treats
+        /// NULL as a difference rather than as unknown.</summary>
+        private const string SqlStaleSearchRows = @"
+FROM PurchaseRequisition
+LEFT JOIN PrSearch ON PrSearch.rowid = PurchaseRequisition.rowid
+WHERE PrSearch.rowid IS NULL
+   OR (PrSearch.prno, PrSearch.refs, PrSearch.description, PrSearch.requestor,
+       PrSearch.items, PrSearch.vendors, PrSearch.meta)
+      IS NOT (" + SqlSearchColumns + ")";
 
-        /// <summary>The bulk rebuild, but touching only the rows whose text actually changed and
-        /// naming them. The restructure operations move a handful of PRs; re-indexing all 20,000
-        /// afterwards cost 1.7 seconds each. RETURNING makes the follow-up work proportional to
-        /// what moved instead of to the size of the database.</summary>
-        public const string SqlRebuildChangedSearchBlobs =
-            "UPDATE PurchaseRequisition SET SearchBlob = " + SqlSearchBlobExpression +
-            " WHERE COALESCE(SearchBlob,'') <> " + SqlSearchBlobExpression + " RETURNING Id;";
+        /// <summary>The bulk rebuild: name the rows that actually changed so the follow-up work is
+        /// proportional to what moved, not to the size of the database. A restructure moves a handful
+        /// of PRs; re-indexing all 20,000 afterwards cost 1.7 seconds each.</summary>
+        public const string SqlStaleSearchRowIds =
+            "SELECT PurchaseRequisition.rowid " + SqlStaleSearchRows + ";";
 
-        /// <summary>Counts PRs whose stored search text no longer matches what it should be - i.e. rows
-        /// some write path changed without refreshing the blob. Must always be 0; see DatabaseSelfCheck.</summary>
-        public const string SqlStaleSearchBlobCount =
-            "SELECT COUNT(*) FROM PurchaseRequisition WHERE COALESCE(SearchBlob,'') <> " + SqlSearchBlobExpression;
+        /// <summary>Must be 0: every write path that touches a PR, its items, its RFQs or its POs has
+        /// to re-index it. Miss one and nothing breaks loudly - that PR just stops being findable.
+        /// See DatabaseSelfCheck.</summary>
+        public const string SqlStaleSearchRowCount =
+            "SELECT COUNT(*) " + SqlStaleSearchRows + ";";
 
         // journal_mode is the one PRAGMA that persists in the database file, so setting it once at
         // creation is correct. The others that used to live here (synchronous, temp_store, foreign_keys)
@@ -203,8 +210,7 @@ CREATE TABLE IF NOT EXISTS PurchaseRequisition (
     CreatedAt TEXT NOT NULL,
     UpdatedAt TEXT NOT NULL,
     ParentPrId TEXT,
-    ConsolidatedFrom TEXT,
-    SearchBlob TEXT
+    ConsolidatedFrom TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_PR_PrNo ON PurchaseRequisition(PrNo);
 CREATE INDEX IF NOT EXISTS IX_PR_Status ON PurchaseRequisition(Status);
@@ -353,7 +359,7 @@ CREATE INDEX IF NOT EXISTS IX_PoItemTransport_PoItemId ON PoItemTransport(PoItem
 -- v13: the Raw & Packing tab's collapsed rows, denormalised. Computing them live meant one
 -- GROUP BY over every eligible PO item on every open - 244ms at 20,000 PRs and linear from
 -- there, so roughly 12 seconds at a million. Reading them from here is O(materials).
--- Kept in sync by MaterialAggregateMaintenance, alongside the SearchBlob refresh that every
+-- Kept in sync by MaterialAggregateMaintenance, alongside the search re-index that every
 -- PR/PO write path already performs, and asserted never to drift by DatabaseSelfCheck.
 CREATE TABLE IF NOT EXISTS MaterialAggregate (
     MaterialKey    TEXT PRIMARY KEY,
@@ -669,7 +675,7 @@ WHERE po.PrId = @PrId;";
 
         /// <summary>Rows where the stored aggregate disagrees with a fresh computation, in either
         /// direction - a stale row, a missing one, or one that should no longer exist. Must always be
-        /// 0; see DatabaseSelfCheck. This is the same guard SqlStaleSearchBlobCount provides for the
+        /// 0; see DatabaseSelfCheck. This is the same guard SqlStaleSearchRowCount provides for the
         /// search column, and for the same reason: a missed write path is otherwise silent.</summary>
         public const string SqlStaleMaterialAggregateCount = @"
 SELECT

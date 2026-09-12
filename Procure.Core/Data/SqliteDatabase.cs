@@ -96,6 +96,18 @@ namespace Procure.Data
                         await ftsCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
 
+                    // v19: SearchBlob is gone. Nothing had read the column since the FTS index
+                    // landed in v18, but every PR write still recomputed it and the changed-rows
+                    // rebuild evaluated its expression twice per row. Dropping it reclaims a second
+                    // copy of every searchable word in the file.
+                    if (storedVersion < 19)
+                    {
+                        using var dropCmd = connection.CreateCommand();
+                        dropCmd.CommandText = "ALTER TABLE PurchaseRequisition DROP COLUMN SearchBlob;";
+                        try { await dropCmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
+                        catch (SqliteException) { /* already gone: a database created at v19 never had it */ }
+                    }
+
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
                 }
 
@@ -156,7 +168,6 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportRatePerUnit", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportTotal", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
-            await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "MaterialAggregate", "LastActivity", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportMode", "TEXT").ConfigureAwait(false);
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases
@@ -220,11 +231,6 @@ WHERE COALESCE(BaseAmount, 0) > 0
                 await aggregates.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
-            // Backfill the search text for every existing row. Only reached when the schema version
-            // moved, so this runs once per database, not once per launch. ~240ms at 20,000 PRs.
-            using var backfill = connection.CreateCommand();
-            backfill.CommandText = DatabaseConstants.SqlRebuildSearchBlob + ";";
-            await backfill.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
         private static async Task EnsureColumnExistsAsync(SqliteConnection connection, string tableName, string columnName, string columnType)

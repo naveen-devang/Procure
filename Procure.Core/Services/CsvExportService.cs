@@ -10,11 +10,34 @@ namespace Procure.Services
 {
     public class CsvExportService : ICsvExportService
     {
-        public Task<string> ExportPrsToCsvAsync(IEnumerable<PurchaseRequisition> prs, IEnumerable<CustomColumnDefinition> customColumns)
+        /// <summary>Writes every requisition to a CSV file, a row at a time.
+        ///
+        /// It used to build the whole file in a StringBuilder, call ToString() on it, and hand that
+        /// string to File.WriteAllTextAsync to be encoded - so at 20,000 PRs the finished file existed
+        /// three times over at the same moment, all of it on the large object heap. Now one row is in
+        /// memory at a time, and the rows arrive from the repository in batches rather than as one
+        /// list of everything.</summary>
+        public async Task<string> WritePrsToFileAsync(
+            IAsyncEnumerable<List<PurchaseRequisition>> batches,
+            IEnumerable<CustomColumnDefinition> customColumns,
+            string? filename = null)
         {
-            var sb = new StringBuilder();
             var colList = customColumns.OrderBy(c => c.SortOrder).ToList();
+            var filePath = Path.Combine(ExportDirectory(),
+                filename ?? $"ProcurementExport_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
+            await using var writer = new StreamWriter(filePath, append: false, Encoding.UTF8);
+            await writer.WriteLineAsync(BuildHeader(colList)).ConfigureAwait(false);
+
+            await foreach (var batch in batches.ConfigureAwait(false))
+                foreach (var pr in batch)
+                    await writer.WriteLineAsync(BuildRow(pr, colList)).ConfigureAwait(false);
+
+            return filePath;
+        }
+
+        private static string BuildHeader(List<CustomColumnDefinition> colList)
+        {
             // Header
             var headers = new List<string>
             {
@@ -43,11 +66,11 @@ namespace Procure.Services
                 headers.Add(EscapeCsv(col.Name));
             }
 
-            sb.AppendLine(string.Join(",", headers));
+            return string.Join(",", headers);
+        }
 
-            // Rows
-            foreach (var pr in prs)
-            {
+        private static string BuildRow(PurchaseRequisition pr, List<CustomColumnDefinition> colList)
+        {
                 // "Total PO Value" was a bare cross-currency sum with no currency anywhere in the
                 // file; the currency column flags it, and the breakdown itemizes mixed-currency PRs.
                 var poCurrencies = pr.Pos?
@@ -89,17 +112,13 @@ namespace Procure.Services
                     row.Add(EscapeCsv(customVal));
                 }
 
-                sb.AppendLine(string.Join(",", row));
-            }
-
-            return Task.FromResult(sb.ToString());
+            return string.Join(",", row);
         }
 
-        public async Task<string> SaveExportToFileAsync(string csvContent, string? filename = null)
+        /// <summary>Where an export lands: the Desktop if there is one, then Documents, then the
+        /// app's own folder.</summary>
+        private static string ExportDirectory()
         {
-            filename ??= $"ProcurementExport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            
-            // Prefer user's Desktop or Documents or AppDataDirectory
             var targetDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
             {
@@ -109,10 +128,7 @@ namespace Procure.Services
             {
                 targetDir = Procure.AppPaths.AppData;
             }
-
-            var filePath = Path.Combine(targetDir, filename);
-            await File.WriteAllTextAsync(filePath, csvContent, Encoding.UTF8);
-            return filePath;
+            return targetDir;
         }
 
         private static string EscapeCsv(string? field)

@@ -323,15 +323,13 @@ namespace Procure.PageModels
         {
             try
             {
-                // The one place that still wants every PR. Read, build and write on a background
-                // thread - the string build alone is most of the ~3s at 20,000 PRs and used to run
-                // on the dispatcher.
-                var filePath = await Task.Run(async () =>
-                {
-                    var all = await _prRepo.GetAllAsync();
-                    var csv = await _csvExportService.ExportPrsToCsvAsync(all, CustomColumnDefinitions);
-                    return await _csvExportService.SaveExportToFileAsync(csv);
-                });
+                // The one place that visits every PR. Rows arrive from the repository in batches and
+                // go straight out to the file, so neither the whole table nor the whole file is ever
+                // resident. On a background thread - the formatting is most of the ~3s at 20,000 PRs
+                // and used to run on the dispatcher.
+                var columns = CustomColumnDefinitions.ToList();
+                var filePath = await Task.Run(() =>
+                    _csvExportService.WritePrsToFileAsync(_prRepo.StreamAllAsync(), columns));
 
                 // Same behavior as the PCR exports: hand the file to the OS viewer instead of
                 // dead-ending at a path in a dialog.
