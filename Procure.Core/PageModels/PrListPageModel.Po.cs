@@ -107,7 +107,6 @@ namespace Procure.PageModels
             IsPoModalStep2Loading = false;
             AddPoModalSubtitle = $"PR: {pr.PrNo} • {(pr.Rfqs?.Count ?? 0)} Supplier Quote(s) available";
             IsAddPoModalVisible = true;
-            _ = LoadKnownTransportContractsAsync();
 
             // Let the modal shell and the step-1 skeleton actually paint before building
             // PoRfqSelections below. Without this yield, the modal's own first-build (now deferred by
@@ -503,43 +502,6 @@ namespace Procure.PageModels
 
         // ---- transport: whole order vs per line ----
 
-        /// <summary>Contract number -> the transporter it was last used with. Loaded when the PO
-        /// dialog opens so typing a known contract fills the transporter in, rather than the same
-        /// contract accumulating three spellings of the haulier's name.</summary>
-        private Dictionary<string, string> _knownTransportContracts = new(StringComparer.OrdinalIgnoreCase);
-
-        public List<string> KnownContractNumbers { get; private set; } = new();
-
-        private async Task LoadKnownTransportContractsAsync()
-        {
-            try
-            {
-                var known = await _prRepo.GetKnownTransportContractsAsync().ConfigureAwait(true);
-                _knownTransportContracts = known.ToDictionary(k => k.ContractNumber, k => k.TransporterName, StringComparer.OrdinalIgnoreCase);
-                KnownContractNumbers = known.Select(k => k.ContractNumber).ToList();
-                OnPropertyChanged(nameof(KnownContractNumbers));
-            }
-            catch (Exception ex)
-            {
-                // A convenience must never stop the dialog opening.
-                _errorHandler.HandleError(ex);
-            }
-        }
-
-        /// <summary>Fills the transporter from the contract, when the contract is one we have seen
-        /// and the transporter has not been typed over. Returns true if something changed.</summary>
-        private bool FillTransporterFromContract(string? contract, string? currentTransporter, out string? transporter)
-        {
-            transporter = currentTransporter;
-            var key = contract?.Trim();
-            if (string.IsNullOrEmpty(key)) return false;
-            if (!string.IsNullOrWhiteSpace(currentTransporter)) return false;
-            if (!_knownTransportContracts.TryGetValue(key, out var known) || string.IsNullOrWhiteSpace(known)) return false;
-            transporter = known;
-            return true;
-        }
-
-
         private PoRfqSelection? CardFor(PoRfqItemSelection row) =>
             PoRfqSelections?.FirstOrDefault(c => c.Items != null && c.Items.Contains(row));
 
@@ -568,16 +530,6 @@ namespace Procure.PageModels
             }
 
             card.SwitchTransportMode(mode);
-            RecalculatePoModalTotals();
-        }
-
-        /// <summary>The whole-order contract box, same courtesy as the per-line one.</summary>
-        public void NotifyOrderTransportEdited(PoRfqSelection? card)
-        {
-            if (card == null) return;
-            if (FillTransporterFromContract(card.TransportContractNumber, card.TransporterName, out var filled))
-                card.TransporterName = filled;
-            card.NotifyCalculationsChanged();
             RecalculatePoModalTotals();
         }
 
@@ -622,8 +574,6 @@ namespace Procure.PageModels
                 foreach (var row in card.Items ?? Enumerable.Empty<PoRfqItemSelection>())
                 {
                     if (!row.Transports.Contains(allocation)) continue;
-                    if (FillTransporterFromContract(allocation.ContractNumber, allocation.TransporterName, out var filled))
-                        allocation.TransporterName = filled;
                     row.NotifyTransportChanged();
                     card.NotifyCalculationsChanged();
                     RecalculatePoModalTotals();

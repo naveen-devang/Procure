@@ -18,49 +18,6 @@ namespace Procure.Data.Repositories
             _db = db;
         }
 
-        /// <summary>Contracts already used, newest first, with the transporter each was last used
-        /// with. Both places transport can live are read: the order-level columns and the per-line
-        /// allocations. A contract that has been used under two transporter names keeps the most
-        /// recent, which is the one worth suggesting.</summary>
-        public async Task<List<(string ContractNumber, string TransporterName)>> GetKnownTransportContractsAsync()
-        {
-            await _db.InitializeAsync().ConfigureAwait(false);
-            var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync().ConfigureAwait(false);
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
-SELECT contract, transporter FROM (
-    SELECT TRIM(t.ContractNumber) AS contract,
-           COALESCE(TRIM(t.TransporterName), '') AS transporter,
-           COALESCE(po.Date, '') AS used
-    FROM PoItemTransport t
-    JOIN PurchaseOrderItem i ON i.Id = t.PoItemId
-    JOIN PurchaseOrder po ON po.Id = i.PoId
-    WHERE COALESCE(TRIM(t.ContractNumber), '') <> ''
-    UNION ALL
-    SELECT TRIM(po.TransportContractNumber),
-           COALESCE(TRIM(po.TransporterName), ''),
-           COALESCE(po.Date, '')
-    FROM PurchaseOrder po
-    WHERE COALESCE(TRIM(po.TransportContractNumber), '') <> ''
-)
-ORDER BY used DESC;";
-
-            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-            while (await reader.ReadAsync().ConfigureAwait(false))
-            {
-                var contract = reader.GetString(0);
-                if (seen.ContainsKey(contract)) continue;   // ORDER BY means the first one wins
-                seen[contract] = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-            }
-
-            var list = new List<(string, string)>();
-            foreach (var kv in seen) list.Add((kv.Key, kv.Value));
-            return list;
-        }
-
         public async Task<List<PurchaseRequisition>> GetAllAsync()
         {
             await _db.InitializeAsync().ConfigureAwait(false);

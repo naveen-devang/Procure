@@ -36,12 +36,6 @@ namespace Procure.Data.Repositories
         /// default view, so this cannot be answered from the loaded window.</summary>
         Task<List<PurchaseRequisition>> GetChildPrsAsync(Guid masterPrId, IReadOnlyCollection<string> fallbackPrNos);
 
-        /// <summary>Transport contracts already used, newest first, each with the transporter it was
-        /// last used with. Feeds the PO dialog: type a contract number you have used before and the
-        /// transporter fills itself in, so the same contract does not end up against three spellings
-        /// of the haulier's name.</summary>
-        Task<List<(string ContractNumber, string TransporterName)>> GetKnownTransportContractsAsync();
-
         Task<List<PurchaseRequisition>> GetAllAsync();
         Task SaveAsync(PurchaseRequisition pr);
         /// <summary>UPSERTs the PurchaseRequisition row only - no PrItem, no CustomFieldValue writes.</summary>

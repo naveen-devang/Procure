@@ -49,13 +49,6 @@ public sealed partial class AddPoModal : UserControl
             Vm?.RemoveLineTransportCommand.Execute(allocation);
     }
 
-    /// <summary>Typing a contract number that has been used before fills the transporter in.</summary>
-    private void OrderTransportEdited(object sender, TextChangedEventArgs e)
-    {
-        if ((sender as FrameworkElement)?.DataContext is PoRfqSelection card)
-            Vm?.NotifyOrderTransportEdited(card);
-    }
-
     /// <summary>The boxes in an allocation row are bound to the allocation, so the line's running
     /// total hears nothing when one changes. The page model finds the owning line.</summary>
     private void TransportEdited(object sender, TextChangedEventArgs e)
