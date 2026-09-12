@@ -141,13 +141,13 @@
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                             <TextBlock Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right"
+                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right"
                                                      IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                         </Grid>
                                     </DataTemplate>

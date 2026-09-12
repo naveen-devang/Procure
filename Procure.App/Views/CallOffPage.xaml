@@ -89,6 +89,12 @@
                 </Grid>
 
                 <ListView Grid.Row="1" x:Name="GroupList" ItemsSource="{Binding Groups}" SelectionMode="None" Margin="8">
+                    <!-- MAUI animated the expand; WinUI's list does not by default. -->
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection>
+                            <RepositionThemeTransition />
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -101,6 +107,11 @@
                             <Border Padding="12,10" BorderThickness="1" CornerRadius="8"
                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
                                 <StackPanel Spacing="8">
+                                    <StackPanel.ChildrenTransitions>
+                                        <TransitionCollection>
+                                            <RepositionThemeTransition />
+                                        </TransitionCollection>
+                                    </StackPanel.ChildrenTransitions>
                                     <Grid ColumnSpacing="8" Tapped="Group_Tapped" Background="Transparent">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
@@ -120,7 +131,12 @@
                                                  Foreground="{ThemeResource AccentFillBrush}" />
                                     <TextBlock Text="{x:Bind VendorCountText, Mode=OneWay}" FontSize="10.5"
                                                Foreground="{ThemeResource AppTextSecondary}" />
-                                    <StackPanel Spacing="6" Visibility="{x:Bind IsExpanded, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                    <StackPanel x:Name="ExpandedLines" Spacing="6" x:Load="{x:Bind IsExpanded, Mode=OneWay}">
+                                        <StackPanel.ChildrenTransitions>
+                                            <TransitionCollection>
+                                                <EntranceThemeTransition FromVerticalOffset="-12" />
+                                            </TransitionCollection>
+                                        </StackPanel.ChildrenTransitions>
                                         <Border Height="1" Background="{ThemeResource AppHairline}" />
                                         <ItemsControl ItemsSource="{x:Bind VisibleLines}" ItemTemplate="{StaticResource CallOffLineRow}" />
                                         <Button Content="{x:Bind ShowMoreText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"

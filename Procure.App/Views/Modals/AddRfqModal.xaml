@@ -175,16 +175,16 @@
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" />
                                             <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Right" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay}" PlaceholderText="0.00" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12"
                                                      TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <Button Grid.Column="8" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28"
                                                     Padding="0" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}"

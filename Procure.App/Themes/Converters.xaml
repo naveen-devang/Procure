@@ -36,4 +36,5 @@
     <DataTemplate x:Key="StringItemTemplate">
         <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
     </DataTemplate>
+    <conv:NumericTextConverter x:Key="Num" />
 </ResourceDictionary>

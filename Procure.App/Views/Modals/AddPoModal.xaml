@@ -202,7 +202,7 @@
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="2" Spacing="4">
                                                                 <TextBlock Text="Rate / Unit" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind TransportRatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="12" />
+                                                                <TextBox Text="{x:Bind TransportRatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="3" Spacing="4">
                                                                 <TextBlock Text="Transport Total" Style="{StaticResource Lbl}" />
@@ -264,10 +264,10 @@
                                                                             <TextBlock Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
                                                                                        Foreground="{x:Bind AllocationStatusText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
                                                                         </StackPanel>
-                                                                        <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
                                                                         <TextBlock Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                                                                        <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
-                                                                        <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
                                                                         <TextBlock Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                                                    HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                                                         <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
@@ -294,19 +294,19 @@
                                                             </Grid.ColumnDefinitions>
                                                             <StackPanel Spacing="2">
                                                                 <TextBlock Text="Base Price" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind CustomBaseAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" />
+                                                                <TextBox Text="{x:Bind CustomBaseAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="1" Spacing="2">
                                                                 <TextBlock Text="Freight (+)" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind Freight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" />
+                                                                <TextBox Text="{x:Bind Freight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="2" Spacing="2">
                                                                 <TextBlock Text="Other Charges (+)" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind OtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" />
+                                                                <TextBox Text="{x:Bind OtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="3" Spacing="2">
                                                                 <TextBlock Text="Total Discount (-)" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind OverallDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="11.5" />
+                                                                <TextBox Text="{x:Bind OverallDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="4" Spacing="2">
                                                                 <TextBlock Text="VAT Type" Style="{StaticResource Lbl}" />
