@@ -93,17 +93,17 @@
                                                 <ColumnDefinition Width="95" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" Height="36"
+                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Height="36" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
-                                                     TextAlignment="Center" VerticalAlignment="Center" />
-                                            <TextBox Height="36" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12"
-                                                     TextAlignment="Center" VerticalAlignment="Center" />
-                                            <TextBox Height="36" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay}" PlaceholderText="Price" FontSize="12"
-                                                     VerticalAlignment="Center" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay}" PlaceholderText="Qty" FontSize="12"
+                                                     TextAlignment="Center" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12"
+                                                     TextAlignment="Center" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay}" PlaceholderText="Price" FontSize="12"
+                                                     />
                                             <Button Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
                                                     Width="28" Height="28" Padding="0" Background="Transparent" BorderThickness="0"
-                                                    Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Center"
+                                                    Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Top" Margin="0,4,0,0"
                                                     Click="RemoveItem_Click" />
                                         </Grid>
                                     </DataTemplate>
