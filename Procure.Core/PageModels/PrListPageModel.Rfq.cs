@@ -117,7 +117,16 @@ namespace Procure.PageModels
 
         public IReadOnlyList<string> AvailableCurrencies => AppConstants.SupportedCurrencies;
         public List<string> AvailableVatTypes { get; } = new() { "5%", "RC", "V0" };
-        public List<string> AvailableIncoterms { get; } = new() { "DDP", "DAP", "CIF", "FOB", "EXW", "CFR", "FCA", "CIP", "CPT" };
+        // Incoterms 2020 in ICC order - the seven any-mode rules, then the four sea and inland
+        // waterway ones - followed by two withdrawn terms vendors here still write on quotes.
+        // DDU was replaced by DAP in the 2010 revision; DAT was renamed DPU in 2020. Kept so a
+        // quote that says DDU can be recorded as it stands, not silently rewritten.
+        public List<string> AvailableIncoterms { get; } = new()
+        {
+            "EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP",   // any mode of transport
+            "FAS", "FOB", "CFR", "CIF",                         // sea / inland waterway
+            "DDU", "DAT",                                       // withdrawn, still seen on paperwork
+        };
 
 
         // ================= RFQ INLINE OPERATIONS =================
