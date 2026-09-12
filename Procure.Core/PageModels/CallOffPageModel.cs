@@ -37,6 +37,22 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string SearchText { get; set; } = string.Empty;
 
+        /// <summary>Newest PO first by default. Toggled from the button beside Refresh.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SortOrderLabel))]
+        [NotifyPropertyChangedFor(nameof(SortOrderGlyph))]
+        public partial bool SortNewestFirst { get; set; } = true;
+
+        public string SortOrderLabel => SortNewestFirst ? "Newest first" : "Oldest first";
+        public string SortOrderGlyph => SortNewestFirst ? "" : "";   // sort down / up
+
+        [RelayCommand]
+        public async Task ToggleSortOrderAsync()
+        {
+            SortNewestFirst = !SortNewestFirst;
+            await LoadAsync(force: true);
+        }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(NoLineSelected))]
         public partial CallOffLine? SelectedLine { get; set; }
@@ -186,9 +202,15 @@ namespace Procure.PageModels
                 var summaries = await _repo.GetMaterialSummariesAsync(term).ConfigureAwait(true);
                 if (generation.HasValue && generation.Value != _searchGeneration) return;
 
-                var groups = summaries
+                // Ordered by the newest PO the material appears on, not by how complete it is:
+                // sorting by PercentComplete meant logging a delivery moved the row you had just
+                // logged against out from under you.
+                var ordered = SortNewestFirst
+                    ? summaries.OrderByDescending(s => s.LastActivity, StringComparer.Ordinal).ThenBy(s => s.MaterialName, StringComparer.OrdinalIgnoreCase)
+                    : summaries.OrderBy(s => s.LastActivity, StringComparer.Ordinal).ThenBy(s => s.MaterialName, StringComparer.OrdinalIgnoreCase);
+
+                var groups = ordered
                     .Select(s => new MaterialGroup(s) { PageRequested = LoadGroupPageAsync })
-                    .OrderBy(g => g.PercentComplete)
                     .ToList();
 
                 Groups = new ObservableCollection<MaterialGroup>(groups);

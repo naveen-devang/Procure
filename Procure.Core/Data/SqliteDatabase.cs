@@ -68,9 +68,11 @@ namespace Procure.Data
                     // Run safe incremental migrations for existing tables
                     await MigrateSchemaAsync(connection, storedVersion).ConfigureAwait(false);
 
-                    // v13 introduced MaterialAggregate. It is derived, so an existing database has to
-                    // have it filled once here; from then on the write paths keep it in step.
-                    if (storedVersion < 13)
+                    // MaterialAggregate is derived: v13 introduced it, v15 added LastActivity, and
+                    // v16 re-runs the fill because a v15 build shipped without the ALTER, leaving
+                    // databases stamped current with the column missing. From then on the write
+                    // paths keep it in step.
+                    if (storedVersion < 16)
                     {
                         using var aggCmd = connection.CreateCommand();
                         aggCmd.CommandText = DatabaseConstants.SqlRebuildAllMaterialAggregates;
@@ -138,6 +140,7 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportTotal", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "MaterialAggregate", "LastActivity", "TEXT").ConfigureAwait(false);
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases
             // have the table already, so the CREATE script skips it; add the column explicitly.
             await EnsureColumnExistsAsync(connection, "TodoTask", "LinkedEntityLabel", "TEXT").ConfigureAwait(false);

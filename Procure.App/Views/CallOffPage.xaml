@@ -80,10 +80,14 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox PlaceholderText="Search material, vendor, or PO..." Height="34"
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Grid.Column="1" Content="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                    <Button Grid.Column="1" Content="{Binding SortOrderGlyph}" FontFamily="Segoe Fluent Icons" FontSize="13"
+                            Height="34" Width="34" Padding="0" Margin="0,0,6,0" Command="{Binding ToggleSortOrderCommand}"
+                            ToolTipService.ToolTip="{Binding SortOrderLabel}" />
+                    <Button Grid.Column="2" Content="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="13"
                             Height="34" Width="34" Padding="0" Command="{Binding RefreshCommand}"
                             ToolTipService.ToolTip="Refresh" />
                 </Grid>

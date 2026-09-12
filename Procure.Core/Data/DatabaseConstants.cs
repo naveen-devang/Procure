@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 14;
+        public const int SchemaVersion = 16;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -268,7 +268,11 @@ CREATE TABLE IF NOT EXISTS MaterialAggregate (
     LineCount      INTEGER NOT NULL,
     TotalOrdered   REAL NOT NULL,
     TotalCalledOff REAL NOT NULL,
-    Unit           TEXT NOT NULL DEFAULT 'pcs'
+    Unit           TEXT NOT NULL DEFAULT 'pcs',
+    -- v15: the newest PO date the material appears on, so the tab can order by recency.
+    -- Deliberately the PO date and not the last call-off: logging a delivery must not
+    -- reshuffle the list under the person logging it.
+    LastActivity   TEXT
 );
 CREATE INDEX IF NOT EXISTS IX_MaterialAggregate_Name ON MaterialAggregate(MaterialName COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS IX_PoItem_PrItemId ON PurchaseOrderItem(PrItemId);
@@ -404,14 +408,15 @@ SELECT lower(TRIM(poi.ItemName)) AS K,
        COUNT(*) AS C,
        COALESCE(SUM(poi.Quantity), 0) AS O,
        COALESCE(SUM((SELECT COALESCE(SUM(Quantity), 0) FROM PoItemCallOff WHERE PoItemId = poi.Id)), 0) AS CO,
-       MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')) AS U
+       MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')) AS U,
+       MAX(COALESCE(po.Date, '')) AS LA
 " + SqlEligibleMaterialLines;
 
         /// <summary>Rebuilds every material's aggregate. Used on first migration and by the
         /// restructure operations, which move POs between PRs in bulk.</summary>
         public const string SqlRebuildAllMaterialAggregates = @"
 DELETE FROM MaterialAggregate;
-INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
+INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit, LastActivity)
 " + SqlComputeMaterialAggregates + @"
 GROUP BY K
 " + SqlMaterialAggregateUpsert + ";";
@@ -430,7 +435,8 @@ ON CONFLICT(MaterialKey) DO UPDATE SET
     LineCount      = excluded.LineCount,
     TotalOrdered   = excluded.TotalOrdered,
     TotalCalledOff = excluded.TotalCalledOff,
-    Unit           = excluded.Unit";
+    Unit           = excluded.Unit,
+    LastActivity   = excluded.LastActivity";
 
         /// <summary>The two halves of the refresh, kept separately so a test can run just the write
         /// half twice and prove the upsert above actually holds. Both take the caller's parameter
@@ -439,7 +445,7 @@ ON CONFLICT(MaterialKey) DO UPDATE SET
             "DELETE FROM MaterialAggregate WHERE MaterialKey IN ({0});";
 
         public const string SqlRefreshMaterialAggregatesInsertTemplate = @"
-INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit)
+INSERT INTO MaterialAggregate (MaterialKey, MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit, LastActivity)
 " + SqlComputeMaterialAggregates + @"
   AND lower(TRIM(poi.ItemName)) IN ({0})
 GROUP BY K

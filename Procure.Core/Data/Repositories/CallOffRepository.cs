@@ -46,7 +46,7 @@ WHERE pr.PrType IN ('Raw Material', 'Packing Material')";
                 // independent of how many PO lines exist. Computing it live was one GROUP BY over
                 // every eligible line: 244ms at 20,000 PRs, and linear from there.
                 cmd.CommandText = @"
-SELECT MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit
+SELECT MaterialName, LineCount, TotalOrdered, TotalCalledOff, Unit, COALESCE(LastActivity, '')
 FROM MaterialAggregate
 ORDER BY MaterialName COLLATE NOCASE ASC;";
             }
@@ -60,7 +60,8 @@ SELECT TRIM(poi.ItemName) AS M,
        COUNT(*),
        COALESCE(SUM(poi.Quantity), 0),
        COALESCE(SUM((SELECT COALESCE(SUM(Quantity), 0) FROM PoItemCallOff WHERE PoItemId = poi.Id)), 0),
-       MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs'))
+       MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')),
+       MAX(COALESCE(po.Date, ''))
 " + EligibleLines + @"
   AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')
 GROUP BY M COLLATE NOCASE
@@ -76,7 +77,8 @@ ORDER BY M COLLATE NOCASE ASC;";
                     reader.GetInt32(1),
                     Convert.ToDecimal(reader.GetValue(2), CultureInfo.InvariantCulture),
                     Convert.ToDecimal(reader.GetValue(3), CultureInfo.InvariantCulture),
-                    reader.IsDBNull(4) ? "pcs" : reader.GetString(4)));
+                    reader.IsDBNull(4) ? "pcs" : reader.GetString(4),
+                    reader.IsDBNull(5) ? string.Empty : reader.GetString(5)));
             }
 
             return list;

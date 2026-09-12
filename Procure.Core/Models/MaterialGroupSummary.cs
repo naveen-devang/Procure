@@ -10,5 +10,8 @@ namespace Procure.Models
         int LineCount,
         decimal TotalOrdered,
         decimal TotalCalledOff,
-        string Unit);
+        string Unit,
+        /// <summary>Newest PO date this material appears on, as stored (yyyy-MM-dd sorts as text).
+        /// Not the last call-off: logging a delivery must not reorder the list.</summary>
+        string LastActivity = "");
 }
