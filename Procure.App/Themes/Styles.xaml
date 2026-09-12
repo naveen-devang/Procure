@@ -61,6 +61,29 @@
         <Setter Property="IsTextSelectionEnabled" Value="False" />
     </Style>
 
+    <!-- ===== Skeletons =========================================================================
+         Used in exactly two places: the detail panel while it fetches a requisition's lines, and
+         Raw &amp; Packing's first fill. Both are waits this app did not have before lines and
+         material groups became lazy. Everywhere else either already shows a spinner or answers
+         fast enough that a skeleton would flash and vanish, which reads worse than nothing.
+
+         A pulsing opacity rather than a travelling gradient: one animation per block, no brush
+         allocation per frame, and it reads as "working" without drawing the eye the way a sweep
+         does on a panel this size. -->
+    <Style x:Key="SkeletonBlock" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Height" Value="13" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style x:Key="SkeletonCard" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Height" Value="92" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
     <!-- Native ButtonBackgroundPointerOver/Pressed default to a Fluent-grey overlay that isn't
          one of our warm-neutral tokens - repoint to app tokens so hover/press is subtle and
          theme-correct everywhere.

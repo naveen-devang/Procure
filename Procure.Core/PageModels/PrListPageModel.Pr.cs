@@ -144,6 +144,8 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task OpenEditPrModalAsync(PurchaseRequisition pr)
         {
+            pr = await EnsureHydratedAsync(pr);   // custom field values are left out of the board read
+
             // A second click before this reaches IsEditModalVisible = true (there's an await right
             // below, so that window is real - IsEditModalVisible itself isn't set yet during it, so
             // it can't be the guard) let two calls both populate EditingPrItems/EditingCustomValues

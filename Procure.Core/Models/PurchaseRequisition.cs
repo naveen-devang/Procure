@@ -129,6 +129,14 @@ namespace Procure.Models
             }
         }
 
+        /// <summary>Whether this requisition carries its quote lines, order lines and custom field
+        /// values, or only what a board card needs. The board's page read leaves them out - about 20
+        /// of the ~35 rows a requisition carries, for four numbers that come from elsewhere - and
+        /// PrListPageModel.EnsureHydratedAsync fills them in when it is actually opened.
+        ///
+        /// Not a UI concern, so deliberately not an ObservableProperty: nothing binds to it.</summary>
+        public bool LineItemsLoaded { get; set; } = true;
+
         public int ItemsCount => Items?.Count ?? 0;
         public bool HasItems => Items != null && Items.Count > 0;
         public decimal TotalItemQuantity => Items?.Sum(i => i.Quantity) ?? 0;
@@ -451,7 +459,12 @@ namespace Procure.Models
             // Only when something actually moved: the computed card labels (ItemsCount, TotalPoValue,
             // PcrStatusDisplay...) read the child collections and nothing notifies them on their own.
             // This is the pass the repository deliberately leaves to the UI thread.
-            if (MergeInto(this, fresh)) NotifyHierarchyChanged();
+            // A board reload reads requisitions without their quote and order lines. Merging that
+            // into a requisition the user has open would see empty collections and take the lines
+            // away - MergeList removes anything the fresh copy does not have. So a shallow source
+            // leaves those collections alone; it has nothing to say about them.
+            if (MergeInto(this, fresh, mergeLineItems: fresh.LineItemsLoaded)) NotifyHierarchyChanged();
+            if (fresh.LineItemsLoaded) LineItemsLoaded = true;
         }
 
         // ponytail: reflection rather than a hand-written copy for each of the seven model types. The
@@ -464,7 +477,7 @@ namespace Procure.Models
 
         /// <summary>Copies every persisted property of <paramref name="fresh"/> onto
         /// <paramref name="target"/> (same runtime type). Returns true if anything actually changed.</summary>
-        private static bool MergeInto(object target, object fresh)
+        private static bool MergeInto(object target, object fresh, bool mergeLineItems = true)
         {
             var changed = false;
 
@@ -472,6 +485,10 @@ namespace Procure.Models
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0
                             && p.Name != nameof(IsExpanded) && p.Name != nameof(IsSelected)
+                            // Describes what this instance holds, not what the row says. Copying it
+                            // from a shallow read would mark a requisition whose lines are still in
+                            // memory as needing them fetched again.
+                            && p.Name != nameof(LineItemsLoaded)
                             // UI-helper setters with side effects (they rewrite the persisted
                             // properties they wrap); merging them would depend on reflection
                             // returning the raw properties first, which is not guaranteed.
@@ -487,14 +504,17 @@ namespace Procure.Models
                 // merge the contents so the bound child layout is not reset.
                 if (current is IList currentList && incoming is IList incomingList)
                 {
-                    changed |= MergeList(currentList, incomingList);
+                    // The lines under a quote or an order, and a requisition's custom field values:
+                    // absent from a shallow read rather than deleted.
+                    if (!mergeLineItems && IsLineItemCollection(target, p.Name)) continue;
+                    changed |= MergeList(currentList, incomingList, mergeLineItems);
                 }
                 // Single nav property (Pcr): same row merges in place, a different row is assigned so
                 // the setter can re-hook its PropertyChanged.
                 else if (current is ObservableObject liveChild && incoming is ObservableObject freshChild
                          && IdOf(liveChild) == IdOf(freshChild))
                 {
-                    changed |= MergeInto(liveChild, freshChild);
+                    changed |= MergeInto(liveChild, freshChild, mergeLineItems);
                 }
                 else if (!Equals(current, incoming))
                 {
@@ -506,11 +526,18 @@ namespace Procure.Models
             return changed;
         }
 
+        /// <summary>The collections a shallow read does not carry: a quote's lines, an order's lines,
+        /// and the requisition's custom field values. A requisition's own Items are NOT one of them -
+        /// the board card counts them.</summary>
+        private static bool IsLineItemCollection(object target, string propertyName) =>
+            (propertyName == nameof(Items) && target is RequestForQuotation or PurchaseOrder)
+            || propertyName == nameof(CustomValues);
+
         /// <summary>Reconciles a bound child collection by Id: a row that is still there merges into the
         /// live element and raises no collection event at all, new rows are inserted, dropped rows removed.
         /// ponytail: O(n^2) scan and remove+insert instead of Move — child lists are a handful of rows and
         /// the DB returns them in SortOrder, so a reorder is rare. Index the ids if that stops holding.</summary>
-        private static bool MergeList(IList target, IList fresh)
+        private static bool MergeList(IList target, IList fresh, bool mergeLineItems = true)
         {
             var changed = false;
 

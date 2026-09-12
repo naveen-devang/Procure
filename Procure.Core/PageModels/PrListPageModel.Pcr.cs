@@ -40,6 +40,7 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task CreatePcrForPrAsync(PurchaseRequisition pr)
         {
+            pr = await EnsureHydratedAsync(pr);
             try
             {
                 var pcr = new PriceComparisonRequest
@@ -378,9 +379,11 @@ namespace Procure.PageModels
         public partial string SelectedRfqCountMessage { get; set; } = string.Empty;
 
         [RelayCommand]
-        public void OpenExportPcrModal(PurchaseRequisition pr)
+        public async Task OpenExportPcrModalAsync(PurchaseRequisition pr)
         {
             if (pr == null) return;
+            // The comparison prints every quote's lines.
+            pr = await EnsureHydratedAsync(pr);
             ExportTargetPr = pr;
             var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "RW01" : pr.Plant.Trim();
             ExportPcrSubtitle = $"Requisition {pr.PrNo} — {plant}";

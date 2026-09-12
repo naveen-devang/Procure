@@ -1031,14 +1031,88 @@ namespace Procure.PageModels
 
         public bool IsDetailPanelOpen => ExpandedPr is not null;
 
+        /// <summary>Fills in the quote lines, order lines and custom field values the board's page read
+        /// deliberately leaves out, if this requisition does not have them yet.
+        ///
+        /// Every path that reaches past a card into the detail of a requisition goes through here -
+        /// opening it, adding or editing a quote or an order, the PCR, merge, split, the batch
+        /// commands. Miss one and that screen shows an empty list instead of failing, which is the
+        /// whole hazard of this change; the list of callers is the list of places that read
+        /// rfq.Items, po.Items or pr.CustomValues.
+        ///
+        /// The fresh copy is merged into the live instance rather than replacing it, so the card
+        /// bound to it keeps its identity and nothing on screen rebuilds.</summary>
+        public async Task<PurchaseRequisition> EnsureHydratedAsync(PurchaseRequisition pr)
+        {
+            if (pr.LineItemsLoaded) return pr;
+
+            try
+            {
+                var full = (await Task.Run(() => _prRepo.GetByIdsAsync(new[] { pr.Id })).ConfigureAwait(true))
+                    .FirstOrDefault();
+                if (full is not null) pr.MergeFrom(full);
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("EnsureHydratedAsync failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+
+            return pr;
+        }
+
+        /// <summary>The same for a set of requisitions - the batch and merge commands act on the
+        /// selection, which comes straight out of the loaded window and is therefore shallow. One read
+        /// for all of them rather than one each.</summary>
+        public async Task EnsureHydratedAsync(IReadOnlyCollection<PurchaseRequisition> prs)
+        {
+            var missing = prs.Where(p => !p.LineItemsLoaded).ToList();
+            if (missing.Count == 0) return;
+
+            try
+            {
+                var ids = missing.Select(p => p.Id).ToList();
+                var full = await Task.Run(() => _prRepo.GetByIdsAsync(ids)).ConfigureAwait(true);
+                var byId = full.ToDictionary(p => p.Id);
+                foreach (var pr in missing)
+                    if (byId.TryGetValue(pr.Id, out var fresh)) pr.MergeFrom(fresh);
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("EnsureHydratedAsync(batch) failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>True while an opened requisition is still fetching its lines. The panel shows a
+        /// skeleton against this - it is the one wait this change introduces that lands on a click.</summary>
+        [ObservableProperty]
+        public partial bool IsDetailHydrating { get; set; }
+
         [RelayCommand]
-        public void ToggleExpand(PurchaseRequisition pr)
+        public async Task ToggleExpandAsync(PurchaseRequisition pr)
         {
             if (ReferenceEquals(ExpandedPr, pr)) { CloseDetailPanel(); return; }
 
             if (ExpandedPr is { } previous) previous.IsExpanded = false;
             pr.IsExpanded = true;
             ExpandedPr = pr;
+
+            if (pr.LineItemsLoaded) return;
+
+            // Opened before its lines are in memory: show the panel now with a skeleton in it rather
+            // than holding the click until the read comes back.
+            IsDetailHydrating = true;
+            try
+            {
+                await EnsureHydratedAsync(pr);
+            }
+            finally
+            {
+                // Only the requisition still on screen clears it - a fast second click on another row
+                // must not uncover a panel that is still filling.
+                if (ReferenceEquals(ExpandedPr, pr)) IsDetailHydrating = false;
+            }
         }
 
         [RelayCommand]

@@ -359,9 +359,42 @@
                             Command="{Binding CloseDetailPanelCommand}" />
                 </Grid>
 
-                <ScrollViewer Grid.Row="1">
-                    <views:PrDetailPanel x:Name="DetailPanel" DataContext="{Binding ExpandedPr}" />
-                </ScrollViewer>
+                <Grid Grid.Row="1">
+                    <ScrollViewer Visibility="{Binding IsDetailHydrating, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                        <views:PrDetailPanel x:Name="DetailPanel" DataContext="{Binding ExpandedPr}" />
+                    </ScrollViewer>
+
+                    <!-- The panel's quote and order lines are not read until a requisition is opened,
+                         so opening one now waits on a query. Without this the panel appears with its
+                         three columns empty and fills a moment later, which reads as a bug rather than
+                         as loading. Shaped like the panel it replaces - three columns, a card or two
+                         each - so the layout does not jump when the real thing arrives. -->
+                    <Border Visibility="{Binding IsDetailHydrating, Converter={StaticResource BoolVis}}"
+                            Padding="20,18">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="10">
+                                <Border Style="{StaticResource SkeletonBlock}" Width="120" HorizontalAlignment="Left" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="10">
+                                <Border Style="{StaticResource SkeletonBlock}" Width="120" HorizontalAlignment="Left" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="10">
+                                <Border Style="{StaticResource SkeletonBlock}" Width="120" HorizontalAlignment="Left" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                                <Border Style="{StaticResource SkeletonCard}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

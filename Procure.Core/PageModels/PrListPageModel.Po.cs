@@ -96,6 +96,8 @@ namespace Procure.PageModels
         [RelayCommand]
         public async Task OpenAddPoModalAsync(PurchaseRequisition pr)
         {
+            // Step 2 builds a row per quote line, so this one cannot run on a shallow requisition.
+            pr = await EnsureHydratedAsync(pr);
             TargetPrForPo = pr;
             IsEditPoMode = false;
             EditingPo = null;

@@ -242,6 +242,7 @@ namespace Procure.PageModels
         public async Task OpenMergePrModalAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count < 2)
             {
                     await _dialogs.DisplayAlertAsync("Combine Requisitions", "Please select at least 2 requisitions to combine.", "OK");
@@ -297,6 +298,7 @@ namespace Procure.PageModels
             }
 
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count < 2) return;
 
             try
@@ -357,6 +359,7 @@ namespace Procure.PageModels
         public async Task MergeOrSplitPrAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count == 1 && selected[0].IsConsolidatedMaster)
             {
                 await SplitMasterPrAsync(selected[0]);
@@ -371,6 +374,7 @@ namespace Procure.PageModels
         public async Task CreateOrSplitSharedRfqAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count >= 1 && selected.All(p => p.Rfqs.Any(r => r.IsSharedRfq)))
             {
                 await SplitSelectedSharedRfqAsync();
@@ -385,6 +389,7 @@ namespace Procure.PageModels
         public async Task CreateOrSplitCombinedPoAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count >= 1 && selected.All(p => p.Pos.Any(po => po.IsCombinedPo)))
             {
                 await SplitSelectedCombinedPoAsync();
@@ -588,6 +593,7 @@ namespace Procure.PageModels
         public async Task SplitSelectedSharedRfqAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             var sharedRfqs = selected.SelectMany(p => p.Rfqs.Where(r => r.IsSharedRfq)).ToList();
             if (sharedRfqs.Count == 0) return;
 
@@ -647,6 +653,7 @@ namespace Procure.PageModels
         public async Task SplitSelectedCombinedPoAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             var combinedPos = selected.SelectMany(p => p.Pos.Where(po => po.IsCombinedPo)).ToList();
             if (combinedPos.Count == 0) return;
 

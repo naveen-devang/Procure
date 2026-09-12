@@ -357,8 +357,9 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public void OpenAddRfqModal(PurchaseRequisition pr)
+        public async Task OpenAddRfqModalAsync(PurchaseRequisition pr)
         {
+            pr = await EnsureHydratedAsync(pr);   // the board read leaves the lines out
             EditingRfq = null;
             IsEditingRfq = false;
             _rfqQuoteAmountAutoSynced = false;

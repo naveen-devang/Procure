@@ -93,10 +93,18 @@ LIMIT @Take OFFSET @Skip;";
         /// NotifyHierarchyChanged is intentionally NOT called here: it must run on the UI thread after
         /// binding, or it fires PropertyChanged for every card from a background thread.
         /// </summary>
-        private static async Task LoadChildrenAsync(SqliteConnection connection, List<PurchaseRequisition> prs, bool scoped)
+        /// <param name="includeLineItems">False for the board's own page read. A card shows counts and
+        /// totals - how many items, how many quotes, what the orders come to, where the PCR stands -
+        /// and every one of those comes from the requisition's items, the quote rows, the order rows
+        /// (Value is a stored column) and the approvals. None of them need a single quote line, order
+        /// line or custom field value, and those are about 20 of the ~35 rows a requisition carries.
+        /// They load when a requisition is actually opened - see PrListPageModel.EnsureHydratedAsync.</param>
+        private static async Task LoadChildrenAsync(SqliteConnection connection, List<PurchaseRequisition> prs, bool scoped,
+                                                    bool includeLineItems = true)
         {
             if (prs.Count == 0) return;
             var prIds = scoped ? prs.Select(p => p.Id).ToList() : null;
+            foreach (var pr in prs) pr.LineItemsLoaded = includeLineItems;
 
             // 2. Load RFQs
             var rfqDict = new Dictionary<Guid, List<RequestForQuotation>>();
@@ -145,6 +153,8 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                 }
             }
 
+            if (includeLineItems)
+            {
             // 2b. Load RfqItems
             using (var cmd = connection.CreateCommand())
             {
@@ -178,6 +188,8 @@ ORDER BY SortOrder ASC;";
                 }
             }
 
+
+            }
             // 3. Load PCRs and Approvals
             var pcrDict = new Dictionary<Guid, PriceComparisonRequest>();
             var pcrById = new Dictionary<Guid, PriceComparisonRequest>();
@@ -271,6 +283,8 @@ FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                 }
             }
 
+            if (includeLineItems)
+            {
             // 4b. Load PO Items
             var poItemDict = new Dictionary<Guid, List<PurchaseOrderItem>>();
             using (var cmd = connection.CreateCommand())
@@ -356,8 +370,12 @@ ORDER BY SortOrder ASC;";
                 }
             }
 
-            // 5. Load Custom Values in a single bulk query with Column Definitions joined
+
+            }
             var customDict = new Dictionary<Guid, List<CustomFieldValue>>();
+            if (includeLineItems)
+            {
+            // 5. Load Custom Values in a single bulk query with Column Definitions joined
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -388,6 +406,8 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
                 }
             }
 
+
+            }
             // 6. Load PrItems
             var itemDict = new Dictionary<Guid, List<PrItem>>();
             using (var cmd = connection.CreateCommand())
@@ -493,7 +513,8 @@ LIMIT @Take OFFSET @Skip;";
                 while (await reader.ReadAsync().ConfigureAwait(false)) prs.Add(ReadPr(reader));
             }
 
-            await LoadChildrenAsync(connection, prs, scoped: true).ConfigureAwait(false);
+            // The board page: counts and totals only. Opening a requisition fills in the rest.
+            await LoadChildrenAsync(connection, prs, scoped: true, includeLineItems: false).ConfigureAwait(false);
             return new PrPage(prs, total);
         }
 

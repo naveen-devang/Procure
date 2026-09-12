@@ -280,6 +280,7 @@ namespace Procure.PageModels
         public async Task OpenBatchRfqModalAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count < 1)
             {
                     await _dialogs.DisplayAlertAsync("Shared RFQ", "Please select at least 1 requisition.", "OK");
@@ -376,6 +377,7 @@ namespace Procure.PageModels
             }
 
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count == 0) return;
 
             try
@@ -450,6 +452,7 @@ namespace Procure.PageModels
         public async Task OpenBatchPoModalAsync()
         {
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count < 1)
             {
                     await _dialogs.DisplayAlertAsync("Combined PO", "Please select at least 1 requisition.", "OK");
@@ -503,6 +506,7 @@ namespace Procure.PageModels
             }
 
             var selected = _loadedPrs.Where(p => p.IsSelected).ToList();
+            await EnsureHydratedAsync(selected);   // the selection comes from the board, so it is shallow
             if (selected.Count == 0) return;
 
             try
