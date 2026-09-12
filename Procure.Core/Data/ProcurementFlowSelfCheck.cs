@@ -695,9 +695,13 @@ namespace Procure.Data
             // a save that did not work. Two approvals signed together did it, because
             // UpdateParentPrApprovalState fires once per approval.
             //
-            // Eight parallel saves above do not reproduce it: SQLite serialises writers, and the
-            // window is narrow. Holding a write transaction open forces the interleave every time -
-            // the second saver must wait for the first to commit and then see its row.
+            // Be clear about what this does and does not prove. It checks that a save whose window
+            // overlaps an open write transaction completes rather than failing - it does NOT
+            // reproduce the collision, and it passed with the fix removed. The interleave that
+            // actually fails (delete, delete, insert, insert across two connections) was reproduced
+            // by hand against this same SQL; reproducing it from here would mean pausing the
+            // repository mid-statement, which there is no hook for. Treat this as a smoke test, and
+            // the transaction in RefreshSearchIndexAsync as the thing that carries the guarantee.
             using (var blocker = db.CreateConnection())
             {
                 await blocker.OpenAsync();
