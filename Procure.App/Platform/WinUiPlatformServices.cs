@@ -81,7 +81,8 @@ public sealed class WinUiNavigationService : INavigationService
     public Task GoToBoardWithSearchAsync(string search)
     {
         Navigate?.Invoke(AppRoute.Board, null);
-        if (PrListPageModel.Current is { } board) board.SearchText = search;
+        // Several linked record numbers: any one of them should surface, not all at once.
+        if (PrListPageModel.Current is { } board) board.SearchAnyOf(search);
         return Task.CompletedTask;
     }
 }

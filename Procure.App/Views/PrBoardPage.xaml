@@ -13,6 +13,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 
     <Page.Resources>
+        <ScalarTransition x:Key="StaleFade" Duration="0:0:0.12" />
         <conv:StatusColorConverter x:Key="StatusColor" />
         <conv:StatusBadgeBgConverter x:Key="StatusBg" />
         <conv:PriorityColorConverter x:Key="PriorityColor" />
@@ -168,8 +169,14 @@
                 ShowsScrollingPlaceholders="False"
                 ItemsSource="{Binding FilteredPrs}"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}, ConverterParameter=invert}"
+                IsHitTestVisible="{Binding IsSearchPending, Converter={StaticResource BoolVis}, ConverterParameter=invert}"
+                Opacity="{Binding StaleResultsOpacity}"
+                OpacityTransition="{StaticResource StaleFade}"
                 ContainerContentChanging="Board_ContainerContentChanging"
                 BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}">
+                <!-- Rows belonging to the term you just replaced are dimmed and inert until the new
+                     ones arrive. Dimmed rather than cleared: emptying the board on every keystroke
+                     flashes, and this says "stale", which is what they are. -->
                 <ListView.Resources>
                     <!-- Neutral hover instead of the default accent-tinted one - a calmer scan surface. -->
                     <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="{ThemeResource AppTertiaryBackground}" />

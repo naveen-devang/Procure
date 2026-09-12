@@ -798,8 +798,8 @@ namespace Procure.PageModels
             task ??= SelectedTask;
             if (task is null || task.Links.Count == 0) return;
 
-            // The board's search splits on whitespace and ORs the terms, so every linked
-            // PR / RFQ / PO number together surfaces all of them at once.
+            // The board ANDs typed words, so this path asks it for OR instead (SearchAnyOf):
+            // every linked PR / RFQ / PO number surfaces together.
             var terms = string.Join(' ', task.Links.Select(l => l.Label).Where(l => l.Length > 0).Distinct());
             if (terms.Length == 0) return;
 

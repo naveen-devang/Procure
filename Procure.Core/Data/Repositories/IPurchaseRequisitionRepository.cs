@@ -16,7 +16,11 @@ namespace Procure.Data.Repositories
         int NormalOverdueDays,
         int UrgentOverdueDays,
         int Skip,
-        int Take);
+        int Take,
+        /// <summary>Search words are ANDed by default, so adding a word narrows. The one caller that
+        /// means "any of these" - looking up the several PR, RFQ and PO numbers a task links to -
+        /// sets this.</summary>
+        bool MatchAnyOf = false);
 
     /// <summary><paramref name="TotalCount"/> is the unpaged match count, for the board's footer and
     /// for knowing when the infinite scroll has reached the end.</summary>

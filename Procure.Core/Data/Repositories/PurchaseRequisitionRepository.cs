@@ -557,9 +557,13 @@ ORDER BY CreatedAt DESC;";
 
             if (hasSearch)
             {
-                // Whitespace splits the term into an OR set: one word behaves exactly as before,
-                // while several (e.g. the numbers behind a task's multiple PR/RFQ/PO links) match
-                // any row carrying one of them. Capped so a pasted paragraph can't explode the SQL.
+                // Whitespace splits the term, and every word has to match: adding a word narrows,
+                // the way every other search box behaves. It used to OR them, so "gasket urgent"
+                // returned more rows than "gasket" alone. Capped so a pasted paragraph cannot
+                // explode the SQL.
+                //
+                // The one caller that wanted OR - a task's several PR/RFQ/PO links - passes them
+                // through MatchAnyOf below instead.
                 var terms = query.Search!.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
                 var likes = new List<string>();
                 for (var i = 0; i < terms.Length && i < 12; i++)
@@ -567,7 +571,8 @@ ORDER BY CreatedAt DESC;";
                     likes.Add($"SearchBlob LIKE @Search{i}");
                     cmd.Parameters.AddWithValue($"@Search{i}", "%" + terms[i].ToLowerInvariant() + "%");
                 }
-                clauses.Add(likes.Count == 1 ? likes[0] : "(" + string.Join(" OR ", likes) + ")");
+                var joiner = query.MatchAnyOf ? " OR " : " AND ";
+                clauses.Add(likes.Count == 1 ? likes[0] : "(" + string.Join(joiner, likes) + ")");
             }
 
             if (hasStatus)

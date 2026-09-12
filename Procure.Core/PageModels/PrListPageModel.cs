@@ -459,8 +459,42 @@ namespace Procure.PageModels
 
         private int _searchGeneration;
 
+        /// <summary>True between a keystroke and the arrival of that term's results. The board used
+        /// to keep the previous rows on screen, under the new term, with the old count in the header
+        /// - which reads as "the search is wrong" rather than "the search has not finished".</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(StaleResultsOpacity))]
+        public partial bool IsSearchPending { get; set; }
+
+        partial void OnIsSearchPendingChanged(bool value) => UpdateListSummary();
+
+        /// <summary>Dims rows that belong to the previous term. Not hidden: keeping them in place
+        /// avoids a flash of empty board on every keystroke, and the dimming says they are stale.</summary>
+        public double StaleResultsOpacity => IsSearchPending ? 0.4 : 1.0;
+
+        // Words typed in the box are ANDed. Opening a task's links is the exception - those are
+        // several PR/RFQ/PO numbers and no single PR carries them all - so that path asks for OR.
+        private bool _searchAnyOf;
+        private bool _settingSearchAnyOf;
+
+        /// <summary>Search for any one of these terms. Used when a task or note sends its linked
+        /// record numbers to the board; typing in the box always means all of the words.</summary>
+        public void SearchAnyOf(string terms)
+        {
+            _settingSearchAnyOf = true;
+            try { SearchText = terms; }
+            finally { _settingSearchAnyOf = false; }
+        }
+
         partial void OnSearchTextChanged(string value)
         {
+            // Whoever set the text decides how the words combine, and typing always resets it.
+            _searchAnyOf = _settingSearchAnyOf;
+
+            // Set before the debounce, not after: the whole point is to mark the rows stale the
+            // moment the term stops matching them.
+            IsSearchPending = true;
+
             // Debounce - re-filtering on every keystroke re-queries and rebuilds the board. Same
             // generation-counter idiom as ShowToast above and LazyExpander: a superseded pass is
             // retired by the counter, so there is no CancellationTokenSource to allocate per
@@ -642,10 +676,21 @@ namespace Procure.PageModels
             NormalOverdueDays: _settingsService.NormalOverdueDays,
             UrgentOverdueDays: _settingsService.UrgentOverdueDays,
             Skip: skip,
-            Take: take);
+            Take: take,
+            MatchAnyOf: _searchAnyOf);
 
         private void UpdateListSummary()
         {
+            if (IsSearchPending)
+            {
+                // Saying "11 of 11" while looking for one PR is worse than saying nothing: the count
+                // belongs to the term that is no longer in the box.
+                ListSummary = "Searching…";
+                ListSummaryPill = "Searching…";
+                IsGenuinelyEmpty = false;
+                return;
+            }
+
             ListSummary = TotalFilteredCount == 0
                 ? "No requisitions found"
                 : $"Showing {FilteredPrs.Count} of {TotalFilteredCount} requisitions";
@@ -772,6 +817,7 @@ namespace Procure.PageModels
                 // Only the pass that raised it clears it, or a superseded query would uncover an empty
                 // board while the current one is still running.
                 if (showSkeleton && generation == _pageGeneration) IsBusy = false;
+                if (generation == _pageGeneration) IsSearchPending = false;
             }
         }
 
