@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -46,6 +47,34 @@ namespace Procure.Models
         public decimal LineTotal => (UnitPrice.HasValue && UnitPrice.Value > 0)
             ? Quantity * Math.Max(0m, UnitPrice.Value - (Discount ?? 0m))
             : 0m;
+
+        /// <summary>Contracts this line's quantity travels under. Empty unless the order is in
+        /// TransportMode "Line"; normally one row, two when the quantity is split.</summary>
+        public ObservableCollection<PoItemTransport> Transports { get; set; } = new();
+
+        public bool HasTransports => Transports.Count > 0;
+
+        public decimal TransportTotal
+        {
+            get
+            {
+                var sum = 0m;
+                foreach (var t in Transports) sum += t.Total;
+                return sum;
+            }
+        }
+
+        /// <summary>How much of the line still has no contract against it. Negative would mean more
+        /// allocated than ordered, which the dialog blocks.</summary>
+        public decimal UnallocatedQuantity
+        {
+            get
+            {
+                var allocated = 0m;
+                foreach (var t in Transports) allocated += t.Quantity;
+                return Quantity - allocated;
+            }
+        }
 
         public string FormattedQuantity
         {

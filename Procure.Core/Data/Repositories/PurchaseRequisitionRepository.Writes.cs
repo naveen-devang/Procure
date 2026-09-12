@@ -516,8 +516,8 @@ ON CONFLICT(Id) DO UPDATE SET
                 using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal)
-VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency, @BaseAmount, @Freight, @OtherCharges, @Discount, @VatType, @TransportContractNumber, @TransporterName, @TransportRatePerUnit, @TransportTotal)
+INSERT INTO PurchaseOrder (Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal, TransportMode)
+VALUES (@Id, @PrId, @PoNo, @Vendor, @LinkedRfqId, @Value, @Status, @Date, @CombinedPrs, @Currency, @BaseAmount, @Freight, @OtherCharges, @Discount, @VatType, @TransportContractNumber, @TransporterName, @TransportRatePerUnit, @TransportTotal, @TransportMode)
 ON CONFLICT(Id) DO UPDATE SET
     PoNo = excluded.PoNo,
     Vendor = excluded.Vendor,
@@ -535,7 +535,8 @@ ON CONFLICT(Id) DO UPDATE SET
     TransportContractNumber = excluded.TransportContractNumber,
     TransporterName = excluded.TransporterName,
     TransportRatePerUnit = excluded.TransportRatePerUnit,
-    TransportTotal = excluded.TransportTotal;";
+    TransportTotal = excluded.TransportTotal,
+    TransportMode = excluded.TransportMode;";
 
                 cmd.Parameters.AddWithValue("@Id", po.Id.ToString());
                 cmd.Parameters.AddWithValue("@PrId", po.PrId.ToString());
@@ -556,6 +557,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 cmd.Parameters.AddWithValue("@TransporterName", (object?)po.TransporterName ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@TransportRatePerUnit", po.TransportRatePerUnit.HasValue ? (object)po.TransportRatePerUnit.Value : DBNull.Value);
                 cmd.Parameters.AddWithValue("@TransportTotal", po.TransportTotal.HasValue ? (object)po.TransportTotal.Value : DBNull.Value);
+                cmd.Parameters.AddWithValue("@TransportMode", string.IsNullOrWhiteSpace(po.TransportMode) ? TransportModes.Order : po.TransportMode);
 
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
@@ -601,6 +603,43 @@ ON CONFLICT(Id) DO UPDATE SET
                         itemCmd.Parameters.AddWithValue("@LineTotal", item.LineTotal);
 
                         await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+
+                        // Transport allocations, line-transport orders only. A whole-order PO keeps
+                        // its single contract on the PurchaseOrder row above and owns no rows here,
+                        // so switching an order back to whole-order clears them.
+                        var allocations = po.IsLineTransport
+                            ? (item.Transports?.ToList() ?? new List<PoItemTransport>())
+                            : new List<PoItemTransport>();
+
+                        await DeleteDepartedChildrenAsync(connection, tx, "PoItemTransport", "PoItemId", item.Id,
+                            allocations.Select(t => t.Id).ToList()).ConfigureAwait(false);
+
+                        var transportSort = 0;
+                        foreach (var t in allocations)
+                        {
+                            t.PoItemId = item.Id;
+                            t.SortOrder = transportSort++;
+                            using var tCmd = connection.CreateCommand();
+                            tCmd.Transaction = tx;
+                            tCmd.CommandText = @"
+INSERT INTO PoItemTransport (Id, PoItemId, Quantity, ContractNumber, TransporterName, RatePerUnit, SortOrder)
+VALUES (@Id, @PoItemId, @Quantity, @ContractNumber, @TransporterName, @RatePerUnit, @SortOrder)
+ON CONFLICT(Id) DO UPDATE SET
+    PoItemId = excluded.PoItemId,
+    Quantity = excluded.Quantity,
+    ContractNumber = excluded.ContractNumber,
+    TransporterName = excluded.TransporterName,
+    RatePerUnit = excluded.RatePerUnit,
+    SortOrder = excluded.SortOrder;";
+                            tCmd.Parameters.AddWithValue("@Id", t.Id.ToString());
+                            tCmd.Parameters.AddWithValue("@PoItemId", item.Id.ToString());
+                            tCmd.Parameters.AddWithValue("@Quantity", t.Quantity);
+                            tCmd.Parameters.AddWithValue("@ContractNumber", (object?)t.ContractNumber ?? DBNull.Value);
+                            tCmd.Parameters.AddWithValue("@TransporterName", (object?)t.TransporterName ?? DBNull.Value);
+                            tCmd.Parameters.AddWithValue("@RatePerUnit", t.RatePerUnit.HasValue ? (object)t.RatePerUnit.Value : DBNull.Value);
+                            tCmd.Parameters.AddWithValue("@SortOrder", t.SortOrder);
+                            await tCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                        }
                     }
                 }
 

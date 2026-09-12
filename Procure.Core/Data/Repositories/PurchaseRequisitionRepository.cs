@@ -193,7 +193,7 @@ ORDER BY SortOrder ASC;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal
+SELECT Id, PrId, PoNo, Vendor, LinkedRfqId, Value, Status, Date, CombinedPrs, Currency, BaseAmount, Freight, OtherCharges, Discount, VatType, TransportContractNumber, TransporterName, TransportRatePerUnit, TransportTotal, TransportMode
 FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -226,7 +226,8 @@ FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                         TransportContractNumber = (reader.FieldCount > 15 && !reader.IsDBNull(15)) ? reader.GetString(15) : null,
                         TransporterName = (reader.FieldCount > 16 && !reader.IsDBNull(16)) ? reader.GetString(16) : null,
                         TransportRatePerUnit = (reader.FieldCount > 17 && !reader.IsDBNull(17)) ? (decimal?)reader.GetDouble(17) : null,
-                        TransportTotal = (reader.FieldCount > 18 && !reader.IsDBNull(18)) ? (decimal?)reader.GetDouble(18) : null
+                        TransportTotal = (reader.FieldCount > 18 && !reader.IsDBNull(18)) ? (decimal?)reader.GetDouble(18) : null,
+                        TransportMode = (reader.FieldCount > 19 && !reader.IsDBNull(19)) ? reader.GetString(19) : TransportModes.Order
                     });
                 }
             }
@@ -265,6 +266,39 @@ ORDER BY SortOrder ASC;";
                 }
             }
 
+            // 4c. Transport allocations. Only line-transport orders have any, so this is empty on
+            // a database where nobody has switched an order over.
+            var transportDict = new Dictionary<Guid, List<PoItemTransport>>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+SELECT Id, PoItemId, Quantity, ContractNumber, TransporterName, RatePerUnit, SortOrder
+FROM PoItemTransport" + Scope(cmd, "PoItemId", "@Pi",
+                        scoped ? poItemDict.Values.SelectMany(l => l).Select(i => i.Id).ToList() : null) + @"
+ORDER BY SortOrder ASC;";
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    var poItemId = Guid.Parse(reader.GetString(1));
+                    if (!transportDict.TryGetValue(poItemId, out var tList))
+                    {
+                        tList = new List<PoItemTransport>();
+                        transportDict[poItemId] = tList;
+                    }
+
+                    tList.Add(new PoItemTransport
+                    {
+                        Id = Guid.Parse(reader.GetString(0)),
+                        PoItemId = poItemId,
+                        Quantity = (decimal)reader.GetDouble(2),
+                        ContractNumber = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        TransporterName = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        RatePerUnit = reader.IsDBNull(5) ? null : (decimal)reader.GetDouble(5),
+                        SortOrder = reader.IsDBNull(6) ? 0 : reader.GetInt32(6)
+                    });
+                }
+            }
+
             // Attach items to POs
             foreach (var poList in poDict.Values)
             {
@@ -273,6 +307,12 @@ ORDER BY SortOrder ASC;";
                     if (poItemDict.TryGetValue(po.Id, out var items))
                     {
                         po.Items = new ObservableCollection<PurchaseOrderItem>(items);
+                        foreach (var item in items)
+                        {
+                            if (!transportDict.TryGetValue(item.Id, out var allocations)) continue;
+                            foreach (var t in allocations) t.Currency = po.Currency ?? "AED";
+                            item.Transports = new ObservableCollection<PoItemTransport>(allocations);
+                        }
                     }
                 }
             }

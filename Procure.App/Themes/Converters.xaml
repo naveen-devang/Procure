@@ -37,4 +37,6 @@
         <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
     </DataTemplate>
     <conv:NumericTextConverter x:Key="Num" />
+    <conv:AllocationColorConverter x:Key="AllocColor" />
+    <conv:SegmentedSelectionTextConverter x:Key="SegText" />
 </ResourceDictionary>

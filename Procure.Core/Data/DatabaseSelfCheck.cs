@@ -48,6 +48,29 @@ namespace Procure.Data
                 await AssertFreshAsync(db, "after SavePoAsync");
                 await AssertFindsAsync(repo, marker + "-po", "PO number is searchable");
 
+                // Transport allocations: a line whose quantity is split across two contracts has to
+                // survive the round trip, and a whole-order PO must own none.
+                po.TransportMode = TransportModes.Line;
+                po.Items.Add(new PurchaseOrderItem
+                {
+                    PoId = po.Id,
+                    ItemName = marker + "-line",
+                    Quantity = 42,
+                    Transports =
+                    {
+                        new PoItemTransport { Quantity = 18, ContractNumber = marker + "-tc-a", TransporterName = "A", RatePerUnit = 12 },
+                        new PoItemTransport { Quantity = 24, ContractNumber = marker + "-tc-b", TransporterName = "B", RatePerUnit = 15 },
+                    }
+                });
+                await repo.SavePoAsync(po);
+                await AssertTransportAsync(repo, pr.Id, 2, 18m * 12m + 24m * 15m, "a split line round-trips");
+
+                // Switching back to whole-order has to clear them, or the two would disagree about
+                // which is the real contract.
+                po.TransportMode = TransportModes.Order;
+                await repo.SavePoAsync(po);
+                await AssertTransportAsync(repo, pr.Id, 0, 0m, "whole-order mode owns no allocations");
+
                 // The case a stale blob shows up as: the row changes, the blob does not.
                 pr.Items[0].ItemName = marker + "-renamed";
                 await repo.SaveAsync(pr);
@@ -114,6 +137,22 @@ namespace Procure.Data
                     $"{staleMaterials} material aggregate row(s) disagree with the live data {step}. " +
                     "A write path changed a PO item, a call-off or a PR's type without going through " +
                     "MaterialAggregateMaintenance, so Raw & Packing will show stale figures.");
+        }
+
+        /// <summary>Reads the PR back and checks the PO line's transport allocations - count and
+        /// money - rather than trusting that what was written is what comes back.</summary>
+        private static async Task AssertTransportAsync(
+            IPurchaseRequisitionRepository repo, Guid prId, int expectedCount, decimal expectedTotal, string what)
+        {
+            var fresh = (await repo.GetByIdsAsync(new[] { prId }).ConfigureAwait(false)).FirstOrDefault();
+            var line = fresh?.Pos?.SelectMany(p => p.Items).FirstOrDefault(i => i.Transports.Count > 0 || expectedCount == 0);
+            var actualCount = line?.Transports.Count ?? 0;
+            var actualTotal = line?.TransportTotal ?? 0m;
+
+            if (actualCount != expectedCount || actualTotal != expectedTotal)
+                throw new InvalidOperationException(
+                    $"Transport allocations wrong: {what}. Expected {expectedCount} row(s) totalling {expectedTotal}, " +
+                    $"got {actualCount} totalling {actualTotal}.");
         }
 
         private static async Task AssertFindsAsync(IPurchaseRequisitionRepository repo, string term, string what)

@@ -66,6 +66,15 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedTransportTotal))]
         public partial decimal? TransportTotal { get; set; }
 
+        /// <summary>"Order" - one contract for the whole PO, in the four properties above, which is
+        /// how every order worked before v17 and still the default. "Line" - each line carries its
+        /// own, in PurchaseOrderItem.Transports, and the properties above are not used.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsLineTransport))]
+        public partial string TransportMode { get; set; } = TransportModes.Order;
+
+        public bool IsLineTransport => TransportMode == TransportModes.Line;
+
         [ObservableProperty]
         public partial ObservableCollection<PurchaseOrderItem> Items { get; set; } = new();
 

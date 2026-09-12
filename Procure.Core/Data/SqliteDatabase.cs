@@ -141,6 +141,7 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "SearchBlob", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "MaterialAggregate", "LastActivity", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportMode", "TEXT").ConfigureAwait(false);
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases
             // have the table already, so the CREATE script skips it; add the column explicitly.
             await EnsureColumnExistsAsync(connection, "TodoTask", "LinkedEntityLabel", "TEXT").ConfigureAwait(false);

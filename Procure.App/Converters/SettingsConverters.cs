@@ -81,3 +81,19 @@ public sealed class NumericTextConverter : IValueConverter
         return value;
     }
 }
+
+/// <summary>Colours the allocation running total on a PO line: amber while some of the quantity has
+/// no transport contract, critical when more has been allocated than ordered, accent when it
+/// balances. The value is the line's unallocated quantity.</summary>
+public sealed class AllocationColorConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l)
+    {
+        var res = Application.Current.Resources;
+        var remaining = value is decimal d ? d : 0m;
+        var key = remaining > 0m ? "FluentCaution" : remaining < 0m ? "FluentCritical" : "PrimaryTextBrush";
+        return res[key];
+    }
+
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}

@@ -35,6 +35,73 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedQuantity))]
         public partial string Unit { get; set; } = "pcs";
 
+        /// <summary>Contracts this line's quantity travels under, when the order is per-line.
+        /// Normally one; two when the quantity is split. Empty in whole-order mode.</summary>
+        public ObservableCollection<PoItemTransport> Transports { get; } = new();
+
+        public decimal TransportTotal
+        {
+            get { var sum = 0m; foreach (var t in Transports) sum += t.Total; return sum; }
+        }
+
+        public decimal AllocatedQuantity
+        {
+            get { var sum = 0m; foreach (var t in Transports) sum += t.Quantity; return sum; }
+        }
+
+        public decimal UnallocatedQuantity => Quantity - AllocatedQuantity;
+
+        public bool IsOverAllocatedTransport => UnallocatedQuantity < 0m;
+
+        /// <summary>The chip on the line: the contract when there is one, a count when the quantity
+        /// is split, a prompt when nothing is set.</summary>
+        public string TransportSummary => Transports.Count switch
+        {
+            0 => "Set transport",
+            1 => string.IsNullOrWhiteSpace(Transports[0].ContractLabel) ? "Set transport" : Transports[0].ContractLabel,
+            var n => $"{n} contracts",
+        };
+
+        public bool HasTransport => Transports.Count > 0
+            && !string.IsNullOrWhiteSpace(Transports[0].ContractLabel);
+
+        /// <summary>Running total under the open panel - the thing that says whether every unit has
+        /// a way to travel.</summary>
+        public string TransportAllocationText
+        {
+            get
+            {
+                var q = Quantity.ToString("G29", CultureInfo.InvariantCulture);
+                var a = AllocatedQuantity.ToString("G29", CultureInfo.InvariantCulture);
+                if (UnallocatedQuantity > 0m)
+                    return $"{a} of {q} allocated - {UnallocatedQuantity.ToString("G29", CultureInfo.InvariantCulture)} with no contract";
+                if (UnallocatedQuantity < 0m)
+                    return $"{a} of {q} allocated - {(-UnallocatedQuantity).ToString("G29", CultureInfo.InvariantCulture)} more than ordered";
+                return $"{a} of {q} allocated";
+            }
+        }
+
+        [ObservableProperty]
+        public partial bool IsTransportExpanded { get; set; }
+
+        /// <summary>Mirrors the order's transport mode. Set by PoRfqSelection whenever the mode
+        /// changes, because a line's DataTemplate cannot bind up to the card that owns it.</summary>
+        [ObservableProperty]
+        public partial bool IsLineTransport { get; set; }
+
+        /// <summary>Called after any allocation edit: the totals above are plain computed properties
+        /// over a collection, so nothing tells the UI on its own.</summary>
+        public void NotifyTransportChanged()
+        {
+            OnPropertyChanged(nameof(TransportTotal));
+            OnPropertyChanged(nameof(AllocatedQuantity));
+            OnPropertyChanged(nameof(UnallocatedQuantity));
+            OnPropertyChanged(nameof(IsOverAllocatedTransport));
+            OnPropertyChanged(nameof(TransportSummary));
+            OnPropertyChanged(nameof(HasTransport));
+            OnPropertyChanged(nameof(TransportAllocationText));
+        }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
@@ -299,8 +366,26 @@ namespace Procure.Models
 
         // Transport details, Raw Material POs only. Kept out of BaseAmount/NetTaxableAmount/
         // DisplayTotalAmount entirely - haulage is tracked here, never folded into the PO's total.
+        /// <summary>Raw Material or Packing Material: the two types that carry transport. Packing
+        /// was excluded before, so a packing PO had nowhere to put a contract.</summary>
         [ObservableProperty]
         public partial bool IsRawMaterial { get; set; }
+
+        internal static bool IsTransportType(string? prType) =>
+            string.Equals(prType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(prType, ProcurementPrType.PackingMaterial, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>"Order" - one contract for the whole PO, in the three properties below, which
+        /// is the default and how every PO worked before. "Line" - each line carries its own, in
+        /// PoRfqItemSelection.Transports.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsLineTransport))]
+        [NotifyPropertyChangedFor(nameof(IsOrderTransport))]
+        [NotifyPropertyChangedFor(nameof(FormattedTransportTotal))]
+        public partial string TransportMode { get; set; } = TransportModes.Order;
+
+        public bool IsLineTransport => TransportMode == TransportModes.Line;
+        public bool IsOrderTransport => !IsLineTransport;
 
         [ObservableProperty]
         public partial string? TransportContractNumber { get; set; }
@@ -315,7 +400,98 @@ namespace Procure.Models
 
         public decimal OrderedQuantity => Items?.Where(i => i.IsSelected).Sum(i => i.Quantity) ?? 0m;
 
-        public decimal? TransportTotal => TransportRatePerUnit.HasValue ? TransportRatePerUnit.Value * OrderedQuantity : null;
+        /// <summary>Whole-order: rate x everything ordered. Per-line: the sum of each line's
+        /// allocations. One accessor so no caller has to know which mode the order is in.</summary>
+        public decimal? TransportTotal
+        {
+            get
+            {
+                if (IsLineTransport)
+                {
+                    var sum = 0m;
+                    foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                        if (item.IsSelected) sum += item.TransportTotal;
+                    return sum;
+                }
+                return TransportRatePerUnit.HasValue ? TransportRatePerUnit.Value * OrderedQuantity : null;
+            }
+        }
+
+        /// <summary>Lines that are short of a contract for some of their quantity. Shown as a
+        /// warning rather than blocking the save - transport is often arranged after the PO.</summary>
+        public int UnallocatedLineCount
+        {
+            get
+            {
+                var n = 0;
+                if (!IsLineTransport) return 0;
+                foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                    if (item.IsSelected && item.UnallocatedQuantity > 0m) n++;
+                return n;
+            }
+        }
+
+        public bool HasUnallocatedLines => UnallocatedLineCount > 0;
+
+        public string UnallocatedLineText => UnallocatedLineCount == 1
+            ? "1 line has quantity with no transport contract"
+            : $"{UnallocatedLineCount} lines have quantity with no transport contract";
+
+        /// <summary>Switching mode keeps what was entered: going per-line seeds every selected line
+        /// with the order's contract so nothing is retyped, and going back to whole-order drops the
+        /// per-line rows (the caller warns first when the lines disagree).</summary>
+        public void SwitchTransportMode(string mode)
+        {
+            if (mode == TransportMode) return;
+
+            if (mode == TransportModes.Line)
+            {
+                foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                {
+                    if (!item.IsSelected || item.Transports.Count > 0) continue;
+                    item.Transports.Add(new PoItemTransport
+                    {
+                        Quantity = item.Quantity,
+                        ContractNumber = TransportContractNumber,
+                        TransporterName = TransporterName,
+                        RatePerUnit = TransportRatePerUnit,
+                        Currency = Currency ?? "AED",
+                    });
+                    item.NotifyTransportChanged();
+                }
+            }
+            else
+            {
+                foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                {
+                    item.Transports.Clear();
+                    item.NotifyTransportChanged();
+                }
+            }
+
+            TransportMode = mode;
+            foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                item.IsLineTransport = mode == TransportModes.Line;
+            NotifyCalculationsChanged();
+        }
+
+        /// <summary>The distinct contracts across the lines, for the warning shown when collapsing
+        /// a per-line order back to one contract.</summary>
+        public List<string> DistinctLineContracts()
+        {
+            var seen = new List<string>();
+            foreach (var item in Items ?? Enumerable.Empty<PoRfqItemSelection>())
+            {
+                if (!item.IsSelected) continue;
+                foreach (var t in item.Transports)
+                {
+                    var name = t.ContractNumber?.Trim();
+                    if (string.IsNullOrEmpty(name)) continue;
+                    if (!seen.Contains(name, StringComparer.OrdinalIgnoreCase)) seen.Add(name);
+                }
+            }
+            return seen;
+        }
 
         public string FormattedTransportTotal
         {
@@ -449,7 +625,7 @@ namespace Procure.Models
             Freight = rfq.Freight;
             OtherCharges = rfq.OtherCharges;
             OverallDiscount = rfq.Discount;
-            IsRawMaterial = string.Equals(pr?.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+            IsRawMaterial = IsTransportType(pr?.PrType);
 
             // One resolution pass for the whole quote, so two lines naming the same item claim two
             // different PR lines instead of both latching onto the first.
@@ -558,7 +734,8 @@ namespace Procure.Models
             // pr is a required argument here (unlike the RFQ constructor's optional one) and the
             // body below indexes into it, so the null-conditional was only ever confusing the
             // compiler's flow analysis.
-            IsRawMaterial = string.Equals(pr.PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+            IsRawMaterial = IsTransportType(pr.PrType);
+            TransportMode = string.IsNullOrWhiteSpace(existingPo.TransportMode) ? TransportModes.Order : existingPo.TransportMode;
             TransportContractNumber = existingPo.TransportContractNumber;
             TransporterName = existingPo.TransporterName;
             TransportRatePerUnit = existingPo.TransportRatePerUnit;
@@ -594,6 +771,24 @@ namespace Procure.Models
                         Discount = poItem.Discount,
                         OnPriceOrSelectionChanged = OnItemSelectionOrPriceChanged
                     };
+
+                    foreach (var t in poItem.Transports)
+                    {
+                        itemSelection.Transports.Add(new PoItemTransport
+                        {
+                            Id = t.Id,
+                            PoItemId = poItem.Id,
+                            Quantity = t.Quantity,
+                            ContractNumber = t.ContractNumber,
+                            TransporterName = t.TransporterName,
+                            RatePerUnit = t.RatePerUnit,
+                            SortOrder = t.SortOrder,
+                            Currency = Currency,
+                        });
+                    }
+                    itemSelection.IsLineTransport = TransportMode == TransportModes.Line;
+                    itemSelection.NotifyTransportChanged();
+
                     Items.Add(itemSelection);
                 }
 
@@ -722,6 +917,11 @@ namespace Procure.Models
             OnPropertyChanged(nameof(FormattedDisplayAmount));
             OnPropertyChanged(nameof(FormattedBaseAmount));
             OnPropertyChanged(nameof(FormattedVatAmount));
+            OnPropertyChanged(nameof(TransportTotal));
+            OnPropertyChanged(nameof(FormattedTransportTotal));
+            OnPropertyChanged(nameof(UnallocatedLineCount));
+            OnPropertyChanged(nameof(HasUnallocatedLines));
+            OnPropertyChanged(nameof(UnallocatedLineText));
             OnPropertyChanged(nameof(SelectedItemsCount));
             OnPropertyChanged(nameof(AllItemsSelected));
             OnPropertyChanged(nameof(PricedItemsCount));

@@ -25,7 +25,12 @@ namespace Procure.Models
         public decimal? TransportTotal { get; set; }
         public string Currency { get; set; } = "AED";
 
-        public bool IsRawMaterial => string.Equals(PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase);
+        /// <summary>Raw Material or Packing Material - the two types the Raw &amp; Packing tab covers,
+        /// and the two that carry transport. Packing Material used to be excluded here, so a packing
+        /// PO could not record a transport contract at all.</summary>
+        public bool IsRawMaterial =>
+            string.Equals(PrType, ProcurementPrType.RawMaterial, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(PrType, ProcurementPrType.PackingMaterial, StringComparison.OrdinalIgnoreCase);
         public bool HasTransportDetails => IsRawMaterial && (TransportRatePerUnit.HasValue || TransportTotal.HasValue
             || !string.IsNullOrWhiteSpace(TransportContractNumber) || !string.IsNullOrWhiteSpace(TransporterName));
         public bool HasTransportContractNumber => !string.IsNullOrWhiteSpace(TransportContractNumber);

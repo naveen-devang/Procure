@@ -36,6 +36,21 @@ sealed class BytesToImageConverter : IValueConverter
 
 /// <summary>value == ConverterParameter -> accent Background for a segmented-choice button,
 /// else the subtle fill. Replaces the MAUI border-width-on-equality trick.</summary>
+/// <summary>Foreground for a segmented pill, paired with SegmentedSelectionBrushConverter: the
+/// selected one is filled with the accent, so its label has to be the on-accent colour or it
+/// disappears into the fill.</summary>
+sealed class SegmentedSelectionTextConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l) =>
+        string.Equals(value?.ToString(), p?.ToString(), StringComparison.OrdinalIgnoreCase)
+            ? Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"] as Brush
+              ?? new SolidColorBrush(Microsoft.UI.Colors.White)
+            : Application.Current.Resources["AppTextPrimary"] as Brush
+              ?? new SolidColorBrush(Microsoft.UI.Colors.Gray);
+
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}
+
 sealed class SegmentedSelectionBrushConverter : IValueConverter
 {
     public object Convert(object value, Type t, object p, string l) =>

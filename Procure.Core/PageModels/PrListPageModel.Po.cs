@@ -500,6 +500,129 @@ namespace Procure.PageModels
             RecalculatePoModalTotals();
         }
 
+        // ---- transport: whole order vs per line ----
+
+        private PoRfqSelection? CardFor(PoRfqItemSelection row) =>
+            PoRfqSelections?.FirstOrDefault(c => c.Items != null && c.Items.Contains(row));
+
+        /// <summary>Switches one supplier card between one contract for the whole order and one per
+        /// line. Collapsing back asks first when the lines carry more than one contract, because
+        /// that is the only direction that loses something. Not a command: the dialog needs to pass
+        /// both the card and the mode, and a RelayCommand takes one parameter.</summary>
+        public async Task SetTransportModeAsync(PoRfqSelection? card, string mode)
+        {
+            if (card == null) return;
+            mode = mode == TransportModes.Line ? TransportModes.Line : TransportModes.Order;
+            if (card.TransportMode == mode) return;
+
+            if (mode == TransportModes.Order)
+            {
+                var contracts = card.DistinctLineContracts();
+                if (contracts.Count > 1)
+                {
+                    var ok = await _dialogs.DisplayAlertAsync(
+                        "One contract for the whole order?",
+                        $"These lines carry {contracts.Count} different contracts ({string.Join(", ", contracts)}). " +
+                        "Switching back keeps only the order-level contract and clears the per-line ones.",
+                        "Switch", "Cancel");
+                    if (!ok) return;
+                }
+            }
+
+            card.SwitchTransportMode(mode);
+            RecalculatePoModalTotals();
+        }
+
+        /// <summary>Opens or closes a line's allocation panel.</summary>
+        [RelayCommand]
+        public void ToggleLineTransport(PoRfqItemSelection? row)
+        {
+            if (row == null) return;
+            row.IsTransportExpanded = !row.IsTransportExpanded;
+            if (row.IsTransportExpanded && row.Transports.Count == 0) AddLineTransport(row);
+        }
+
+        /// <summary>Adds a contract to a line, defaulted to whatever quantity has none yet - so the
+        /// first one covers the whole line and a split starts from the remainder.</summary>
+        [RelayCommand]
+        public void AddLineTransport(PoRfqItemSelection? row)
+        {
+            if (row == null) return;
+            var card = CardFor(row);
+            row.Transports.Add(new PoItemTransport
+            {
+                PoItemId = row.Id,
+                Quantity = Math.Max(0m, row.UnallocatedQuantity),
+                RatePerUnit = card?.TransportRatePerUnit,
+                ContractNumber = row.Transports.Count == 0 ? card?.TransportContractNumber : null,
+                TransporterName = row.Transports.Count == 0 ? card?.TransporterName : null,
+                Currency = card?.Currency ?? "AED",
+            });
+            row.NotifyTransportChanged();
+            card?.NotifyCalculationsChanged();
+            RecalculatePoModalTotals();
+        }
+
+        /// <summary>An allocation's boxes are bound to the allocation, not the line, so editing one
+        /// tells the line's running total nothing. The dialog calls this after every keystroke and
+        /// it finds the owning line rather than the view having to walk the tree.</summary>
+        public void NotifyTransportEdited(PoItemTransport? allocation)
+        {
+            if (allocation == null || PoRfqSelections == null) return;
+            foreach (var card in PoRfqSelections)
+            {
+                foreach (var row in card.Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                {
+                    if (!row.Transports.Contains(allocation)) continue;
+                    row.NotifyTransportChanged();
+                    card.NotifyCalculationsChanged();
+                    RecalculatePoModalTotals();
+                    return;
+                }
+            }
+        }
+
+        [RelayCommand]
+        public void RemoveLineTransport(PoItemTransport? allocation)
+        {
+            if (allocation == null || PoRfqSelections == null) return;
+            foreach (var card in PoRfqSelections)
+            {
+                foreach (var row in card.Items ?? Enumerable.Empty<PoRfqItemSelection>())
+                {
+                    if (!row.Transports.Remove(allocation)) continue;
+                    row.NotifyTransportChanged();
+                    card.NotifyCalculationsChanged();
+                    RecalculatePoModalTotals();
+                    return;
+                }
+            }
+        }
+
+        /// <summary>Puts the order-level contract on every line that has none - the common start for
+        /// a per-line order, where most lines share a contract and one or two differ.</summary>
+        [RelayCommand]
+        public void FillLinesFromOrderTransport(PoRfqSelection? card)
+        {
+            if (card?.Items == null) return;
+            foreach (var row in card.Items.Where(i => i.IsSelected))
+            {
+                if (row.Transports.Count == 0)
+                {
+                    row.Transports.Add(new PoItemTransport { PoItemId = row.Id, Quantity = row.Quantity, Currency = card.Currency ?? "AED" });
+                }
+                foreach (var t in row.Transports)
+                {
+                    t.ContractNumber = card.TransportContractNumber;
+                    t.TransporterName = card.TransporterName;
+                    t.RatePerUnit ??= card.TransportRatePerUnit;
+                }
+                row.NotifyTransportChanged();
+            }
+            card.NotifyCalculationsChanged();
+            RecalculatePoModalTotals();
+        }
+
         [RelayCommand]
         public async Task GoToPoStep2Async()
         {
@@ -664,17 +787,21 @@ namespace Procure.PageModels
             po.VatType = rfqSel.VatType;
 
             // Transport is never folded into po.Value/BaseAmount above - stored and shown separately.
-            po.TransportContractNumber = rfqSel.IsRawMaterial ? rfqSel.TransportContractNumber?.Trim() : null;
-            po.TransporterName = rfqSel.IsRawMaterial ? rfqSel.TransporterName?.Trim() : null;
-            po.TransportRatePerUnit = rfqSel.IsRawMaterial ? rfqSel.TransportRatePerUnit : null;
-            po.TransportTotal = rfqSel.IsRawMaterial ? rfqSel.TransportTotal : null;
+            // Whole-order mode fills the four columns; per-line leaves them null and writes an
+            // allocation per line instead, so only one of the two ever holds the truth.
+            var wholeOrder = rfqSel.IsRawMaterial && rfqSel.IsOrderTransport;
+            po.TransportMode = rfqSel.IsRawMaterial ? rfqSel.TransportMode : TransportModes.Order;
+            po.TransportContractNumber = wholeOrder ? rfqSel.TransportContractNumber?.Trim() : null;
+            po.TransporterName = wholeOrder ? rfqSel.TransporterName?.Trim() : null;
+            po.TransportRatePerUnit = wholeOrder ? rfqSel.TransportRatePerUnit : null;
+            po.TransportTotal = wholeOrder ? rfqSel.TransportTotal : null;
 
             po.Items.Clear();
             if (rfqSel.HasItems)
             {
                 foreach (var itemSel in rfqSel.Items.Where(i => i.IsSelected))
                 {
-                    po.Items.Add(new PurchaseOrderItem
+                    var poItem = new PurchaseOrderItem
                     {
                         Id = freshItemIds ? Guid.NewGuid() : itemSel.Id,
                         PoId = po.Id,
@@ -685,7 +812,27 @@ namespace Procure.PageModels
                         Unit = itemSel.Unit,
                         UnitPrice = itemSel.QuotedUnitPrice,
                         Discount = itemSel.Discount
-                    });
+                    };
+
+                    if (po.IsLineTransport)
+                    {
+                        foreach (var t in itemSel.Transports)
+                        {
+                            poItem.Transports.Add(new PoItemTransport
+                            {
+                                Id = freshItemIds ? Guid.NewGuid() : t.Id,
+                                PoItemId = poItem.Id,
+                                Quantity = t.Quantity,
+                                ContractNumber = t.ContractNumber?.Trim(),
+                                TransporterName = t.TransporterName?.Trim(),
+                                RatePerUnit = t.RatePerUnit,
+                                SortOrder = t.SortOrder,
+                                Currency = po.Currency ?? "AED",
+                            });
+                        }
+                    }
+
+                    po.Items.Add(poItem);
                 }
             }
         }

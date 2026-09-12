@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 16;
+        public const int SchemaVersion = 17;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -234,7 +234,10 @@ CREATE TABLE IF NOT EXISTS PurchaseOrder (
     TransportContractNumber TEXT,
     TransporterName TEXT,
     TransportRatePerUnit REAL,
-    TransportTotal REAL
+    TransportTotal REAL,
+    -- v17: 'Order' (one contract for the whole PO, the four columns above) or 'Line'
+    -- (each line carries its own, in PoItemTransport). Existing orders are 'Order'.
+    TransportMode TEXT DEFAULT 'Order'
 );
 CREATE INDEX IF NOT EXISTS IX_PO_PrId ON PurchaseOrder(PrId);
 CREATE INDEX IF NOT EXISTS IX_PO_LinkedRfqId ON PurchaseOrder(LinkedRfqId);
@@ -256,6 +259,20 @@ CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
 -- v12: Raw & Packing groups by material name and fetches one material's lines on expand; both
 -- want the name ordered rather than scanned and sorted into a temp B-tree.
 CREATE INDEX IF NOT EXISTS IX_PoItem_ItemName ON PurchaseOrderItem(ItemName);
+
+-- v17: transport arranged per PO line. One row per contract a line's quantity moves under -
+-- normally one, two when a quantity is split across contracts. Only populated for orders in
+-- TransportMode 'Line'; a whole-order PO keeps using PurchaseOrder's four transport columns.
+CREATE TABLE IF NOT EXISTS PoItemTransport (
+    Id              TEXT PRIMARY KEY,
+    PoItemId        TEXT NOT NULL REFERENCES PurchaseOrderItem(Id) ON DELETE CASCADE,
+    Quantity        REAL NOT NULL DEFAULT 0,
+    ContractNumber  TEXT,
+    TransporterName TEXT,
+    RatePerUnit     REAL,
+    SortOrder       INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS IX_PoItemTransport_PoItemId ON PoItemTransport(PoItemId);
 
 -- v13: the Raw & Packing tab's collapsed rows, denormalised. Computing them live meant one
 -- GROUP BY over every eligible PO item on every open - 244ms at 20,000 PRs and linear from
