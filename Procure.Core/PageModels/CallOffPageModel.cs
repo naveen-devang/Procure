@@ -93,9 +93,13 @@ namespace Procure.PageModels
 
         private void OnDataChanged(Utilities.ProcurementChange what)
         {
-            // Only PO writes can move what this tab reads (it summarises PO items and their
-            // call-offs), so a PR rename or a quote edit costs nothing here.
-            if ((what & Utilities.ProcurementChange.Po) == 0) return;
+            // PO writes move what this tab reads, and so do PR writes: the query is filtered by
+            // pr.PrType, so switching a requisition to or from Raw / Packing Material adds or
+            // removes its PO items here. That was missed, and since this page model is a DI
+            // singleton the tab stayed stale for the rest of the session - change a PR's type and
+            // it never appeared. A quote edit still costs nothing.
+            const Utilities.ProcurementChange Watched = Utilities.ProcurementChange.Po | Utilities.ProcurementChange.Pr;
+            if ((what & Watched) == 0) return;
 
             _loaded = false;
             if (IsVisible) _ = LoadAsync(force: true);
