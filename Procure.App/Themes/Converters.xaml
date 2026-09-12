@@ -39,4 +39,5 @@
     <conv:NumericTextConverter x:Key="Num" />
     <conv:AllocationColorConverter x:Key="AllocColor" />
     <conv:SegmentedSelectionTextConverter x:Key="SegText" />
+    <conv:PixelsToGridLengthConverter x:Key="Px" />
 </ResourceDictionary>

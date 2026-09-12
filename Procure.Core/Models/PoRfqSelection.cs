@@ -87,7 +87,11 @@ namespace Procure.Models
         /// <summary>Mirrors the order's transport mode. Set by PoRfqSelection whenever the mode
         /// changes, because a line's DataTemplate cannot bind up to the card that owns it.</summary>
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(TransportColumnWidth))]
         public partial bool IsLineTransport { get; set; }
+
+        /// <summary>Matches the card's, so a row's cells line up with the headings above them.</summary>
+        public double TransportColumnWidth => IsLineTransport ? 150d : 0d;
 
         /// <summary>Called after any allocation edit: the totals above are plain computed properties
         /// over a collection, so nothing tells the UI on its own.</summary>
@@ -381,11 +385,17 @@ namespace Procure.Models
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsLineTransport))]
         [NotifyPropertyChangedFor(nameof(IsOrderTransport))]
+        [NotifyPropertyChangedFor(nameof(TransportColumnWidth))]
         [NotifyPropertyChangedFor(nameof(FormattedTransportTotal))]
         public partial string TransportMode { get; set; } = TransportModes.Order;
 
         public bool IsLineTransport => TransportMode == TransportModes.Line;
         public bool IsOrderTransport => !IsLineTransport;
+
+        /// <summary>The Transport column's width, on the header and on every row alike. Auto sized
+        /// to the heading in one and to a wider chip in the other, so the cells drifted out of line
+        /// with their headings. Zero in whole-order mode, where the column does not exist.</summary>
+        public double TransportColumnWidth => IsLineTransport ? 150d : 0d;
 
         [ObservableProperty]
         public partial string? TransportContractNumber { get; set; }

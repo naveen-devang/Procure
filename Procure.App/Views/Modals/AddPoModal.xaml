@@ -287,7 +287,7 @@
                                                             <ColumnDefinition Width="85" />
                                                             <ColumnDefinition Width="100" />
                                                             <ColumnDefinition Width="28" />
-                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Grid.Column="1" Text="ITEM" />
                                                         <TextBlock Grid.Column="2" Text="QTY" />
@@ -314,7 +314,7 @@
                                                                             <ColumnDefinition Width="85" />
                                                                             <ColumnDefinition Width="100" />
                                                                             <ColumnDefinition Width="28" />
-                                                                            <ColumnDefinition Width="Auto" />
+                                                                            <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
                                                                         </Grid.ColumnDefinitions>
                                                                         <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
@@ -338,6 +338,8 @@
                                                                         <Button Grid.Column="8" MinWidth="130" Height="28" Padding="10,0" CornerRadius="10"
                                                                                 FontSize="11" VerticalAlignment="Center"
                                                                                 Content="{x:Bind TransportSummary, Mode=OneWay}"
+                                                                                ToolTipService.ToolTip="{x:Bind TransportSummary, Mode=OneWay}"
+                                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                                                                 Foreground="{x:Bind HasTransport, Converter={StaticResource ChipText}, Mode=OneWay}"
                                                                                 Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}"
                                                                                 Click="LineTransport_Click" />

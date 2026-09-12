@@ -97,3 +97,13 @@ public sealed class AllocationColorConverter : IValueConverter
 
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }
+
+/// <summary>Pixel count -> GridLength. Procure.Core is UI-framework-free, so a column width that
+/// the view model decides comes across as a plain number.</summary>
+public sealed class PixelsToGridLengthConverter : IValueConverter
+{
+    public object Convert(object value, Type t, object p, string l) =>
+        new GridLength(value is double d ? d : 0d, GridUnitType.Pixel);
+
+    public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
+}
