@@ -116,19 +116,25 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:MaterialGroup">
-                            <Border Padding="12,10" BorderThickness="1" CornerRadius="8"
+                            <!-- The whole card toggles, not just the title row. The tap used to sit on
+                                 the header Grid alone, so clicking the progress bar, the vendor count
+                                 or anywhere in the card's padding did nothing - which reads as a dead
+                                 card, since none of that text is selectable either. A line row inside
+                                 marks its own tap handled, so expanding does not make the lines
+                                 collapse the group. -->
+                            <Border Padding="12,10" BorderThickness="1" CornerRadius="8" Tapped="Group_Tapped"
                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                <Border.Resources>
+                                    <!-- Clicked, not read (see Styles.xaml). -->
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                                </Border.Resources>
                                 <StackPanel Spacing="8">
                                     <StackPanel.ChildrenTransitions>
                                         <TransitionCollection>
                                             <RepositionThemeTransition />
                                         </TransitionCollection>
                                     </StackPanel.ChildrenTransitions>
-                                    <Grid ColumnSpacing="8" Tapped="Group_Tapped" Background="Transparent">
-                                        <Grid.Resources>
-                                            <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
-                                        </Grid.Resources>
+                                    <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
