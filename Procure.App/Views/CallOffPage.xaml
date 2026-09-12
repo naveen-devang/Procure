@@ -85,7 +85,8 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBox PlaceholderText="Search material, vendor, PO" FontSize="12.5" Height="34"
+                    <TextBox PlaceholderText="Search material, vendor, PO, PR, contract" FontSize="12" Height="34"
+                             ToolTipService.ToolTip="Matches material, vendor, PO number, PR number, transport contract or transporter"
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Grid.Column="1" Style="{StaticResource ToolbarIcon}"
                             Content="{Binding SortOrderGlyph}" Command="{Binding ToggleSortOrderCommand}"

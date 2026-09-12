@@ -22,6 +22,21 @@ namespace Procure.Data.Repositories
         //
         // Search matches material, vendor or PO number but still returns one row per material: a
         // vendor-name hit has to surface the material group that contains it.
+        /// <summary>What the search box matches: the material, the supplier, the PO and PR numbers,
+        /// and the transport contract or transporter - which live on the order when its transport is
+        /// arranged for the whole PO and on the line when it is arranged per line, so both are
+        /// checked. One definition, shared by the summary and the line queries.</summary>
+        private const string SearchMatch = @"
+       poi.ItemName LIKE @q ESCAPE '\'
+    OR po.Vendor LIKE @q ESCAPE '\'
+    OR po.PoNo LIKE @q ESCAPE '\'
+    OR pr.PrNo LIKE @q ESCAPE '\'
+    OR po.TransportContractNumber LIKE @q ESCAPE '\'
+    OR po.TransporterName LIKE @q ESCAPE '\'
+    OR EXISTS (SELECT 1 FROM PoItemTransport t
+               WHERE t.PoItemId = poi.Id
+                 AND (t.ContractNumber LIKE @q ESCAPE '\' OR t.TransporterName LIKE @q ESCAPE '\'))";
+
         private const string EligibleLines = @"
 FROM PurchaseOrderItem poi
 JOIN PurchaseOrder po ON poi.PoId = po.Id
@@ -63,7 +78,7 @@ SELECT TRIM(poi.ItemName) AS M,
        MIN(COALESCE(NULLIF(poi.Unit, ''), 'pcs')),
        MAX(COALESCE(po.Date, ''))
 " + EligibleLines + @"
-  AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')
+  AND (" + SearchMatch + @")
 GROUP BY M COLLATE NOCASE
 ORDER BY M COLLATE NOCASE ASC;";
                 cmd.Parameters.AddWithValue("@q", "%" + EscapeLike(term!) + "%");
@@ -109,7 +124,7 @@ SELECT poi.Id, poi.ItemName, poi.Quantity, poi.Unit, po.Vendor, po.PoNo,
 " + EligibleLines + @"
   AND TRIM(poi.ItemName) = @material COLLATE NOCASE" + (filtered
                 ? @"
-  AND (poi.ItemName LIKE @q ESCAPE '\' OR po.Vendor LIKE @q ESCAPE '\' OR po.PoNo LIKE @q ESCAPE '\')"
+  AND (" + SearchMatch + @")"
                 : string.Empty) + @"
 ORDER BY (CASE WHEN poi.Quantity > 0
                THEN MIN(1.0, COALESCE((SELECT SUM(Quantity) FROM PoItemCallOff WHERE PoItemId = poi.Id), 0) / poi.Quantity)
