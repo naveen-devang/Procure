@@ -186,9 +186,13 @@
 
                 <!-- Pinned, not the last child of the ScrollViewer: on a PR with a few line items
                      the primary action scrolled out of sight with nothing to say it was there. -->
-                <Grid Grid.Row="2" Padding="0,14,0,0">
-                    <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource AppHairline}" />
-                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                <Grid Grid.Row="2" RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Height="1" Background="{ThemeResource AppHairline}" />
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
                         <Button Content="Cancel" Command="{Binding CloseEditModalCommand}" />
                         <Button Content="Save Requisition" Style="{StaticResource AccentButtonStyle}" Command="{Binding SavePrModalCommand}" />
                     </StackPanel>

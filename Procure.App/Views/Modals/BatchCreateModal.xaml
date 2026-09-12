@@ -247,16 +247,20 @@
                     </ScrollViewer>
                 </Grid>
 
-                <Grid Grid.Row="4" Margin="0,4,0,0" Padding="0,14,0,0">
+                <Grid Grid.Row="4" Margin="0,4,0,0" RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Border Grid.ColumnSpan="2" Height="1" VerticalAlignment="Top" Background="{ThemeResource AppHairline}" />
-                    <TextBlock Text="{Binding BatchEntriesSummary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                    <Border Grid.ColumnSpan="2" Height="1" Background="{ThemeResource AppHairline}" />
+                    <TextBlock Grid.Row="1" Text="{Binding BatchEntriesSummary}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
                                Foreground="{ThemeResource AppTextSecondary}"
                                Visibility="{Binding IsBulkMode, Converter={StaticResource BoolVis}}" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10">
                         <Button Content="Cancel" Command="{Binding CloseBatchCreateModalCommand}" />
                         <Button Content="{Binding SaveButtonText}" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveBatchPrsModalCommand}" />
                     </StackPanel>
