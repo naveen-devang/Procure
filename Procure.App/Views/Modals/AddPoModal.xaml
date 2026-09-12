@@ -224,7 +224,8 @@
                                                             </Grid.ColumnDefinitions>
                                                             <StackPanel Spacing="4">
                                                                 <TextBlock Text="Contract Number" Style="{StaticResource Lbl}" />
-                                                                <TextBox Text="{x:Bind TransportContractNumber, Mode=TwoWay}" PlaceholderText="e.g. TC-2026-014" FontSize="12" />
+                                                                <TextBox Text="{x:Bind TransportContractNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                         PlaceholderText="e.g. TC-2026-014" FontSize="12" TextChanged="OrderTransportEdited" />
                                                             </StackPanel>
                                                             <StackPanel Grid.Column="1" Spacing="4">
                                                                 <TextBlock Text="Transporter Name" Style="{StaticResource Lbl}" />
