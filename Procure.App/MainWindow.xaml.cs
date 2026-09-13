@@ -73,7 +73,7 @@ public sealed partial class MainWindow : Window
         RefreshThemeState();   // caption button colours right from the first frame, not after activation
         if (Content is FrameworkElement c) _shell.WatchOsTheme?.Invoke(c);
 
-        NavigateTo(AppRoute.Board, null);
+        NavigateTo(AppRoute.Dashboard, null);   // the page the app opens on, as in the MAUI app
     }
 
     private bool _themeApplied;
@@ -173,6 +173,11 @@ public sealed partial class MainWindow : Window
 
         if (route == AppRoute.Board && param == "new" && PrListPageModel.Current is { } b)
             b.ActionParam = "new";
+
+        // Several linked record numbers: any one of them should surface, not all at once.
+        if (route == AppRoute.Board && param?.StartsWith(WinUiNavigationService.SearchParamPrefix, StringComparison.Ordinal) == true
+            && PrListPageModel.Current is { } board)
+            board.SearchAnyOf(param[WinUiNavigationService.SearchParamPrefix.Length..]);
 
         foreach (var item in EnumerateNavItems())
             if (item.Tag as string == route.ToString()) { Nav.SelectedItem = item; break; }

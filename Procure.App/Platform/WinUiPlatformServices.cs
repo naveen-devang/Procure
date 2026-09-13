@@ -94,11 +94,14 @@ public sealed class WinUiNavigationService : INavigationService
         return Task.CompletedTask;
     }
 
+    internal const string SearchParamPrefix = "search:";
+
     public Task GoToBoardWithSearchAsync(string search)
     {
-        Navigate?.Invoke(AppRoute.Board, null);
-        // Several linked record numbers: any one of them should surface, not all at once.
-        if (PrListPageModel.Current is { } board) board.SearchAnyOf(search);
+        // Applied by the navigation itself, once the board exists. The app opens on the Dashboard, so
+        // the board may not have been created yet at this point - searching it here found no board
+        // and dropped the search.
+        Navigate?.Invoke(AppRoute.Board, SearchParamPrefix + search);
         return Task.CompletedTask;
     }
 }

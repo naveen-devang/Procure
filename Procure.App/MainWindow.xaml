@@ -57,31 +57,36 @@
                             <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#161619" />
                         </ResourceDictionary>
                     </ResourceDictionary.ThemeDictionaries>
+                    <!-- The MAUI app's navigation icon font (FluentSystemIcons-Regular). -->
+                    <FontFamily x:Key="NavIconFont">ms-appx:///Assets/Fonts/FluentSystemIcons-Regular.ttf#FluentSystemIcons-Regular</FontFamily>
                 </ResourceDictionary>
             </muxc:NavigationView.Resources>
 
+            <!-- Same order and icons as the MAUI app (AppShell.xaml / App.xaml there): Dashboard first -
+                 it is the page the app opens on - and the Fluent UI System Icons it used, from the same
+                 font file, rather than Segoe symbol stand-ins. -->
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItemHeader Content="Workspace" />
-                <muxc:NavigationViewItem Content="PR Board" Tag="Board" IsSelected="True">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="ViewAll" /></muxc:NavigationViewItem.Icon>
+                <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard" IsSelected="True">
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF35A;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
-                <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></muxc:NavigationViewItem.Icon>
+                <muxc:NavigationViewItem Content="PR Board" Tag="Board">
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF379;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="CallOff">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></muxc:NavigationViewItem.Icon>
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xE218;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItemHeader Content="Planning" />
                 <muxc:NavigationViewItem Content="Tasks" Tag="Tasks">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="List" /></muxc:NavigationViewItem.Icon>
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xEC93;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItem Content="Notes" Tag="Notes">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Page2" /></muxc:NavigationViewItem.Icon>
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF577;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.MenuItems>
             <muxc:NavigationView.FooterMenuItems>
                 <muxc:NavigationViewItem Content="Settings" Tag="Settings">
-                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></muxc:NavigationViewItem.Icon>
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF6AA;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.FooterMenuItems>
 
