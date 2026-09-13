@@ -912,18 +912,88 @@ namespace Procure.Data
             var widePng = await wideSource.RenderAsync(0);
             Assert(widePng.Length > 8 && widePng[0] == 0x89, "the fitted twelve-supplier sheet renders");
 
-            // Print resolution follows the sheet's smallest text: a normal sheet stays at 300 DPI, a
-            // sheet shrunk for many suppliers goes up to 600, and never past what the printer prints.
-            var fullDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5, 0);
-            Assert(fullDpi == 300, $"a full-size sheet prints at 300 DPI, as it always has; got {fullDpi}");
-            var eightDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(6.2, 0);
-            Assert(eightDpi == 300, $"6.2 pt text (about eight suppliers on A4) still prints at 300 DPI; got {eightDpi}");
-            var wideDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5 * twelveScale, 0);
-            Assert(wideDpi == 600, $"twelve suppliers on A4 ({7.5 * twelveScale:0.0} pt text) print at 600 DPI; got {wideDpi}");
-            var cappedDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5 * twelveScale, 300);
+            // Prints go out black and white at 600 DPI - never past the printer's own resolution - and
+            // neither A4 nor A3 is held down by the render size cap.
+            var wideDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(0);
+            Assert(wideDpi == 600, $"a print is rendered at 600 DPI; got {wideDpi}");
+            var cappedDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(300);
             Assert(cappedDpi == 300, $"but never past a 300 DPI printer's own resolution; got {cappedDpi}");
-            var printSource = await Services.Export.PcrPdfPageSource.OpenAsync(wide, wideDpi);
-            Assert(Math.Abs(printSource.EffectiveDpi - 600) < 0.01, $"A4 is not held down by the render size cap at 600 DPI; got {printSource.EffectiveDpi:0}");
+            using (var printSource = await Services.Export.PcrPdfPageSource.OpenAsync(wide, wideDpi))
+            {
+                Assert(Math.Abs(printSource.EffectiveDpi - 600) < 0.01, $"A4 prints at the full 600 DPI; got {printSource.EffectiveDpi:0}");
+                var mono = await printSource.RenderMonochromeAsync(0);
+                // 842 x 595 pt at 600 DPI.
+                Assert(mono.Width == 7017 && mono.Height == 4958 && mono.Bits.Length == mono.Stride * mono.Height,
+                    $"an A4 landscape page renders black and white at 7017x4958; got {mono.Width}x{mono.Height}");
+                long black = 0;
+                foreach (var b in mono.Bits) black += 8 - System.Numerics.BitOperations.PopCount(b);
+                var inkShare = black / (double)(mono.Width * (long)mono.Height);
+                Assert(inkShare is > 0.005 and < 0.5, $"and carries the sheet - some ink, mostly paper; got {inkShare:P1} black");
+
+                // Two corners saved beside the check's logs, so a person can look at exactly what a printer
+                // receives: the top-left (title, headings, first rows) and the right-hand vendor columns.
+                foreach (var (name, left, top) in new[] { ("pcr-print-left.png", 0, 0), ("pcr-print-right.png", mono.Width - 2400, 0) })
+                {
+                    const int cw = 2400, ch = 1400;
+                    var bgra = new byte[cw * ch * 4];
+                    for (int y = 0; y < ch; y++)
+                        for (int x = 0; x < cw; x++)
+                        {
+                            var sx = left + x; var sy = top + y;
+                            var white = (mono.Bits[sy * mono.Stride + (sx >> 3)] & (0x80 >> (sx & 7))) != 0;
+                            var o = (y * cw + x) * 4;
+                            bgra[o] = bgra[o + 1] = bgra[o + 2] = white ? (byte)255 : (byte)0; bgra[o + 3] = 255;
+                        }
+                    using var dumpStream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                    var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, dumpStream);
+                    encoder.SetPixelData(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, Windows.Graphics.Imaging.BitmapAlphaMode.Ignore,
+                        cw, ch, mono.Dpi, mono.Dpi, bgra);
+                    await encoder.FlushAsync();
+                    var png = new byte[dumpStream.Size];
+                    using var reader = new Windows.Storage.Streams.DataReader(dumpStream.GetInputStreamAt(0));
+                    await reader.LoadAsync((uint)dumpStream.Size);
+                    reader.ReadBytes(png);
+                    await System.IO.File.WriteAllBytesAsync(System.IO.Path.Combine(DatabaseConstants.DatabaseDirectory, name), png);
+                }
+            }
+            var a3Wide = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, twelve, "fit check",
+                Opts(Services.Export.PdfPaperSize.A3, Services.Export.PdfOrientation.Landscape));
+            using (var a3Source = await Services.Export.PcrPdfPageSource.OpenAsync(a3Wide, wideDpi))
+                Assert(Math.Abs(a3Source.EffectiveDpi - 600) < 0.01, $"A3 prints at the full 600 DPI too; got {a3Source.EffectiveDpi:0}");
+
+            // The fit-to-one-page shrink is part of how small the text prints.
+            var onePage = Services.Export.PcrPdfExporter.GeneratePdfDocument(read, read.Pcr ?? pcr, twelve, "fit check",
+                a4Land with { LayoutMode = Services.Export.PdfLayoutMode.ShrinkToFit });
+            var fitOnly = Services.Export.PcrPdfExporter.GeneratePdfDocument(read, read.Pcr ?? pcr, twelve, "fit check", a4Land);
+            Assert(Math.Abs(fitOnly.TextScale - twelveScale) < 0.0001, $"without fit-to-one-page the reported scale is the width fit; got {fitOnly.TextScale:P1} vs {twelveScale:P1}");
+            Assert(onePage.TextScale <= fitOnly.TextScale, $"with it the reported scale includes that extra shrink; got {onePage.TextScale:P1} vs {fitOnly.TextScale:P1}");
+
+            // A long run of RFQ numbers wraps onto more lines at full size instead of being squeezed
+            // onto one and running off the page; a one-word vendor name is broken across the heading
+            // instead of being cut off with "..".
+            var savedNos = rfqs.Select(r => r.RfqNo).ToList();
+            var savedVendor = rfqs[0].Vendor;
+            try
+            {
+                // No long shared prefix, so the sheet cannot shorten them into one compact run.
+                for (int i = 0; i < rfqs.Count; i++) rfqs[i].RfqNo = $"RFQ-{(char)('K' + i)}{(i + 3) * 7919 % 99991:D5}-PROCUREMENT";
+                rfqs[0].Vendor = "InternationalIndustrialTradingCompanyLLC";
+                var fifteen = Cycle(15);
+                var longText = System.Text.Encoding.Latin1.GetString(
+                    Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, fifteen, "wrap check", a4Land));
+                var rfqLines = System.Text.RegularExpressions.Regex.Matches(longText, @"\([^()]*PROCUREMENT[^()]*\) Tj").Count;
+                Assert(rfqLines >= 2, $"fifteen long RFQ numbers wrap onto more than one line; got {rfqLines} line(s)");
+                var rfqFont = System.Text.RegularExpressions.Regex.Match(longText, @"/F2 (\d+\.\d) Tf\s+[\d. ]+rg\s+[\d. ]+Td\s+\(RFQ Number");
+                Assert(rfqFont.Success && rfqFont.Groups[1].Value == "8.5", $"at the normal 8.5 pt, not shrunk; got {(rfqFont.Success ? rfqFont.Groups[1].Value : "no match")}");
+                Assert(!System.Text.RegularExpressions.Regex.IsMatch(longText, @"\(International[^()]*\.\.\) Tj"),
+                    "a one-word vendor name is not cut off with an ellipsis");
+                Assert(longText.Contains("(International"), "and its first part is in the heading");
+            }
+            finally
+            {
+                for (int i = 0; i < rfqs.Count; i++) rfqs[i].RfqNo = savedNos[i];
+                rfqs[0].Vendor = savedVendor;
+            }
 
             // The preview's sharp zoom draws just a region of the page, at exactly the size asked for.
             var (pw, ph) = wideSource.PageSizeDips(0);

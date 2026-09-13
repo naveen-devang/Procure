@@ -469,6 +469,7 @@ namespace Procure.PageModels
             PcrPreviewPages.Clear();
             PcrPreviewCurrentPage = null;
             _pcrPreviewBytes = null;
+            PcrPreviewSource?.Dispose();
             PcrPreviewSource = null;
             _pcrPreviewPr = null;
             _pcrPreviewRfqs = null;
@@ -623,6 +624,9 @@ namespace Procure.PageModels
         /// <summary>The previewed PDF, open. The preview reads it to draw the visible part of a page
         /// sharply when zoomed in past what the page image holds.</summary>
         public PcrPdfPageSource? PcrPreviewSource { get; private set; }
+
+        // How small the previewed sheet's text prints overall (see PcrPdfExporter.PcrPdfDocument).
+        private double _pcrPreviewTextScale = 1.0;
         private PurchaseRequisition? _pcrPreviewPr;
         private List<RequestForQuotation>? _pcrPreviewRfqs;
         private string _pcrPreviewRemarksSnapshot = string.Empty;
@@ -738,19 +742,22 @@ namespace Procure.PageModels
         /// <summary>"scaled to 62% ... text prints at about 4.6 pt", plus a warning and a paper that
         /// would do better when that is too small. Empty at full size. Uses the exporter's own scale
         /// calculation, so it describes exactly the sheet being previewed.</summary>
-        private static string PcrFitNote(PurchaseRequisition pr, IReadOnlyList<RequestForQuotation> rfqs, PcrPdfOptions options)
+        private static string PcrFitNote(PurchaseRequisition pr, PriceComparisonRequest pcr, IReadOnlyList<RequestForQuotation> rfqs,
+            string remarks, PcrPdfOptions options, double scale)
         {
             const double bodyPt = 7.5;   // the sheet's item and price text
-            var scale = Services.Export.PcrPdfExporter.PrintScaleFor(pr, rfqs, options);
             if (scale >= 1.0) return string.Empty;
 
+            // The scale is the one the sheet was actually generated with - fitting every supplier across
+            // the page and fitting the sheet to one page, together - so the size quoted is what prints.
             var printedPt = bodyPt * scale;
-            var note = $" - scaled to {scale:P0} so all {rfqs.Count} suppliers fit across the page; text prints at about {printedPt:0.0} pt.";
+            var why = rfqs.Count > PcrPdfExporter.FullSizeSupplierLimit ? $"so all {rfqs.Count} suppliers fit" : "to fit";
+            var note = $" - scaled to {scale:P0} {why}; text prints at about {printedPt:0.0} pt.";
             if (printedPt >= PcrReadablePrintedPt) return note;
 
             note += " That is hard to read.";
             var a3 = options with { PaperSize = PdfPaperSize.A3, Orientation = PdfOrientation.Landscape };
-            var a3Pt = bodyPt * Services.Export.PcrPdfExporter.PrintScaleFor(pr, rfqs, a3);
+            var a3Pt = bodyPt * PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, a3).TextScale;
             bool alreadyA3OrBigger = options.Orientation == PdfOrientation.Landscape
                 && options.PaperSize is PdfPaperSize.A3 or PdfPaperSize.A2 or PdfPaperSize.A1 or PdfPaperSize.A0 or PdfPaperSize.Tabloid;
             return alreadyA3OrBigger || a3Pt <= printedPt + 0.05
@@ -779,19 +786,23 @@ namespace Procure.PageModels
                 // The PDF itself is cheap; rasterizing it is what takes the time. So build and open it
                 // once, then draw page one and show it before the rest are started - this used to
                 // render every page before displaying any, and again on every option change.
-                var (bytes, source) = await Task.Run(async () =>
+                var (document, source) = await Task.Run(async () =>
                 {
-                    var pdfBytes = _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options);
-                    return (pdfBytes, await PcrPdfPageSource.OpenAsync(pdfBytes));
+                    var doc = PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, options);
+                    return (doc, await PcrPdfPageSource.OpenAsync(doc.Bytes));
                 });
+                var bytes = document.Bytes;
 
-                if (generation != _pcrPreviewGeneration) return;
+                if (generation != _pcrPreviewGeneration) { source.Dispose(); return; }
 
                 // Sized to the real page count up front, one empty slot per page. The pager and the
                 // print path's page-range check both read Count, and both need the true number even
                 // while pages are still arriving.
                 _pcrPreviewBytes = bytes;
+                // The document this replaces is released now, not whenever a collection reaches it.
+                PcrPreviewSource?.Dispose();
                 PcrPreviewSource = source;
+                _pcrPreviewTextScale = document.TextScale;
                 PcrPreviewPages.Clear();
                 for (var i = 0; i < source.PageCount; i++) PcrPreviewPages.Add(null!);
                 PcrPreviewPageSummary = source.PageCount == 1 ? "1 page" : $"{source.PageCount} pages";
@@ -799,7 +810,7 @@ namespace Procure.PageModels
                 // A sheet too wide for this paper is scaled down to fit rather than overprinting its own
                 // columns - so say so, with the size it will actually print at. Discovering 30%-size text
                 // after it comes out of the printer is the thing to avoid.
-                PcrPreviewPageSummary += PcrFitNote(pr, rfqs, options);
+                PcrPreviewPageSummary += PcrFitNote(pr, pcr, rfqs, remarks, options, document.TextScale);
                 IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();
@@ -807,7 +818,16 @@ namespace Procure.PageModels
                 for (var i = 0; i < source.PageCount; i++)
                 {
                     var index = i;
-                    var png = await Task.Run(() => source.RenderAsync(index));
+                    byte[] png;
+                    try
+                    {
+                        png = await Task.Run(() => source.RenderAsync(index));
+                    }
+                    catch when (generation != _pcrPreviewGeneration || source.IsDisposed)
+                    {
+                        // A newer option change replaced - and released - this document mid-render.
+                        return;
+                    }
 
                     // A newer option change owns the preview now; this render is for a document
                     // nobody is looking at any more.
@@ -947,10 +967,7 @@ namespace Procure.PageModels
                 }
 
                 var copies = ParseCopies(PcrCopiesText);
-                // How small the sheet's text prints - the print resolution is sized to it.
-                var smallestPt = _pcrPreviewRfqs == null ? 7.5
-                    : 7.5 * PcrPdfExporter.PrintScaleFor(_pcrPreviewPr, _pcrPreviewRfqs, BuildPcrPdfOptions());
-                var succeeded = await _pcrExportService.PrintPcrPdfAsync(pdfBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices, copies, smallestPt);
+                var succeeded = await _pcrExportService.PrintPcrPdfAsync(pdfBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices, copies);
                 ShowToast(succeeded ? $"Sent to {PcrSelectedPrinter}" : "Print cancelled");
             }
             catch (Exception ex)

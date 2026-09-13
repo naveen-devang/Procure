@@ -43,9 +43,28 @@ public sealed partial class PcrPreviewModal : UserControl
         _detailTimer.IsRepeating = false;
         _detailTimer.Tick += (_, _) => _ = RenderDetailTileAsync();
 
-        Loaded += (_, _) => Watch(Vm);
-        Unloaded += (_, _) => { Watch(null); ClearDetailTile(); };
+        Loaded += (_, _) =>
+        {
+            Watch(Vm);
+            // Dragged to a screen with different scaling: the sharp tile was drawn for the old one.
+            if (XamlRoot != null) XamlRoot.Changed += OnXamlRootChanged;
+        };
+        Unloaded += (_, _) =>
+        {
+            Watch(null);
+            if (XamlRoot != null) XamlRoot.Changed -= OnXamlRootChanged;
+            ClearDetailTile();
+        };
         DataContextChanged += (_, _) => { if (IsLoaded) Watch(Vm); };
+    }
+
+    private double _lastRasterizationScale;
+
+    private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        if (sender.RasterizationScale == _lastRasterizationScale) return;
+        _lastRasterizationScale = sender.RasterizationScale;
+        ScheduleDetailTile();
     }
 
     private void Watch(PrListPageModel? vm)
@@ -117,6 +136,8 @@ public sealed partial class PcrPreviewModal : UserControl
         if (visible.IsEmpty || visible.Width < 1 || visible.Height < 1) return;
 
         var screenScale = XamlRoot.RasterizationScale;
+        _lastRasterizationScale = screenScale;
+        if (source.IsDisposed) return;
         var (pageWidthDips, pageHeightDips) = source.PageSizeDips(pageIndex);
         double imagePixelsWide = pageWidthDips * source.EffectiveDpi / 96.0;
         double screenPixelsWide = pageRect.Width * screenScale;
@@ -148,6 +169,8 @@ public sealed partial class PcrPreviewModal : UserControl
         }
         catch (Exception ex)
         {
+            // A document replaced (and released) by an option change mid-draw is expected, not a fault.
+            if (source.IsDisposed || generation != _detailGeneration) return;
             // A failed sharpen leaves the stretched image showing, which is still a working preview.
             Procure.Utilities.CrashLog.Write("PCR preview detail render failed", ex);
         }

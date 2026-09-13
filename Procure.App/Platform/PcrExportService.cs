@@ -64,7 +64,7 @@ public sealed class PcrExportService : IPcrExportService
     public string GetDefaultPrinterName()
         => new System.Drawing.Printing.PrinterSettings().PrinterName;
 
-    public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1, double smallestPrintedPt = 7.5)
+    public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1)
     {
         // A PDF/XPS-writer "printer" actually saves a file - route it through the file-save
         // flow, which reports cancellation correctly (GDI's Print() does not).
@@ -75,9 +75,8 @@ public sealed class PcrExportService : IPcrExportService
             return savedPath != null;
         }
 
-        // Resolution from the sheet's smallest text, capped at what the printer prints (see
-        // PcrPdfRasterizer.PrintDpiFor): 300 DPI for every normal sheet, up to 600 for one fitted to
-        // the page for many suppliers.
+        // Black and white at 600 DPI, or the printer's own resolution when lower - see
+        // PcrPdfRasterizer.PrintDpiFor for the measurements behind it.
         double printerDpi = 0;
         try
         {
@@ -86,16 +85,15 @@ public sealed class PcrExportService : IPcrExportService
             printerDpi = probe.DefaultPageSettings.PrinterResolution.X;   // negative = a quality preset, not DPI
         }
         catch { /* unknown printer resolution: no cap */ }
-        var requestedDpi = PcrPdfRasterizer.PrintDpiFor(smallestPrintedPt, printerDpi);
+        var requestedDpi = PcrPdfRasterizer.PrintDpiFor(printerDpi);
 
         // Opened once; each page is drawn only when the printer asks for it and released after, so a
-        // print holds one page image however many pages the sheet has. Rendering every page up front
-        // held them all - fine at 300 DPI, not at 600.
+        // print holds one page image however many pages the sheet has.
         var source = await PcrPdfPageSource.OpenAsync(pdfBytes, requestedDpi);
         var renderDpi = source.EffectiveDpi;
-        if (source.PageCount == 0) return true;
+        if (source.PageCount == 0) { source.Dispose(); return true; }
         if (Environment.GetEnvironmentVariable("PROCURE_PRINT_LOG") == "1")
-            Procure.Utilities.CrashLog.Write($"PCR print: {renderDpi:0} DPI (smallest text {smallestPrintedPt:0.0} pt, printer {printerDpi:0}), {source.PageCount} page(s)");
+            Procure.Utilities.CrashLog.Write($"PCR print: {renderDpi:0} DPI black and white (printer reports {printerDpi:0}), {source.PageCount} page(s)");
 
         var selectedPages = (pageIndices == null || pageIndices.Count == 0)
             ? Enumerable.Range(0, source.PageCount).ToList()
@@ -104,6 +102,7 @@ public sealed class PcrExportService : IPcrExportService
 
         return await Task.Run(() =>
         {
+            using var sourceLifetime = source;
             using var printDocument = new System.Drawing.Printing.PrintDocument();
             if (!string.IsNullOrWhiteSpace(printerName))
             {
@@ -143,13 +142,15 @@ public sealed class PcrExportService : IPcrExportService
             printDocument.PrintPage += (_, e) =>
             {
                 // PdfDocument is agile, so rendering here on the print thread is fine.
-                using var pageStream = new MemoryStream(source.RenderAsync(selectedPages[cursor]).GetAwaiter().GetResult());
-                using var image = System.Drawing.Image.FromStream(pageStream);
+                var page = source.RenderMonochromeAsync(selectedPages[cursor]).GetAwaiter().GetResult();
+                using var image = ToBitmap(page);
 
                 var dest = PlacePage(e.Graphics!, image.Width, image.Height);
 
-                e.Graphics!.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                // Nearest neighbour: smoothing a black-and-white page on its way to the printer would
+                // turn it back into greys and undo the point of sending it that way.
+                e.Graphics!.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+                e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
                 e.Graphics.DrawImage(image, dest);
 
                 cursor++;
@@ -159,6 +160,27 @@ public sealed class PcrExportService : IPcrExportService
             printDocument.Print();
             return true;
         });
+    }
+
+    /// <summary>A one-bit GDI+ bitmap over a rendered black-and-white page. One bit per pixel is what
+    /// keeps the print job small: an A4 page at 600 DPI records as 4.3 MB, against 33.7 MB in colour.</summary>
+    internal static System.Drawing.Bitmap ToBitmap(MonochromePage page)
+    {
+        var bitmap = new System.Drawing.Bitmap(page.Width, page.Height, System.Drawing.Imaging.PixelFormat.Format1bppIndexed);
+        bitmap.SetResolution((float)page.Dpi, (float)page.Dpi);
+        var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, page.Width, page.Height),
+            System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format1bppIndexed);
+        try
+        {
+            int rowBytes = Math.Min(Math.Abs(data.Stride), page.Stride);
+            for (int y = 0; y < page.Height; y++)
+                System.Runtime.InteropServices.Marshal.Copy(page.Bits, y * page.Stride, data.Scan0 + y * data.Stride, rowBytes);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+        return bitmap;
     }
 
     internal static System.Drawing.RectangleF PlacePage(System.Drawing.Graphics g, int imageWidth, int imageHeight)

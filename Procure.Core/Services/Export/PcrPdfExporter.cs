@@ -247,7 +247,10 @@ namespace Procure.Services.Export
                     priceNeed = Math.Max(priceNeed, CellPad + MeasureTextWidth(currencyInHeader ? $"Price ({cur})" : "Unit Price", "F2", 7));
                     var longestWord = (rf.Vendor ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
                         .Select(w => MeasureTextWidth(w, "F2", 7.5)).DefaultIfEmpty(0).Max();
-                    pairNeed = Math.Max(pairNeed, longestWord + 6);
+                    // Capped: a name that is one long word ("InternationalTradingCompanyLLC") is broken
+                    // across the heading's lines instead of being handed width it would squeeze out of
+                    // the description column.
+                    pairNeed = Math.Max(pairNeed, Math.Min(longestWord + 6, MaxVendorPairWidth));
                 }
 
                 qty[i] = qtyNeed;
@@ -288,7 +291,19 @@ namespace Procure.Services.Export
             return PageScaleFor(width - 2 * margin, rfqs.Count, needs);
         }
 
+        /// <summary>A generated sheet and how much its text was shrunk overall - the fit-every-vendor
+        /// scale times the fit-to-one-page scale, 1.0 at full size. Body text prints at 7.5 pt x this.</summary>
+        public sealed record PcrPdfDocument(byte[] Bytes, double TextScale);
+
         public static byte[] GeneratePdf(
+            PurchaseRequisition pr,
+            PriceComparisonRequest pcr,
+            IReadOnlyList<RequestForQuotation> selectedRfqs,
+            string remarks,
+            PcrPdfOptions? options = null)
+            => GeneratePdfDocument(pr, pcr, selectedRfqs, remarks, options).Bytes;
+
+        public static PcrPdfDocument GeneratePdfDocument(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
@@ -594,14 +609,36 @@ namespace Procure.Services.Export
             // even without whitespace - rather than one bare word landing alone on a line while
             // everything else piles onto the next. A chunk with no break point at all (rare: truly
             // no spaces or punctuation) still renders whole on its own line - never split mid-word.
-            List<string> WrapText(string text, string font, double fontSize, double maxWidth, int maxLines, bool truncate = true)
+            List<string> WrapText(string text, string font, double fontSize, double maxWidth, int maxLines, bool truncate = true, bool splitLongWords = false)
             {
                 if (string.IsNullOrEmpty(text)) return new List<string> { string.Empty };
 
-                var chunks = System.Text.RegularExpressions.Regex.Matches(text, @"[^\s;,:\-]*[\s;,:\-]+|[^\s;,:\-]+$")
+                // '/' breaks too, so a run of RFQ numbers ("999-0/999-1/...") wraps between numbers.
+                var chunks = System.Text.RegularExpressions.Regex.Matches(text, @"[^\s;,:/\-]*[\s;,:/\-]+|[^\s;,:/\-]+$")
                     .Select(m => m.Value)
                     .Where(c => c.Length > 0)
                     .ToList();
+
+                // A heading has no room to let one word run wider than its column, and cutting it off
+                // with ".." loses the vendor's name - so a word that alone is too wide is split across
+                // lines at whatever character fills the line.
+                if (splitLongWords)
+                {
+                    var split = new List<string>();
+                    foreach (var chunk in chunks)
+                    {
+                        var rest = chunk;
+                        while (rest.Length > 1 && MeasureTextWidth(rest.TrimEnd(), font, fontSize) > maxWidth)
+                        {
+                            int cut = rest.Length - 1;
+                            while (cut > 1 && MeasureTextWidth(rest[..cut], font, fontSize) > maxWidth) cut--;
+                            split.Add(rest[..cut] + " ");
+                            rest = rest[cut..];
+                        }
+                        split.Add(rest);
+                    }
+                    chunks = split;
+                }
 
                 var lines = new List<string>();
                 var current = string.Empty;
@@ -762,7 +799,7 @@ namespace Procure.Services.Export
             {
                 // Vendor name spans the whole pair (Qty + Unit Price), same as the merged header
                 // cell the Excel version already draws.
-                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, VendorPairW(i) - 6, maxLines: fitVendors ? 3 : 2));
+                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, VendorPairW(i) - 6, maxLines: fitVendors ? 3 : 2, splitLongWords: true));
             }
             var historicalHeaderLines = WrapText("Historical Price", "F2", 7.5, historicalWidth - 6, maxLines: 2);
 
@@ -773,6 +810,23 @@ namespace Procure.Services.Export
             {
                 tableHeaderRowH1 += (maxHeaderLines - 1) * vendorHeaderLineHeight;
             }
+
+            // The first page's metadata block. Proportional to contentWidth (calibrated against A4's
+            // 770pt content area) rather than the fixed 460/490pt this used to be - those were tuned for
+            // A4 and, on a wider page (A3, Wide margins, ...), left the right-hand block anchored well
+            // short of the table's right edge, reading as "shifted toward center".
+            const double referenceContentWidth = 770.0;
+            double metaLeftWidth = contentWidth * (460.0 / referenceContentWidth);
+            double metaRightX = marginLeft + (contentWidth * (490.0 / referenceContentWidth));
+            double metaRightWidth = (marginLeft + contentWidth) - metaRightX;
+
+            // PR and RFQ numbers can be long lists (a consolidated PR; a dozen RFQs). They used to be
+            // shrunk onto one line, stopping at 6.5 pt and then running off the right edge of the page.
+            // Now they wrap onto up to three lines at full size, and the block grows to fit.
+            const int MaxMetaLines = 3;
+            var prNumberLines = WrapText($"PR Number : {FormatPrNumbers(pr)}", "F2", 8.5, metaLeftWidth, MaxMetaLines);
+            var rfqNumberLines = WrapText($"RFQ Number : {FormatRfqNumbers(selectedRfqs)}", "F2", 8.5, metaRightWidth, MaxMetaLines);
+            int numberRowLines = Math.Max(prNumberLines.Count, rfqNumberLines.Count);
 
             void StartNewPage(bool isFirstPage)
             {
@@ -797,14 +851,8 @@ namespace Procure.Services.Export
                     DrawText(title, marginLeft, curY, font: "F2", fontSize: 13, align: "center", width: contentWidth);
                     curY -= titleGap;
 
-                    // Proportional to contentWidth (calibrated against A4's 770pt content area) rather
-                    // than the fixed 460/490pt this used to be - those were tuned for A4 and, on a
-                    // wider page (A3, Wide margins, ...), left the right-hand metadata block anchored
-                    // well short of the table's actual right edge, reading as "shifted toward center".
-                    const double referenceContentWidth = 770.0;
-                    double leftColWidth = contentWidth * (460.0 / referenceContentWidth);
-                    double rightColX = marginLeft + (contentWidth * (490.0 / referenceContentWidth));
-                    double rightColWidth = (marginLeft + contentWidth) - rightColX;
+                    double rightColX = metaRightX;
+                    double rightColWidth = metaRightWidth;
 
                     // Row 1: Date (Left) & Collective Number (Right)
                     DrawText($"Date : {dateStr}", marginLeft, curY, font: "F2", fontSize: 8.5);
@@ -817,12 +865,13 @@ namespace Procure.Services.Export
                     DrawFittedText($"Requested For : {reqFor}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
                     curY -= metaLineGap;
 
-                    // Row 3: PR Number (Left) & RFQ Number (Right)
-                    var prDisplay = FormatPrNumbers(pr);
-                    var rfqDisplay = FormatRfqNumbers(selectedRfqs);
-
-                    DrawFittedText($"PR Number : {prDisplay}", marginLeft, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: leftColWidth);
-                    DrawFittedText($"RFQ Number : {rfqDisplay}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
+                    // Row 3: PR Number (Left) & RFQ Number (Right), each wrapped (see numberRowLines)
+                    for (int line = 0; line < numberRowLines; line++)
+                    {
+                        if (line < prNumberLines.Count) DrawText(prNumberLines[line], marginLeft, curY, font: "F2", fontSize: 8.5);
+                        if (line < rfqNumberLines.Count) DrawText(rfqNumberLines[line], rightColX, curY, font: "F2", fontSize: 8.5);
+                        if (line < numberRowLines - 1) curY -= metaLineGap;
+                    }
                     curY -= metaGapAfter;
                 }
                 else
@@ -937,7 +986,7 @@ namespace Procure.Services.Export
             double autoScale = 1.0;
             if (shrink && prItems.Count > 0)
             {
-                double headerBlockHeight = titleGap + (2 * metaLineGap) + metaGapAfter + tableHeaderRowH1 + tableHeaderRowH2;
+                double headerBlockHeight = titleGap + ((2 + numberRowLines - 1) * metaLineGap) + metaGapAfter + tableHeaderRowH1 + tableHeaderRowH2;
                 double neededHeight = headerBlockHeight + itemRowHeights.Sum() + footerBlockNeeded;
                 double availableForOnePage = pageHeight - marginTop - bottomLimit;
 
@@ -1366,7 +1415,7 @@ namespace Procure.Services.Export
             pdfWriter.WriteLine("%%EOF");
             pdfWriter.Flush();
 
-            return pdfMs.ToArray();
+            return new PcrPdfDocument(pdfMs.ToArray(), pageScale * (useAutoScale ? autoScale : 1.0));
         }
 
         // Adobe Core-14 AFM glyph widths (1/1000 em), ASCII 32-126 - real per-character widths instead
