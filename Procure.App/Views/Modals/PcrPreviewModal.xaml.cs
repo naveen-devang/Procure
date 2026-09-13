@@ -180,11 +180,25 @@ public sealed partial class PcrPreviewModal : UserControl
     {
         var ctrl = (Microsoft.UI.Input.InputKeyboardSource
             .GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
-        if (!ctrl || Vm is not { } vm) return;
+        if (Vm is not { } vm) return;
+
+        if (!ctrl)
+        {
+            // Plain wheel pans up/down; a trackpad's sideways swipe arrives as a horizontal wheel and pans
+            // left/right (as in the MAUI preview). 40 px per notch.
+            var props = e.GetCurrentPoint(PreviewViewport).Properties;
+            var step = props.MouseWheelDelta / 120.0 * 40.0;
+            if (props.IsHorizontalMouseWheel) vm.PcrPreviewPanX -= step;
+            else vm.PcrPreviewPanY += step;
+            ClampPan(vm, vm.PcrPreviewZoom);
+            e.Handled = true;
+            return;
+        }
 
         var delta = e.GetCurrentPoint(PreviewViewport).Properties.MouseWheelDelta;
         var next = Math.Clamp(vm.PcrPreviewZoom * (delta > 0 ? 1.1 : 1 / 1.1), 0.25, 6.0);
         vm.PcrPreviewZoom = next;
+        ClampPan(vm, next);
         e.Handled = true;
     }
 
@@ -204,6 +218,23 @@ public sealed partial class PcrPreviewModal : UserControl
         var p = e.GetCurrentPoint(PreviewViewport).Position;
         vm.PcrPreviewPanX = _panStartX + (p.X - _dragStart.X);
         vm.PcrPreviewPanY = _panStartY + (p.Y - _dragStart.Y);
+        ClampPan(vm, vm.PcrPreviewZoom);
+    }
+
+    /// <summary>Keeps the page on screen: it can move only as far as it overhangs the viewport on each side,
+    /// and not at all along a side where it fits. Otherwise a drag or wheel could leave the viewport empty.</summary>
+    private void ClampPan(PrListPageModel vm, double zoom)
+    {
+        var viewW = PreviewViewport.ActualWidth;
+        var viewH = PreviewViewport.ActualHeight;
+        if (viewW <= 0 || viewH <= 0) return;
+
+        var maxX = Math.Max(0, (SheetFrame.ActualWidth * zoom - viewW) / 2);
+        var maxY = Math.Max(0, (SheetFrame.ActualHeight * zoom - viewH) / 2);
+        var x = Math.Clamp(vm.PcrPreviewPanX, -maxX, maxX);
+        var y = Math.Clamp(vm.PcrPreviewPanY, -maxY, maxY);
+        if (x != vm.PcrPreviewPanX) vm.PcrPreviewPanX = x;
+        if (y != vm.PcrPreviewPanY) vm.PcrPreviewPanY = y;
     }
 
     private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
