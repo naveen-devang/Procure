@@ -86,13 +86,13 @@
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#005FB8" Opacity="0.9" />
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#005FB8" Opacity="0.8" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#005FB8" />
-            <!-- Hover/press for plain Buttons. Two rules:
-                 - Here, in the theme dictionaries: outside them a brush keeps the start-up theme's colour.
-                 - Same colour family as the resting ButtonBackground (translucent white in both themes).
-                   The button fades between the two over 83 ms, and fading from near-clear white to a
-                   solid dark grey passes through a half-clear light grey - a bright flash on every hover. -->
-            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#CCEDE9E0" />
-            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#99EDE9E0" />
+            <!-- Hover/press for plain Buttons: a thin translucent tint, so a coloured fill behind a
+                 transparent Button (the Settings mode pills, swatches) still shows through on hover.
+                 In the theme dictionaries, because outside them a brush keeps the start-up theme's
+                 colour. (The flash these used to cause came from the template's fade, which
+                 NoFadeButtons.xaml removes.) -->
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1A8A7A5C" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0F8A7A5C" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Default">
@@ -167,11 +167,11 @@
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#60CDFF" Opacity="0.9" />
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#60CDFF" Opacity="0.8" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#60CDFF" />
-            <!-- Hover/press for plain Buttons. Two rules:
-                 - Here, in the theme dictionaries: outside them a brush keeps the start-up theme's colour.
-                 - Same colour family as the resting ButtonBackground (translucent white in both themes).
-                   The button fades between the two over 83 ms, and fading from near-clear white to a
-                   solid dark grey passes through a half-clear light grey - a bright flash on every hover. -->
+            <!-- Hover/press for plain Buttons: a thin translucent tint, so a coloured fill behind a
+                 transparent Button (the Settings mode pills, swatches) still shows through on hover.
+                 In the theme dictionaries, because outside them a brush keeps the start-up theme's
+                 colour. (The flash these used to cause came from the template's fade, which
+                 NoFadeButtons.xaml removes.) -->
             <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1AFFFFFF" />
             <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0DFFFFFF" />
         </ResourceDictionary>

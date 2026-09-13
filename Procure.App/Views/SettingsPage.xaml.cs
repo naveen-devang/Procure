@@ -39,6 +39,9 @@ public sealed partial class SettingsPage : Page
         Rail.ItemsSource = Sections;
         Vm.PropertyChanged += OnVmPropertyChanged;
         Loaded += OnLoaded;
+        // SelectedThemeMode changes BEFORE the new theme is applied, so that repaint used the old
+        // theme's accent shade. Paint again once the page has actually changed theme.
+        ActualThemeChanged += (_, _) => PaintModeChips();
         Unloaded += (_, _) => Vm.PropertyChanged -= OnVmPropertyChanged;
     }
 
@@ -75,6 +78,8 @@ public sealed partial class SettingsPage : Page
     /// <summary>Repaints the three Color Mode pills. Runs on every theme *and* accent change, so
     /// the lit pill always carries the live accent - a plain binding would go stale on an accent
     /// switch, and a Checked visual state goes stale on a light/dark switch.</summary>
+    private static readonly SolidColorBrush Transparent = new(Microsoft.UI.Colors.Transparent);
+
     private void PaintModeChips()
     {
         var accent = (SolidColorBrush)Application.Current.Resources["PrimaryTextBrush"];
@@ -86,8 +91,11 @@ public sealed partial class SettingsPage : Page
 
         void Paint(Border fill, TextBlock text, bool on)
         {
-            if (on) { fill.Background = accent; text.Foreground = onAccent; }
-            else { fill.ClearValue(Border.BackgroundProperty); text.ClearValue(TextBlock.ForegroundProperty); }
+            // Both states painted from code with live brushes. The off state used to fall back to a
+            // {ThemeResource} set in XAML, and a theme switch re-applies those over code-set values,
+            // so the highlight stayed on the old pill after switching Dark -> Light.
+            fill.Background = on ? accent : Transparent;
+            text.Foreground = on ? onAccent : Procure.App.Converters.BoardTheme.Themed("AppTextPrimary");
         }
 
         Paint(DarkFill, DarkText, Vm.SelectedThemeMode is "Dark" or "");
