@@ -24,7 +24,7 @@ under the dotnet CLI here.
 & "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
   Procure.App\Procure.App.csproj -t:Restore,Build -p:Configuration=Debug -p:Platform=x64
 
-.\Procure.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\Procure.App.exe
+.\Procure.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\Procure.exe
 ```
 
 Pinned to `Microsoft.WindowsAppSDK` **1.8.x** (not the MAUI project's 2.4.0 — 2.4.0's

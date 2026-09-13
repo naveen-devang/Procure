@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
         // Drag area and caption-button reservation - see AppTitleBar in MainWindow.xaml. Tall (48) so
         // the bar lines up with the sidebar's own 48 px items.
         SetTitleBar(AppTitleBar);
+        AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "appicon.ico"));   // taskbar / Alt+Tab
         AppWindow.TitleBar.PreferredHeightOption = Microsoft.UI.Windowing.TitleBarHeightOption.Tall;
         _shell.Window = this;
         _shell.ContentFrame = ContentFrame;

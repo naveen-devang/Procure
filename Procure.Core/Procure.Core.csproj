@@ -20,7 +20,6 @@
     <!-- Self-check harness classes stay internal; the app hosts that runs them see them. -->
     <InternalsVisibleTo Include="Procure" />
     <InternalsVisibleTo Include="Procure.Spike" />
-    <InternalsVisibleTo Include="Procure.App" />
   </ItemGroup>
 
   <ItemGroup>
