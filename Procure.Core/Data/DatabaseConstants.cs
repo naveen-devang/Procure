@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using Microsoft.Data.Sqlite;
 
@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 19;
+        public const int SchemaVersion = 20;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS PurchaseRequisition (
     PrNo TEXT NOT NULL,
     Description TEXT,
     Requestor TEXT,
+    RequestedFor TEXT,
     Plant TEXT DEFAULT 'RW01',
     PrType TEXT DEFAULT 'Stores&Spares',
     Priority TEXT NOT NULL DEFAULT 'Normal',

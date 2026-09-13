@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
@@ -257,6 +257,8 @@ namespace Procure.Data
         {
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "Plant", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "PrType", "TEXT").ConfigureAwait(false);
+            // v20: "Requested For" on the PCR, which had been printing the Description instead.
+            await EnsureColumnExistsAsync(connection, "PurchaseRequisition", "RequestedFor", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "Freight", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "Warranty", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "TechnicalApproval", "TEXT").ConfigureAwait(false);

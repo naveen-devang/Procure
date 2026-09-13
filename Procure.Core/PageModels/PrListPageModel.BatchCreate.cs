@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -347,6 +347,7 @@ namespace Procure.PageModels
                     Id = entry.Id,
                     PrNo = entry.PrNo.Trim(),
                     Description = desc,
+                    RequestedFor = entry.RequestedFor?.Trim() ?? string.Empty,
                     Requestor = string.IsNullOrWhiteSpace(entry.Requestor) ? (string.IsNullOrWhiteSpace(BatchSharedRequestor) ? "Unassigned" : BatchSharedRequestor.Trim()) : entry.Requestor.Trim(),
                     Plant = string.IsNullOrWhiteSpace(entry.Plant) ? (string.IsNullOrWhiteSpace(BatchSharedPlant) ? ProcurementPlant.RW01 : BatchSharedPlant) : entry.Plant,
                     PrType = prType,

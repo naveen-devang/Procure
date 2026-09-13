@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -279,7 +279,7 @@ namespace Procure.Services.Export
             var collectiveNo = string.IsNullOrWhiteSpace(pcr.PcrNo) ? "-" : pcr.PcrNo;
             var dateStr = DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             // Raw string here — EscapeXml at the point of use escapes it exactly once.
-            var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&I" : pr.Description.Trim();
+            var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "E&I" : pr.RequestedFor.Trim();
             var prDisplay = PcrPdfExporter.FormatPrNumbers(pr);
             var rfqDisplay = PcrPdfExporter.FormatRfqNumbers(selectedRfqs);
 

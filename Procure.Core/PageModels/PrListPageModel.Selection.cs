@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -310,6 +310,9 @@ namespace Procure.PageModels
                     PrNo = MergeMasterPrNo.Trim(),
                     Description = MergeDescription.Trim(),
                     Requestor = MergeRequestor.Trim(),
+                    // Carried over only when every merged PR was for the same department.
+                    RequestedFor = selected.Select(p => p.RequestedFor?.Trim() ?? string.Empty).Distinct().Count() == 1
+                        ? selected[0].RequestedFor?.Trim() ?? string.Empty : string.Empty,
                     // Inherit from the sources (most common value): defaulting silently relabeled
                     // e.g. an all-NO01/Capex merge as RW01/Stores&Spares.
                     Plant = selected.GroupBy(p => p.Plant).OrderByDescending(g => g.Count()).First().Key,

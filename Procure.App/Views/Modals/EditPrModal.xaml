@@ -36,8 +36,9 @@
                     <StackPanel Spacing="16" Padding="0,0,16,0">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.2*" />
-                                <ColumnDefinition Width="1.2*" />
+                                <ColumnDefinition Width="1.1*" />
+                                <ColumnDefinition Width="1.1*" />
+                                <ColumnDefinition Width="1.1*" />
                                 <ColumnDefinition Width="130" />
                                 <ColumnDefinition Width="170" />
                             </Grid.ColumnDefinitions>
@@ -49,12 +50,17 @@
                                 <TextBlock Style="{StaticResource AppText}" Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <TextBox Text="{Binding EditingPrRequestor, Mode=TwoWay}" PlaceholderText="e.g. Sarah Lin" />
                             </StackPanel>
+                            <!-- Printed on the PCR as "Requested For". Blank prints the E&I default. -->
                             <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Style="{StaticResource AppText}" Text="Requested For" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                <TextBox Text="{Binding EditingPrRequestedFor, Mode=TwoWay}" PlaceholderText="e.g. E&amp;I" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPlants}"
                                           SelectedItem="{Binding CurrentEditingPr.Plant, Mode=TwoWay}" />
                             </StackPanel>
-                            <StackPanel Grid.Column="3" Spacing="4">
+                            <StackPanel Grid.Column="4" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="PR Type *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AllPrTypes}"
                                           SelectedItem="{Binding CurrentEditingPr.PrType, Mode=TwoWay}" />

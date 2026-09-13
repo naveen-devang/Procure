@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -17,12 +17,13 @@ namespace Procure.Data.Repositories
             using var cmd = connection.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = @"
-INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType)
-VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType)
+INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor)
+VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType, @RequestedFor)
 ON CONFLICT(Id) DO UPDATE SET
     PrNo = excluded.PrNo,
     Description = excluded.Description,
     Requestor = excluded.Requestor,
+    RequestedFor = excluded.RequestedFor,
     Plant = excluded.Plant,
     PrType = excluded.PrType,
     Priority = excluded.Priority,
@@ -36,6 +37,7 @@ ON CONFLICT(Id) DO UPDATE SET
             cmd.Parameters.AddWithValue("@PrNo", pr.PrNo);
             cmd.Parameters.AddWithValue("@Description", pr.Description);
             cmd.Parameters.AddWithValue("@Requestor", pr.Requestor);
+            cmd.Parameters.AddWithValue("@RequestedFor", pr.RequestedFor ?? string.Empty);
             cmd.Parameters.AddWithValue("@Plant", string.IsNullOrWhiteSpace(pr.Plant) ? ProcurementPlant.RW01 : pr.Plant);
             cmd.Parameters.AddWithValue("@PrType", string.IsNullOrWhiteSpace(pr.PrType) ? ProcurementPrType.StoresAndSpares : pr.PrType);
             cmd.Parameters.AddWithValue("@Priority", pr.Priority);

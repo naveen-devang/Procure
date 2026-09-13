@@ -137,6 +137,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="PR Type *" Style="{StaticResource Lbl}" />
@@ -156,6 +157,10 @@
                                 <StackPanel Grid.Column="3" Spacing="4">
                                     <TextBlock Text="Requestor" Style="{StaticResource Lbl}" />
                                     <TextBox Text="{Binding SelectedBatchEntry.Requestor, Mode=TwoWay}" PlaceholderText="Requestor / team" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="4">
+                                    <TextBlock Text="Requested For" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding SelectedBatchEntry.RequestedFor, Mode=TwoWay}" PlaceholderText="e.g. E&amp;I" FontSize="12" />
                                 </StackPanel>
                             </Grid>
 

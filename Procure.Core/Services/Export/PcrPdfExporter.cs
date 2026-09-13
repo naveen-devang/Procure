@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -683,7 +683,7 @@ namespace Procure.Services.Export
 
                     // Row 2: Requested By (Left) & Requested For (Right)
                     DrawText($"Requested By : {pr.Requestor}", marginLeft, curY, font: "F2", fontSize: 8.5);
-                    var reqFor = string.IsNullOrWhiteSpace(pr.Description) ? "E&I" : pr.Description.Trim();
+                    var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "E&I" : pr.RequestedFor.Trim();
                     DrawFittedText($"Requested For : {reqFor}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
                     curY -= metaLineGap;
 

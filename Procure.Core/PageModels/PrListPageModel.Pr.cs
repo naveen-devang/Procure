@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -47,6 +47,9 @@ namespace Procure.PageModels
         public partial string EditingPrRequestor { get; set; } = string.Empty;
 
         [ObservableProperty]
+        public partial string EditingPrRequestedFor { get; set; } = string.Empty;
+
+        [ObservableProperty]
         public partial string EditingPrDescription { get; set; } = string.Empty;
 
         [ObservableProperty]
@@ -56,7 +59,7 @@ namespace Procure.PageModels
         // what was there on open or abandoned edits stay on the card and ride along with the next
         // unrelated save. Items/CustomValues references included: a failed validation replaces them
         // before the user can still cancel.
-        private sealed record PrEditSnapshot(string PrNo, string Requestor, string Plant, string PrType,
+        private sealed record PrEditSnapshot(string PrNo, string Requestor, string RequestedFor, string Plant, string PrType,
             string Description, string Priority, string Status, string Notes,
             ObservableCollection<PrItem> Items, ObservableCollection<CustomFieldValue> CustomValues);
         private PrEditSnapshot? _editSnapshot;
@@ -175,9 +178,10 @@ namespace Procure.PageModels
             CurrentEditingPr = pr;
             EditingPrNo = pr.PrNo;
             EditingPrRequestor = pr.Requestor;
+            EditingPrRequestedFor = pr.RequestedFor;
             EditingPrDescription = pr.Description;
             EditingPrNotes = pr.Notes;
-            _editSnapshot = new PrEditSnapshot(pr.PrNo, pr.Requestor, pr.Plant, pr.PrType,
+            _editSnapshot = new PrEditSnapshot(pr.PrNo, pr.Requestor, pr.RequestedFor, pr.Plant, pr.PrType,
                 pr.Description, pr.Priority, pr.Status, pr.Notes, pr.Items, pr.CustomValues);
 
             // Prepare custom fields with existing values
@@ -253,6 +257,7 @@ namespace Procure.PageModels
             // typing does not repaint the board card behind it.
             CurrentEditingPr.PrNo = EditingPrNo;
             CurrentEditingPr.Requestor = EditingPrRequestor;
+            CurrentEditingPr.RequestedFor = EditingPrRequestedFor?.Trim() ?? string.Empty;
             CurrentEditingPr.Description = EditingPrDescription;
             CurrentEditingPr.Notes = EditingPrNotes;
 
@@ -320,6 +325,7 @@ namespace Procure.PageModels
             {
                 pr.PrNo = s.PrNo;
                 pr.Requestor = s.Requestor;
+                pr.RequestedFor = s.RequestedFor;
                 pr.Plant = s.Plant;
                 pr.PrType = s.PrType;
                 pr.Description = s.Description;

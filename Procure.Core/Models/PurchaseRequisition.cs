@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -20,6 +20,11 @@ namespace Procure.Models
 
         [ObservableProperty]
         public partial string Requestor { get; set; } = string.Empty;
+
+        /// <summary>Who the purchase is for (a department or cost owner), printed on the PCR as
+        /// "Requested For". Not the Description, which is the short title people use to find a PR.</summary>
+        [ObservableProperty]
+        public partial string RequestedFor { get; set; } = string.Empty;
 
         [ObservableProperty]
         public partial string Plant { get; set; } = ProcurementPlant.RW01;

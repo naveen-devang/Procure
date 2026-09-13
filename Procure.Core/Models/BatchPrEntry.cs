@@ -19,6 +19,9 @@ namespace Procure.Models
         public partial string Requestor { get; set; } = string.Empty;
 
         [ObservableProperty]
+        public partial string RequestedFor { get; set; } = string.Empty;
+
+        [ObservableProperty]
         public partial string Plant { get; set; } = ProcurementPlant.RW01;
 
         [ObservableProperty]

@@ -30,7 +30,7 @@ namespace Procure.Data.Repositories
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition
 ORDER BY CreatedAt DESC;";
 
@@ -64,7 +64,7 @@ ORDER BY CreatedAt DESC;";
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition
 ORDER BY CreatedAt DESC
 LIMIT @Take OFFSET @Skip;";
@@ -502,7 +502,7 @@ ORDER BY SortOrder ASC;";
                 var order = searching ? "Matches.rank ASC, CreatedAt DESC" : "CreatedAt DESC";
 
                 cmd.CommandText = MatchesCte(query) + @"
-SELECT PurchaseRequisition.Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT PurchaseRequisition.Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition" + rankJoin + BuildWhere(cmd, query) + @"
 ORDER BY " + order + @"
 LIMIT @Take OFFSET @Skip;";
@@ -533,7 +533,7 @@ LIMIT @Take OFFSET @Skip;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition WHERE Id IN (" + BindIdList(cmd, "@Id", ids) + @")
 ORDER BY CreatedAt DESC;";
 
@@ -579,7 +579,7 @@ ORDER BY CreatedAt DESC;";
                 }
 
                 cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition
 WHERE Id <> @MasterId AND (ParentPrId = @MasterId" + byNumber + @")
 ORDER BY CreatedAt DESC;";
@@ -715,7 +715,8 @@ ORDER BY CreatedAt DESC;";
             UpdatedAt = DateTime.Parse(reader.GetString(9)),
             ParentPrId = reader.IsDBNull(10) ? null : Guid.Parse(reader.GetString(10)),
             ConsolidatedFrom = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
-            PrType = reader.IsDBNull(12) ? ProcurementPrType.StoresAndSpares : reader.GetString(12)
+            PrType = reader.IsDBNull(12) ? ProcurementPrType.StoresAndSpares : reader.GetString(12),
+            RequestedFor = reader.IsDBNull(13) ? string.Empty : reader.GetString(13)
         };
 
         /// <summary>Renders " WHERE col IN (...)" with every id bound as a parameter, or an empty string
@@ -805,7 +806,7 @@ SELECT
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType
+SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
 FROM PurchaseRequisition
 WHERE Status NOT IN ('Delivered', 'Closed', 'Cancelled', 'Merged')
   AND (

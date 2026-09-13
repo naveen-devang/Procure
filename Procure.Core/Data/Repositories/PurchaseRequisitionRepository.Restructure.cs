@@ -28,13 +28,14 @@ namespace Procure.Data.Repositories
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType)
-VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType);";
+INSERT INTO PurchaseRequisition (Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor)
+VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes, @CreatedAt, @UpdatedAt, @ParentPrId, @ConsolidatedFrom, @PrType, @RequestedFor);";
 
                 cmd.Parameters.AddWithValue("@Id", masterPr.Id.ToString());
                 cmd.Parameters.AddWithValue("@PrNo", masterPr.PrNo);
                 cmd.Parameters.AddWithValue("@Description", masterPr.Description);
                 cmd.Parameters.AddWithValue("@Requestor", masterPr.Requestor);
+                cmd.Parameters.AddWithValue("@RequestedFor", masterPr.RequestedFor ?? string.Empty);
                 cmd.Parameters.AddWithValue("@Plant", masterPr.Plant ?? "RW01");
                 cmd.Parameters.AddWithValue("@PrType", masterPr.PrType ?? "Stores&Spares");
                 cmd.Parameters.AddWithValue("@Priority", masterPr.Priority);
