@@ -709,7 +709,11 @@ namespace Procure.Services.Export
                     }
 
                     if (showCurrency) DrawText(currency, cellX + 3, textY, font: font, fontSize: fontSize, align: "left");
-                    DrawFittedText(amtStr, cellX, textY, font: font, baseFontSize: fontSize, align: "right", maxWidth: cellWidth, minFontSize: 5.0);
+                    // No currency in the cell (it is in the column heading past CurrencyInCellsSupplierLimit
+                    // suppliers): nothing sits on the left to balance a right-aligned figure, so a short
+                    // amount is centred instead of leaving the left of the cell empty.
+                    DrawFittedText(amtStr, cellX, textY, font: font, baseFontSize: fontSize,
+                        align: currency.Length == 0 ? "center" : "right", maxWidth: cellWidth, minFontSize: 5.0);
                 }
                 else
                 {
