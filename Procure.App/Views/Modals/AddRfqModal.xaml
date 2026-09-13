@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.AddRfqModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
+
+    <UserControl.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+        <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="#B3000000">
+        <Grid.ChildrenTransitions>
+            <TransitionCollection>
+                <EntranceThemeTransition FromVerticalOffset="18" />
+            </TransitionCollection>
+        </Grid.ChildrenTransitions>
+        <Border MaxWidth="950" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <Grid RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource AppText}" Text="{Binding ModalRfqTitle}" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
+                            Command="{Binding CloseAddRfqModalCommand}" />
+                </Grid>
+
+                <!-- Scrollbar always drawn: the dialog cut content off at the bottom with nothing
+                     to say there was more, which reads as clipped rather than scrollable. -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Visible" Padding="0,0,4,0">
+                <StackPanel Spacing="16">
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="200" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="RFQ Number" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding NewRfqNo, Mode=TwoWay}" PlaceholderText="e.g. RFQ-001-A" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Vendor Name *" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding NewRfqVendor, Mode=TwoWay}" PlaceholderText="e.g. Dell Enterprise Systems" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{Binding AvailableTechnicalApprovals}"
+                                              SelectedItem="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Currency" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
+                                              SelectedItem="{Binding NewRfqCurrency, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding NewRfqPaymentTerms, Mode=TwoWay}" PlaceholderText="30 Days Net" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableIncoterms}"
+                                              SelectedItem="{Binding NewRfqIncoterms, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="4">
+                                    <TextBlock Text="Delivery / Lead Time" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding NewRfqDeliveryLeadTime, Mode=TwoWay}" PlaceholderText="e.g. 2 Weeks" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="4">
+                                    <TextBlock Text="Warranty" Style="{StaticResource Lbl}" />
+                                    <TextBox Text="{Binding NewRfqWarranty, Mode=TwoWay}" PlaceholderText="e.g. 12 Months" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Visibility="{Binding HasEditingRfqItems, Converter={StaticResource BoolVis}}">
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Style="{StaticResource AppText}" Text="PR Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="+ Add Line" FontSize="11" Height="28" Padding="8,0" Command="{Binding AddEditingRfqItemCommand}" />
+                                    <Button Content="{Binding AllRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
+                                            Command="{Binding ToggleAllRfqItemsCommand}" />
+                                    <Button Content="Copy for Email" FontSize="11" Height="28" Padding="10,0"
+                                            Command="{Binding CopySelectedRfqItemsForEmailCommand}" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Header row. Without it these are five unlabelled number boxes per
+                                 line - unit price, discount, computed total, last price - and
+                                 typing a price into the discount column is a money error. -->
+                            <Grid ColumnSpacing="8" Padding="4,0,4,2">
+                                <Grid.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontSize" Value="10.5" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                        <Setter Property="VerticalAlignment" Value="Bottom" />
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="64" />
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="ITEM" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="UNIT" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                <TextBlock Style="{StaticResource AppText}" Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Border Height="1" Background="{ThemeResource AppHairline}" />
+                            <ItemsControl ItemsSource="{Binding EditingRfqItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:RfqItem">
+                                        <Grid ColumnSpacing="8" Padding="4,2" Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="82" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="95" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="34" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" />
+                                            <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
+                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Qty" FontSize="12"
+                                                     TextAlignment="Right" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12"
+                                                     TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
+                                            <Button Grid.Column="8" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28"
+                                                    Padding="0" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}"
+                                                    VerticalAlignment="Top" Margin="0,4,0,0" Click="RemoveItem_Click" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Base Quote Sum ({0})'}" />
+                                    <TextBox Text="{Binding NewRfqQuoteAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00"
+                                             FontSize="13" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Freight ({0})'}" />
+                                    <TextBox Text="{Binding NewRfqFreight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Other Charges ({0})'}" />
+                                    <TextBox Text="{Binding NewRfqOtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Total Discount ({0})'}" />
+                                    <TextBox Text="{Binding NewRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableVatTypes}"
+                                              SelectedItem="{Binding NewRfqVatType, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+                            <Border Padding="12,10" CornerRadius="6" BorderThickness="1"
+                                    BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding FormattedCalculatedRfqGrandTotal}" FontSize="22" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{Binding CalculatedRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
+                                               FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+                </ScrollViewer>
+
+                <Grid Grid.Row="2" RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Height="1" Background="{ThemeResource AppHairline}" />
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Command="{Binding CloseAddRfqModalCommand}" />
+                        <Button Content="Save RFQ" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveNewRfqCommand}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -75,9 +75,9 @@ namespace Procure.Utilities
                     settings.AccentTheme = p.Id;
                     var fill = Res("AccentFill");
                     var primary = Res("Primary");
-                    var expectPrimary = mode == "Dark" ? p.DarkColor : p.LightColor;
-                    if (Hex(fill) != Hex(p.DarkColor))
-                        throw new InvalidOperationException($"{mode}/{p.Id}: AccentFill is {Hex(fill)}, expected the pastel {Hex(p.DarkColor)} - the pastel is not reaching the fills.");
+                    var expectPrimary = mode == "Dark" ? Color.FromArgb(p.DarkHex) : Color.FromArgb(p.LightHex);
+                    if (Hex(fill) != Hex(Color.FromArgb(p.DarkHex)))
+                        throw new InvalidOperationException($"{mode}/{p.Id}: AccentFill is {Hex(fill)}, expected the pastel {Hex(Color.FromArgb(p.DarkHex))} - the pastel is not reaching the fills.");
                     if (Hex(primary) != Hex(expectPrimary))
                         throw new InvalidOperationException($"{mode}/{p.Id}: Primary is {Hex(primary)}, expected {Hex(expectPrimary)}.");
                 }
@@ -96,9 +96,9 @@ namespace Procure.Utilities
             settings.AppTheme = "Dark";
             var after = Hex(Res("Primary"));
             log.AppendLine($"theme switch with Mint held: Primary {before} -> {after}");
-            if (before != Hex(p.LightColor) || after != Hex(p.DarkColor))
-                throw new InvalidOperationException($"Primary did not follow the theme switch: {before} -> {after}; expected {Hex(p.LightColor)} -> {Hex(p.DarkColor)}.");
-            if (Hex(Res("AccentFill")) != Hex(p.DarkColor))
+            if (before != Hex(Color.FromArgb(p.LightHex)) || after != Hex(Color.FromArgb(p.DarkHex)))
+                throw new InvalidOperationException($"Primary did not follow the theme switch: {before} -> {after}; expected {Hex(Color.FromArgb(p.LightHex))} -> {Hex(Color.FromArgb(p.DarkHex))}.");
+            if (Hex(Res("AccentFill")) != Hex(Color.FromArgb(p.DarkHex)))
                 throw new InvalidOperationException("AccentFill changed on a theme switch; the pastel fill must be the same in both modes.");
         }
 
@@ -122,8 +122,8 @@ namespace Procure.Utilities
             foreach (var b in swatches)
             {
                 var p = SettingsService.PastelPalettes.First(x => x.Id == (string)b.CommandParameter);
-                if (Hex(b.BorderColor) != Hex(p.DarkColor))
-                    throw new InvalidOperationException($"Swatch '{p.Id}' shows {Hex(b.BorderColor)} but would apply {Hex(p.DarkColor)}.");
+                if (Hex(b.BorderColor) != Hex(Color.FromArgb(p.DarkHex)))
+                    throw new InvalidOperationException($"Swatch '{p.Id}' shows {Hex(b.BorderColor)} but would apply {Hex(Color.FromArgb(p.DarkHex))}.");
             }
             log.AppendLine($"swatches: {swatches.Count} previews match their fill");
 
@@ -143,9 +143,9 @@ namespace Procure.Utilities
             if (switches.Count == 0 || buttons.Count == 0)
                 throw new InvalidOperationException($"Expected toggles and accent buttons on Settings; found {switches.Count} / {buttons.Count}.");
             foreach (var sw in switches)
-                if (Hex(sw.OnColor) != Hex(current.DarkColor))
-                    throw new InvalidOperationException($"A toggle track is {Hex(sw.OnColor)}; the pastel for {current.Id} is {Hex(current.DarkColor)} - the pastel is not reaching the fills.");
-            var offFills = buttons.Where(b => Hex(b.BackgroundColor) != Hex(current.DarkColor)).Select(b => $"'{b.Text}'={Hex(b.BackgroundColor)}").ToList();
+                if (Hex(sw.OnColor) != Hex(Color.FromArgb(current.DarkHex)))
+                    throw new InvalidOperationException($"A toggle track is {Hex(sw.OnColor)}; the pastel for {current.Id} is {Hex(Color.FromArgb(current.DarkHex))} - the pastel is not reaching the fills.");
+            var offFills = buttons.Where(b => Hex(b.BackgroundColor) != Hex(Color.FromArgb(current.DarkHex))).Select(b => $"'{b.Text}'={Hex(b.BackgroundColor)}").ToList();
             log.AppendLine($"live: {switches.Count} toggles and {buttons.Count} accent buttons checked; off-pastel: {offFills.Count}");
             if (offFills.Count > 0)
                 throw new InvalidOperationException("Filled buttons not on the pastel: " + string.Join(", ", offFills));
@@ -186,12 +186,12 @@ namespace Procure.Utilities
             var worst = 99.0; var worstId = "";
             foreach (var p in SettingsService.PastelPalettes)
             {
-                var ratio = Contrast(text, p.DarkColor);
+                var ratio = Contrast(text, Color.FromArgb(p.DarkHex));
                 if (ratio < worst) { worst = ratio; worstId = p.Id; }
                 if (ratio < 4.5)
-                    throw new InvalidOperationException($"Button text {Hex(text)} on pastel {p.Id} {Hex(p.DarkColor)} is {ratio:0.0}:1; needs 4.5:1.");
+                    throw new InvalidOperationException($"Button text {Hex(text)} on pastel {p.Id} {Hex(Color.FromArgb(p.DarkHex))} is {ratio:0.0}:1; needs 4.5:1.");
             }
-            var whiteWorst = SettingsService.PastelPalettes.Min(p => Contrast(Colors.White, p.DarkColor));
+            var whiteWorst = SettingsService.PastelPalettes.Min(p => Contrast(Colors.White, Color.FromArgb(p.DarkHex)));
             log.AppendLine($"contrast: dark text worst {worst:0.0}:1 ({worstId}); white text would be {whiteWorst:0.0}:1");
         }
 

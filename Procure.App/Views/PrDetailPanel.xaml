@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.PrDetailPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models"
+    xmlns:views="using:Procure.App.Views"
+    xmlns:conv="using:Procure.App.Converters"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:NullOrEmptyToVisibilityConverter x:Key="NullVis" />
+        <conv:FormatConverter x:Key="Fmt" />
+        <conv:DateTimeOffsetNullConverter x:Key="Dto" />
+        <conv:PoFulfillmentColorConverter x:Key="FulfilColor" />
+        <conv:PoFulfillmentBgConverter x:Key="FulfilBg" />
+        <conv:PoFulfillmentStrokeConverter x:Key="FulfilStroke" />
+        <conv:ApprovalStatusColorConverter x:Key="ApprovalColor" />
+        <conv:ZeroCountToVisibilityConverter x:Key="ZeroVis" />
+        <conv:DoneGlyphConverter x:Key="DoneGlyph" />
+        <conv:StrikethroughConverter x:Key="Strike" />
+
+        <!-- The app-wide implicit TextBlock style (Themes/Styles.xaml) does not reach TextBlocks
+             inside a DataTemplate - measured, not assumed: the vendor name came back with text
+             selection off AND in Segoe UI Variable rather than Plus Jakarta Sans, which is what a
+             TextBlock with no style at all looks like. Redeclaring it here puts it in scope for the
+             templates in this file. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource AppText}" />
+
+        <Style x:Key="Col" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+        <Style x:Key="ColTitle" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="ItemCard" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="IconBtn" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+        </Style>
+        <!-- Fill only, no stroke. A 1px border in a saturated colour on a rounded rect whose
+             measured size is fractional (9.5px chip text, asymmetric padding) gets antialiased
+             across two physical pixels - solid on one edge, washed out on another, worst on the
+             corner arcs. That's the "half-rendered" look. The tinted fill already carries the
+             meaning, and it matches how every badge on the board is drawn. -->
+        <Style x:Key="Chip" TargetType="Border">
+            <Setter Property="Padding" Value="8,2,8,3" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinWidth" Value="40" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{ThemeResource AppSubtleFill}" />
+        </Style>
+        <Style x:Key="ChipText" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <!-- Chrome (top hairline, entrance transition) lived here while this was an inline row
+         expander; the slide-over container in PrBoardPage owns it now. -->
+    <Border Background="{ThemeResource AppBackground}" Padding="18">
+        <StackPanel Spacing="16">
+
+            <!-- consolidated-master banner -->
+            <Border Padding="14,10" CornerRadius="8" BorderThickness="1"
+                    BorderBrush="{ThemeResource BadgeCombinedPrBorder}" Background="{ThemeResource BadgeCombinedPrBg}"
+                    Visibility="{Binding IsConsolidatedMaster, Converter={StaticResource BoolVis}}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE8D7;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center"
+                               Foreground="{ThemeResource BadgeCombinedPrText}" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Style="{StaticResource AppText}" Text="Consolidated Master Requisition" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{ThemeResource BadgeCombinedPrText}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding ConsolidatedFrom, Converter={StaticResource Fmt}, ConverterParameter='Combined from source requisitions: {0}'}"
+                                   FontSize="11" Foreground="{ThemeResource AppTextPrimary}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Content="Split PR" FontSize="11" Height="28" Padding="10,0" Click="SplitMasterPr_Click" />
+                </Grid>
+            </Border>
+
+            <!-- Not three equal columns. RFQ cards are the densest (vendor, status, actions, total,
+                 breakdown and up to ~10 term chips) so they get the most. PCR needs enough for a
+                 role name beside its fixed 212px date stack and no more. POs are the lightest. -->
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="0.85*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- COLUMN 1: RFQs -->
+                <Border Style="{StaticResource Col}">
+                    <StackPanel Spacing="12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="1. RFQs &amp; Vendor Quotes" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="+ Add RFQ" FontSize="11" Height="28" Padding="10,0" Click="AddRfq_Click"
+                                    Background="{ThemeResource FluentTealBg}" Foreground="{ThemeResource FluentTeal}"
+                                    BorderBrush="{ThemeResource BadgeSharedRfqBorder}" BorderThickness="0" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Rfqs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:RequestForQuotation">
+                                    <Border Style="{StaticResource ItemCard}" Padding="14,12">
+                                        <StackPanel Spacing="10">
+                                            <!-- Vendor, its quote status, and the row actions on one line:
+                                                 the status belongs next to the vendor it describes. -->
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Vendor}" FontWeight="SemiBold" FontSize="13.5"
+                                                               TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RfqNo}" FontSize="11"
+                                                                   Foreground="{ThemeResource AppTextTertiary}" />
+                                                        <Border Padding="5,1.5" CornerRadius="9" MinWidth="40" BorderThickness="0"
+                                                                BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
+                                                                Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind SharedPrs, Converter={StaticResource Fmt}, ConverterParameter='Shared ({0})'}"
+                                                                       FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                                       Foreground="{ThemeResource BadgeSharedRfqText}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="{x:Bind Status}" Click="RfqStatus_Click"
+                                                        FontSize="10.5" Height="24" Padding="10,0" CornerRadius="12" MinWidth="48"
+                                                        VerticalAlignment="Center"
+                                                        Background="{ThemeResource AppSubtleFill}" Foreground="{ThemeResource AppTextPrimary}" />
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                    <Button Style="{StaticResource IconBtn}" Content="&#xE748;" Click="SplitRfq_Click"
+                                                            ToolTipService.ToolTip="Split shared RFQ"
+                                                            Visibility="{x:Bind IsSharedRfq, Converter={StaticResource BoolVis}}" />
+                                                    <Button Style="{StaticResource IconBtn}" Content="&#xE70F;" Click="EditRfq_Click"
+                                                            ToolTipService.ToolTip="Edit RFQ" />
+                                                    <Button Style="{StaticResource IconBtn}" Content="&#xE74D;" Click="DeleteRfq_Click"
+                                                            ToolTipService.ToolTip="Delete RFQ"
+                                                            Foreground="{ThemeResource FluentCritical}" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Total first, breakdown as a caption under it. Side by side these two
+                                                 collided - the breakdown has no natural length limit. -->
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount}" FontSize="16" FontWeight="SemiBold"
+                                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FinancialBreakdownSummary}" FontSize="11" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource AppTextTertiary}" />
+                                            </StackPanel>
+
+                                            <views:WrapPanel HorizontalSpacing="6" VerticalSpacing="6">
+                                                <Border Style="{StaticResource Chip}" BorderBrush="{ThemeResource BadgeSharedRfqBorder}" Background="{ThemeResource BadgeSharedRfqBg}"
+                                                        Visibility="{x:Bind HasQuoteCompletenessBadge, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind QuoteCompletenessBadge}" Style="{StaticResource ChipText}" Foreground="{ThemeResource BadgeSharedRfqText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasMissingPrLines, Converter={StaticResource BoolVis}}"
+                                                        Background="{x:Bind MissingPrLinesBadge, Converter={StaticResource FulfilBg}}"
+                                                        BorderBrush="{x:Bind MissingPrLinesBadge, Converter={StaticResource FulfilStroke}}">
+                                                    <TextBlock Text="{x:Bind MissingPrLinesBadge}" Style="{StaticResource ChipText}"
+                                                               Foreground="{x:Bind MissingPrLinesBadge, Converter={StaticResource FulfilColor}}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasQuantityDrift, Converter={StaticResource BoolVis}}"
+                                                        Background="{x:Bind QuantityDriftBadge, Converter={StaticResource FulfilBg}}"
+                                                        BorderBrush="{x:Bind QuantityDriftBadge, Converter={StaticResource FulfilStroke}}">
+                                                    <TextBlock Text="{x:Bind QuantityDriftBadge}" Style="{StaticResource ChipText}"
+                                                               Foreground="{x:Bind QuantityDriftBadge, Converter={StaticResource FulfilColor}}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasIncoterms, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind Incoterms}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}">
+                                                    <TextBlock Text="{x:Bind VatBadgeText}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasPaymentTerms, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind FormattedPaymentTermsBadge}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasDeliveryLeadTime, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind FormattedLeadTimeBadge}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasFreight, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind FormattedFreightBadge}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" Visibility="{x:Bind HasOtherCharges, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{x:Bind FormattedOtherChargesBadge}" Style="{StaticResource ChipText}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" BorderBrush="{ThemeResource FluentSuccess}" Background="{ThemeResource FluentSuccessBg}"
+                                                        Visibility="{x:Bind IsTechnicallyApproved, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="Tech Approved" Style="{StaticResource ChipText}" Foreground="{ThemeResource FluentSuccess}" />
+                                                </Border>
+                                                <Border Style="{StaticResource Chip}" BorderBrush="{ThemeResource FluentCritical}" Background="{ThemeResource FluentCriticalBg}"
+                                                        Visibility="{x:Bind IsTechnicallyNotApproved, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="Tech: Not Approved" Style="{StaticResource ChipText}" Foreground="{ThemeResource FluentCritical}" />
+                                                </Border>
+                                            </views:WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource AppText}" Text="No RFQs invited yet. Click '+ Add RFQ' to record vendor inquiries."
+                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}" Padding="6,12" TextWrapping="Wrap"
+                                   Visibility="{Binding RfqCount, Converter={StaticResource ZeroVis}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- COLUMN 2: PCR & Approvals -->
+                <Border Grid.Column="1" Style="{StaticResource Col}">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="2. PCR &amp; Approvals" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
+                            <!-- Asymmetric bottom padding + explicit centering, same as the other
+                                 badges: Plus Jakarta Sans sits text high in a tight pill otherwise. -->
+                            <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="0"
+                                    VerticalAlignment="Center"
+                                    BorderBrush="{ThemeResource PillBorder}" Background="{ThemeResource PillBg}"
+                                    Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
+                                <TextBlock Style="{StaticResource AppText}" Text="{Binding Pcr.ApprovalSummary}" FontSize="11" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Foreground="{ThemeResource AppTextPrimary}" />
+                            </Border>
+                            <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xEDE1;" FontSize="13" Width="28" Height="28"
+                                    Click="ExportPcr_Click" Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}"
+                                    Foreground="{ThemeResource AppTextPrimary}" ToolTipService.ToolTip="Export Price Comparison Sheet" />
+                            <Button Grid.Column="3" Style="{StaticResource IconBtn}" Content="&#xE713;" FontSize="14" Width="28" Height="28"
+                                    Click="ApprovalConfig_Click" Foreground="{ThemeResource AppTextPrimary}"
+                                    ToolTipService.ToolTip="Configure Approval Stages" />
+                        </Grid>
+
+                        <!-- No MaxHeight/inner ScrollViewer: that capped the approvals at ~335px and
+                             made this column scroll inside itself. It existed because the panel used
+                             to expand inline inside a board row, where unbounded growth was a problem.
+                             As a slide-over the outer ScrollViewer handles it, and nesting a second
+                             scroll region here just truncated the last approval for no reason. -->
+                        <Grid Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
+                            <ItemsControl ItemsSource="{Binding Pcr.Approvals}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Approval">
+                                        <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RoleDisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <!-- Wraps: "Sent Sep 10, 2026 (Pending)" is longer than the column
+                                                         the date pickers leave, and it was being cut mid-word. -->
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{x:Bind StatusText, Converter={StaticResource ApprovalColor}, Mode=OneWay}" />
+                                                </StackPanel>
+                                                <!-- 186 is the tightest that still fits "Sep 27, 2025" + the picker's
+                                                     calendar glyph + the clear button; the rest of the column goes to
+                                                     the role name and its status line. -->
+                                                <StackPanel Grid.Column="1" Spacing="4" Width="186" VerticalAlignment="Center">
+                                                    <Grid ColumnSpacing="4" Visibility="{x:Bind RequiresMultipleDates, Converter={StaticResource BoolVis}}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Style="{StaticResource AppText}" Text="Sent:" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   Foreground="{ThemeResource AppTextSecondary}" />
+                                                        <Button Grid.Column="1" Content="+ Sent Date" FontSize="10" Height="26" Padding="6,0"
+                                                                HorizontalAlignment="Stretch" Click="SetSent_Click"
+                                                                Visibility="{x:Bind HasSentDate, Converter={StaticResource BoolVis}, ConverterParameter=invert, Mode=OneWay}" />
+                                                        <Grid Grid.Column="1" ColumnSpacing="3"
+                                                              Visibility="{x:Bind HasSentDate, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <CalendarDatePicker HorizontalAlignment="Stretch"
+                                                                                Date="{x:Bind SentDatePickerValue, Converter={StaticResource Dto}, Mode=TwoWay}"
+                                                                                DateFormat="{}{month.abbreviated} {day.integer}, {year.full}"
+                                                                                DateChanged="ApprovalDate_Changed" />
+                                                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
+                                                                    Click="ClearSent_Click" />
+                                                        </Grid>
+                                                    </Grid>
+                                                    <Grid ColumnSpacing="4">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Style="{StaticResource AppText}" Text="Recv:" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   Foreground="{ThemeResource AppTextSecondary}" />
+                                                        <Button Grid.Column="1" Content="+ Received Date" FontSize="10" Height="26" Padding="6,0"
+                                                                HorizontalAlignment="Stretch" Click="SetReceived_Click"
+                                                                Visibility="{x:Bind HasReceivedDate, Converter={StaticResource BoolVis}, ConverterParameter=invert, Mode=OneWay}" />
+                                                        <Grid Grid.Column="1" ColumnSpacing="3"
+                                                              Visibility="{x:Bind HasReceivedDate, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <CalendarDatePicker HorizontalAlignment="Stretch"
+                                                                                Date="{x:Bind ReceivedDatePickerValue, Converter={StaticResource Dto}, Mode=TwoWay}"
+                                                                                DateFormat="{}{month.abbreviated} {day.integer}, {year.full}"
+                                                                                DateChanged="ApprovalDate_Changed" />
+                                                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
+                                                                    Click="ClearReceived_Click" />
+                                                        </Grid>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+
+                        <Border Style="{StaticResource ItemCard}" Padding="16" Margin="0"
+                                Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource AppText}" Text="Ready to compare received quotes?" FontSize="12" Foreground="{ThemeResource AppTextTertiary}" />
+                                <Button Content="+ Create &amp; Submit PCR" Style="{StaticResource AccentButtonStyle}"
+                                        FontSize="12" Height="32" Padding="14,0" Click="CreatePcr_Click" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- COLUMN 3: POs -->
+                <Border Grid.Column="2" Style="{StaticResource Col}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="3. Purchase Orders" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="+ Add PO" FontSize="11" Height="28" Padding="10,0" Click="AddPo_Click"
+                                        Background="{ThemeResource FluentSuccessBg}" Foreground="{ThemeResource FluentSuccess}"
+                                        BorderBrush="{ThemeResource BadgeCombinedPoBorder}" BorderThickness="0" />
+                            </Grid>
+                            <Border Style="{StaticResource Chip}" HorizontalAlignment="Left"
+                                    Visibility="{Binding HasItems, Converter={StaticResource BoolVis}}"
+                                    Background="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilBg}}"
+                                    BorderBrush="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilStroke}}">
+                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PoFulfillmentBadgeText}" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilColor}}" />
+                            </Border>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Pos}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:PurchaseOrder">
+                                    <Border Style="{StaticResource ItemCard}" Padding="12,10">
+                                        <Grid ColumnSpacing="10" RowSpacing="4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind PoNo}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                                <Border Padding="5,1" CornerRadius="9" MinWidth="40" BorderThickness="0"
+                                                        BorderBrush="{ThemeResource BadgeCombinedPoBorder}" Background="{ThemeResource BadgeCombinedPoBg}"
+                                                        Visibility="{x:Bind IsCombinedPo, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind CombinedPrs, Converter={StaticResource Fmt}, ConverterParameter='Combined ({0})'}"
+                                                               FontSize="9" FontWeight="SemiBold" Foreground="{ThemeResource BadgeCombinedPoText}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{x:Bind FormattedValue}" FontSize="13.5" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE70F;" Click="EditPo_Click"
+                                                    ToolTipService.ToolTip="Edit Purchase Order" />
+                                            <TextBlock Style="{StaticResource AppText}" Grid.Row="1" Text="{x:Bind Vendor}" FontSize="11" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                            <Button Grid.Row="1" Grid.Column="1" Content="{x:Bind Status}" Click="PoStatus_Click"
+                                                    FontSize="10" Height="24" Padding="8,0" HorizontalAlignment="Right"
+                                                    Background="{ThemeResource FluentCautionBg}" Foreground="{ThemeResource FluentCaution}" />
+                                            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                                <Button Style="{StaticResource IconBtn}" Content="&#xE748;" Click="SplitPo_Click"
+                                                        Visibility="{x:Bind IsCombinedPo, Converter={StaticResource BoolVis}}" />
+                                                <Button Style="{StaticResource IconBtn}" Content="&#xE74D;" Click="DeletePo_Click"
+                                                        Foreground="{ThemeResource FluentCritical}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource AppText}" Text="No PO raised yet. Click '+ Add PO' once PCR approval is signed."
+                                   FontSize="11" Foreground="{ThemeResource AppTextTertiary}" Padding="6,12" TextWrapping="Wrap"
+                                   Visibility="{Binding PoCount, Converter={StaticResource ZeroVis}}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- line items -->
+            <Border Style="{StaticResource Col}" Visibility="{Binding HasItems, Converter={StaticResource BoolVis}}">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="{ThemeResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Requisition Line Items" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
+                        <Border Padding="6,2,6,4" CornerRadius="10" MinWidth="46" VerticalAlignment="Center"
+                                Background="{ThemeResource AppSubtleFill}">
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items'}"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AppTextSecondary}" />
+                        </Border>
+                        <!-- Same muted amber as the per-line "Unordered / Pending" tags, not raw
+                             FluentCaution (#FCE100 in dark - a near-fluorescent yellow). -->
+                        <Border Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                Background="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilBg}}"
+                                Visibility="{Binding HasPendingItemsSummary, Converter={StaticResource BoolVis}}">
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding PendingItemsSummaryText}" FontSize="10" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilColor}}" />
+                        </Border>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:PrItem">
+                                <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ItemName}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap"
+                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Notes}" FontSize="11" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{ThemeResource AppTextSecondary}"
+                                                       Visibility="{x:Bind Notes, Converter={StaticResource NullVis}}" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                                Background="{x:Bind FulfillmentBadgeText, Converter={StaticResource FulfilBg}, Mode=OneWay}"
+                                                BorderBrush="{x:Bind FulfillmentBadgeText, Converter={StaticResource FulfilStroke}, Mode=OneWay}">
+                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FulfillmentBadgeText, Mode=OneWay}" FontSize="10.5" FontWeight="SemiBold"
+                                                       Foreground="{x:Bind FulfillmentBadgeText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
+                                        </Border>
+                                        <Border Grid.Column="2" Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                                Background="{ThemeResource PillBg}" BorderBrush="{ThemeResource PillBorder}">
+                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedQuantity}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        </Border>
+                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind EstimatedTotalPrice}" FontSize="12" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Foreground="{ThemeResource FluentTeal}"
+                                                   Visibility="{x:Bind EstimatedTotalPrice, Converter={StaticResource NullVis}}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- custom fields footer -->
+            <Border Style="{StaticResource Col}" Padding="14,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource AppText}" Text="{Binding Notes, Converter={StaticResource Fmt}, ConverterParameter='Notes: {0}'}"
+                                   FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Style="{StaticResource AppText}" Text="Team Fields:" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                            <ItemsControl ItemsSource="{Binding CustomValues}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><views:WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CustomFieldValue">
+                                        <Border Style="{StaticResource Chip}" Background="{ThemeResource AppSubtleFill}"
+                                                Visibility="{x:Bind HasValue, Converter={StaticResource BoolVis}}">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ColumnName}" FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
+                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Value}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Edit Requisition &amp; Fields" FontSize="12" Height="32" Padding="14,0"
+                            VerticalAlignment="Center" Click="EditPr_Click" />
+                </Grid>
+            </Border>
+
+            <!-- linked tasks -->
+            <Border Style="{StaticResource Col}" Padding="14,12">
+                <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource AppText}" Text="{Binding LinkedTaskCountLabel}" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                    <ItemsControl ItemsSource="{Binding LinkedTasks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:TodoTask">
+                                <Grid ColumnSpacing="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Style="{StaticResource IconBtn}" FontSize="13" Width="22" Height="22" Click="LinkedTaskToggle_Click"
+                                            Content="{x:Bind IsDone, Converter={StaticResource DoneGlyph}, Mode=OneWay}" />
+                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{x:Bind Title, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}"
+                                               TextDecorations="{x:Bind IsDone, Converter={StaticResource Strike}, Mode=OneWay}" />
+                                    <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE74D;" FontSize="10" Width="22" Height="22"
+                                            Foreground="{ThemeResource AppTextTertiary}" Click="LinkedTaskDelete_Click" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Grid ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="11" VerticalAlignment="Center"
+                                   Margin="2,0,4,0" Foreground="{ThemeResource AppTextTertiary}" />
+                        <TextBox Grid.Column="1" PlaceholderText="Add a task for this PR" FontSize="12" KeyDown="AddTask_KeyDown" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Border>
+</UserControl>

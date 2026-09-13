@@ -1,0 +1,1155 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Procure.Abstractions;
+using Procure.Data.Repositories;
+using Procure.Models;
+using Procure.Services;
+using Procure.Services.Export;
+
+namespace Procure.PageModels
+{
+    // Board state and the paths every feature file leans on: construction and disposal,
+    // loading, filtering, paging, the status banner and inline status transitions.
+    // Feature areas live in the sibling PrListPageModel.*.cs partials.
+    // (Was [QueryProperty] for the "//prboard?action=new" deep link; the nav service sets
+    //  ActionParam directly now - Procure.Core has no MAUI Shell.)
+    public partial class PrListPageModel : ObservableObject, IDisposable
+    {
+        private readonly IPurchaseRequisitionRepository _prRepo;
+        private readonly ICustomColumnRepository _customColumnRepo;
+        private readonly ICsvExportService _csvExportService;
+        private readonly IPcrExportService _pcrExportService;
+        private readonly ISettingsService _settingsService;
+        private readonly IErrorHandler _errorHandler;
+        private readonly ITodoRepository _todoRepo;
+
+        // The PRs currently loaded - one page, not the table. Everything else lives in SQLite and is
+        // reached through _prRepo. Loading the lot cost 3.1s and 231MB at 20,000 PRs; a page costs ~10ms.
+        private List<PurchaseRequisition> _loadedPrs = new();
+
+        /// <summary>The PRs the board has in memory right now. Only ever the current page - use
+        /// <see cref="GetSelectedPrsAsync"/> or a repository query for anything wider.</summary>
+        public IReadOnlyList<PurchaseRequisition> LoadedPrs => _loadedPrs;
+
+        /// <summary>Test seam for BoardMemorySelfCheck: sets the loaded window directly, in memory, no
+        /// database round-trip, so the release-threshold logic can be exercised at 500+ rows without
+        /// generating or fetching that many real PRs. Also updates FilteredPrs, since BoardDisappearing's
+        /// release path clears both.</summary>
+        internal void SeedLoadedPrsForTest(List<PurchaseRequisition> prs)
+        {
+            _loadedPrs = prs;
+            FilteredPrs = new ObservableCollection<PurchaseRequisition>(prs);
+        }
+
+        /// <summary>Selection has to outlive the page it was made on: a checked PR that scrolls out of
+        /// the window is evicted from memory, so the ids are the record and PurchaseRequisition.IsSelected
+        /// is just the checkbox binding, restored from here whenever a page loads.</summary>
+        private readonly HashSet<Guid> _selectedIds = new();
+
+        [ObservableProperty]
+        public partial ObservableCollection<PurchaseRequisition> FilteredPrs { get; set; } = new();
+
+        [ObservableProperty]
+        public partial ObservableCollection<CustomColumnDefinition> CustomColumnDefinitions { get; set; } = new();
+
+        [ObservableProperty]
+        public partial string SearchText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string SelectedStatusFilter { get; set; } = "All";
+
+        [ObservableProperty]
+        public partial bool FilterOverdueOnly { get; set; }
+
+        [ObservableProperty]
+        public partial bool FilterPcrPendingOnly { get; set; }
+
+        [ObservableProperty]
+        public partial bool FilterUrgentOnly { get; set; }
+
+        [ObservableProperty]
+        public partial bool IsBusy { get; set; }
+
+        [ObservableProperty]
+        public partial string ToastText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial bool IsToastVisible { get; set; }
+
+        private int _toastGeneration;
+
+        /// <summary>In-app success pill. OS toasts (CommunityToolkit Toast) go through the packaged
+        /// notification pipeline and throw 0x80070490 "Element not found" on this unpackaged app.</summary>
+        public void ShowToast(string message)
+        {
+            ToastText = message;
+            IsToastVisible = true;
+            var gen = ++_toastGeneration;
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(2500), () =>
+                {
+                    if (gen == _toastGeneration) IsToastVisible = false;
+                });
+        }
+
+        [ObservableProperty]
+        public partial int TotalFilteredCount { get; set; }
+
+        [ObservableProperty]
+        public partial string ListSummary { get; set; } = "Showing 0 requisitions";
+
+        // Compact "N of M" for the header pill next to the page title; empty until the first
+        // load so the pill stays hidden instead of flashing "0 of 0" during startup.
+        [ObservableProperty]
+        public partial string ListSummaryPill { get; set; } = string.Empty;
+
+        /// <summary>True once a real load has settled on zero PRs total, with no search/status/chip
+        /// filter narrowing the result - i.e. the database itself is empty, not just "nothing matches
+        /// right now". Distinguishes the board's two empty states: "create your first PR" vs "nothing
+        /// matches your filter". Guarded by <see cref="_hasEverLoaded"/> so it never reads true during
+        /// the skeleton's first pass, before a real count has come back.</summary>
+        [ObservableProperty]
+        public partial bool IsGenuinelyEmpty { get; set; }
+
+
+        public List<string> StatusFilterOptions { get; } = new()
+        {
+            "All",
+            ProcurementStatus.PrRaised,
+            ProcurementStatus.RfqSent,
+            ProcurementStatus.QuotesReceived,
+            ProcurementStatus.PcrSubmitted,
+            ProcurementStatus.PcrApproved,
+            ProcurementStatus.PoRaised,
+            ProcurementStatus.PartiallyDelivered,
+            ProcurementStatus.Delivered,
+            ProcurementStatus.Closed,
+            ProcurementStatus.Merged,
+            ProcurementStatus.OnHold,
+            ProcurementStatus.Cancelled
+        };
+
+        public string[] SelectableStatuses => ProcurementStatus.SelectableStatuses;
+        public string[] AllPriorities => ProcurementPriority.AllPriorities;
+        public string[] AllPlants => ProcurementPlant.AllPlants;
+        public string[] AllPrTypes => ProcurementPrType.AllPrTypes;
+
+        public string? ActionParam
+        {
+            set
+            {
+                if (value == "new" || value == "bulk")
+                {
+                    _ = OpenBatchCreateModalAsync();
+                }
+            }
+        }
+
+        private readonly IUiDispatcher _dispatcher;
+        private readonly IDialogService _dialogs;
+        private readonly IClipboardService _clipboard;
+        private readonly IAppHost _appHost;
+
+        public PrListPageModel(
+            IPurchaseRequisitionRepository prRepo,
+            ICustomColumnRepository customColumnRepo,
+            ICsvExportService csvExportService,
+            IPcrExportService pcrExportService,
+            ISettingsService settingsService,
+            IErrorHandler errorHandler,
+            ITodoRepository todoRepo,
+            IUiDispatcher dispatcher,
+            IDialogService dialogs,
+            IClipboardService clipboard,
+            IAppHost appHost)
+        {
+            _prRepo = prRepo;
+            _customColumnRepo = customColumnRepo;
+            _csvExportService = csvExportService;
+            _pcrExportService = pcrExportService;
+            _settingsService = settingsService;
+            _errorHandler = errorHandler;
+            _todoRepo = todoRepo;
+            _dispatcher = dispatcher;
+            _dialogs = dialogs;
+            _clipboard = clipboard;
+            _appHost = appHost;
+
+            _settingsService.SettingsChanged += OnSettingsChanged;
+            _appHost.ThemeChanged += OnAppRequestedThemeChanged;
+
+            Current = this;
+        }
+
+        /// <summary>The one instance DI ever constructs (registered AddSingleton). Lets card rows and
+        /// the detail panel - both realised inside a DataTemplate, where a plain {Binding} only sees the
+        /// template's own BindingContext - reach page-level commands via {x:Static ...Current} instead
+        /// of {RelativeSource AncestorType=...}. AncestorType walks the live element tree on every bind
+        /// and every container recycle; x:Static is a direct field read, and unlike {x:Reference} it
+        /// does not depend on template scope, so it does not hit the NRE-inside-templates bug that
+        /// reverted the last attempt to move off AncestorType (see git history on PrListPage.xaml).
+        /// Safe as a static: the instance it points to already outlives the process either way.</summary>
+        public static PrListPageModel? Current { get; private set; }
+
+        // Registered as a DI singleton, so the container disposes it at shutdown — that is the
+        // only point at which these two subscriptions may be released.
+        public void Dispose()
+        {
+            _settingsService.SettingsChanged -= OnSettingsChanged;
+            _appHost.ThemeChanged -= OnAppRequestedThemeChanged;
+        }
+
+        private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
+        {
+            switch (e.Key)
+            {
+                // Thresholds feed the overdue filter and the banner only — nothing on a card is bound to them.
+                case nameof(ISettingsService.NormalOverdueDays):
+                case nameof(ISettingsService.UrgentOverdueDays):
+                    _dispatcher.Post(() =>
+                    {
+                        ApplyFilters();
+                    });
+                    break;
+
+                // Theme repaints every converter-bound brush; currency reformats every money label.
+                case nameof(ISettingsService.AppTheme):
+                case nameof(ISettingsService.AccentTheme):
+                case nameof(ISettingsService.DefaultCurrency):
+                    RefreshCardVisuals();
+                    break;
+            }
+        }
+
+        // Application.RequestedThemeChanged fires a dispatcher turn AFTER SettingsChanged, so a
+        // queue-flag guard cannot fold the two together. It only carries new information when the
+        // theme follows the OS ("System"); pinned to Light/Dark, the only thing that can raise it
+        // is this app's own AppTheme setter, which SettingsChanged has already handled.
+        private void OnAppRequestedThemeChanged(object? sender, EventArgs e)
+        {
+            if (_settingsService.AppTheme is "Light" or "Dark") return;
+            RefreshCardVisuals();
+        }
+
+        private int _cardVisualsRefreshQueued;
+
+        private void RefreshCardVisuals()
+        {
+            // Setting AppTheme raises BOTH SettingsChanged and Application.RequestedThemeChanged, so a
+            // single theme click lands here twice. Coalesce — one queued pass repaints everything.
+            if (Interlocked.CompareExchange(ref _cardVisualsRefreshQueued, 1, 0) != 0) return;
+
+            _dispatcher.Post(() =>
+            {
+                Interlocked.Exchange(ref _cardVisualsRefreshQueued, 0);
+
+                OnPropertyChanged(nameof(FilterOverdueOnly));
+                OnPropertyChanged(nameof(FilterPcrPendingOnly));
+                OnPropertyChanged(nameof(FilterUrgentOnly));
+
+                // Only the current page is bound; off-page PRs repaint when ApplyFilters brings them in.
+                foreach (var pr in FilteredPrs)
+                {
+                    pr.NotifyHierarchyChanged();
+                }
+            });
+        }
+
+        // Set when a load finished while the board was still off-screen. Shell does not realise a
+        // page's native controls until you navigate to it, so filling FilteredPrs during the preload
+        // just parks the cards to be created in one synchronous block on the first tab switch -
+        // which is the freeze. Hold the fill until the board is actually appearing.
+        private bool _fillPending;
+        private bool _isBoardVisible;
+        private bool _hasLoadedOnce;
+
+        [RelayCommand]
+        public Task LoadPrsAsync() => LoadCoreAsync(fillUi: true);
+
+        /// <summary>Bound to the board's "Refresh" button. A plain LoadPrsAsync re-reads only the
+        /// window already on screen (see ReloadWindowAsync), so at 20,000 rows scrolled deep it would
+        /// keep the whole loaded window in memory. This drops the window first - same release path as
+        /// <see cref="BoardDisappearing"/> above <see cref="ReleaseThreshold"/> - so the reload that
+        /// follows takes the exact first-open path: empty board, skeleton, top of the list.</summary>
+        [RelayCommand]
+        public async Task RefreshBoardAsync()
+        {
+            if (_loadInFlight) return;
+
+            var released = _loadedPrs.Count;
+
+            foreach (var pr in _loadedPrs) pr.PropertyChanged -= OnPrItemPropertyChanged;
+            _loadedPrs = new List<PurchaseRequisition>();
+            FilteredPrs.Clear();
+            _hasLoadedOnce = false;
+            _hasEverLoaded = false;
+            _pageGeneration++;
+            TotalFilteredCount = 0;
+            UpdateListSummary();
+
+            await LoadCoreAsync(fillUi: true);
+
+            // Refreshing after a long scroll drops hundreds of PRs with their whole item/RFQ/PO
+            // graphs. Measured with the retention probe, they are genuinely released - but the
+            // runtime keeps the pages, so Task Manager shows the same number it did before and the
+            // refresh looks like it freed nothing. Same deliberate compaction BoardDisappearing
+            // already does for the same reason, on the same threshold, off the UI thread so the
+            // reload is not waiting on it.
+            if (released > ReleaseThreshold)
+            {
+                _ = Task.Run(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                    GC.WaitForPendingFinalizers();
+                });
+            }
+        }
+
+        /// <summary>Warms the data before the board's XAML has ever been built. The card fill waits for
+        /// <see cref="BoardAppearing"/>, unless the user reaches the board first - see LoadCoreAsync.</summary>
+        public Task PreloadDataAsync() => LoadCoreAsync(fillUi: false);
+
+        /// <summary>Called from PrListPage.OnAppearing: releases a fill the preload deferred, or starts
+        /// the load outright if no preload ever ran.</summary>
+        public void BoardAppearing()
+        {
+            _isBoardVisible = true;
+
+            if (_fillPending)
+            {
+                _fillPending = false;
+                ApplyFilters();
+            }
+            else if (!_hasLoadedOnce)
+            {
+                // Also the path when a preload is still in flight: LoadCoreAsync returns early on
+                // IsBusy, and the in-flight load now sees _isBoardVisible and fills itself.
+                _ = LoadPrsAsync();
+            }
+        }
+
+        /// <summary>Above this many loaded rows, leaving the board releases the window instead of
+        /// keeping it (see <see cref="BoardDisappearing"/>). Below it, memory is small enough that
+        /// keeping your place is worth more than the RAM.</summary>
+        private const int ReleaseThreshold = 500;
+
+        /// <summary>Called from PrListPage.OnDisappearing. Below <see cref="ReleaseThreshold"/> loaded
+        /// rows, nothing is torn down: the CollectionView recycles containers, so what is realised is
+        /// bounded by the viewport however far the user scrolled, and the board keeps its place exactly
+        /// as before this method existed. This used to unconditionally drop the window back to one
+        /// batch, which meant removing hundreds of rows one at a time - each destroying a card and
+        /// relaying out the rest - and that quadratic teardown, run inside OnDisappearing, was the
+        /// original tab-switch freeze; the threshold exists so a light session never risks it again.
+        ///
+        /// Above the threshold, the loaded window is real memory - a PR's full RFQ/PO/item graph, not a
+        /// row - so it is released here, immediately, while the user is already looking at another tab
+        /// rather than at the board. Unsubscribing before dropping the reference matters: PropertyChanged
+        /// stays wired to <see cref="OnPrItemPropertyChanged"/> otherwise, and the row can never be
+        /// collected. The next <see cref="BoardAppearing"/> finds _hasLoadedOnce false and takes the
+        /// exact path a first-ever open takes - same skeleton, same fast first paint - not new code.</summary>
+        /// <returns>true if the loaded window was actually released - the host can use that as the
+        /// cue to nudge the GC, since dropping a few hundred PRs with their full RFQ/PO/item graphs
+        /// leaves a lot of gen2 garbage the collector won't otherwise reclaim promptly.</returns>
+        public bool BoardDisappearing()
+        {
+            _isBoardVisible = false;
+
+            if (_loadedPrs.Count <= ReleaseThreshold) return false;
+
+            foreach (var pr in _loadedPrs)
+            {
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+            }
+
+            _loadedPrs = new List<PurchaseRequisition>();
+            FilteredPrs.Clear();
+            _hasLoadedOnce = false;
+            _hasEverLoaded = false;
+            TotalFilteredCount = 0;
+            UpdateListSummary();
+
+            if (Procure.Utilities.BoardTrace.IsEnabled)
+                Procure.Utilities.BoardTrace.Mark("board-window-released");
+
+            return true;
+        }
+
+        private bool _loadInFlight;
+
+        private async Task LoadCoreAsync(bool fillUi)
+        {
+            if (_loadInFlight) return;
+
+            try
+            {
+                _loadInFlight = true;
+
+                // The column definitions are the only thing a load still needs up front; the PR rows
+                // themselves arrive through ReloadPageAsync, which reads one page rather than the table.
+                CustomColumnDefinitions = new ObservableCollection<CustomColumnDefinition>(
+                    await Task.Run(() => _customColumnRepo.GetAllDefinitionsAsync()).ConfigureAwait(true));
+                _hasLoadedOnce = true;
+
+                // _isBoardVisible covers the race where the user opens the board while a preload is
+                // still running: without it the load would defer a fill nobody is left to release.
+                if (fillUi || _isBoardVisible)
+                {
+                    _fillPending = false;
+                    ApplyFilters();
+                }
+                else
+                {
+                    _fillPending = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("PrListPageModel.LoadCoreAsync failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                _loadInFlight = false;
+            }
+        }
+
+        /// <summary>Folds a freshly read page into the instances the board is already bound to: same Id
+        /// merges in place, so a reload that changed nothing leaves FilteredPrs reference-identical and
+        /// the caller's SequenceEqual check exits without rebuilding a single card. Also reapplies the
+        /// checkbox state from <see cref="_selectedIds"/>, which is what lets a selection survive being
+        /// scrolled or filtered out of the loaded window.</summary>
+        /// <param name="retain">Rows the board still shows beyond the re-read window. They are already
+        /// live instances with no fresh counterpart, so they are kept subscribed and kept in
+        /// <see cref="_loadedPrs"/> rather than being treated as gone.</param>
+        private List<PurchaseRequisition> MergeLoadedPrs(List<PurchaseRequisition> loaded,
+                                                         IReadOnlyList<PurchaseRequisition>? retain = null)
+        {
+            var live = _loadedPrs.ToDictionary(p => p.Id);
+            var merged = new List<PurchaseRequisition>(loaded.Count + (retain?.Count ?? 0));
+
+            foreach (var fresh in loaded)
+            {
+                var pr = fresh;
+                if (live.TryGetValue(fresh.Id, out var kept))
+                {
+                    kept.MergeFrom(fresh);
+                    pr = kept;
+                }
+
+                // Unconditional -= then +=: idempotent for a reused instance, and it still picks up PRs
+                // that arrive by any path other than a merge.
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+                pr.PropertyChanged += OnPrItemPropertyChanged;
+                pr.IsSelected = _selectedIds.Contains(pr.Id);
+                merged.Add(pr);
+            }
+
+            var keptIds = merged.Select(p => p.Id).ToHashSet();
+
+            if (retain != null)
+            {
+                foreach (var pr in retain)
+                {
+                    if (keptIds.Add(pr.Id)) merged.Add(pr);
+                }
+            }
+
+            // Anything the board no longer shows is dropped here — unsubscribe or the handler keeps it
+            // alive, and a long scroll would leak every row it ever loaded.
+            foreach (var gone in _loadedPrs)
+            {
+                if (!keptIds.Contains(gone.Id)) gone.PropertyChanged -= OnPrItemPropertyChanged;
+            }
+
+            Debug.Assert(merged.All(p => !live.TryGetValue(p.Id, out var before) || ReferenceEquals(p, before)),
+                "A reload replaced a live PurchaseRequisition instead of merging into it - every bound card will be rebuilt.");
+
+            return merged;
+        }
+
+        private int _searchGeneration;
+
+        /// <summary>True between a keystroke and the arrival of that term's results. The board used
+        /// to keep the previous rows on screen, under the new term, with the old count in the header
+        /// - which reads as "the search is wrong" rather than "the search has not finished".</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(StaleResultsOpacity))]
+        public partial bool IsSearchPending { get; set; }
+
+        partial void OnIsSearchPendingChanged(bool value) => UpdateListSummary();
+
+        /// <summary>Dims rows that belong to the previous term. Not hidden: keeping them in place
+        /// avoids a flash of empty board on every keystroke, and the dimming says they are stale.</summary>
+        public double StaleResultsOpacity => IsSearchPending ? 0.4 : 1.0;
+
+        // Words typed in the box are ANDed. Opening a task's links is the exception - those are
+        // several PR/RFQ/PO numbers and no single PR carries them all - so that path asks for OR.
+        private bool _searchAnyOf;
+        private bool _settingSearchAnyOf;
+
+        /// <summary>Search for any one of these terms. Used when a task or note sends its linked
+        /// record numbers to the board; typing in the box always means all of the words.</summary>
+        public void SearchAnyOf(string terms)
+        {
+            _settingSearchAnyOf = true;
+            try { SearchText = terms; }
+            finally { _settingSearchAnyOf = false; }
+        }
+
+        partial void OnSearchTextChanged(string value)
+        {
+            // Whoever set the text decides how the words combine, and typing always resets it.
+            _searchAnyOf = _settingSearchAnyOf;
+
+            // Set before the debounce, not after: the whole point is to mark the rows stale the
+            // moment the term stops matching them.
+            IsSearchPending = true;
+
+            // Debounce - re-filtering on every keystroke re-queries and rebuilds the board. Same
+            // generation-counter idiom as ShowToast above and LazyExpander: a superseded pass is
+            // retired by the counter, so there is no CancellationTokenSource to allocate per
+            // keystroke and the callback already runs on the UI thread with nothing to marshal back.
+            var generation = ++_searchGeneration;
+            _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(300), () =>
+                {
+                    if (generation == _searchGeneration) ApplyFilters(true);
+                });
+        }
+
+        partial void OnSelectedStatusFilterChanged(string value) => ApplyFilters(true);
+        partial void OnFilterOverdueOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+        partial void OnFilterPcrPendingOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+        partial void OnFilterUrgentOnlyChanged(bool value) { NotifyActiveFilterCount(); ApplyFilters(true); }
+
+        /// <summary>How many of the three toggle filters are on - drives the count badge on the
+        /// board's "Filters" button, which replaced the three loose chips.</summary>
+        public int ActiveFilterCount =>
+            (FilterOverdueOnly ? 1 : 0) + (FilterPcrPendingOnly ? 1 : 0) + (FilterUrgentOnly ? 1 : 0);
+
+        public bool HasActiveFilters => ActiveFilterCount > 0;
+
+        private void NotifyActiveFilterCount()
+        {
+            OnPropertyChanged(nameof(ActiveFilterCount));
+            OnPropertyChanged(nameof(HasActiveFilters));
+        }
+
+        [RelayCommand]
+        public void ToggleFilterOverdue() => FilterOverdueOnly = !FilterOverdueOnly;
+
+        [RelayCommand]
+        public void ToggleFilterPcrPending() => FilterPcrPendingOnly = !FilterPcrPendingOnly;
+
+        [RelayCommand]
+        public void ToggleFilterUrgent() => FilterUrgentOnly = !FilterUrgentOnly;
+
+        /// <summary>Bound to the empty state's "Reset Filters" button. Each setter triggers its own
+        /// ApplyFilters pass; the generation counter retires the superseded ones.</summary>
+        [RelayCommand]
+        public void ResetFilters()
+        {
+            SearchText = string.Empty;
+            SelectedStatusFilter = "All";
+            FilterOverdueOnly = false;
+            FilterPcrPendingOnly = false;
+            FilterUrgentOnly = false;
+        }
+
+        /// <summary>The board is out of date - re-read what is currently shown. Keeps its ~23 call sites
+        /// and their meaning; <paramref name="resetToTop"/> is for the cases where the match set itself
+        /// changed (search, status, filter chips) and the old window no longer means anything.</summary>
+        private void ApplyFilters(bool resetToTop = false)
+        {
+            // Fire and forget: the query runs off the UI thread and the generation retires any pass a
+            // later change supersedes.
+            _ = ReloadWindowAsync(++_pageGeneration, resetToTop);
+        }
+
+        // Bumped on every load so a page that arrives after a newer one is discarded.
+        private int _pageGeneration;
+
+        /// <summary>Test seam for BoardMemorySelfCheck: counts board reload passes. Only ApplyFilters
+        /// and the Refresh button bump this, so it is exactly what the search debounce collapses.</summary>
+        internal int ReloadPassesForTest => _pageGeneration;
+        private bool _loadingMore;
+        private bool _loadMorePending;
+        private int _lastVisibleIndex;
+
+        // The shimmer skeleton belongs to the FIRST load only. Keying it on "board is empty" made
+        // every filter selection after an empty result raise the full skeleton + an extra 80ms.
+        private bool _hasEverLoaded;
+
+        // Matches the XAML RemainingItemsThreshold; used by the Scrolled-driven trigger below.
+        private const int LoadMoreThreshold = 10;
+
+        /// <summary>The authoritative infinite-scroll trigger. RemainingItemsThresholdReached is
+        /// unreliable on Windows - a traced session showed it never firing across 30s of scrolling -
+        /// so pagination keys off the Scrolled event's LastVisibleItemIndex instead. The XAML
+        /// threshold stays wired as harmless redundancy behind the same re-entry guard.</summary>
+        public void OnBoardScrolled(int lastVisibleItemIndex)
+        {
+            _lastVisibleIndex = lastVisibleItemIndex;
+            if (lastVisibleItemIndex >= FilteredPrs.Count - LoadMoreThreshold) _ = LoadMoreAsync();
+        }
+
+        private bool _nearTail;
+
+        /// <summary>Fed by the page's native ScrollViewer.ViewChanged hook - the one scroll signal
+        /// that provably fires on a prewarmed page's first visit, where both MAUI scroll events stay
+        /// dead until the page is left and revisited. Also fires on extent changes, so a user parked
+        /// at the bottom keeps triggering as appended pages grow the list.</summary>
+        public void OnBoardNearTail(bool nearTail)
+        {
+            _nearTail = nearTail;
+            if (nearTail) _ = LoadMoreAsync();
+        }
+
+        // Rows per fetch. Larger than the old reveal batch because the CollectionView recycles
+        // containers - fetching 50 rows no longer means building 50 cards.
+        private const int PageSize = 50;
+
+        // First fill only: roughly one viewport. Hydrating 50 PRs with 5 RFQs + 2 POs each costs
+        // ~350ms off-thread before anything can show; 16 gets first cards on screen sooner and
+        // RemainingItemsThresholdReached immediately tops the window up to PageSize and beyond.
+        private const int FirstPaintPageSize = 16;
+
+        // Bounds the re-read after an edit. Only a database cost now - the CollectionView realises a
+        // screenful whatever the number is - so it is set high enough that normal use never trims the
+        // board. Roughly 250ms of background materialisation at this size.
+        private const int MaxWindowReread = 2000;
+
+        /// <summary>Grows the board by one page. Bound to the CollectionView's
+        /// RemainingItemsThresholdReached, which fires as the user nears the end of what is loaded. This
+        /// is the whole of infinite scroll now, and it appends instead of re-reading the window.</summary>
+        [RelayCommand]
+        private async Task LoadMoreAsync()
+        {
+            if (Procure.Utilities.BoardTrace.IsEnabled)
+                Procure.Utilities.BoardTrace.Mark($"load-more-event shown={FilteredPrs.Count} total={TotalFilteredCount} inflight={_loadingMore}");
+            // Triggers fire repeatedly while the tail is on screen; one that lands mid-load is
+            // remembered and serviced below instead of being dropped.
+            if (_loadingMore)
+            {
+                _loadMorePending = true;
+                return;
+            }
+            if (FilteredPrs.Count >= TotalFilteredCount) return;
+
+            // Consume the near-tail signal: ViewChanged re-arms it while the user genuinely sits at
+            // the tail. Left sticky, a short list (extent < ~3 viewports) kept it true forever and
+            // the chain below paged the ENTIRE table into memory.
+            _nearTail = false;
+
+            var countBefore = FilteredPrs.Count;
+            try
+            {
+                _loadingMore = true;
+                var generation = _pageGeneration;
+                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(FilteredPrs.Count, PageSize)))
+                                     .ConfigureAwait(true);
+                if (generation != _pageGeneration) return;   // a filter change superseded this
+
+                foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
+                TotalFilteredCount = page.TotalCount;
+                UpdateListSummary();
+                if (Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"more-loaded total={FilteredPrs.Count}");
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                _loadingMore = false;
+            }
+
+            // A user parked at the tail produces no scroll delta and therefore no further trigger,
+            // so keep filling until the window is ahead of the viewport. The grew-this-pass check
+            // keeps a non-appending pass from chaining forever.
+            var pending = _loadMorePending;
+            _loadMorePending = false;
+            if ((pending || _lastVisibleIndex >= FilteredPrs.Count - LoadMoreThreshold)
+                && FilteredPrs.Count > countBefore
+                && FilteredPrs.Count < TotalFilteredCount)
+            {
+                _ = LoadMoreAsync();
+            }
+        }
+
+        private PrQuery BuildQuery(int skip, int take) => new(
+            Search: SearchText,
+            Status: SelectedStatusFilter,
+            OverdueOnly: FilterOverdueOnly,
+            PcrPendingOnly: FilterPcrPendingOnly,
+            UrgentOnly: FilterUrgentOnly,
+            NormalOverdueDays: _settingsService.NormalOverdueDays,
+            UrgentOverdueDays: _settingsService.UrgentOverdueDays,
+            Skip: skip,
+            Take: take,
+            MatchAnyOf: _searchAnyOf);
+
+        private void UpdateListSummary()
+        {
+            if (IsSearchPending)
+            {
+                // Saying "11 of 11" while looking for one PR is worse than saying nothing: the count
+                // belongs to the term that is no longer in the box.
+                ListSummary = "Searching…";
+                ListSummaryPill = "Searching…";
+                IsGenuinelyEmpty = false;
+                return;
+            }
+
+            ListSummary = TotalFilteredCount == 0
+                ? "No requisitions found"
+                : $"Showing {FilteredPrs.Count} of {TotalFilteredCount} requisitions";
+            // Compact form for the header pill; the full sentence above becomes its tooltip.
+            ListSummaryPill = $"{FilteredPrs.Count} of {TotalFilteredCount}";
+            IsGenuinelyEmpty = _hasEverLoaded && TotalFilteredCount == 0 && !RowFilterActive;
+        }
+
+        /// <summary>Merge for appended rows: reuses any instance already loaded, subscribes the rest, and
+        /// drops nothing - appending never removes anything from the board.</summary>
+        private List<PurchaseRequisition> MergeAppend(List<PurchaseRequisition> loaded)
+        {
+            var live = _loadedPrs.ToDictionary(p => p.Id);
+            var merged = new List<PurchaseRequisition>(loaded.Count);
+
+            foreach (var fresh in loaded)
+            {
+                var pr = fresh;
+                if (live.TryGetValue(fresh.Id, out var kept)) { kept.MergeFrom(fresh); pr = kept; }
+                else _loadedPrs.Add(pr);
+
+                pr.PropertyChanged -= OnPrItemPropertyChanged;
+                pr.PropertyChanged += OnPrItemPropertyChanged;
+                pr.IsSelected = _selectedIds.Contains(pr.Id);
+                merged.Add(pr);
+            }
+
+            return merged;
+        }
+
+        /// <summary>Re-reads the loaded window and reconciles it in place, so an edit does not throw the
+        /// user back to the top. Only edits and filter changes reach this - scrolling appends through
+        /// LoadMoreAsync, which never re-reads what it already has.</summary>
+        private async Task ReloadWindowAsync(int generation, bool resetToTop)
+        {
+            // The skeleton covers the window where the board has nothing to show and a query is still
+            // running. Without it the empty view - "No requisitions found" - flashes before the first
+            // page lands, which now happens on every open because the read is asynchronous.
+            var showSkeleton = FilteredPrs.Count == 0 && !_hasEverLoaded;
+            var loadTimer = showSkeleton ? Stopwatch.StartNew() : null;
+            if (showSkeleton)
+            {
+                IsBusy = true;
+                Procure.Utilities.BoardTrace.Mark("skeleton-built");
+            }
+
+            try
+            {
+                // Re-read exactly what is on the board, so an edit leaves the user where they were.
+                // Bounded, because someone who scrolled to row 500 should not pay for that on every save.
+                var take = showSkeleton
+                    ? FirstPaintPageSize
+                    : resetToTop
+                        ? PageSize
+                        : Math.Min(FilteredPrs.Count, MaxWindowReread);
+
+                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(0, take))).ConfigureAwait(true);
+                if (showSkeleton && Procure.Utilities.BoardTrace.IsEnabled)
+                    Procure.Utilities.BoardTrace.Mark($"query-done rows={page.Rows.Count}");
+
+                if (showSkeleton)
+                {
+                    // Give the page shell and the shimmering skeleton a painted frame before card
+                    // realization takes the UI thread - without this yield the entire open, from
+                    // click to first card pixels, is one continuous freeze. Same calibration as
+                    // LazyExpander's placeholder delay.
+                    await Task.Delay(80).ConfigureAwait(true);
+                    if (generation != _pageGeneration) return;
+                }
+
+                // A selected PR outside the window still has to be loaded, or the action bar and the
+                // batch commands would silently act on only the part of the selection still on screen.
+                // Selections are a handful of rows, so this is bounded and usually skipped entirely.
+                var offWindow = _selectedIds.Except(page.Rows.Select(r => r.Id)).ToList();
+                var extra = offWindow.Count == 0
+                    ? new List<PurchaseRequisition>()
+                    : await Task.Run(() => _prRepo.GetByIdsAsync(offWindow)).ConfigureAwait(true);
+
+                // Back on the UI thread. A newer filter has already queued its own pass.
+                if (generation != _pageGeneration) return;
+
+                // Anything the user had scrolled past the re-read window keeps its place. Re-reading all
+                // of it would cost seconds at 12,000 rows, and dropping it - which is what the clamp used
+                // to do - yanks the board back to the end of the window mid-edit.
+                var tail = resetToTop
+                    ? new List<PurchaseRequisition>()
+                    : FilteredPrs.Skip(page.Rows.Count).ToList();
+
+                // Page rows first, so the visible window is the head of the merged list.
+                _loadedPrs = MergeLoadedPrs(page.Rows.Concat(extra).ToList(), retain: tail);
+
+                var rows = _loadedPrs.Take(page.Rows.Count).ToList();
+                var reread = rows.Select(r => r.Id).ToHashSet();
+                rows.AddRange(tail.Where(p => !reread.Contains(p.Id)));
+
+                TotalFilteredCount = page.TotalCount;
+
+                _hasEverLoaded = true;
+
+                // Selection state travels with the ids, so the action bar has to be recomputed once the
+                // page it describes has actually landed.
+                UpdateSelectionState();
+                ReplaceRows(rows, resetToTop);
+                UpdateListSummary();
+                if (showSkeleton)
+                {
+                    if (Procure.Utilities.BoardTrace.IsEnabled)
+                        Procure.Utilities.BoardTrace.Mark($"rows-filled n={rows.Count}");
+                    if (loadTimer is not null)
+                        Procure.Utilities.PerfProbe.ReportPageLoad("board first paint", loadTimer.ElapsedMilliseconds);
+                    // The first fill is one viewport; grow the window to a full page shortly after,
+                    // off the critical path, so "Showing N of M" reaches PageSize without the user
+                    // having to scroll to trigger the first threshold fetch.
+                    _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(250), () => _ = LoadMoreAsync());
+                }
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("PrListPageModel.ReloadWindowAsync failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+            finally
+            {
+                // Only the pass that raised it clears it, or a superseded query would uncover an empty
+                // board while the current one is still running.
+                if (showSkeleton && generation == _pageGeneration) IsBusy = false;
+                if (generation == _pageGeneration) IsSearchPending = false;
+            }
+        }
+
+
+        /// <summary>Reconciles the bound collection to <paramref name="rows"/>. Rows that are already
+        /// there keep their position, so an edit does not disturb the cards around it.
+        ///
+        /// This used to have to trickle inserts across dispatcher ticks, because every insert built a
+        /// whole card synchronously and every removal tore one down - which is what froze the app when
+        /// a few hundred rows changed at once. The CollectionView only realises what is on screen, so a
+        /// wholesale swap now costs a screenful of containers however many rows moved.</summary>
+        private void ReplaceRows(List<PurchaseRequisition> rows, bool reset)
+        {
+            if (FilteredPrs.SequenceEqual(rows)) return;
+
+            // Only a genuinely new match set is expressed as a reset. Deciding this on size instead
+            // would send the board back to the top every time a single row dropped out of a long
+            // window - a status edit at row 400 would look like the list had been rebuilt.
+            if (reset)
+            {
+                // A reset rebuilds every container; cards left expanded would each flash the
+                // LazyExpander placeholder and pay a synchronous detail-panel build. A new match
+                // set starting collapsed is the expected UX anyway.
+                foreach (var pr in FilteredPrs)
+                {
+                    if (pr.IsExpanded) pr.IsExpanded = false;
+                }
+                foreach (var pr in rows)
+                {
+                    if (pr.IsExpanded) pr.IsExpanded = false;
+                }
+
+                FilteredPrs.Clear();
+                foreach (var pr in rows) FilteredPrs.Add(pr);
+                return;
+            }
+
+            // Set lookup: rows can be up to MaxWindowReread deep, and List.Contains per element made
+            // this loop O(n^2) on the dispatcher thread.
+            var rowSet = new HashSet<PurchaseRequisition>(rows);
+            for (var i = FilteredPrs.Count - 1; i >= 0; i--)
+            {
+                if (!rowSet.Contains(FilteredPrs[i])) FilteredPrs.RemoveAt(i);
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                // Fast path first: after the removal pass the lists are aligned except around an
+                // actual insert/move, so the IndexOf scan (O(n) per row, O(n²) per pass at a
+                // 20k-grown board) only runs for the handful of genuinely displaced rows.
+                if (i < FilteredPrs.Count && ReferenceEquals(FilteredPrs[i], rows[i])) continue;
+
+                var existing = FilteredPrs.IndexOf(rows[i]);
+                if (existing < 0) FilteredPrs.Insert(i, rows[i]);
+                else if (existing != i) FilteredPrs.Move(existing, i);
+            }
+        }
+
+        [RelayCommand]
+        public async Task ChangePrStatusAsync(PurchaseRequisition pr)
+        {
+
+            var selected = await _dialogs.DisplayActionSheetAsync(
+                $"Update Status for {pr.PrNo}",
+                "Cancel",
+                null,
+                ProcurementStatus.SelectableStatuses);
+
+            if (selected != null && selected != "Cancel" && selected != pr.Status)
+            {
+                await UpdatePrStatusDirectAsync(pr, selected);
+            }
+        }
+
+        // A one-field status/priority edit only changes the board's match set when a filter that
+        // inspects it is active. The card is already bound to the updated object, so reloading and
+        // reconciling the whole window (query + reflection merge + reconcile, the slowest single
+        // click in the app) is skipped when no filter can be affected.
+        private bool RowFilterActive =>
+            SelectedStatusFilter != "All" ||
+            FilterOverdueOnly ||
+            FilterPcrPendingOnly ||
+            FilterUrgentOnly ||
+            !string.IsNullOrWhiteSpace(SearchText);
+
+        public async Task UpdatePrStatusDirectAsync(PurchaseRequisition pr, string newStatus)
+        {
+            if (string.IsNullOrWhiteSpace(newStatus) || pr.Status == newStatus) return;
+            try
+            {
+                pr.Status = newStatus;
+                await _prRepo.SavePrFieldsAsync(pr);
+                pr.NotifyStatusChanged();
+                if (RowFilterActive) ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        public async Task UpdatePoStatusDirectAsync(PurchaseOrder po, string newStatus)
+        {
+            if (string.IsNullOrWhiteSpace(newStatus) || po.Status == newStatus) return;
+            try
+            {
+                po.Status = newStatus;
+                await _prRepo.SavePoAsync(po);
+
+                var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == po.PrId);
+                if (parentPr != null)
+                {
+                    if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
+                    {
+                        parentPr.Status = ProcurementStatus.Delivered;
+                        await _prRepo.SavePrFieldsAsync(parentPr);
+                    }
+                    else if (parentPr.Pos.Any(p => p.Status == PoStatus.Delivered))
+                    {
+                        parentPr.Status = ProcurementStatus.PartiallyDelivered;
+                        await _prRepo.SavePrFieldsAsync(parentPr);
+                    }
+
+                    parentPr.NotifyHierarchyChanged();
+                }
+
+                if (RowFilterActive) ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        public async Task UpdateRfqStatusDirectAsync(RequestForQuotation rfq, string newStatus)
+        {
+            if (string.IsNullOrWhiteSpace(newStatus) || rfq.Status == newStatus) return;
+            try
+            {
+                rfq.Status = newStatus;
+                if (newStatus == RfqStatus.QuoteReceived && !rfq.QuoteReceivedDate.HasValue)
+                {
+                    rfq.QuoteReceivedDate = DateTime.Now;
+                }
+
+                await _prRepo.SaveRfqAsync(rfq);
+
+                var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == rfq.PrId);
+                if (parentPr != null)
+                {
+                    if (parentPr.Rfqs.All(r => r.IsQuoteReceived) && parentPr.Status == ProcurementStatus.RfqSent)
+                    {
+                        parentPr.Status = ProcurementStatus.QuotesReceived;
+                        await _prRepo.SavePrFieldsAsync(parentPr);
+                    }
+
+                    parentPr.NotifyHierarchyChanged();
+                }
+
+                if (RowFilterActive) ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        [RelayCommand]
+        public async Task TogglePriorityAsync(PurchaseRequisition pr)
+        {
+            try
+            {
+                pr.Priority = pr.Priority == ProcurementPriority.Urgent
+                    ? ProcurementPriority.Normal
+                    : ProcurementPriority.Urgent;
+
+                await _prRepo.SavePrFieldsAsync(pr);
+                pr.NotifyStatusChanged();
+                if (RowFilterActive) ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>The PR shown in the detail slide-over, or null when it's closed. The panel used
+        /// to expand inline inside the row, so several could be open at once; as a slide-over only
+        /// one can be, and this is it. <see cref="PurchaseRequisition.IsExpanded"/> is kept in sync
+        /// because the row's chevron still reads it.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsDetailPanelOpen))]
+        public partial PurchaseRequisition? ExpandedPr { get; set; }
+
+        public bool IsDetailPanelOpen => ExpandedPr is not null;
+
+        /// <summary>Fills in the quote lines, order lines and custom field values the board's page read
+        /// deliberately leaves out, if this requisition does not have them yet.
+        ///
+        /// Every path that reaches past a card into the detail of a requisition goes through here -
+        /// opening it, adding or editing a quote or an order, the PCR, merge, split, the batch
+        /// commands. Miss one and that screen shows an empty list instead of failing, which is the
+        /// whole hazard of this change; the list of callers is the list of places that read
+        /// rfq.Items, po.Items or pr.CustomValues.
+        ///
+        /// The fresh copy is merged into the live instance rather than replacing it, so the card
+        /// bound to it keeps its identity and nothing on screen rebuilds.</summary>
+        public async Task<PurchaseRequisition> EnsureHydratedAsync(PurchaseRequisition pr)
+        {
+            if (pr.LineItemsLoaded) return pr;
+
+            try
+            {
+                var full = (await Task.Run(() => _prRepo.GetByIdsAsync(new[] { pr.Id })).ConfigureAwait(true))
+                    .FirstOrDefault();
+                if (full is not null) pr.MergeFrom(full);
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("EnsureHydratedAsync failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+
+            return pr;
+        }
+
+        /// <summary>The same for a set of requisitions - the batch and merge commands act on the
+        /// selection, which comes straight out of the loaded window and is therefore shallow. One read
+        /// for all of them rather than one each.</summary>
+        public async Task EnsureHydratedAsync(IReadOnlyCollection<PurchaseRequisition> prs)
+        {
+            var missing = prs.Where(p => !p.LineItemsLoaded).ToList();
+            if (missing.Count == 0) return;
+
+            try
+            {
+                var ids = missing.Select(p => p.Id).ToList();
+                var full = await Task.Run(() => _prRepo.GetByIdsAsync(ids)).ConfigureAwait(true);
+                var byId = full.ToDictionary(p => p.Id);
+                foreach (var pr in missing)
+                    if (byId.TryGetValue(pr.Id, out var fresh)) pr.MergeFrom(fresh);
+            }
+            catch (Exception ex)
+            {
+                Procure.Utilities.CrashLog.Write("EnsureHydratedAsync(batch) failed", ex);
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>True while an opened requisition is still fetching its lines. The panel shows a
+        /// skeleton against this - it is the one wait this change introduces that lands on a click.</summary>
+        [ObservableProperty]
+        public partial bool IsDetailHydrating { get; set; }
+
+        [RelayCommand]
+        public async Task ToggleExpandAsync(PurchaseRequisition pr)
+        {
+            if (ReferenceEquals(ExpandedPr, pr)) { CloseDetailPanel(); return; }
+
+            if (ExpandedPr is { } previous) previous.IsExpanded = false;
+            pr.IsExpanded = true;
+            ExpandedPr = pr;
+
+            if (pr.LineItemsLoaded) return;
+
+            // Opened before its lines are in memory: show the panel now with a skeleton in it rather
+            // than holding the click until the read comes back.
+            IsDetailHydrating = true;
+            try
+            {
+                await EnsureHydratedAsync(pr);
+            }
+            finally
+            {
+                // Only the requisition still on screen clears it - a fast second click on another row
+                // must not uncover a panel that is still filling.
+                if (ReferenceEquals(ExpandedPr, pr)) IsDetailHydrating = false;
+            }
+        }
+
+        [RelayCommand]
+        public void CloseDetailPanel()
+        {
+            if (ExpandedPr is { } pr) pr.IsExpanded = false;
+            ExpandedPr = null;
+        }
+
+        /// <summary>Esc support: closes the topmost open modal overlay through its Close command
+        /// (which may revert state, e.g. the edit modal's snapshot restore). False when none is open.</summary>
+        public bool CloseTopmostModal()
+        {
+            // Config/export modals first - they open on top of the board's other overlays.
+            if (IsApprovalConfigModalVisible) { CloseApprovalConfigModal(); return true; }
+            if (IsPcrPreviewVisible) { ClosePcrPreview(); return true; }
+            if (IsExportPcrModalVisible) { CloseExportPcrModal(); return true; }
+            if (IsEditModalVisible) { CloseEditModal(); return true; }
+            if (IsAddRfqModalVisible) { CloseAddRfqModal(); return true; }
+            if (IsAddPoModalVisible) { CloseAddPoModal(); return true; }
+            if (IsMergePrModalVisible) { CloseMergePrModal(); return true; }
+            if (IsSplitPrModalVisible) { CloseSplitPrModal(); return true; }
+            if (IsBatchRfqModalVisible) { CloseBatchRfqModal(); return true; }
+            if (IsBatchPoModalVisible) { CloseBatchPoModal(); return true; }
+            if (IsBatchCreateModalVisible) { CloseBatchCreateModal(); return true; }
+            // The detail slide-over sits under every modal, so it closes last.
+            if (IsDetailPanelOpen) { CloseDetailPanel(); return true; }
+            return false;
+        }
+
+        /// <summary>Gates the board's own shortcuts (search focus, new PR, refresh, export) so they
+        /// don't fire out from under whatever modal is currently on top of them.</summary>
+        public bool IsAnyModalVisible =>
+            IsApprovalConfigModalVisible || IsPcrPreviewVisible || IsExportPcrModalVisible ||
+            IsEditModalVisible || IsAddRfqModalVisible || IsAddPoModalVisible ||
+            IsMergePrModalVisible || IsSplitPrModalVisible || IsBatchRfqModalVisible ||
+            IsBatchPoModalVisible || IsBatchCreateModalVisible;
+
+    }
+}

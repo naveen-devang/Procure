@@ -42,54 +42,9 @@ namespace Procure
             _ = ShowWhatsNewIfJustUpdatedAsync();
 
 #if DEBUG
-            // Opt-in only: PROCURE_SELFCHECK=1. One environment read on a Debug launch, nothing in Release.
-            if (Environment.GetEnvironmentVariable("PROCURE_SELFCHECK") == "1")
-            {
-                Utilities.PrLineMatcherSelfCheck.Run();
-                Utilities.ClipboardItemParserSelfCheck.Run();
-                Utilities.UpdateDownloadCoordinatorSelfCheck.Run();
-            }
-
-            // Opt-in only: PROCURE_UPDATE_SELFCHECK=1.
-            if (Environment.GetEnvironmentVariable("PROCURE_UPDATE_SELFCHECK") == "1")
-            {
-                Utilities.UpdateCheckSchedulerSelfCheck.Run();
-                Utilities.UpdateStateStoreSelfCheck.Run();
-            }
-
-            // The two database suites run one after the other, never at once. Both assert invariants
-            // that are global - "no PR anywhere has stale search text", "no material aggregate
-            // anywhere disagrees with its rows" - and a global invariant cannot hold while another
-            // writer is mid-flight. Started in parallel, the flow check read the database in the
-            // middle of the call-off check creating its Raw Material orders and reported 6 stale
-            // aggregate rows against an app that was behaving correctly.
-            _databaseSuites = RunDatabaseSuitesAsync();
-
-            // Opt-in only: PROCURE_TODO_SELFCHECK=1.
-            if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") == "1")
-            {
-                _ = RunTodoSelfChecksAsync();
-            }
-
-            // Opt-in only: PROCURE_NOTE_SELFCHECK=1.
-            if (Environment.GetEnvironmentVariable("PROCURE_NOTE_SELFCHECK") == "1")
-            {
-                _ = RunNoteSelfChecksAsync();
-            }
-            else
-            {
-                // Sweep any self-check notes a killed run left behind, so a normal Debug launch
-                // never shows nfsc-/nrsc- notes in the list.
-                _ = SweepSelfCheckNotesAsync();
-            }
-
-            // The same sweep for tasks. Notes had one and tasks did not, so a self-check run that was
-            // killed before its cleanup left a "tfsc-..." task sitting in the real to-do list for
-            // good - one from 3 September was still there when this was written.
-            if (Environment.GetEnvironmentVariable("PROCURE_TODO_SELFCHECK") != "1")
-            {
-                _ = SweepSelfCheckTasksAsync();
-            }
+            // Every self-check now lives in Procure.Core (Data/SelfCheckSuite.cs) so the WinUI head
+            // can run exactly the same suite. Opt-in through the same environment variables.
+            _databaseSuites = Data.SelfCheckSuite.RunAsync(_services);
 #endif
         }
 

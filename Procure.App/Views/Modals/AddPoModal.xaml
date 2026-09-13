@@ -1,0 +1,550 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Procure.App.Views.Modals.AddPoModal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
+
+    <UserControl.Resources>
+        <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="#99000000">
+        <Grid.ChildrenTransitions>
+            <TransitionCollection>
+                <EntranceThemeTransition FromVerticalOffset="18" />
+            </TransitionCollection>
+        </Grid.ChildrenTransitions>
+        <Border MaxWidth="980" MaxHeight="860" Margin="24" CornerRadius="10" BorderThickness="1"
+                VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- header + stepper -->
+                <StackPanel Padding="20,14,16,12" Spacing="10" Background="{ThemeResource AppTertiaryBackground}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding PoModalTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding AddPoModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
+                                Command="{Binding CloseAddPoModalCommand}" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="10"
+                                Visibility="{Binding IsEditPoMode, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                        <Border Padding="10,4" CornerRadius="12" BorderThickness="0"
+                                Background="{Binding IsPoModalStep1, Converter={StaticResource ChipBg}}"
+                                BorderBrush="{Binding IsPoModalStep1, Converter={StaticResource ChipStroke}}">
+                            <TextBlock Style="{StaticResource AppText}" Text="1  Select Supplier Quotes" FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="{Binding IsPoModalStep1, Converter={StaticResource ChipText}}" />
+                        </Border>
+                        <TextBlock Style="{StaticResource AppText}" Text="&#x2192;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
+                        <Border Padding="10,4" CornerRadius="12" BorderThickness="0"
+                                Background="{Binding IsPoModalStep2, Converter={StaticResource ChipBg}}"
+                                BorderBrush="{Binding IsPoModalStep2, Converter={StaticResource ChipStroke}}">
+                            <TextBlock Style="{StaticResource AppText}" Text="2  Configure PO Details &amp; Quantities" FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="{Binding IsPoModalStep2, Converter={StaticResource ChipText}}" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" Padding="20,16" VerticalScrollBarVisibility="Visible">
+                    <Grid>
+                        <!-- ===== STEP 1 ===== -->
+                        <StackPanel Spacing="14" Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select Supplier Quotation(s) to Award" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select one or more quotes. A separate PO is created for each selected supplier in the next step."
+                                               FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="{Binding AllPoRfqsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="10,0"
+                                        Command="{Binding ToggleAllPoRfqsCommand}" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource AppText}" Text="No RFQ or vendor quotes found for this requisition. Create and price an RFQ first."
+                                       FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}"
+                                       Visibility="{Binding HasPoRfqs, Converter={StaticResource BoolVis}, ConverterParameter=invert}" />
+                            <!-- One card per selected supplier, stacked down a scroll: without a
+                                 count, the PO number fields for suppliers 2..n are easy to miss
+                                 entirely before hitting Raise. -->
+                            <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                                       Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
+                            <ItemsControl ItemsSource="{Binding PoRfqSelections}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PoRfqSelection">
+                                        <Border Padding="14,12" Margin="0,0,0,8" CornerRadius="6" BorderThickness="1"
+                                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="13.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}"
+                                                                Background="{ThemeResource AppSubtleFill}"
+                                                                Visibility="{x:Bind HasRfqNumber, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RfqNumber}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
+                                                        </Border>
+                                                        <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource FluentSuccess}"
+                                                                Background="{ThemeResource FluentSuccessBg}"
+                                                                Visibility="{x:Bind HasTechnicalApproval, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind TechnicalApproval}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}">
+                                                        <Run Text="{x:Bind SelectedItemsSummary}" /><Run Text="  ·  " /><Run Text="{x:Bind Incoterms}" /><Run Text="  ·  " /><Run Text="{x:Bind PaymentTerms}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold"
+                                                               HorizontalAlignment="Right" Foreground="{ThemeResource FluentSuccess}" />
+                                                    <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost" FontSize="10" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- ===== STEP 2 ===== -->
+                        <StackPanel Spacing="14"
+                                    Visibility="{Binding IsPoModalStep2, Converter={StaticResource BoolVis}}">
+                            <Border Padding="12,8" CornerRadius="6" BorderThickness="1"
+                                    Visibility="{Binding PoAllocationSummaryText, Converter={StaticResource NullVis}}"
+                                    BorderBrush="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilStroke}}"
+                                    Background="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilBg}}">
+                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PoAllocationSummaryText}" FontSize="11.5" FontWeight="SemiBold"
+                                           Foreground="{Binding PoAllocationSummaryText, Converter={StaticResource FulfilColor}}" />
+                            </Border>
+                            <!-- One card per selected supplier, stacked down a scroll: without a
+                                 count, the PO number fields for suppliers 2..n are easy to miss
+                                 entirely before hitting Raise. -->
+                            <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}"
+                                       Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} purchase order(s) to configure - one per supplier. Scroll for the rest.'}" />
+                            <ItemsControl ItemsSource="{Binding PoRfqSelections}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PoRfqSelection">
+                                        <Border Padding="16" Margin="0,0,0,16" CornerRadius="8" BorderThickness="1"
+                                                Visibility="{x:Bind IsSelected, Converter={StaticResource BoolVis}, Mode=OneWay}"
+                                                BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppTertiaryBackground}">
+                                            <StackPanel Spacing="14">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Rectangle Width="6" Height="18" RadiusX="2" RadiusY="2" Fill="{ThemeResource FluentSuccess}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Currency, Converter={StaticResource Fmt}, ConverterParameter='Currency: {0}'}" FontSize="10" FontWeight="SemiBold"
+                                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                        <TextBlock Style="{StaticResource AppText}" Text="PO Amount:" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                                                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="120" />
+                                                        <ColumnDefinition Width="240" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Style="{StaticResource AppText}" Text="PO Number *" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <TextBox Grid.Column="1" Text="{x:Bind PoNo, Mode=TwoWay}" PlaceholderText="e.g. PO-2026-101" FontSize="12" FontWeight="SemiBold" />
+                                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="Enter a unique PO reference for this supplier" FontSize="11"
+                                                               VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                                </Grid>
+
+                                                <Border BorderThickness="1" CornerRadius="8" Padding="12,10" BorderBrush="{ThemeResource AppHairline}"
+                                                        Visibility="{x:Bind IsRawMaterial, Converter={StaticResource BoolVis}}">
+                                                    <StackPanel Spacing="10">
+                                                        <Grid ColumnSpacing="10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Style="{StaticResource AppText}" Text="Transport" FontSize="12" FontWeight="SemiBold"
+                                                                       VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                                            <!-- Two ways to arrange transport, chosen per order. Whole-order is the
+                                                                 default and is exactly what this dialog did before. -->
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                                                <Grid>
+                                                                    <Border CornerRadius="14"
+                                                                            Background="{x:Bind TransportMode, Converter={StaticResource SegBg}, ConverterParameter=Order, Mode=OneWay}" />
+                                                                    <Button Height="28" Padding="12,0" CornerRadius="14" FontSize="11"
+                                                                            Background="Transparent" BorderThickness="0"
+                                                                            Content="One contract for the whole order"
+                                                                            Foreground="{x:Bind TransportMode, Converter={StaticResource SegText}, ConverterParameter=Order, Mode=OneWay}"
+                                                                            Tag="Order" Click="TransportMode_Click" />
+                                                                </Grid>
+                                                                <Grid>
+                                                                    <Border CornerRadius="14"
+                                                                            Background="{x:Bind TransportMode, Converter={StaticResource SegBg}, ConverterParameter=Line, Mode=OneWay}" />
+                                                                    <Button Height="28" Padding="12,0" CornerRadius="14" FontSize="11"
+                                                                            Background="Transparent" BorderThickness="0"
+                                                                            Content="Different per line"
+                                                                            Foreground="{x:Bind TransportMode, Converter={StaticResource SegText}, ConverterParameter=Line, Mode=OneWay}"
+                                                                            Tag="Line" Click="TransportMode_Click" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Grid ColumnSpacing="12" Visibility="{x:Bind IsOrderTransport, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Spacing="4">
+                                                                <TextBlock Text="Contract Number" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind TransportContractNumber, Mode=TwoWay}" PlaceholderText="e.g. TC-2026-014" FontSize="12" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                                <TextBlock Text="Transporter Name" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind TransporterName, Mode=TwoWay}" PlaceholderText="e.g. Al Futtaim Logistics" FontSize="12" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="2" Spacing="4">
+                                                                <TextBlock Text="Rate / Unit" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind TransportRatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="3" Spacing="4">
+                                                                <TextBlock Text="Transport Total" Style="{StaticResource Lbl}" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
+                                                                           VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Grid ColumnSpacing="12" Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource AppText}" Text="Each line carries its own contract - set it in the Transport column."
+                                                                           FontSize="11.5" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind UnallocatedLineText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                                           Foreground="{ThemeResource FluentCaution}"
+                                                                           Visibility="{x:Bind HasUnallocatedLines, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" Content="Fill all lines" FontSize="11" Height="28" Padding="12,0"
+                                                                    VerticalAlignment="Center" Margin="12,0,0,0"
+                                                                    ToolTipService.ToolTip="Put the order-level contract on every line"
+                                                                    Click="FillLines_Click" />
+                                                            <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" MinWidth="120" Margin="16,0,0,0">
+                                                                <TextBlock Text="Transport Total" Style="{StaticResource Lbl}" HorizontalAlignment="Right" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedTransportTotal, Mode=OneWay}" FontSize="13" FontWeight="SemiBold"
+                                                                           HorizontalAlignment="Right" Foreground="{ThemeResource AppTextPrimary}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <StackPanel Spacing="8" Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}}">
+                                                    <!-- Header row: without it these are four unlabelled number boxes
+                                                         per line and the computed total looks like another input. -->
+                                                    <Grid ColumnSpacing="8" Padding="10,0">
+                                                        <Grid.Resources>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="FontSize" Value="10" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                                            </Style>
+                                                        </Grid.Resources>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="36" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="75" />
+                                                            <ColumnDefinition Width="45" />
+                                                            <ColumnDefinition Width="95" />
+                                                            <ColumnDefinition Width="85" />
+                                                            <ColumnDefinition Width="100" />
+                                                            <ColumnDefinition Width="28" />
+                                                            <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="ITEM" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="QTY" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="UNIT" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="UNIT RATE" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="5" Text="DISCOUNT" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="8" Text="TRANSPORT"
+                                                                   Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                                    </Grid>
+                                                    <!-- A ListView, not an ItemsControl, and capped in height: that is what makes it virtualize.
+                                                         An ItemsControl builds a row for every line it is given - measured at 150 lines across five
+                                                         quotes, opening this step froze the UI for 13.4 SECONDS and added ~350 MB, because it built
+                                                         750 editable rows up front. Inside the modal's own ScrollViewer a list only virtualizes if
+                                                         its viewport is bounded, hence MaxHeight. A normal requisition's few lines are shorter than
+                                                         the cap, so the list sizes to them and this card looks exactly as it did; only a long one
+                                                         scrolls inside its card. The item container is stripped back so a row keeps its own border
+                                                         and fill rather than picking up list selection and hover chrome. -->
+                                                    <ListView ItemsSource="{x:Bind Items}" MaxHeight="560" SelectionMode="None" IsItemClickEnabled="False"
+                                                              Padding="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <!-- Half a viewport of rows kept ready either side, not the default four. Opening this step
+                                                             measures all five supplier cards at once, and each list would otherwise realize its visible
+                                                             rows plus several screens more - that was most of the remaining one-second hitch, once the
+                                                             view-model side was timed at 15 ms. A row is heavy here: a checkbox and three input boxes. -->
+                                                        <ListView.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <ItemsStackPanel CacheLength="0.5" />
+                                                            </ItemsPanelTemplate>
+                                                        </ListView.ItemsPanel>
+                                                        <ListView.ItemContainerStyle>
+                                                            <Style TargetType="ListViewItem">
+                                                                <Setter Property="Padding" Value="0" />
+                                                                <Setter Property="Margin" Value="0" />
+                                                                <Setter Property="MinHeight" Value="0" />
+                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                            </Style>
+                                                        </ListView.ItemContainerStyle>
+                                                        <ListView.Resources>
+                                                            <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="Transparent" />
+                                                            <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="Transparent" />
+                                                        </ListView.Resources>
+                                                        <ListView.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:PoRfqItemSelection">
+                                                                <Border Padding="10,6" Margin="0,0,0,4" CornerRadius="4" BorderThickness="1"
+                                                                        BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
+                                                                  <StackPanel Spacing="8">
+                                                                    <Grid ColumnSpacing="8">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="36" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="75" />
+                                                                            <ColumnDefinition Width="45" />
+                                                                            <ColumnDefinition Width="95" />
+                                                                            <ColumnDefinition Width="85" />
+                                                                            <ColumnDefinition Width="100" />
+                                                                            <ColumnDefinition Width="28" />
+                                                                            <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ItemName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                                                                       Foreground="{x:Bind AllocationStatusText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
+                                                                        </StackPanel>
+                                                                        <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                                                        <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                                                                        <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
+                                                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                                                                        <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
+                                                                                Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AppTextSecondary}"
+                                                                                VerticalAlignment="Center" Click="RemoveLine_Click" />
+
+                                                                        <!-- One chip per line: the contract, a count when the quantity is
+                                                                             split, or a prompt. Opens the panel below. -->
+                                                                        <Button Grid.Column="8" MinWidth="130" Height="28" Padding="10,0" CornerRadius="10"
+                                                                                FontSize="11" VerticalAlignment="Center"
+                                                                                Content="{x:Bind TransportSummary, Mode=OneWay}"
+                                                                                ToolTipService.ToolTip="{x:Bind TransportSummary, Mode=OneWay}"
+                                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                                                                Foreground="{x:Bind HasTransport, Converter={StaticResource ChipText}, Mode=OneWay}"
+                                                                                Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}"
+                                                                                Click="LineTransport_Click" />
+                                                                    </Grid>
+
+                                                                    <Border CornerRadius="6" Padding="10,8" Background="{ThemeResource AppSubtleFill}"
+                                                                            Visibility="{x:Bind IsTransportExpanded, Converter={StaticResource BoolVis}, Mode=OneWay}"
+                                                                            x:Load="{x:Bind IsLineTransport, Mode=OneWay}" x:Name="LineTransportPanel">
+                                                                        <StackPanel Spacing="6">
+                                                                            <Grid ColumnSpacing="8">
+                                                                                <Grid.Resources>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="FontSize" Value="9.5" />
+                                                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                                                        <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                                                                    </Style>
+                                                                                </Grid.Resources>
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="80" />
+                                                                                    <ColumnDefinition Width="*" />
+                                                                                    <ColumnDefinition Width="*" />
+                                                                                    <ColumnDefinition Width="95" />
+                                                                                    <ColumnDefinition Width="100" />
+                                                                                    <ColumnDefinition Width="28" />
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBlock Style="{StaticResource AppText}" Text="QTY" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="CONTRACT" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="TRANSPORTER" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="RATE / UNIT" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="TOTAL" HorizontalAlignment="Right" />
+                                                                            </Grid>
+                                                                            <ItemsControl ItemsSource="{x:Bind Transports}">
+                                                                                <ItemsControl.ItemTemplate>
+                                                                                    <DataTemplate x:DataType="models:PoItemTransport">
+                                                                                        <Grid ColumnSpacing="8" Margin="0,0,0,4">
+                                                                                            <Grid.ColumnDefinitions>
+                                                                                                <ColumnDefinition Width="80" />
+                                                                                                <ColumnDefinition Width="*" />
+                                                                                                <ColumnDefinition Width="*" />
+                                                                                                <ColumnDefinition Width="95" />
+                                                                                                <ColumnDefinition Width="100" />
+                                                                                                <ColumnDefinition Width="28" />
+                                                                                            </Grid.ColumnDefinitions>
+                                                                                            <TextBox Height="30" FontSize="11.5" TextAlignment="Right"
+                                                                                                     Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}"
+                                                                                                     TextChanged="TransportEdited" />
+                                                                                            <TextBox Grid.Column="1" Height="30" FontSize="11.5" PlaceholderText="e.g. TC-2026-014"
+                                                                                                     Text="{x:Bind ContractNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                     TextChanged="TransportEdited" />
+                                                                                            <TextBox Grid.Column="2" Height="30" FontSize="11.5" PlaceholderText="e.g. Gulf Freight LLC"
+                                                                                                     Text="{x:Bind TransporterName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                     TextChanged="TransportEdited" />
+                                                                                            <TextBox Grid.Column="3" Height="30" FontSize="11.5" TextAlignment="Right" PlaceholderText="0.00"
+                                                                                                     Text="{x:Bind RatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}"
+                                                                                                     TextChanged="TransportEdited" />
+                                                                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="{x:Bind FormattedTotal, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold"
+                                                                                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                                                       Foreground="{ThemeResource AppTextPrimary}" />
+                                                                                            <Button Grid.Column="5" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
+                                                                                                    Width="26" Height="26" Padding="0" Background="Transparent" BorderThickness="0"
+                                                                                                    Foreground="{ThemeResource AppTextSecondary}" VerticalAlignment="Center"
+                                                                                                    Click="RemoveTransport_Click" />
+                                                                                        </Grid>
+                                                                                    </DataTemplate>
+                                                                                </ItemsControl.ItemTemplate>
+                                                                            </ItemsControl>
+                                                                            <Grid>
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="Auto" />
+                                                                                    <ColumnDefinition Width="*" />
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <Button Content="+ Split this line" FontSize="11" Height="26" Padding="10,0"
+                                                                                        Click="AddTransport_Click" />
+                                                                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{x:Bind TransportAllocationText, Mode=OneWay}"
+                                                                                           FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"
+                                                                                           VerticalAlignment="Center"
+                                                                                           Foreground="{x:Bind UnallocatedQuantity, Converter={StaticResource AllocColor}, Mode=OneWay}" />
+                                                                            </Grid>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                  </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ListView.ItemTemplate>
+                                                    </ListView>
+                                                </StackPanel>
+
+                                                <Border Padding="14,10" CornerRadius="6" BorderThickness="1"
+                                                        BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSubtleFill}">
+                                                    <StackPanel Spacing="10">
+                                                        <TextBlock Style="{StaticResource AppText}" Text="Commercial Terms &amp; Landed Cost Breakdown" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                        <Grid ColumnSpacing="10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Spacing="2">
+                                                                <TextBlock Text="Base Price" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind CustomBaseAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                                <TextBlock Text="Freight (+)" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind Freight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="2" Spacing="2">
+                                                                <TextBlock Text="Other Charges (+)" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind OtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="3" Spacing="2">
+                                                                <TextBlock Text="Total Discount (-)" Style="{StaticResource Lbl}" />
+                                                                <TextBox Text="{x:Bind OverallDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="4" Spacing="2">
+                                                                <TextBlock Text="VAT Type" Style="{StaticResource Lbl}" />
+                                                                <ComboBox HorizontalAlignment="Stretch" FontSize="11.5" SelectedItem="{x:Bind VatType, Mode=TwoWay}">
+                                                                    <x:String>5%</x:String>
+                                                                    <x:String>RC</x:String>
+                                                                    <x:String>V0</x:String>
+                                                                </ComboBox>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedVatAmount, Converter={StaticResource Fmt}, ConverterParameter='Calculated VAT: +{0}', Mode=OneWay}"
+                                                                       FontSize="11" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource AppText}" Text="Total PO Value:" FontSize="12.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedDisplayAmount, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- footer -->
+                <Grid Grid.Row="2" Padding="20,14" ColumnSpacing="10" Background="{ThemeResource AppTertiaryBackground}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Cancel" Command="{Binding CloseAddPoModalCommand}"
+                            Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}" />
+                    <Button Content="{Binding PoModalBackButtonText}" Command="{Binding GoToPoStep1Command}"
+                            Visibility="{Binding IsPoModalStep2, Converter={StaticResource BoolVis}}" />
+                    <Border Grid.Column="1" Padding="12,6" CornerRadius="16" MinWidth="70" BorderThickness="0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                            BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding SelectedPoRfqCount, Converter={StaticResource Fmt}, ConverterParameter='Selected: {0} quote(s)'}"
+                                       FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="·" FontSize="11.5" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Style="{StaticResource AppText}" Text="{Binding TotalPoAmountSummary}" FontSize="11.5" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                        </StackPanel>
+                    </Border>
+                    <Button Grid.Column="2" Content="Next: Configure PO(s) →" Style="{StaticResource AccentButtonStyle}"
+                            Command="{Binding GoToPoStep2Command}" IsEnabled="{Binding CanGoToPoStep2}"
+                            Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}" />
+                    <Button Grid.Column="2" Content="{Binding PoModalSaveButtonText}" Style="{StaticResource AccentButtonStyle}"
+                            Command="{Binding SaveNewPoCommand}"
+                            Visibility="{Binding IsPoModalStep2, Converter={StaticResource BoolVis}}" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

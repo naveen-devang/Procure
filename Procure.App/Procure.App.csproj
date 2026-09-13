@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The native WinUI 3 app (MIGRATION-PLAN.md Phase 2+). Replaces the MAUI head:
+       same Procure.Core, same SQLite file, same Velopack packaging. Build with
+       MSBuild, not `dotnet build` (the XAML compiler crashes under the CLI here). -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Procure.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <NoWarn>$(NoWarn);MSB3270;CsWinRT1028;CS0618</NoWarn>
+
+    <!-- Memory & GC - matches Procure.csproj. Workstation + concurrent: one managed heap
+         instead of one per core, gen2 collected in the background. These are the .NET
+         defaults for a standalone app, but the MAUI head set them explicitly while the
+         WinUI runtimeconfig.json had nothing - stated here so the flavor can't drift on a
+         many-core box. TieredPGO trims the JIT'd-code footprint; R2R helps cold start. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260529003" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Procure.Core\Procure.Core.csproj" />
+  </ItemGroup>
+
+  <!-- UI font (redesign, Sep 2026): Plus Jakarta Sans, variable weight, referenced via
+       ms-appx:///Assets/Fonts/... in App.xaml. Segoe Fluent Icons stays untouched for glyphs. -->
+  <ItemGroup>
+    <Content Include="Assets\Fonts\*.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -15,6 +15,21 @@ namespace Procure
     {
         public static MauiApp CreateMauiApp()
         {
+            // DatabaseConstants now lives in Procure.Core (no MAUI). Back its saved-directory
+            // hooks with Preferences, the same store it used to read/write directly.
+            Procure.Data.DatabaseConstants.SavedDirectoryReader = () =>
+            {
+                var v = Microsoft.Maui.Storage.Preferences.Default.Get("CustomDatabaseDirectory", string.Empty);
+                return string.IsNullOrEmpty(v) ? null : v;
+            };
+            Procure.Data.DatabaseConstants.SavedDirectoryWriter = v =>
+                Microsoft.Maui.Storage.Preferences.Default.Set("CustomDatabaseDirectory", v);
+
+#if WINDOWS
+            // Core view models report page-load times through PerfProbe; forward them to the HUD.
+            Procure.Utilities.PerfProbe.PageLoad = Procure.Utilities.PerfHud.ReportPageLoad;
+#endif
+
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
@@ -26,10 +41,12 @@ namespace Procure
                     {
                         windows.OnWindowCreated(window =>
                         {
-                            window.SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop
-                            {
-                                Kind = Microsoft.UI.Composition.SystemBackdrops.MicaKind.Base
-                            };
+                            // Mica backdrop removed (perf experiment, PERF-PLAN.md Phase A.1).
+                            // TitleBarHelper already paints the window root grid opaque and every
+                            // page paints an opaque background, so Mica was never visible - it only
+                            // put the window on the DWM backdrop composition path. No visual change;
+                            // restore with `window.SystemBackdrop = new MicaBackdrop { Kind = Base }`
+                            // if it turns out not to matter.
 
                             try
                             {
@@ -141,6 +158,13 @@ namespace Procure
             // Shared by Tasks and Notes, which used to hold a full copy of this each.
             builder.Services.AddSingleton<ILinkTargetService, LinkTargetService>();
             builder.Services.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
+
+            // Procure.Core platform abstractions (MIGRATION-PLAN.md Phase 1b) - MAUI implementations.
+            builder.Services.AddSingleton<Procure.Abstractions.IUiDispatcher, Procure.Services.MauiUiDispatcher>();
+            builder.Services.AddSingleton<Procure.Abstractions.INavigationService, Procure.Services.MauiNavigationService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IDialogService, Procure.Services.MauiDialogService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IClipboardService, Procure.Services.MauiClipboardService>();
+            builder.Services.AddSingleton<Procure.Abstractions.IAppHost, Procure.Services.MauiAppHost>();
 
             // Services
             builder.Services.AddSingleton<ISettingsService, SettingsService>();

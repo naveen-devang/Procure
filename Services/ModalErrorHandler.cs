@@ -33,7 +33,7 @@ namespace Procure.Services
 
                     if (Shell.Current != null)
                     {
-                        await Shell.Current.DisplayAlertAsync("Error", ex.Message, "OK");
+                        await Shell.Current.DisplayAlertAsync("Error", Procure.Utilities.UserFacingError.Describe(ex), "OK");
                     }
                     else
                     {

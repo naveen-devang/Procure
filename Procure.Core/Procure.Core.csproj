@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- UI-free core: domain models, SQLite data layer, repositories, and the pure
+       business logic (PrLineMatcher, MoneyFormat). No MAUI, no WinUI - referenced
+       by both the MAUI app (during the migration) and the new WinUI app.
+       See MIGRATION-PLAN.md Phase 1. -->
+
+  <PropertyGroup>
+    <!-- Windows-only, like the app. Lets the data + rasterization layer use System.Drawing
+         and WinRT clipboard APIs without a UI framework. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Procure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Self-check harness classes stay internal; the app hosts that runs them see them. -->
+    <InternalsVisibleTo Include="Procure" />
+    <InternalsVisibleTo Include="Procure.Spike" />
+    <InternalsVisibleTo Include="Procure.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.11" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+  </ItemGroup>
+
+</Project>

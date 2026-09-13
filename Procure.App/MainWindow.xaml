@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Procure.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    Title="RWC MM Tracker">
+
+    <!-- Explicit background: the window has no backdrop (Mica is off), so without this the
+         NavigationView pane's default acrylic falls back to fully transparent on an unpackaged
+         build - fine-looking in dark, see-through to the desktop in light. -->
+    <Grid Background="{ThemeResource AppBackground}">
+        <muxc:NavigationView
+            x:Name="Nav"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            OpenPaneLength="180"
+            Background="{ThemeResource AppBackground}"
+            SelectionChanged="Nav_SelectionChanged">
+            <muxc:NavigationView.Resources>
+                <!-- Replace the acrylic pane fills (transparent on an unpackaged build) with a
+                     solid surface. Theme-keyed so it re-resolves live when RequestedTheme flips -
+                     a plain StaticResource froze the pane to its launch-time colour. Values match
+                     AppBackground (redesign, Sep 2026). -->
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#FBFAF8" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#FBFAF8" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#FBFAF8" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#161619" />
+                            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#161619" />
+                            <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="#161619" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </muxc:NavigationView.Resources>
+
+            <muxc:NavigationView.MenuItems>
+                <muxc:NavigationViewItemHeader Content="Workspace" />
+                <muxc:NavigationViewItem Content="PR Board" Tag="Board" IsSelected="True">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="ViewAll" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItem Content="Dashboard" Tag="Dashboard">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="CallOff">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItemHeader Content="Planning" />
+                <muxc:NavigationViewItem Content="Tasks" Tag="Tasks">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="List" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+                <muxc:NavigationViewItem Content="Notes" Tag="Notes">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Page2" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+            </muxc:NavigationView.MenuItems>
+            <muxc:NavigationView.FooterMenuItems>
+                <muxc:NavigationViewItem Content="Settings" Tag="Settings">
+                    <muxc:NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
+            </muxc:NavigationView.FooterMenuItems>
+
+            <Frame x:Name="ContentFrame">
+                <!-- Fires on a direct Content set too (NavigateTo assigns .Content to keep DI
+                     singletons), so tab switches get the standard entrance animation. -->
+                <Frame.ContentTransitions>
+                    <TransitionCollection>
+                        <NavigationThemeTransition />
+                    </TransitionCollection>
+                </Frame.ContentTransitions>
+            </Frame>
+        </muxc:NavigationView>
+
+        <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
+             Bottom-right so it clears the caption buttons reserved by ExtendsContentIntoTitleBar. -->
+        <!-- Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
+        <Border x:Name="Hud" Visibility="Collapsed"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,12,10" Padding="8,4"
+                CornerRadius="4" IsHitTestVisible="False"
+                Background="#99000000">
+            <TextBlock x:Name="HudText" FontFamily="Consolas" FontSize="11"
+                       Foreground="#30FF90" Text="perf: warming up…" />
+        </Border>
+    </Grid>
+</Window>

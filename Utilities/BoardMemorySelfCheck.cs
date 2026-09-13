@@ -266,7 +266,7 @@ namespace Procure.Utilities
         {
             var model = PrListPageModel.Current!;
 
-            model.PcrPreviewPages.Add(ImageSource.FromStream(() => new MemoryStream(new byte[] { 1, 2, 3 })));
+            model.PcrPreviewPages.Add(new byte[] { 1, 2, 3 });
             model.BackToPcrExportModal();
 
             if (model.PcrPreviewPages.Count == 0)

@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Procure.App.Views.CallOffPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models"
+    xmlns:conv="using:Procure.App.Converters"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Page.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:BoolToChevronConverter x:Key="Chevron" />
+        <conv:NullOrEmptyToVisibilityConverter x:Key="NullVis" />
+        <conv:DateTimeOffsetConverter x:Key="Dto" />
+        <conv:PercentTextConverter x:Key="Pct" />
+        <conv:ShortDateConverter x:Key="ShortDate" />
+
+        <Style x:Key="Pane" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style x:Key="TileCap" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+        </Style>
+        <Style x:Key="TileVal" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+
+        <DataTemplate x:Key="CallOffLineRow" x:DataType="models:CallOffLine">
+            <Grid Padding="8,6" Margin="0,0,2,0" CornerRadius="6" Tapped="Line_Tapped" Background="Transparent">
+                <Grid.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Grid.Resources>
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind Vendor}" FontWeight="SemiBold" FontSize="11.5" MaxLines="1"
+                                   TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind PercentComplete, Converter={StaticResource Pct}, Mode=OneWay}" FontWeight="SemiBold" FontSize="10.5"
+                                   Foreground="{ThemeResource AppTextSecondary}" />
+                    </Grid>
+                    <TextBlock Text="{x:Bind PoNo}" FontSize="10" MaxLines="1" TextTrimming="CharacterEllipsis"
+                               Foreground="{ThemeResource AppTextSecondary}"
+                               Visibility="{x:Bind PoNo, Converter={StaticResource NullVis}}" />
+                    <ProgressBar Value="{x:Bind PercentComplete, Mode=OneWay}" Maximum="100" Height="4"
+                                 Foreground="{ThemeResource AccentFillBrush}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="24" ColumnSpacing="16" Background="{ThemeResource AppBackground}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT: material index -->
+        <Border Style="{StaticResource Pane}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <!-- One row: the field takes the space, the two icon buttons are a matched pair.
+                     The gap was ColumnSpacing plus a stray Margin on the sort button, and the two
+                     buttons picked up different backgrounds because only one carried a style. -->
+                <Grid Margin="10,10,10,0" ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox PlaceholderText="Search material, vendor, PO, PR, contract" FontSize="12" Height="34"
+                             ToolTipService.ToolTip="Matches material, vendor, PO number, PR number, transport contract or transporter"
+                             Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="1" Style="{StaticResource ToolbarIcon}"
+                            Content="{Binding SortOrderGlyph}" Command="{Binding ToggleSortOrderCommand}"
+                            ToolTipService.ToolTip="{Binding SortOrderLabel}" />
+                    <Button Grid.Column="2" Style="{StaticResource ToolbarIcon}"
+                            Content="&#xE72C;" Command="{Binding RefreshCommand}"
+                            ToolTipService.ToolTip="Refresh" />
+                </Grid>
+
+                <ListView Grid.Row="1" x:Name="GroupList" ItemsSource="{Binding Groups}" SelectionMode="None" Margin="8"
+                          ContainerContentChanging="GroupList_ContainerContentChanging"
+                          Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                    <!-- MAUI animated the expand; WinUI's list does not by default. -->
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection>
+                            <RepositionThemeTransition />
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,0,0,8" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:MaterialGroup">
+                            <!-- The whole card toggles, not just the title row. The tap used to sit on
+                                 the header Grid alone, so clicking the progress bar, the vendor count
+                                 or anywhere in the card's padding did nothing - which reads as a dead
+                                 card, since none of that text is selectable either. A line row inside
+                                 marks its own tap handled, so expanding does not make the lines
+                                 collapse the group. -->
+                            <Border Padding="12,10" BorderThickness="1" CornerRadius="8" Tapped="Group_Tapped"
+                                    BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                <Border.Resources>
+                                    <!-- Clicked, not read (see Styles.xaml). -->
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                                </Border.Resources>
+                                <StackPanel Spacing="8">
+                                    <StackPanel.ChildrenTransitions>
+                                        <TransitionCollection>
+                                            <RepositionThemeTransition />
+                                        </TransitionCollection>
+                                    </StackPanel.ChildrenTransitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind IsExpanded, Converter={StaticResource Chevron}, Mode=OneWay}"
+                                                   FontFamily="Segoe Fluent Icons" FontSize="11" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource AppTextTertiary}" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind MaterialName}" FontWeight="SemiBold" FontSize="13.5"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind PercentComplete, Converter={StaticResource Pct}, Mode=OneWay}" FontSize="13.5"
+                                                   FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                    </Grid>
+                                    <ProgressBar Value="{x:Bind PercentComplete, Mode=OneWay}" Maximum="100" Height="5"
+                                                 Foreground="{ThemeResource AccentFillBrush}" />
+                                    <TextBlock Text="{x:Bind VendorCountText, Mode=OneWay}" FontSize="10.5"
+                                               Foreground="{ThemeResource AppTextSecondary}" />
+                                    <StackPanel x:Name="ExpandedLines" Spacing="6" x:Load="{x:Bind IsExpanded, Mode=OneWay}">
+                                        <StackPanel.ChildrenTransitions>
+                                            <TransitionCollection>
+                                                <EntranceThemeTransition FromVerticalOffset="-12" />
+                                            </TransitionCollection>
+                                        </StackPanel.ChildrenTransitions>
+                                        <Border Height="1" Background="{ThemeResource AppHairline}" />
+                                        <ItemsControl ItemsSource="{x:Bind VisibleLines}" ItemTemplate="{StaticResource CallOffLineRow}" />
+                                        <Button Content="{x:Bind ShowMoreText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                Height="30" Padding="10,0" Background="Transparent"
+                                                BorderBrush="{ThemeResource AppHairline}" BorderThickness="1"
+                                                Foreground="{ThemeResource PrimaryTextBrush}" Click="ShowMore_Click"
+                                                Visibility="{x:Bind HasMoreLines, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <!-- Materials arrive a page at a time now, so the first open goes from a full list to
+                     an empty one that fills. Only the first fill - scrolling for more happens below
+                     the fold and needs nothing. -->
+                <StackPanel Grid.Row="1" Margin="8,8,8,0" Spacing="8"
+                            Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}}">
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                    <Border Style="{StaticResource SkeletonCard}" Height="72" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- RIGHT: detail. Toggling Visibility animates nothing in WinUI, so picking a vendor
+             swapped the pane in with a hard cut; the page code runs DetailEntrance on every
+             selection change instead. -->
+        <Grid x:Name="DetailPane" Grid.Column="1" RowSpacing="14"
+              Visibility="{Binding SelectedLine, Converter={StaticResource NullVis}}">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="DetailShift" />
+            </Grid.RenderTransform>
+            <Grid.Resources>
+                <Storyboard x:Name="DetailEntrance">
+                    <DoubleAnimation Storyboard.TargetName="DetailPane" Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.18" />
+                    <DoubleAnimation Storyboard.TargetName="DetailShift" Storyboard.TargetProperty="Y"
+                                     From="14" To="0" Duration="0:0:0.22" EnableDependentAnimation="True">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut" />
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </Grid.Resources>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource Pane}" Padding="16" DataContext="{Binding SelectedLine}">
+                <StackPanel Spacing="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="VENDOR" FontSize="10" Foreground="{ThemeResource AppTextSecondary}" />
+                            <TextBlock Text="{Binding Vendor}" FontWeight="SemiBold" FontSize="20"
+                                       Foreground="{ThemeResource AppTextPrimary}" />
+                        </StackPanel>
+                        <Grid Grid.Column="1" ColumnSpacing="6" RowSpacing="4" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="PO" FontSize="10" HorizontalTextAlignment="Right" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Grid.Column="1" Text="{Binding PoNo}" FontWeight="SemiBold" FontSize="12.5" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Grid.Row="1" Text="PR" FontSize="10" HorizontalTextAlignment="Right" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PrNo}" FontWeight="SemiBold" FontSize="12.5" Foreground="{ThemeResource AppTextPrimary}" />
+                            <TextBlock Grid.Row="2" Text="CONTRACT" FontSize="10" HorizontalTextAlignment="Right" Foreground="{ThemeResource AppTextTertiary}"
+                                       Visibility="{Binding HasTransportContractNumber, Converter={StaticResource BoolVis}}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TransportContractNumber}" FontWeight="SemiBold" FontSize="12.5"
+                                       Foreground="{ThemeResource AppTextPrimary}"
+                                       Visibility="{Binding HasTransportContractNumber, Converter={StaticResource BoolVis}}" />
+                            <TextBlock Grid.Row="3" Text="TRANSPORTER" FontSize="10" HorizontalTextAlignment="Right" Foreground="{ThemeResource AppTextTertiary}"
+                                       Visibility="{Binding HasTransporterName, Converter={StaticResource BoolVis}}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TransporterName}" FontWeight="SemiBold" FontSize="12.5"
+                                       Foreground="{ThemeResource AppTextPrimary}"
+                                       Visibility="{Binding HasTransporterName, Converter={StaticResource BoolVis}}" />
+                        </Grid>
+                        <StackPanel Grid.Column="2" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock Text="MATERIAL" FontSize="10" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
+                            <TextBlock Text="{Binding MaterialName}" FontWeight="SemiBold" FontSize="20" HorizontalAlignment="Right"
+                                       Foreground="{ThemeResource AppTextPrimary}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Tile}">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="ORDERED" Style="{StaticResource TileCap}" />
+                                <TextBlock Text="{Binding FormattedOrdered}" Style="{StaticResource TileVal}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource Tile}">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="DELIVERED" Style="{StaticResource TileCap}" />
+                                <TextBlock Text="{Binding FormattedCalledOff, Mode=OneWay}" Style="{StaticResource TileVal}"
+                                           Foreground="{ThemeResource PrimaryTextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Tile}">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="REMAINING" Style="{StaticResource TileCap}" />
+                                <TextBlock Text="{Binding FormattedRemaining, Mode=OneWay}" Style="{StaticResource TileVal}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="3" Style="{StaticResource Tile}"
+                                Visibility="{Binding IsRawMaterial, Converter={StaticResource BoolVis}}">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="TRANSPORT RATE/UNIT" Style="{StaticResource TileCap}" />
+                                <TextBlock Text="{Binding FormattedTransportRatePerUnit}" Style="{StaticResource TileVal}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <ProgressBar Value="{Binding Percent01, Mode=OneWay}" Maximum="1" Height="6"
+                                 Foreground="{ThemeResource AccentFillBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- log-delivery form -->
+            <Border Grid.Row="1" Style="{StaticResource Pane}" Padding="14">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <CalendarDatePicker Date="{Binding NewCallOffDate, Converter={StaticResource Dto}, Mode=TwoWay}" />
+                    <TextBox Grid.Column="1" PlaceholderText="Qty" Height="34" Text="{Binding NewCallOffQuantity, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding SelectedLine.Unit}" VerticalAlignment="Center" FontSize="12"
+                               Foreground="{ThemeResource AppTextSecondary}" />
+                    <TextBox Grid.Column="3" PlaceholderText="Note (optional)" Height="34" Text="{Binding NewCallOffNote, Mode=TwoWay}" />
+                    <Button Grid.Column="4" Content="+ Log Delivery" Style="{StaticResource AccentButtonStyle}"
+                            Command="{Binding LogCallOffCommand}" />
+                </Grid>
+            </Border>
+
+            <!-- history -->
+            <Border Grid.Row="2" Style="{StaticResource Pane}" Padding="14">
+                <Grid RowSpacing="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="0,0,0,8" ColumnSpacing="0" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource AppHairline}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Background="Transparent" BorderThickness="0" Padding="0" Tag="Date" Click="Sort_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                <TextBlock Text="DATE" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
+                                <TextBlock Text="{Binding DateSortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
+                                           Foreground="{ThemeResource AppTextTertiary}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="0" Tag="Quantity" Click="Sort_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                                <TextBlock Text="QUANTITY" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
+                                <TextBlock Text="{Binding QuantitySortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
+                                           Foreground="{ThemeResource AppTextTertiary}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="2" Text="NOTE" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" VerticalAlignment="Bottom" />
+                    </Grid>
+                    <ListView Grid.Row="1" ItemsSource="{Binding SelectedLineHistory}" SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:PoItemCallOff">
+                                <Grid Padding="0,8" ColumnSpacing="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind CallOffDate, Converter={StaticResource ShortDate}}" FontSize="11" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Quantity}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Note}" FontSize="11.5" MaxLines="1" TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <Button Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                            Height="26" Width="26" Padding="0" CornerRadius="4" Click="DeleteEntry_Click"
+                                            Background="{ThemeResource FluentCriticalBg}" Foreground="{ThemeResource FluentCritical}"
+                                            ToolTipService.ToolTip="Delete entry" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <TextBlock Grid.Column="1" Text="Select a vendor line on the left to log or review deliveries."
+                   HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
+                   Foreground="{ThemeResource AppTextTertiary}"
+                   Visibility="{Binding NoLineSelected, Converter={StaticResource BoolVis}}" />
+    </Grid>
+</Page>

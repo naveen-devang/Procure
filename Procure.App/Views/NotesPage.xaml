@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Procure.App.Views.NotesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models"
+    xmlns:views="using:Procure.App.Views"
+    xmlns:conv="using:Procure.App.Converters"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Page.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+
+        <Style x:Key="Pane" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style x:Key="ToolBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+
+        <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
+            <Grid Padding="11,8" Tapped="Note_Tapped">
+                <Grid.Resources>
+                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                </Grid.Resources>
+                <StackPanel Spacing="1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Width="5" Height="5" VerticalAlignment="Center" Fill="{ThemeResource PrimaryTextBrush}"
+                                 Visibility="{x:Bind Pinned, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind DisplayTitle, Mode=OneWay}" FontWeight="SemiBold" FontSize="12.5"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="{ThemeResource AppTextPrimary}" />
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind Snippet, Mode=OneWay}" FontSize="11" TextTrimming="CharacterEllipsis" MaxLines="1"
+                               Foreground="{ThemeResource AppTextTertiary}"
+                               Visibility="{x:Bind HasSnippet, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind WhenLabel, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextTertiary}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="20" ColumnSpacing="16" Background="{ThemeResource AppBackground}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="292" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT: index -->
+        <Border Style="{StaticResource Pane}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Padding="14,14,14,10" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Notes" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock FontSize="11" Foreground="{ThemeResource AppTextTertiary}"
+                                   Text="{Binding NoteCountLabel}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="+ New" FontSize="11.5" Height="30" Padding="12,0" CornerRadius="7"
+                            Command="{Binding NewNoteCommand}" />
+                </Grid>
+                <TextBox Grid.Row="1" PlaceholderText="Search notes" FontSize="12.5" Margin="14,0,14,10" Height="34"
+                         Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <ListView Grid.Row="2" x:Name="NoteList" ItemsSource="{Binding Notes}" SelectionMode="None"
+                          Margin="6,0,6,8" ItemTemplate="{StaticResource NoteRow}" />
+            </Grid>
+        </Border>
+
+        <!-- RIGHT: editor -->
+        <Border Grid.Column="1" Style="{StaticResource Pane}"
+                Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Padding="16,12,12,8" ColumnSpacing="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox PlaceholderText="Note title" FontWeight="SemiBold" FontSize="15" BorderThickness="0"
+                             Background="Transparent" Text="{Binding SelectedNote.Title, Mode=TwoWay}" />
+                    <Button Grid.Column="1" Content="Pin" FontSize="11" Height="28" Padding="10,0" Background="Transparent"
+                            BorderThickness="0" Foreground="{ThemeResource AppTextTertiary}" Click="Pin_Click" />
+                    <Button Grid.Column="2" Content="Duplicate" FontSize="11" Height="28" Padding="10,0" Background="Transparent"
+                            BorderThickness="0" Foreground="{ThemeResource AppTextTertiary}" Click="Duplicate_Click" />
+                    <Button Grid.Column="3" Content="Delete" FontSize="11" Height="28" Padding="10,0" Background="Transparent"
+                            BorderThickness="0" Foreground="{ThemeResource AppTextTertiary}" Click="Delete_Click" />
+                </Grid>
+
+                <Border Grid.Row="1" Margin="12,0,12,8" Padding="4" CornerRadius="8" Background="{ThemeResource AppSubtleFill}">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource ToolBtn}" Content="B" FontWeight="Bold" Tag="Bold" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="I" FontStyle="Italic" Tag="Italic" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="U" Tag="Underline" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="S" Tag="Strike" Click="Fmt_Click" />
+                        <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
+                        <Button Style="{StaticResource ToolBtn}" Content="&#x2022;" Tag="Bullet" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="1." Tag="Number" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="&#x2610;" Tag="Checklist" Click="Fmt_Click" />
+                        <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
+                        <Button Style="{StaticResource ToolBtn}" Width="38" Content="H1" Tag="H1" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Width="38" Content="H2" Tag="H2" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Width="44" FontSize="11" Content="Body" Tag="Body" Click="Fmt_Click" />
+                        <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
+                        <Button Style="{StaticResource ToolBtn}" Content="&#x21B6;" Tag="Undo" Click="Fmt_Click" />
+                        <Button Style="{StaticResource ToolBtn}" Content="&#x21B7;" Tag="Redo" Click="Fmt_Click" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Margin="12,0,12,8" BorderThickness="1" CornerRadius="10"
+                        BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                    <views:NoteEditor x:Name="Editor" />
+                </Border>
+
+                <StackPanel Grid.Row="3" Margin="12,0,12,6" Spacing="6">
+                    <ItemsControl ItemsSource="{Binding SelectedNote.Links}"
+                                  Visibility="{Binding SelectedNote.HasLinks, Converter={StaticResource BoolVis}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:NoteLink">
+                                <Border Margin="0,0,6,4" Padding="8,3" CornerRadius="9" BorderThickness="0"
+                                        Background="{ThemeResource AppSubtleFill}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{x:Bind Label}" FontSize="10.5" Foreground="{ThemeResource PrimaryTextBrush}"
+                                                   Tapped="LinkOpen_Tapped" />
+                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="9" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource AppTextTertiary}" Tapped="LinkRemove_Tapped" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBox PlaceholderText="Link a PR / RFQ / PO number" FontSize="12" Height="32"
+                             Text="{Binding LinkQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Border BorderThickness="1" CornerRadius="7" BorderBrush="{ThemeResource AppHairline}"
+                            Background="{ThemeResource AppTertiaryBackground}"
+                            Visibility="{Binding ShowLinkResults, Converter={StaticResource BoolVis}}">
+                        <ListView ItemsSource="{Binding LinkResults}" SelectionMode="None" MaxHeight="150"
+                                  IsItemClickEnabled="True" ItemClick="LinkResult_Click">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:TaskLinkTarget">
+                                    <Grid Padding="4,3" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Padding="5,1" CornerRadius="9" MinWidth="40" Background="{ThemeResource AppSubtleFill}" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Type}" FontSize="9" Foreground="{ThemeResource AppTextTertiary}" />
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Label}" FontSize="11.5" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+
+                <TextBlock Grid.Row="4" Padding="16,0,16,12" FontSize="11" Text="{Binding SaveState}"
+                           Foreground="{ThemeResource AppTextTertiary}" />
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6"
+                    Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+            <TextBlock Text="&#xE70B;" FontFamily="Segoe Fluent Icons" FontSize="24" HorizontalAlignment="Center"
+                       Foreground="{ThemeResource AppTextTertiary}" />
+            <TextBlock Text="Select a note to edit it" FontSize="12.5" Foreground="{ThemeResource AppTextTertiary}" />
+        </StackPanel>
+    </Grid>
+</Page>
