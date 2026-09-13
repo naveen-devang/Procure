@@ -7,9 +7,48 @@ namespace Procure.App.Views.Modals;
 
 public sealed partial class AddPoModal : UserControl
 {
-    public AddPoModal() => InitializeComponent();
+    private readonly PoStep2RowList _step2 = new();
+    private PrListPageModel? _hooked;
+
+    public AddPoModal()
+    {
+        InitializeComponent();
+        Step2List.ItemsSource = _step2.Rows;
+        Loaded += (_, _) => Attach();
+        // The modal is x:Load-ed per open and unloaded on close; the page model and its cards are not,
+        // so everything this subscribed to is let go here.
+        Unloaded += (_, _) => Detach();
+    }
 
     private PrListPageModel? Vm => DataContext as PrListPageModel;
+
+    private void Attach()
+    {
+        Detach();
+        if (Vm is not { } vm) return;
+        _hooked = vm;
+        vm.PropertyChanged += OnVmPropertyChanged;
+        if (vm.IsPoModalStep2) _step2.Build(vm.PoRfqSelections);   // Edit PO opens straight on step 2
+    }
+
+    private void Detach()
+    {
+        if (_hooked is not null) _hooked.PropertyChanged -= OnVmPropertyChanged;
+        _hooked = null;
+        _step2.Detach();
+    }
+
+    /// <summary>The rows are cut from the cards each time step 2 is entered - going back to step 1 is the
+    /// only way to change which suppliers are selected, so that is the only moment the set can change.</summary>
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        if (e.PropertyName is nameof(PrListPageModel.IsPoModalStep2) or nameof(PrListPageModel.PoRfqSelections))
+        {
+            if (vm.IsPoModalStep2) _step2.Build(vm.PoRfqSelections);
+            else _step2.Detach();
+        }
+    }
 
     private void RemoveLine_Click(object sender, RoutedEventArgs e)
     {
