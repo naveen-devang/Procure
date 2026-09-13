@@ -10,9 +10,30 @@
          NavigationView pane's default acrylic falls back to fully transparent on an unpackaged
          build - fine-looking in dark, see-through to the desktop in light. -->
     <Grid Background="{ThemeResource AppBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- The window's title bar. The window draws its own (ExtendsContentIntoTitleBar), and without
+             a row of its own every page started at the very top, underneath Windows' minimise /
+             maximise / close buttons: "+ Add PR" sat beneath Close, and the top strip of each header
+             was the window's drag area, so clicks there moved the window instead of pressing buttons.
+             This row is the drag area (SetTitleBar), keeps clear of the caption buttons at any display
+             scale, and carries the sidebar toggle that used to sit inside the pane. -->
+        <muxc:TitleBar x:Name="AppTitleBar" Grid.Row="0"
+                       Title="RWC MM Tracker"
+                       IsPaneToggleButtonVisible="True"
+                       IsBackButtonVisible="False"
+                       PaneToggleRequested="AppTitleBar_PaneToggleRequested"
+                       Background="{ThemeResource AppBackground}" />
+
         <muxc:NavigationView
             x:Name="Nav"
+            Grid.Row="1"
             IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsTitleBarAutoPaddingEnabled="False"
             IsSettingsVisible="False"
             PaneDisplayMode="Left"
             OpenPaneLength="180"
@@ -76,9 +97,8 @@
         </muxc:NavigationView>
 
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
-             Bottom-right so it clears the caption buttons reserved by ExtendsContentIntoTitleBar. -->
-        <!-- Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
-        <Border x:Name="Hud" Visibility="Collapsed"
+             Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
+        <Border x:Name="Hud" Grid.Row="1" Visibility="Collapsed"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,12,10" Padding="8,4"
                 CornerRadius="4" IsHitTestVisible="False"

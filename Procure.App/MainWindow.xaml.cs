@@ -35,6 +35,10 @@ public sealed partial class MainWindow : Window
         _appHost = appHost;
 
         ExtendsContentIntoTitleBar = true;
+        // Drag area and caption-button reservation - see AppTitleBar in MainWindow.xaml. Tall (48) so
+        // the bar lines up with the sidebar's own 48 px items.
+        SetTitleBar(AppTitleBar);
+        AppWindow.TitleBar.PreferredHeightOption = Microsoft.UI.Windowing.TitleBarHeightOption.Tall;
         _shell.Window = this;
         _shell.ContentFrame = ContentFrame;
 
@@ -66,6 +70,7 @@ public sealed partial class MainWindow : Window
 
         // Before first render: the pane does not re-theme reliably once it has loaded.
         (_appHost as WinUiAppHost)?.ApplyCurrentTheme();
+        RefreshThemeState();   // caption button colours right from the first frame, not after activation
         if (Content is FrameworkElement c) _shell.WatchOsTheme?.Invoke(c);
 
         NavigateTo(AppRoute.Board, null);
@@ -97,6 +102,45 @@ public sealed partial class MainWindow : Window
             // already settled when WatchOsTheme raises this. Application.RequestedTheme is frozen at launch.
             _ => (Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
         };
+        ApplyCaptionButtonColors(Procure.App.Converters.BoardTheme.IsDark);
+    }
+
+    // The sidebar toggle lives in the title bar now; it opens and collapses the pane exactly as the
+    // pane's own button did.
+    private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args) => Nav.IsPaneOpen = !Nav.IsPaneOpen;
+
+    /// <summary>
+    /// Minimise / maximise / close. Windows draws these itself and does not follow the app's theme:
+    /// it uses whatever colours it is handed, so without this their symbols and hover fill stayed in
+    /// Windows' defaults - faint on one theme, and unchanged after switching Light/Dark. Windows only
+    /// allows transparency on the resting background, so hover and pressed use the app's solid fills
+    /// (AppSubtleFill / a step deeper). Close keeps Windows' own red hover.
+    /// </summary>
+    private void ApplyCaptionButtonColors(bool dark)
+    {
+        var bar = AppWindow.TitleBar;
+        static Windows.UI.Color C(byte r, byte g, byte b) => Windows.UI.Color.FromArgb(255, r, g, b);
+
+        bar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+        bar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+        if (dark)
+        {
+            bar.ButtonForegroundColor = C(0xF1, 0xEF, 0xEC);          // AppTextPrimary
+            bar.ButtonInactiveForegroundColor = C(0x6F, 0x6A, 0x62);  // AppTextTertiary
+            bar.ButtonHoverBackgroundColor = C(0x2A, 0x2A, 0x30);     // AppSubtleFill
+            bar.ButtonHoverForegroundColor = C(0xF1, 0xEF, 0xEC);
+            bar.ButtonPressedBackgroundColor = C(0x33, 0x33, 0x3A);
+            bar.ButtonPressedForegroundColor = C(0xF1, 0xEF, 0xEC);
+        }
+        else
+        {
+            bar.ButtonForegroundColor = C(0x37, 0x33, 0x2E);
+            bar.ButtonInactiveForegroundColor = C(0xA3, 0x9C, 0x92);
+            bar.ButtonHoverBackgroundColor = C(0xF0, 0xED, 0xE6);
+            bar.ButtonHoverForegroundColor = C(0x37, 0x33, 0x2E);
+            bar.ButtonPressedBackgroundColor = C(0xE6, 0xE2, 0xD9);
+            bar.ButtonPressedForegroundColor = C(0x37, 0x33, 0x2E);
+        }
     }
 
     private void Nav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
