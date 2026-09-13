@@ -83,9 +83,15 @@
                                                         TranslateX="{Binding PcrPreviewPanX}"
                                                         TranslateY="{Binding PcrPreviewPanY}" />
                                 </Border.RenderTransform>
-                                <Image Source="{Binding PcrPreviewCurrentPage, Converter={StaticResource PngImg}}"
+                                <Image x:Name="PageImage" Source="{Binding PcrPreviewCurrentPage, Converter={StaticResource PngImg}}"
                                        Stretch="Uniform" Width="700" />
                             </Border>
+
+                            <!-- Zoomed in past what the page image holds: the visible part of the page, drawn
+                                 again from the PDF at the screen's resolution and laid exactly over it. Hidden
+                                 while zooming or dragging; see code-behind. -->
+                            <Image x:Name="DetailTile" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                   IsHitTestVisible="False" Visibility="Collapsed" />
 
                             <StackPanel x:Name="BusyOverlay" Visibility="{Binding IsPcrPreviewBusy, Converter={StaticResource BoolVis}}"
                                         Background="{ThemeResource AppSubtleFill}" Padding="18,14"

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -911,6 +911,28 @@ namespace Procure.Data
                 "past six suppliers each vendor's price heading carries its currency");
             var widePng = await wideSource.RenderAsync(0);
             Assert(widePng.Length > 8 && widePng[0] == 0x89, "the fitted twelve-supplier sheet renders");
+
+            // Print resolution follows the sheet's smallest text: a normal sheet stays at 300 DPI, a
+            // sheet shrunk for many suppliers goes up to 600, and never past what the printer prints.
+            var fullDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5, 0);
+            Assert(fullDpi == 300, $"a full-size sheet prints at 300 DPI, as it always has; got {fullDpi}");
+            var eightDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(6.2, 0);
+            Assert(eightDpi == 300, $"6.2 pt text (about eight suppliers on A4) still prints at 300 DPI; got {eightDpi}");
+            var wideDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5 * twelveScale, 0);
+            Assert(wideDpi == 600, $"twelve suppliers on A4 ({7.5 * twelveScale:0.0} pt text) print at 600 DPI; got {wideDpi}");
+            var cappedDpi = Services.Export.PcrPdfRasterizer.PrintDpiFor(7.5 * twelveScale, 300);
+            Assert(cappedDpi == 300, $"but never past a 300 DPI printer's own resolution; got {cappedDpi}");
+            var printSource = await Services.Export.PcrPdfPageSource.OpenAsync(wide, wideDpi);
+            Assert(Math.Abs(printSource.EffectiveDpi - 600) < 0.01, $"A4 is not held down by the render size cap at 600 DPI; got {printSource.EffectiveDpi:0}");
+
+            // The preview's sharp zoom draws just a region of the page, at exactly the size asked for.
+            var (pw, ph) = wideSource.PageSizeDips(0);
+            using (var region = await wideSource.RenderRegionAsync(0, new Windows.Foundation.Rect(pw / 4, ph / 4, pw / 4, ph / 4), 640, 400))
+            {
+                var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(region);
+                Assert(decoder.PixelWidth == 640 && decoder.PixelHeight == 400,
+                    $"a zoomed region renders at the requested size; got {decoder.PixelWidth}x{decoder.PixelHeight}");
+            }
 
             var sixText = System.Text.Encoding.Latin1.GetString(
                 Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, Cycle(6), "fit check", a4Land));

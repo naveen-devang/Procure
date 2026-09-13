@@ -19,11 +19,37 @@ namespace Procure.Services.Export
         /// text and uneven table rules next to Acrobat printing the same PDF as vectors.</summary>
         public const double PrintDpi = 300;
 
+        /// <summary>The sharpest a print is rendered: past this an office printer adds nothing.</summary>
+        public const double MaxPrintDpi = 600;
+
+        /// <summary>
+        /// The DPI a print is rendered at, sized to the smallest text on the sheet instead of fixed.
+        ///
+        /// A sheet's body text is 7.5 pt, which gets ~31 dots per em at 300 DPI and prints crisp. A
+        /// sheet fitted to the page for many suppliers prints that text smaller - 12 suppliers on A4
+        /// landscape come out near 4.9 pt, only ~20 dots at 300 DPI, which reads fuzzy on a 600 DPI
+        /// laser. So the smallest text gets at least ~25 dots per em: 300 DPI (what every normal sheet
+        /// already uses, so it costs exactly what it did) down to 6 pt text - about eight suppliers on
+        /// A4 - and 600 below that, never above what the printer itself says it prints at.
+        /// </summary>
+        /// <param name="smallestPrintedPt">The sheet's body text size after any fit scaling.</param>
+        /// <param name="printerDpi">The printer's reported resolution; 0 or less when unknown.</param>
+        public static double PrintDpiFor(double smallestPrintedPt, double printerDpi)
+        {
+            const double dotsPerEm = 25;
+            var needed = smallestPrintedPt > 0 ? dotsPerEm * 72.0 / smallestPrintedPt : PrintDpi;
+            // Two steps only - what printers actually print at - so a sheet is either exactly as it was or sharp.
+            var dpi = needed <= PrintDpi ? PrintDpi : MaxPrintDpi;
+            return printerDpi > 0 ? Math.Min(dpi, Math.Max(PrintDpi, printerDpi)) : dpi;
+        }
+
         // A0 at 300 DPI is 14042x9933 - a 558MB decoded bitmap that GDI+ will simply fail on, and
         // the paper dropdown does offer A0. Capping the longest rendered edge lets outsized paper
         // degrade to a lower DPI instead of falling over. A4 and A3 - what a PCR is realistically
         // printed on - stay at the full requested DPI (A3 at 300 DPI is 4963px on its long edge).
-        public const double MaxRenderEdgePx = 5000;
+        // Raised from 5000 so A4 still gets the full MaxPrintDpi (7016 px on its long edge). Only one
+        // page is ever held at that size - printing renders a page when the printer asks for it.
+        public const double MaxRenderEdgePx = 7100;
 
         // PdfPage.Size is in device-independent pixels (96 per inch), NOT PDF points (72 per inch).
         // Scaling it by dpi/72 - as this did - rendered every page 4/3 oversized: A4 landscape came
@@ -113,6 +139,41 @@ namespace Procure.Services.Export
             }
 
             return new PcrPdfPageSource(document, effectiveDpi);
+        }
+
+        /// <summary>A page's paper size in inches.</summary>
+        public (double Width, double Height) PageSizeInches(int index)
+        {
+            using var page = _document.GetPage((uint)index);
+            return (page.Size.Width / 96.0, page.Size.Height / 96.0);
+        }
+
+        /// <summary>A page's size in device-independent pixels (96 per inch).</summary>
+        public (double Width, double Height) PageSizeDips(int index)
+        {
+            using var page = _document.GetPage((uint)index);
+            return (page.Size.Width, page.Size.Height);
+        }
+
+        /// <summary>
+        /// Part of a page, drawn straight from the PDF at exactly the pixel size asked for, as a PNG
+        /// stream. The preview uses it when zoomed in past what its page image holds: only the visible
+        /// part is drawn, at the screen's own resolution, so it is sharp at any zoom while costing no
+        /// more than one viewport of pixels however far in it goes.
+        /// </summary>
+        /// <param name="sourceDips">The region of the page, in the page's DIPs.</param>
+        public async Task<IRandomAccessStream> RenderRegionAsync(int index, Windows.Foundation.Rect sourceDips, uint widthPx, uint heightPx)
+        {
+            using var page = _document.GetPage((uint)index);
+            var stream = new InMemoryRandomAccessStream();
+            await page.RenderToStreamAsync(stream, new PdfPageRenderOptions
+            {
+                SourceRect = sourceDips,
+                DestinationWidth = Math.Max(1u, widthPx),
+                DestinationHeight = Math.Max(1u, heightPx)
+            });
+            stream.Seek(0);
+            return stream;
         }
 
         /// <summary>One page as PNG bytes.</summary>

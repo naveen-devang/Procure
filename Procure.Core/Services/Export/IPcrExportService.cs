@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Procure.Models;
 
@@ -32,7 +32,9 @@ namespace Procure.Services.Export
         // through the Save As file picker instead of GDI printing, since that's what it actually does
         // and it's the only way to get a real answer on whether the user went through with it; the
         // returned bool reflects that (false = the save/print was cancelled).
-        Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1);
+        // smallestPrintedPt is the sheet's body text size after fit scaling (7.5 at full size); the
+        // print resolution is chosen from it (PcrPdfRasterizer.PrintDpiFor).
+        Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1, double smallestPrintedPt = 7.5);
 
         // True for a "printer" that actually saves a file (Microsoft Print to PDF, Adobe PDF, XPS
         // Writer, ...). The caller uses it to hand PrintPcrPdfAsync a PDF already cut down to the

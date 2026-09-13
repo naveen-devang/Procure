@@ -469,6 +469,7 @@ namespace Procure.PageModels
             PcrPreviewPages.Clear();
             PcrPreviewCurrentPage = null;
             _pcrPreviewBytes = null;
+            PcrPreviewSource = null;
             _pcrPreviewPr = null;
             _pcrPreviewRfqs = null;
         }
@@ -618,6 +619,10 @@ namespace Procure.PageModels
         partial void OnPcrPreviewZoomChanged(double value) => PcrPreviewZoomLabel = $"{value:P0}";
 
         private byte[]? _pcrPreviewBytes;
+
+        /// <summary>The previewed PDF, open. The preview reads it to draw the visible part of a page
+        /// sharply when zoomed in past what the page image holds.</summary>
+        public PcrPdfPageSource? PcrPreviewSource { get; private set; }
         private PurchaseRequisition? _pcrPreviewPr;
         private List<RequestForQuotation>? _pcrPreviewRfqs;
         private string _pcrPreviewRemarksSnapshot = string.Empty;
@@ -786,6 +791,7 @@ namespace Procure.PageModels
                 // print path's page-range check both read Count, and both need the true number even
                 // while pages are still arriving.
                 _pcrPreviewBytes = bytes;
+                PcrPreviewSource = source;
                 PcrPreviewPages.Clear();
                 for (var i = 0; i < source.PageCount; i++) PcrPreviewPages.Add(null!);
                 PcrPreviewPageSummary = source.PageCount == 1 ? "1 page" : $"{source.PageCount} pages";
@@ -941,7 +947,10 @@ namespace Procure.PageModels
                 }
 
                 var copies = ParseCopies(PcrCopiesText);
-                var succeeded = await _pcrExportService.PrintPcrPdfAsync(pdfBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices, copies);
+                // How small the sheet's text prints - the print resolution is sized to it.
+                var smallestPt = _pcrPreviewRfqs == null ? 7.5
+                    : 7.5 * PcrPdfExporter.PrintScaleFor(_pcrPreviewPr, _pcrPreviewRfqs, BuildPcrPdfOptions());
+                var succeeded = await _pcrExportService.PrintPcrPdfAsync(pdfBytes, PcrSelectedPrinter, $"Price Comparison - {_pcrPreviewPr.PrNo}", PcrDoubleSided, pageIndices, copies, smallestPt);
                 ShowToast(succeeded ? $"Sent to {PcrSelectedPrinter}" : "Print cancelled");
             }
             catch (Exception ex)

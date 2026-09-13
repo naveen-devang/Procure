@@ -64,7 +64,7 @@ public sealed class PcrExportService : IPcrExportService
     public string GetDefaultPrinterName()
         => new System.Drawing.Printing.PrinterSettings().PrinterName;
 
-    public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1)
+    public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1, double smallestPrintedPt = 7.5)
     {
         // A PDF/XPS-writer "printer" actually saves a file - route it through the file-save
         // flow, which reports cancellation correctly (GDI's Print() does not).
@@ -75,13 +75,32 @@ public sealed class PcrExportService : IPcrExportService
             return savedPath != null;
         }
 
-        var (allPages, renderDpi) = await PcrPdfRasterizer.RenderPagesAsync(pdfBytes, PcrPdfRasterizer.PrintDpi);
-        if (allPages.Count == 0) return true;
+        // Resolution from the sheet's smallest text, capped at what the printer prints (see
+        // PcrPdfRasterizer.PrintDpiFor): 300 DPI for every normal sheet, up to 600 for one fitted to
+        // the page for many suppliers.
+        double printerDpi = 0;
+        try
+        {
+            var probe = new System.Drawing.Printing.PrinterSettings();
+            if (!string.IsNullOrWhiteSpace(printerName)) probe.PrinterName = printerName;
+            printerDpi = probe.DefaultPageSettings.PrinterResolution.X;   // negative = a quality preset, not DPI
+        }
+        catch { /* unknown printer resolution: no cap */ }
+        var requestedDpi = PcrPdfRasterizer.PrintDpiFor(smallestPrintedPt, printerDpi);
+
+        // Opened once; each page is drawn only when the printer asks for it and released after, so a
+        // print holds one page image however many pages the sheet has. Rendering every page up front
+        // held them all - fine at 300 DPI, not at 600.
+        var source = await PcrPdfPageSource.OpenAsync(pdfBytes, requestedDpi);
+        var renderDpi = source.EffectiveDpi;
+        if (source.PageCount == 0) return true;
+        if (Environment.GetEnvironmentVariable("PROCURE_PRINT_LOG") == "1")
+            Procure.Utilities.CrashLog.Write($"PCR print: {renderDpi:0} DPI (smallest text {smallestPrintedPt:0.0} pt, printer {printerDpi:0}), {source.PageCount} page(s)");
 
         var selectedPages = (pageIndices == null || pageIndices.Count == 0)
-            ? Enumerable.Range(0, allPages.Count).ToList()
-            : pageIndices.Where(i => i >= 0 && i < allPages.Count).Distinct().OrderBy(i => i).ToList();
-        if (selectedPages.Count == 0) selectedPages = Enumerable.Range(0, allPages.Count).ToList();
+            ? Enumerable.Range(0, source.PageCount).ToList()
+            : pageIndices.Where(i => i >= 0 && i < source.PageCount).Distinct().OrderBy(i => i).ToList();
+        if (selectedPages.Count == 0) selectedPages = Enumerable.Range(0, source.PageCount).ToList();
 
         return await Task.Run(() =>
         {
@@ -95,11 +114,9 @@ public sealed class PcrExportService : IPcrExportService
             // The rasterized bitmap carries this job's real geometry (PcrPdfExporter's chosen
             // orientation/paper size); read it back from the first page's pixel dimensions.
             bool isLandscapeJob;
-            using (var firstImage = System.Drawing.Image.FromStream(new MemoryStream(allPages[selectedPages[0]])))
             {
-                bool isLandscape = isLandscapeJob = firstImage.Width > firstImage.Height;
-                double widthIn = firstImage.Width / renderDpi;
-                double heightIn = firstImage.Height / renderDpi;
+                var (widthIn, heightIn) = source.PageSizeInches(selectedPages[0]);
+                bool isLandscape = isLandscapeJob = widthIn > heightIn;
 
                 var (paperWidthIn, paperHeightIn) = isLandscape ? (heightIn, widthIn) : (widthIn, heightIn);
 
@@ -125,7 +142,8 @@ public sealed class PcrExportService : IPcrExportService
             var cursor = 0;
             printDocument.PrintPage += (_, e) =>
             {
-                using var pageStream = new MemoryStream(allPages[selectedPages[cursor]]);
+                // PdfDocument is agile, so rendering here on the print thread is fine.
+                using var pageStream = new MemoryStream(source.RenderAsync(selectedPages[cursor]).GetAwaiter().GetResult());
                 using var image = System.Drawing.Image.FromStream(pageStream);
 
                 var dest = PlacePage(e.Graphics!, image.Width, image.Height);

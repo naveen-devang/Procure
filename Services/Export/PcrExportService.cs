@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -72,7 +72,7 @@ namespace Procure.Services.Export
         public string GetDefaultPrinterName()
             => new System.Drawing.Printing.PrinterSettings().PrinterName;
 
-        public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1)
+        public async Task<bool> PrintPcrPdfAsync(byte[] pdfBytes, string printerName, string jobTitle, bool doubleSided, IReadOnlyList<int>? pageIndices, int copies = 1, double smallestPrintedPt = 7.5)
         {
             // A "printer" that's actually a PDF/XPS writer (Microsoft Print to PDF, Adobe PDF, ...)
             // shows its own Save-As dialog after the job is spooled - and GDI's PrintDocument.Print()

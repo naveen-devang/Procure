@@ -1,7 +1,11 @@
 using System;
+using System.ComponentModel;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
 using Procure.PageModels;
@@ -19,6 +23,12 @@ public sealed partial class PcrPreviewModal : UserControl
     private Windows.Foundation.Point _dragStart;
     private double _panStartX, _panStartY;
 
+    // Sharp zoom (see RenderDetailTileAsync). Held as a field: a timer that is only a local can be
+    // collected before it fires.
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _detailTimer;
+    private PrListPageModel? _watched;
+    private int _detailGeneration;
+
     public PcrPreviewModal()
     {
         InitializeComponent();
@@ -27,6 +37,120 @@ public sealed partial class PcrPreviewModal : UserControl
         PreviewViewport.PointerMoved += OnPointerMoved;
         PreviewViewport.PointerReleased += OnPointerReleased;
         PreviewViewport.PointerCanceled += OnPointerReleased;
+
+        _detailTimer = DispatcherQueue.CreateTimer();
+        _detailTimer.Interval = TimeSpan.FromMilliseconds(150);
+        _detailTimer.IsRepeating = false;
+        _detailTimer.Tick += (_, _) => _ = RenderDetailTileAsync();
+
+        Loaded += (_, _) => Watch(Vm);
+        Unloaded += (_, _) => { Watch(null); ClearDetailTile(); };
+        DataContextChanged += (_, _) => { if (IsLoaded) Watch(Vm); };
+    }
+
+    private void Watch(PrListPageModel? vm)
+    {
+        if (ReferenceEquals(vm, _watched)) return;
+        if (_watched != null) _watched.PropertyChanged -= OnVmPropertyChanged;
+        _watched = vm;
+        if (vm != null) vm.PropertyChanged += OnVmPropertyChanged;
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(PrListPageModel.PcrPreviewZoom):
+            case nameof(PrListPageModel.PcrPreviewPanX):
+            case nameof(PrListPageModel.PcrPreviewPanY):
+            case nameof(PrListPageModel.PcrPreviewCurrentPage):
+            case nameof(PrListPageModel.PcrPreviewPageIndex):
+            case nameof(PrListPageModel.IsPcrPreviewVisible):
+                ScheduleDetailTile();
+                break;
+        }
+    }
+
+    // The view is moving: the sharp tile no longer lines up, so hide it at once and draw a new one
+    // once things have been still for a moment - the stretched page image covers the gap, the way
+    // Acrobat sharpens a page a beat after you stop zooming.
+    private void ScheduleDetailTile()
+    {
+        ClearDetailTile();
+        _detailTimer.Stop();
+        _detailTimer.Start();
+    }
+
+    private void ClearDetailTile()
+    {
+        _detailGeneration++;
+        DetailTile.Visibility = Visibility.Collapsed;
+        DetailTile.Source = null;   // one viewport of pixels, released as soon as it is out of date
+    }
+
+    /// <summary>
+    /// Draws the part of the page that is on screen again, straight from the PDF, at the screen's own
+    /// resolution, and lays it exactly over the stretched page image.
+    ///
+    /// The page image is rendered once at the preview DPI. At normal zoom it already has more pixels
+    /// than the screen shows, so nothing extra is made - a five-supplier sheet at 100% never draws a
+    /// tile. Zoomed in past that, stretching it blurs small text badly (a sheet fitted for twelve
+    /// suppliers prints at ~4.9 pt). The tile is only ever the visible region, so it costs one
+    /// viewport of pixels whatever the zoom, and it is dropped the moment the view changes.
+    /// </summary>
+    private async System.Threading.Tasks.Task RenderDetailTileAsync()
+    {
+        var vm = Vm;
+        var source = vm?.PcrPreviewSource;
+        if (vm == null || source == null || !vm.IsPcrPreviewVisible || vm.PcrPreviewCurrentPage == null || XamlRoot == null) return;
+
+        var pageIndex = vm.PcrPreviewPageIndex;
+        if (pageIndex < 0 || pageIndex >= source.PageCount) return;
+        if (PageImage.ActualWidth <= 0 || PageImage.ActualHeight <= 0) return;
+
+        // Where the page is on screen, zoom and pan included.
+        var pageRect = PageImage.TransformToVisual(PreviewViewport)
+            .TransformBounds(new Rect(0, 0, PageImage.ActualWidth, PageImage.ActualHeight));
+        var viewport = new Rect(0, 0, PreviewViewport.ActualWidth, PreviewViewport.ActualHeight);
+        var visible = pageRect;
+        visible.Intersect(viewport);
+        if (visible.IsEmpty || visible.Width < 1 || visible.Height < 1) return;
+
+        var screenScale = XamlRoot.RasterizationScale;
+        var (pageWidthDips, pageHeightDips) = source.PageSizeDips(pageIndex);
+        double imagePixelsWide = pageWidthDips * source.EffectiveDpi / 96.0;
+        double screenPixelsWide = pageRect.Width * screenScale;
+        if (screenPixelsWide <= imagePixelsWide * 1.05) return;   // the page image is already sharp enough here
+
+        // The visible region in the page's own coordinates.
+        var sourceRect = new Rect(
+            (visible.X - pageRect.X) / pageRect.Width * pageWidthDips,
+            (visible.Y - pageRect.Y) / pageRect.Height * pageHeightDips,
+            visible.Width / pageRect.Width * pageWidthDips,
+            visible.Height / pageRect.Height * pageHeightDips);
+
+        var generation = ++_detailGeneration;
+        try
+        {
+            using var stream = await source.RenderRegionAsync(pageIndex, sourceRect,
+                (uint)Math.Ceiling(visible.Width * screenScale), (uint)Math.Ceiling(visible.Height * screenScale));
+            if (generation != _detailGeneration) return;   // the view moved while it drew
+
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(stream);
+            if (generation != _detailGeneration) return;
+
+            DetailTile.Source = bitmap;
+            DetailTile.Margin = new Thickness(visible.X, visible.Y, 0, 0);
+            DetailTile.Width = visible.Width;
+            DetailTile.Height = visible.Height;
+            DetailTile.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            // A failed sharpen leaves the stretched image showing, which is still a working preview.
+            Procure.Utilities.CrashLog.Write("PCR preview detail render failed", ex);
+        }
     }
 
     private void OnWheel(object sender, PointerRoutedEventArgs e)
@@ -72,5 +196,6 @@ public sealed partial class PcrPreviewModal : UserControl
         {
             Rect = new Windows.Foundation.Rect(0, 0, e.NewSize.Width, e.NewSize.Height)
         };
+        ScheduleDetailTile();
     }
 }
