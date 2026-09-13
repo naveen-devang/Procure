@@ -170,17 +170,16 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:CustomFieldValue">
+                                    <!-- Only the input for the field's type is built (x:Load). All four used to exist with three hidden,
+                                             each bound to the same value: the hidden dropdown and date picker wrote their own
+                                             empty / today's-date value back and wiped what was typed. -->
+                                        <DataTemplate x:DataType="models:CustomFieldValue">
                                         <StackPanel Spacing="4" Margin="0,0,0,8" Width="300">
                                             <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ColumnName}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{x:Bind OptionsList}" SelectedItem="{x:Bind Value, Mode=TwoWay}"
-                                                      Visibility="{x:Bind IsSelect, Converter={StaticResource BoolVis}}" />
-                                            <CalendarDatePicker Date="{x:Bind DateValue, Converter={StaticResource Dto}, Mode=TwoWay}"
-                                                                Visibility="{x:Bind IsDate, Converter={StaticResource BoolVis}}" />
-                                            <TextBox Text="{x:Bind Value, Mode=TwoWay}"
-                                                     Visibility="{x:Bind IsNumber, Converter={StaticResource BoolVis}}" />
-                                            <TextBox Text="{x:Bind Value, Mode=TwoWay}"
-                                                     Visibility="{x:Bind IsText, Converter={StaticResource BoolVis}}" />
+                                            <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{x:Bind OptionsList}" SelectedItem="{x:Bind Value, Mode=TwoWay}" x:Name="CfSelect" x:Load="{x:Bind IsSelect}" />
+                                            <CalendarDatePicker Date="{x:Bind DateValue, Converter={StaticResource Dto}, Mode=TwoWay}" x:Name="CfDate" x:Load="{x:Bind IsDate}" />
+                                            <TextBox x:Name="CfNumber" Text="{x:Bind Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" x:Load="{x:Bind IsNumber}" />
+                                            <TextBox x:Name="CfText" Text="{x:Bind Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" x:Load="{x:Bind IsText}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
