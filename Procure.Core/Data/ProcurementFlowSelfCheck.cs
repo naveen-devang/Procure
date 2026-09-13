@@ -848,6 +848,24 @@ namespace Procure.Data
             var pdf = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, rfqs, "flow check");
             Assert(pdf.Length > 1000, $"the PDF is produced; got {pdf.Length} bytes");
 
+            // The preview no longer rasterizes every page up front - it opens the document once and
+            // draws pages on request, so page one reaches the screen before the rest are done. Every
+            // page has to come back as a real PNG from that path, in any order, or the preview shows
+            // a blank sheet where a page should be.
+            var pageSource = await Services.Export.PcrPdfPageSource.OpenAsync(pdf);
+            Assert(pageSource.PageCount >= 1, $"the page source finds the PDF's pages; got {pageSource.PageCount}");
+            for (var pageIndex = pageSource.PageCount - 1; pageIndex >= 0; pageIndex--)   // last first: order must not matter
+            {
+                var png = await pageSource.RenderAsync(pageIndex);
+                var isPng = png.Length > 8 && png[0] == 0x89 && png[1] == 0x50 && png[2] == 0x4E && png[3] == 0x47;
+                Assert(isPng, $"page {pageIndex + 1} of {pageSource.PageCount} renders on request as a PNG; got {png.Length} bytes");
+            }
+
+            // And the all-pages path printing uses still agrees with it on the count.
+            var (allPages, _) = await Services.Export.PcrPdfRasterizer.RenderPagesAsync(pdf);
+            Assert(allPages.Count == pageSource.PageCount,
+                $"printing's full render and the preview's page source agree on the page count; got {allPages.Count} vs {pageSource.PageCount}");
+
             // Each hard line of the item name is drawn as its own PDF text op - never one mangled
             // string with a raw newline in it.
             var pdfText = System.Text.Encoding.Latin1.GetString(pdf);

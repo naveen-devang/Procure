@@ -37,8 +37,59 @@ namespace Procure.Services.Export
 
         /// <summary>Renders every page, and reports the DPI it actually used. Callers reconstruct a
         /// page's physical size by dividing its pixel dimensions by that number, so they must use the
-        /// returned value rather than the one they asked for - the two differ on outsized paper.</summary>
+        /// returned value rather than the one they asked for - the two differ on outsized paper.
+        ///
+        /// Used by printing, which needs every page. The preview does not - it opens a
+        /// <see cref="PcrPdfPageSource"/> and asks for pages as they are needed.</summary>
         public static async Task<(List<byte[]> Pages, double Dpi)> RenderPagesAsync(byte[] pdfBytes, double dpi = DefaultDpi)
+        {
+            var source = await PcrPdfPageSource.OpenAsync(pdfBytes, dpi);
+            var images = new List<byte[]>(source.PageCount);
+            for (var i = 0; i < source.PageCount; i++)
+                images.Add(await source.RenderAsync(i));
+            return (images, source.EffectiveDpi);
+        }
+
+        /// <summary>The DPI a page of this DIP size is rendered at: the requested figure, pulled down
+        /// only as far as needed to keep the longest edge within <see cref="MaxRenderEdgePx"/>.
+        /// Pure, so PrintGeometrySelfCheck can pin the cap without rendering anything.</summary>
+        internal static double EffectiveDpi(double widthDips, double heightDips, double requestedDpi)
+        {
+            var longestIn = Math.Max(widthDips, heightDips) / DipsPerInch;
+            return longestIn > 0 ? Math.Min(requestedDpi, MaxRenderEdgePx / longestIn) : requestedDpi;
+        }
+    }
+
+    /// <summary>
+    /// An opened PDF that renders one page at a time, on request.
+    ///
+    /// The preview used to rasterize every page before showing the first, and did it again on every
+    /// option change - paper size, orientation, margins, shrink-to-fit. A six-page comparison paid six
+    /// full-resolution renders before anything appeared. Opening the document once and rendering on
+    /// demand lets page one reach the screen while the rest are still being drawn.
+    ///
+    /// The document is parsed once and reused for every page; PdfDocument is an agile WinRT object, so
+    /// the renders can run on whatever thread the caller is on.
+    /// </summary>
+    public sealed class PcrPdfPageSource
+    {
+        private readonly PdfDocument _document;
+        private readonly double _scale;
+
+        public int PageCount { get; }
+
+        /// <summary>The DPI pages actually render at - see PcrPdfRasterizer.RenderPagesAsync.</summary>
+        public double EffectiveDpi { get; }
+
+        private PcrPdfPageSource(PdfDocument document, double effectiveDpi)
+        {
+            _document = document;
+            PageCount = (int)document.PageCount;
+            EffectiveDpi = effectiveDpi;
+            _scale = effectiveDpi / 96.0;
+        }
+
+        public static async Task<PcrPdfPageSource> OpenAsync(byte[] pdfBytes, double dpi = PcrPdfRasterizer.DefaultDpi)
         {
             using var inputStream = new InMemoryRandomAccessStream();
             using (var writer = new DataWriter(inputStream))
@@ -50,48 +101,37 @@ namespace Procure.Services.Export
             inputStream.Seek(0);
 
             var document = await PdfDocument.LoadFromStreamAsync(inputStream);
-            var images = new List<byte[]>((int)document.PageCount);
-            if (document.PageCount == 0) return (images, dpi);
 
             // One DPI for the whole document, decided by page 0: every page of a PCR is the same
-            // size, and the caller derives physical page size from pixels, so a per-page DPI would
+            // size, and callers derive physical page size from pixels, so a per-page DPI would
             // silently describe some pages as a different paper than others.
-            double effectiveDpi;
-            using (var firstPage = document.GetPage(0))
+            var effectiveDpi = dpi;
+            if (document.PageCount > 0)
             {
-                effectiveDpi = EffectiveDpi(firstPage.Size.Width, firstPage.Size.Height, dpi);
-            }
-            var scale = effectiveDpi / DipsPerInch;
-
-            for (uint i = 0; i < document.PageCount; i++)
-            {
-                using var page = document.GetPage(i);
-
-                using var pageStream = new InMemoryRandomAccessStream();
-                await page.RenderToStreamAsync(pageStream, new PdfPageRenderOptions
-                {
-                    DestinationWidth = (uint)Math.Round(page.Size.Width * scale),
-                    DestinationHeight = (uint)Math.Round(page.Size.Height * scale)
-                });
-
-                pageStream.Seek(0);
-                using var reader = new DataReader(pageStream.GetInputStreamAt(0));
-                await reader.LoadAsync((uint)pageStream.Size);
-                var bytes = new byte[pageStream.Size];
-                reader.ReadBytes(bytes);
-                images.Add(bytes);
+                using var firstPage = document.GetPage(0);
+                effectiveDpi = PcrPdfRasterizer.EffectiveDpi(firstPage.Size.Width, firstPage.Size.Height, dpi);
             }
 
-            return (images, effectiveDpi);
+            return new PcrPdfPageSource(document, effectiveDpi);
         }
 
-        /// <summary>The DPI a page of this DIP size is rendered at: the requested figure, pulled down
-        /// only as far as needed to keep the longest edge within <see cref="MaxRenderEdgePx"/>.
-        /// Pure, so PrintGeometrySelfCheck can pin the cap without rendering anything.</summary>
-        internal static double EffectiveDpi(double widthDips, double heightDips, double requestedDpi)
+        /// <summary>One page as PNG bytes.</summary>
+        public async Task<byte[]> RenderAsync(int index)
         {
-            var longestIn = Math.Max(widthDips, heightDips) / DipsPerInch;
-            return longestIn > 0 ? Math.Min(requestedDpi, MaxRenderEdgePx / longestIn) : requestedDpi;
+            using var page = _document.GetPage((uint)index);
+            using var pageStream = new InMemoryRandomAccessStream();
+            await page.RenderToStreamAsync(pageStream, new PdfPageRenderOptions
+            {
+                DestinationWidth = (uint)Math.Round(page.Size.Width * _scale),
+                DestinationHeight = (uint)Math.Round(page.Size.Height * _scale)
+            });
+
+            pageStream.Seek(0);
+            using var reader = new DataReader(pageStream.GetInputStreamAt(0));
+            await reader.LoadAsync((uint)pageStream.Size);
+            var bytes = new byte[pageStream.Size];
+            reader.ReadBytes(bytes);
+            return bytes;
         }
     }
 }

@@ -684,6 +684,10 @@ namespace Procure.PageModels
             PcrPreviewCurrentPage = PcrPreviewPageIndex < PcrPreviewPages.Count
                 ? PcrPreviewPages[PcrPreviewPageIndex]
                 : null;
+
+            // Turning to a page that is still being drawn shows the spinner rather than a blank sheet;
+            // the render loop swaps the page in and clears it the moment it lands.
+            IsPcrPreviewBusy = PcrPreviewCurrentPage is null && PcrPreviewPages.Count > 0;
             PcrPreviewPagerText = $"Page {PcrPreviewPageIndex + 1} of {PcrPreviewPages.Count}";
             PcrPreviewZoom = 1.0;
             PcrPreviewPanX = 0;
@@ -751,25 +755,43 @@ namespace Procure.PageModels
                 var rfqs = _pcrPreviewRfqs;
                 var remarks = _pcrPreviewRemarksSnapshot;
 
-                var (bytes, images) = await Task.Run(async () =>
+                // The PDF itself is cheap; rasterizing it is what takes the time. So build and open it
+                // once, then draw page one and show it before the rest are started - this used to
+                // render every page before displaying any, and again on every option change.
+                var (bytes, source) = await Task.Run(async () =>
                 {
                     var pdfBytes = _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options);
-                    var pages = (await PcrPdfRasterizer.RenderPagesAsync(pdfBytes)).Pages;
-                    return (pdfBytes, pages);
+                    return (pdfBytes, await PcrPdfPageSource.OpenAsync(pdfBytes));
                 });
 
                 if (generation != _pcrPreviewGeneration) return;
 
+                // Sized to the real page count up front, one empty slot per page. The pager and the
+                // print path's page-range check both read Count, and both need the true number even
+                // while pages are still arriving.
                 _pcrPreviewBytes = bytes;
                 PcrPreviewPages.Clear();
-                foreach (var png in images)
-                {
-                    PcrPreviewPages.Add(png);
-                }
-                PcrPreviewPageSummary = images.Count == 1 ? "1 page" : $"{images.Count} pages";
-                IsPcrPagerVisible = images.Count > 1;
+                for (var i = 0; i < source.PageCount; i++) PcrPreviewPages.Add(null!);
+                PcrPreviewPageSummary = source.PageCount == 1 ? "1 page" : $"{source.PageCount} pages";
+                IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();
+
+                for (var i = 0; i < source.PageCount; i++)
+                {
+                    var index = i;
+                    var png = await Task.Run(() => source.RenderAsync(index));
+
+                    // A newer option change owns the preview now; this render is for a document
+                    // nobody is looking at any more.
+                    if (generation != _pcrPreviewGeneration) return;
+
+                    PcrPreviewPages[index] = png;
+
+                    // Only the page on screen decides the spinner. Clearing it when page one lands
+                    // would be wrong if the user has already turned to page three, still being drawn.
+                    if (index == PcrPreviewPageIndex) ShowPcrPreviewPage();
+                }
             }
             catch (Exception ex)
             {
