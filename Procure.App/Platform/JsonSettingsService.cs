@@ -163,7 +163,7 @@ public sealed class JsonSettingsService : ISettingsService
     {
         var raw = Get("DefaultApprovalRoles", "");
         return string.IsNullOrWhiteSpace(raw)
-            ? new List<string> { "Requestor", "Department Head", "Finance", "Management" }
+            ? new List<string> { ApprovalRoles.ProcurementManager, ApprovalRoles.FinanceController, ApprovalRoles.Cfo, ApprovalRoles.Ceo }
             : new List<string>(raw.Split('|', StringSplitOptions.RemoveEmptyEntries));
     }
 
