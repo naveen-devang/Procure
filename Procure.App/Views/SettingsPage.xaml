@@ -95,7 +95,7 @@
                                     <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
                                             Background="Transparent" BorderThickness="0"
                                             Tag="Dark" Click="ThemeMode_Click">
-                                        <TextBlock x:Name="DarkText" Text="Dark" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock x:Name="DarkText" Style="{StaticResource NonSelectableText}" Text="Dark" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                                     </Button>
                                 </Grid>
                                 <Grid>
@@ -103,7 +103,7 @@
                                     <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
                                             Background="Transparent" BorderThickness="0"
                                             Tag="Light" Click="ThemeMode_Click">
-                                        <TextBlock x:Name="LightText" Text="Light" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock x:Name="LightText" Style="{StaticResource NonSelectableText}" Text="Light" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                                     </Button>
                                 </Grid>
                                 <Grid>
@@ -111,7 +111,7 @@
                                     <Button Height="36" MinWidth="70" Padding="14,0" CornerRadius="18"
                                             Background="Transparent" BorderThickness="0"
                                             Tag="System" Click="ThemeMode_Click">
-                                        <TextBlock x:Name="SystemText" Text="System" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock x:Name="SystemText" Style="{StaticResource NonSelectableText}" Text="System" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
                                     </Button>
                                 </Grid>
                             </StackPanel>
