@@ -256,7 +256,7 @@
                             <TextBox x:Name="NewTaskBox" PlaceholderText="Add a task" FontSize="13.5" Height="36"
                                      GotFocus="Composer_GotFocus" KeyDown="NewTask_KeyDown"
                                      Text="{Binding NewTaskTitle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#xE70D;" FontSize="11"
+                            <Button ToolTipService.ToolTip="More options" Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#xE70D;" FontSize="11"
                                     Width="28" Height="28" Command="{Binding NewTaskCommand}"
                                     Visibility="{Binding ComposerOpen, Converter={StaticResource BoolVis}, ConverterParameter=invert}" />
                         </Grid>
@@ -325,6 +325,17 @@
 
                 <!-- content area -->
                 <Grid Grid.Row="3">
+                    <!-- Empty list (as in the MAUI page) -->
+                    <Grid Visibility="{Binding ShowListOrFinished, Converter={StaticResource BoolVis}}">
+                        <StackPanel Visibility="{Binding Groups.Count, Converter={StaticResource ZeroVis}}" Spacing="6"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,40">
+                            <FontIcon Glyph="&#xE73E;" FontSize="26" Foreground="{ThemeResource AppTextTertiary}" />
+                            <TextBlock Style="{StaticResource NonSelectableText}" Text="Nothing here yet" FontSize="13" HorizontalAlignment="Center"
+                                       Foreground="{ThemeResource AppTextSecondary}" />
+                            <TextBlock Style="{StaticResource NonSelectableText}" Text="or press Ctrl+N to add one" FontSize="11.5" HorizontalAlignment="Center"
+                                       Foreground="{ThemeResource AppTextTertiary}" />
+                        </StackPanel>
+                    </Grid>
                     <!-- List / Finished -->
                     <ListView x:Name="TaskList" Margin="8,0,8,8" SelectionMode="None"
                               ItemTemplate="{StaticResource TaskRow}"
@@ -393,9 +404,9 @@
                     <Grid Padding="12,0,6,8" RowSpacing="8" Visibility="{Binding IsCalendarView, Converter={StaticResource BoolVis}}">
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE76B;" FontSize="11" Width="30" Height="30"
+                            <Button ToolTipService.ToolTip="Previous week" Style="{StaticResource IconBtn}" Content="&#xE76B;" FontSize="11" Width="30" Height="30"
                                     Background="{ThemeResource AppSubtleFill}" Command="{Binding WeekPrevCommand}" />
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE76C;" FontSize="11" Width="30" Height="30"
+                            <Button ToolTipService.ToolTip="Next week" Style="{StaticResource IconBtn}" Content="&#xE76C;" FontSize="11" Width="30" Height="30"
                                     Background="{ThemeResource AppSubtleFill}" Command="{Binding WeekNextCommand}" />
                             <TextBlock Text="{Binding WeekRangeLabel}" FontWeight="SemiBold" FontSize="14"
                                        VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{ThemeResource AppTextPrimary}" />
@@ -515,7 +526,7 @@
                                     <TextBlock Grid.Column="1" Text="{x:Bind Title, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}"
                                                TextDecorations="{x:Bind IsDone, Converter={StaticResource Strike}, Mode=OneWay}" />
-                                    <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE74D;" FontSize="10"
+                                    <Button ToolTipService.ToolTip="Delete subtask" Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE74D;" FontSize="10"
                                             Width="22" Foreground="{ThemeResource AppTextTertiary}" Click="Subtask_Delete" />
                                 </Grid>
                             </DataTemplate>
@@ -527,9 +538,9 @@
                     <Border Height="1" Background="{ThemeResource AppHairline}" Margin="0,4" />
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Reorder" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
-                        <Button Style="{StaticResource IconBtn}" Content="&#xE70E;" FontSize="11" Width="34" Height="30"
+                        <Button ToolTipService.ToolTip="Move up" Style="{StaticResource IconBtn}" Content="&#xE70E;" FontSize="11" Width="34" Height="30"
                                 Background="{ThemeResource AppSubtleFill}" Command="{Binding MoveSelectedCommand}" CommandParameter="Up" />
-                        <Button Style="{StaticResource IconBtn}" Content="&#xE70D;" FontSize="11" Width="34" Height="30"
+                        <Button ToolTipService.ToolTip="Move down" Style="{StaticResource IconBtn}" Content="&#xE70D;" FontSize="11" Width="34" Height="30"
                                 Background="{ThemeResource AppSubtleFill}" Command="{Binding MoveSelectedCommand}" CommandParameter="Down" />
                     </StackPanel>
 

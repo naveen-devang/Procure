@@ -214,7 +214,7 @@
                     <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
                     <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                    <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
+                    <Button ToolTipService.ToolTip="Remove this line" Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
                             Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AppTextSecondary}"
                             VerticalAlignment="Center" Click="RemoveLine_Click" />
 
@@ -283,7 +283,7 @@
                                         <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="{x:Bind FormattedTotal, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold"
                                                    HorizontalAlignment="Right" VerticalAlignment="Center"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
-                                        <Button Grid.Column="5" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
+                                        <Button ToolTipService.ToolTip="Remove this contract" Grid.Column="5" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
                                                 Width="26" Height="26" Padding="0" Background="Transparent" BorderThickness="0"
                                                 Foreground="{ThemeResource AppTextSecondary}" VerticalAlignment="Center"
                                                 Click="RemoveTransport_Click" />
@@ -421,7 +421,7 @@
                             <TextBlock Style="{StaticResource AppText}" Text="{Binding PoModalTitle}" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                             <TextBlock Style="{StaticResource AppText}" Text="{Binding AddPoModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                        <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                 Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
                                 Command="{Binding CloseAddPoModalCommand}" />
                     </Grid>

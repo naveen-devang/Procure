@@ -41,7 +41,7 @@
                         <TextBlock Style="{StaticResource AppText}" Text="{Binding ModalTitle}" FontWeight="SemiBold" FontSize="18" Foreground="{ThemeResource AppTextPrimary}" />
                         <TextBlock Style="{StaticResource AppText}" Text="{Binding ModalSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                    <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
                             Command="{Binding CloseBatchCreateModalCommand}" />
                 </Grid>
@@ -216,7 +216,7 @@
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Qty" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Price" FontSize="12" />
-                                            <Button Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28" Padding="0"
+                                            <Button ToolTipService.ToolTip="Remove Item" Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28" Padding="0"
                                                     Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Top" Margin="0,4,0,0"
                                                     Click="RemoveItem_Click" />
                                         </Grid>

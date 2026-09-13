@@ -52,7 +52,7 @@
                                    Foreground="{ThemeResource AppTextPrimary}" />
                         <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPageSummary}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                    <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
                             Command="{Binding ClosePcrPreviewCommand}" />
                 </Grid>
@@ -109,11 +109,11 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center"
                                         Visibility="{Binding IsPcrPagerVisible, Converter={StaticResource BoolVis}}">
-                                <Button Content="&#x2039;" Command="{Binding PreviousPcrPreviewPageCommand}"
+                                <Button ToolTipService.ToolTip="Previous page" Content="&#x2039;" Command="{Binding PreviousPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
                                 <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalAlignment="Center"
                                            Foreground="{ThemeResource AppTextPrimary}" />
-                                <Button Content="&#x203A;" Command="{Binding NextPcrPreviewPageCommand}"
+                                <Button ToolTipService.ToolTip="Next page" Content="&#x203A;" Command="{Binding NextPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource AppText}" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"

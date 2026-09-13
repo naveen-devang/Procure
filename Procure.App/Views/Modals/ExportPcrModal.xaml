@@ -44,7 +44,7 @@
                         <TextBlock Style="{StaticResource AppText}" Text="Export Price Comparison Sheet" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
                         <TextBlock Style="{StaticResource AppText}" Text="{Binding ExportPcrSubtitle}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                    <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
                             Command="{Binding CloseExportPcrModalCommand}" />
                 </Grid>

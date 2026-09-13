@@ -275,11 +275,11 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{x:Bind}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"
                                                            Foreground="{ThemeResource AppTextPrimary}" />
-                                                <Button Grid.Column="1" Content="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                <Button ToolTipService.ToolTip="Move Up" Grid.Column="1" Content="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="11"
                                                         Width="28" Height="28" Padding="0" Click="StageUp_Click" Tag="{x:Bind}" />
-                                                <Button Grid.Column="2" Content="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                <Button ToolTipService.ToolTip="Move Down" Grid.Column="2" Content="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="11"
                                                         Width="28" Height="28" Padding="0" Click="StageDown_Click" Tag="{x:Bind}" />
-                                                <Button Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                <Button ToolTipService.ToolTip="Remove Default Stage" Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
                                                         Width="28" Height="28" Padding="0" Background="Transparent"
                                                         Foreground="{ThemeResource FluentCritical}" Click="StageRemove_Click" Tag="{x:Bind}" />
                                             </Grid>
@@ -339,6 +339,8 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel Spacing="16">
                             <TextBlock Text="Active Custom Columns" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Style="{StaticResource RowHint}" Text="No custom columns defined yet."
+                                       Visibility="{Binding Columns.Count, Converter={StaticResource ZeroVis}}" />
                             <ItemsControl ItemsSource="{Binding Columns}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:CustomColumnDefinition">
@@ -485,7 +487,7 @@
                                             </StackPanel>
                                             <Button Grid.Column="1" Content="{x:Bind DisplayText, Mode=OneWay}" Width="140" Height="30" FontSize="11.5"
                                                     Command="{x:Bind StartRecordingCommand}" />
-                                            <Button Grid.Column="2" Content="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                            <Button ToolTipService.ToolTip="Reset to default" Grid.Column="2" Content="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                                     Width="30" Height="30" Padding="0" Background="Transparent"
                                                     Command="{x:Bind ResetToDefaultCommand}"
                                                     Visibility="{x:Bind IsCustomized, Converter={StaticResource BoolVis}, Mode=OneWay}" />

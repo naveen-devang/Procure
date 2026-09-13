@@ -312,7 +312,7 @@
                                                                                 Date="{x:Bind SentDatePickerValue, Converter={StaticResource Dto}, Mode=TwoWay}"
                                                                                 DateFormat="{}{month.abbreviated} {day.integer}, {year.full}"
                                                                                 DateChanged="ApprovalDate_Changed" />
-                                                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
+                                                            <Button ToolTipService.ToolTip="Clear date" Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
                                                                     Click="ClearSent_Click" />
                                                         </Grid>
                                                     </Grid>
@@ -336,7 +336,7 @@
                                                                                 Date="{x:Bind ReceivedDatePickerValue, Converter={StaticResource Dto}, Mode=TwoWay}"
                                                                                 DateFormat="{}{month.abbreviated} {day.integer}, {year.full}"
                                                                                 DateChanged="ApprovalDate_Changed" />
-                                                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
+                                                            <Button ToolTipService.ToolTip="Clear date" Grid.Column="1" Style="{StaticResource IconBtn}" Content="&#x2715;" FontFamily="Segoe UI" Width="19" Height="26"
                                                                     Click="ClearReceived_Click" />
                                                         </Grid>
                                                     </Grid>
@@ -413,9 +413,9 @@
                                                     FontSize="10" Height="24" Padding="8,0" HorizontalAlignment="Right"
                                                     Background="{ThemeResource FluentCautionBg}" Foreground="{ThemeResource FluentCaution}" />
                                             <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="4">
-                                                <Button Style="{StaticResource IconBtn}" Content="&#xE748;" Click="SplitPo_Click"
+                                                <Button ToolTipService.ToolTip="Split this PO" Style="{StaticResource IconBtn}" Content="&#xE748;" Click="SplitPo_Click"
                                                         Visibility="{x:Bind IsCombinedPo, Converter={StaticResource BoolVis}}" />
-                                                <Button Style="{StaticResource IconBtn}" Content="&#xE74D;" Click="DeletePo_Click"
+                                                <Button ToolTipService.ToolTip="Delete PO" Style="{StaticResource IconBtn}" Content="&#xE74D;" Click="DeletePo_Click"
                                                         Foreground="{ThemeResource FluentCritical}" />
                                             </StackPanel>
                                         </Grid>
@@ -545,7 +545,7 @@
                                     <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{x:Bind Title, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}"
                                                TextDecorations="{x:Bind IsDone, Converter={StaticResource Strike}, Mode=OneWay}" />
-                                    <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE74D;" FontSize="10" Width="22" Height="22"
+                                    <Button ToolTipService.ToolTip="Delete task" Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE74D;" FontSize="10" Width="22" Height="22"
                                             Foreground="{ThemeResource AppTextTertiary}" Click="LinkedTaskDelete_Click" />
                                 </Grid>
                             </DataTemplate>

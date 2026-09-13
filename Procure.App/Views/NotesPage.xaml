@@ -83,6 +83,14 @@
                          Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <ListView Grid.Row="2" x:Name="NoteList" ItemsSource="{Binding Notes}" SelectionMode="None"
                           Margin="6,0,6,8" ItemTemplate="{StaticResource NoteRow}" />
+                <StackPanel Grid.Row="2" Visibility="{Binding Notes.Count, Converter={StaticResource ZeroVis}}" Spacing="6"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,40">
+                    <FontIcon Glyph="&#xE70B;" FontSize="26" Foreground="{ThemeResource AppTextTertiary}" />
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="No notes yet" FontSize="13" HorizontalAlignment="Center"
+                               Foreground="{ThemeResource AppTextSecondary}" />
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="or press Ctrl+N for a new one" FontSize="11.5" HorizontalAlignment="Center"
+                               Foreground="{ThemeResource AppTextTertiary}" />
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -117,21 +125,21 @@
 
                 <Border Grid.Row="1" Margin="12,0,12,8" Padding="4" CornerRadius="8" Background="{ThemeResource AppSubtleFill}">
                     <StackPanel Orientation="Horizontal">
-                        <Button Style="{StaticResource ToolBtn}" Content="B" FontWeight="Bold" Tag="Bold" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="I" FontStyle="Italic" Tag="Italic" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="U" Tag="Underline" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="S" Tag="Strike" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Bold" Style="{StaticResource ToolBtn}" Content="B" FontWeight="Bold" Tag="Bold" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Italic" Style="{StaticResource ToolBtn}" Content="I" FontStyle="Italic" Tag="Italic" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Underline" Style="{StaticResource ToolBtn}" Content="U" Tag="Underline" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Strikethrough" Style="{StaticResource ToolBtn}" Content="S" Tag="Strike" Click="Fmt_Click" />
                         <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
-                        <Button Style="{StaticResource ToolBtn}" Content="&#x2022;" Tag="Bullet" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="1." Tag="Number" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="&#x2610;" Tag="Checklist" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Bulleted list" Style="{StaticResource ToolBtn}" Content="&#x2022;" Tag="Bullet" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Numbered list" Style="{StaticResource ToolBtn}" Content="1." Tag="Number" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Checklist" Style="{StaticResource ToolBtn}" Content="&#x2610;" Tag="Checklist" Click="Fmt_Click" />
                         <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
-                        <Button Style="{StaticResource ToolBtn}" Width="38" Content="H1" Tag="H1" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Width="38" Content="H2" Tag="H2" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Heading 1" Style="{StaticResource ToolBtn}" Width="38" Content="H1" Tag="H1" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Heading 2" Style="{StaticResource ToolBtn}" Width="38" Content="H2" Tag="H2" Click="Fmt_Click" />
                         <Button Style="{StaticResource ToolBtn}" Width="44" FontSize="11" Content="Body" Tag="Body" Click="Fmt_Click" />
                         <Border Width="1" Height="18" Margin="4,0" Background="{ThemeResource AppHairline}" />
-                        <Button Style="{StaticResource ToolBtn}" Content="&#x21B6;" Tag="Undo" Click="Fmt_Click" />
-                        <Button Style="{StaticResource ToolBtn}" Content="&#x21B7;" Tag="Redo" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Undo" Style="{StaticResource ToolBtn}" Content="&#x21B6;" Tag="Undo" Click="Fmt_Click" />
+                        <Button ToolTipService.ToolTip="Redo" Style="{StaticResource ToolBtn}" Content="&#x21B7;" Tag="Redo" Click="Fmt_Click" />
                     </StackPanel>
                 </Border>
 

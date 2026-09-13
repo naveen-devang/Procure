@@ -40,7 +40,7 @@
                             <TextBlock Style="{StaticResource AppText}" Text="Create Shared RFQ across Selected PRs" FontWeight="SemiBold" FontSize="16" Foreground="{ThemeResource AppTextPrimary}" />
                             <TextBlock Style="{StaticResource AppText}" Text="{Binding BatchRfqPrsSummary}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                        <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                 Width="30" Height="30" Padding="0" Background="Transparent" BorderThickness="0"
                                 Command="{Binding CloseBatchRfqModalCommand}" />
                     </Grid>
@@ -108,14 +108,43 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2">
                                     <TextBlock Style="{StaticResource AppText}" Text="Consolidated Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices (paste from Excel supported)." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Content="{Binding AllBatchRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
                                             Command="{Binding ToggleAllBatchRfqItemsCommand}" />
                                     <Button Content="Copy for Email" FontSize="11" Height="28" Padding="10,0"
+                                            ToolTipService.ToolTip="Copy all selected items across combined PRs as a formatted table ready to paste into email"
                                             Command="{Binding CopySelectedBatchRfqItemsForEmailCommand}" />
                                 </StackPanel>
+                            </Grid>
+                            <!-- Column headings, as in the MAUI dialog - without them the four number boxes per line are unlabelled. -->
+                            <Grid ColumnSpacing="8" Padding="4,0">
+                                <Grid.Resources>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+                                        <Setter Property="FontSize" Value="10" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+                                    </Style>
+                                </Grid.Resources>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="75" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="85" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="QUOTE" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="SOURCE PR" />
+                                <TextBlock Grid.Column="2" Text="ITEM" />
+                                <TextBlock Grid.Column="3" Text="QTY" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding BatchEditingRfqItems}">
                                 <ItemsControl.ItemTemplate>

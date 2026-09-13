@@ -100,6 +100,11 @@
                             ToolTipService.ToolTip="Refresh" />
                 </Grid>
 
+                <Grid Grid.Row="1" Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="No raw or packing material POs yet." FontSize="12.5"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}"
+                               Visibility="{Binding Groups.Count, Converter={StaticResource ZeroVis}}" />
+                </Grid>
                 <ListView Grid.Row="1" x:Name="GroupList" ItemsSource="{Binding Groups}" SelectionMode="None" Margin="8"
                           ContainerContentChanging="GroupList_ContainerContentChanging"
                           Visibility="{Binding IsFirstFill, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
@@ -351,6 +356,9 @@
                         </Button>
                         <TextBlock Grid.Column="2" Text="NOTE" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" VerticalAlignment="Bottom" />
                     </Grid>
+                    <TextBlock Grid.Row="1" Style="{StaticResource NonSelectableText}" Text="No deliveries logged yet." FontSize="12"
+                               HorizontalAlignment="Center" Margin="0,16,0,0" Foreground="{ThemeResource AppTextSecondary}"
+                               Visibility="{Binding SelectedLineHistory.Count, Converter={StaticResource ZeroVis}}" />
                     <ListView Grid.Row="1" ItemsSource="{Binding SelectedLineHistory}" SelectionMode="None">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
