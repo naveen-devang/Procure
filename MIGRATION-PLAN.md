@@ -229,7 +229,8 @@ low-risk and independently valuable even if the port is paused after it.
      (the rehearsal the plan called for), dogfoods, then promotes it. Right after
      promoting, confirm a real v1.0.27 → v2 in-app update; demote again if it fails.
   5. Rollback if needed: release a higher version built from `maui-legacy`. The MAUI app
-     opens the upgraded database (additive columns) and still has its own settings file.
+     should open the upgraded database (the schema changes are additive) - test that on a
+     copy before shipping a rollback. It still has its own settings file.
 
 ### Build commands
 
