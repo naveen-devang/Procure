@@ -94,11 +94,11 @@
             <Button Grid.Column="2" Height="36" Padding="14,0" VerticalAlignment="Center"
                     ToolTipService.ToolTip="Overdue SLA, PCR awaiting sign, urgent only">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Filters" FontSize="12.5" VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="Filters" FontSize="12.5" VerticalAlignment="Center" />
                     <Border Background="{ThemeResource AccentFillBrush}" CornerRadius="9" MinWidth="18" Height="18"
                             Padding="6,0" VerticalAlignment="Center"
                             Visibility="{Binding HasActiveFilters, Converter={StaticResource BoolVis}}">
-                        <TextBlock Text="{Binding ActiveFilterCount}" FontSize="10.5" FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource NonSelectableText}" Text="{Binding ActiveFilterCount}" FontSize="10.5" FontWeight="SemiBold"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#1A1A1A" />
                     </Border>
                 </StackPanel>

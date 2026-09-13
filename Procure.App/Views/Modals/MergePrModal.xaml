@@ -90,9 +90,9 @@
                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppTertiaryBackground}">
                         <CheckBox IsChecked="{Binding MergeCopyChildRfqs, Mode=TwoWay}">
                             <StackPanel Spacing="1">
-                                <TextBlock Style="{StaticResource AppText}" Text="Copy existing vendor RFQs &amp; quotes into Master PR" FontWeight="SemiBold" FontSize="12"
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="Copy existing vendor RFQs &amp; quotes into Master PR" FontWeight="SemiBold" FontSize="12"
                                            Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBlock Style="{StaticResource AppText}" Text="If unchecked, the consolidated PR will start with a fresh RFQ slate."
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="If unchecked, the consolidated PR will start with a fresh RFQ slate."
                                            FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource AppTextTertiary}" />
                             </StackPanel>
                         </CheckBox>

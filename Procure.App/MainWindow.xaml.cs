@@ -80,6 +80,7 @@ public sealed partial class MainWindow : Window
         // to settle BoardTheme.IsDark. It used to re-run ApplyThemeAsync, which wrote the setting
         // back and raised a change - a third apply, and a full rebind, before the first frame.
         RefreshThemeState();
+        Procure.App.Platform.PopupCursorFix.Install(DispatcherQueue);   // no busy cursor over dropdowns
     }
 
     // The board / tasks / detail colour converters hand out brushes that follow BoardTheme.IsDark.

@@ -337,15 +337,15 @@
                         </Grid.ColumnDefinitions>
                         <Button Background="Transparent" BorderThickness="0" Padding="0" Tag="Date" Click="Sort_Click">
                             <StackPanel Orientation="Horizontal" Spacing="3">
-                                <TextBlock Text="DATE" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
-                                <TextBlock Text="{Binding DateSortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="DATE" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="{Binding DateSortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
                                            Foreground="{ThemeResource AppTextTertiary}" />
                             </StackPanel>
                         </Button>
                         <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Padding="0" Tag="Quantity" Click="Sort_Click">
                             <StackPanel Orientation="Horizontal" Spacing="3">
-                                <TextBlock Text="QUANTITY" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
-                                <TextBlock Text="{Binding QuantitySortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="QUANTITY" FontSize="9.5" Foreground="{ThemeResource AppTextTertiary}" />
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="{Binding QuantitySortGlyph}" FontFamily="Segoe Fluent Icons" FontSize="9"
                                            Foreground="{ThemeResource AppTextTertiary}" />
                             </StackPanel>
                         </Button>
