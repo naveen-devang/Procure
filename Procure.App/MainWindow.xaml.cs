@@ -74,6 +74,9 @@ public sealed partial class MainWindow : Window
         if (Content is FrameworkElement c) _shell.WatchOsTheme?.Invoke(c);
 
         InstallShortcuts();
+        InitSidebar();
+        // Opens maximised, as the MAUI app did.
+        if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Maximize();
         NavigateTo(AppRoute.Dashboard, null);   // the page the app opens on, as in the MAUI app
     }
 
@@ -88,6 +91,11 @@ public sealed partial class MainWindow : Window
         RefreshThemeState();
         Procure.App.Platform.PopupCursorFix.Install(DispatcherQueue);   // no busy cursor over dropdowns
         EnsureKeyboardFocus();
+        StartUpdateWork();
+        // Load the PR Board's rows and the task list while the user is still on the Dashboard (data only,
+        // no visual tree), so opening either tab doesn't pay for the whole load on the click.
+        _ = App.Services.GetService(typeof(PrListPageModel)) is PrListPageModel board ? board.PreloadDataAsync() : null;
+        _ = App.Services.GetService(typeof(TodoPageModel)) is TodoPageModel tasks ? tasks.PreloadDataAsync() : null;
     }
 
     // The board / tasks / detail colour converters hand out brushes that follow BoardTheme.IsDark.
@@ -107,9 +115,9 @@ public sealed partial class MainWindow : Window
         ApplyCaptionButtonColors(Procure.App.Converters.BoardTheme.IsDark);
     }
 
-    // The sidebar toggle lives in the title bar now; it opens and collapses the pane exactly as the
-    // pane's own button did.
-    private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args) => Nav.IsPaneOpen = !Nav.IsPaneOpen;
+    // The sidebar toggle lives in the title bar; like Ctrl+B it flips the saved Compact sidebar setting
+    // (MainWindow.Sidebar.cs).
+    private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args) => ToggleSidebar();
 
     /// <summary>
     /// Minimise / maximise / close. Windows draws these itself and does not follow the app's theme:

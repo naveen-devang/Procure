@@ -73,7 +73,7 @@
                 <muxc:NavigationViewItem Content="PR Board" Tag="Board">
                     <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF379;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
-                <muxc:NavigationViewItem Content="Raw &amp; Packing" Tag="CallOff">
+                <muxc:NavigationViewItem x:Name="RawPackingNavItem" Content="Raw &amp; Packing" Tag="CallOff">
                     <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xE218;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItemHeader Content="Planning" />
@@ -87,6 +87,10 @@
             <muxc:NavigationView.FooterMenuItems>
                 <muxc:NavigationViewItem Content="Settings" Tag="Settings">
                     <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xF6AA;" /></muxc:NavigationViewItem.Icon>
+                    <!-- Dot while an update is ready and the sidebar is collapsed (no room for the card). -->
+                    <muxc:NavigationViewItem.InfoBadge>
+                        <muxc:InfoBadge x:Name="UpdateReadyDot" Visibility="Collapsed" ToolTipService.ToolTip="Update ready - expand the sidebar to restart" />
+                    </muxc:NavigationViewItem.InfoBadge>
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.FooterMenuItems>
 
@@ -101,6 +105,41 @@
             </Frame>
         </muxc:NavigationView>
 
+        <!-- "Update ready": shown once an update has downloaded in the background (MainWindow.Updates.cs).
+             The card floats just above Settings while the sidebar is open; collapsed, a dot on Settings stands
+             in. Not in NavigationView.PaneFooter: the pane laid its menu items out in the wrong place every
+             time the footer changed height. -->
+        <Border x:Name="UpdateReadyCard" Grid.Row="1" Visibility="Collapsed" Width="160" Margin="10,0,0,56" Padding="12,10"
+                HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                CornerRadius="8" BorderThickness="1"
+                BorderBrush="{ThemeResource AccentButtonBackground}" Background="{ThemeResource AppSecondaryBackground}">
+            <StackPanel Spacing="6">
+                <Grid ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="{ThemeResource AccentButtonBackground}" />
+                    <TextBlock Grid.Column="1" Text="Update ready" FontSize="12" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
+                            Width="22" Height="22" Padding="0" Background="Transparent" BorderThickness="0"
+                            ToolTipService.ToolTip="Dismiss" Click="UpdateLater_Click" />
+                </Grid>
+                <TextBlock x:Name="UpdateReadyText" Text="Downloaded in the background. Restart to apply." FontSize="10.5" TextWrapping="Wrap"
+                           Foreground="{ThemeResource AppTextSecondary}" />
+                <Grid ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Restart" Style="{StaticResource AccentButtonStyle}" FontSize="11" Height="28"
+                            HorizontalAlignment="Stretch" Click="UpdateRestart_Click" />
+                    <Button Grid.Column="1" Content="Later" FontSize="11" Height="28" Click="UpdateLater_Click" />
+                </Grid>
+            </StackPanel>
+        </Border>
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
              Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
         <Border x:Name="Hud" Grid.Row="1" Visibility="Collapsed"

@@ -82,7 +82,7 @@ public sealed partial class MainWindow
         if (Is(KeyboardShortcutIds.ToggleSidebar))
         {
             e.Handled = true;
-            Nav.IsPaneOpen = !Nav.IsPaneOpen;
+            ToggleSidebar();
             return;
         }
 
