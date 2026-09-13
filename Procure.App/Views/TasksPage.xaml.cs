@@ -36,11 +36,6 @@ public sealed partial class TasksPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Vm.IsVisible = true;
-        if (Content is FrameworkElement root)
-        {
-            root.KeyDown -= OnKeyDown;
-            root.KeyDown += OnKeyDown;
-        }
         if (_loaded) { await Vm.RefreshAsync(); return; }
         _loaded = true;
         try
@@ -57,7 +52,6 @@ public sealed partial class TasksPage : Page
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         Vm.IsVisible = false;
-        if (Content is FrameworkElement root) root.KeyDown -= OnKeyDown;
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -69,20 +63,23 @@ public sealed partial class TasksPage : Page
         }
     }
 
-    private void OnKeyDown(object sender, KeyRoutedEventArgs e)
+    /// <summary>Tasks keys, called from MainWindow's keyboard hook.</summary>
+    internal bool HandleShortcut(VirtualKey key, Procure.Services.IKeyboardShortcutService s)
     {
-        if (e.Key == VirtualKey.Escape)
+        if (key == VirtualKey.Escape)
         {
             if (!string.IsNullOrEmpty(Vm.FilterText)) Vm.FilterText = string.Empty;
             else Vm.SelectCommand.Execute(null);
-            e.Handled = true;
+            return true;
         }
-        else if (e.Key == VirtualKey.Delete && Vm.SelectedTask != null
-                 && FocusManager.GetFocusedElement(XamlRoot) is not (TextBox or RichEditBox))
+        if (key == VirtualKey.Delete && Vm.SelectedTask != null && !Procure.App.Platform.ShortcutInput.IsTextInputFocused(XamlRoot))
         {
             Vm.DeleteCommand.Execute(Vm.SelectedTask);
-            e.Handled = true;
+            return true;
         }
+        if (Procure.App.Platform.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.TasksNew), key)) { Vm.NewTaskCommand.Execute(null); return true; }
+        if (Procure.App.Platform.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.TasksRefresh), key)) { Vm.RefreshCommand.Execute(null); return true; }
+        return false;
     }
 
     private void RebuildWeek()

@@ -72,4 +72,12 @@ public sealed partial class NotesPage : Page
     {
         if (e.ClickedItem is TaskLinkTarget target) Vm.PickLinkTargetCommand.Execute(target);
     }
+
+    /// <summary>Notes keys, called from MainWindow's keyboard hook.</summary>
+    internal bool HandleShortcut(Windows.System.VirtualKey key, Procure.Services.IKeyboardShortcutService s)
+    {
+        if (!Procure.App.Platform.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.NotesNew), key)) return false;
+        Vm.NewNoteCommand.Execute(null);
+        return true;
+    }
 }

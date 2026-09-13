@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
         RefreshThemeState();   // caption button colours right from the first frame, not after activation
         if (Content is FrameworkElement c) _shell.WatchOsTheme?.Invoke(c);
 
+        InstallShortcuts();
         NavigateTo(AppRoute.Dashboard, null);   // the page the app opens on, as in the MAUI app
     }
 
@@ -86,6 +87,7 @@ public sealed partial class MainWindow : Window
         // back and raised a change - a third apply, and a full rebind, before the first frame.
         RefreshThemeState();
         Procure.App.Platform.PopupCursorFix.Install(DispatcherQueue);   // no busy cursor over dropdowns
+        EnsureKeyboardFocus();
     }
 
     // The board / tasks / detail colour converters hand out brushes that follow BoardTheme.IsDark.
@@ -181,6 +183,9 @@ public sealed partial class MainWindow : Window
 
         foreach (var item in EnumerateNavItems())
             if (item.Tag as string == route.ToString()) { Nav.SelectedItem = item; break; }
+
+        // A page swap can leave nothing focused, which would silence every shortcut until a click.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, EnsureKeyboardFocus);
     }
 
     private IEnumerable<NavigationViewItem> EnumerateNavItems()

@@ -86,4 +86,29 @@ public sealed partial class CallOffPage : Page
     {
         if ((sender as FrameworkElement)?.DataContext is PoItemCallOff entry) Vm.DeleteCallOffCommand.Execute(entry);
     }
+
+    /// <summary>Raw &amp; Packing keys, called from MainWindow's keyboard hook. Uses the PR Board's
+    /// search and refresh bindings, as the MAUI app did.</summary>
+    internal bool HandleShortcut(Windows.System.VirtualKey key, Procure.Services.IKeyboardShortcutService s)
+    {
+        if (key == Windows.System.VirtualKey.Escape)
+        {
+            if (!string.IsNullOrEmpty(Vm.SearchText)) Vm.SearchText = string.Empty;
+            else if (Vm.SelectedLine != null) Vm.SelectedLine.IsSelected = false;
+            Vm.SelectedLine = null;
+            return true;
+        }
+        if (Procure.App.Platform.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.FocusSearch), key))
+        {
+            SearchBox.Focus(FocusState.Keyboard);
+            SearchBox.SelectAll();
+            return true;
+        }
+        if (Procure.App.Platform.ShortcutInput.Matches(s.GetCombo(Procure.Utilities.KeyboardShortcutIds.RefreshBoard), key))
+        {
+            Vm.RefreshCommand.Execute(null);
+            return true;
+        }
+        return false;
+    }
 }

@@ -60,18 +60,60 @@ public sealed partial class PrBoardPage : Page
             }
         };
 
-        // Esc closes the topmost modal. handledEventsToo so a TextBox inside a modal
-        // that marks the key handled doesn't swallow it.
-        AddHandler(KeyDownEvent, new KeyEventHandler(OnPageKeyDown), handledEventsToo: true);
         // Click on a modal's dimmed backdrop (the modal UserControl's root Grid, not its
         // content card) closes it too - one handler for all 11 modals.
         AddHandler(TappedEvent, new TappedEventHandler(OnPageTapped), handledEventsToo: true);
     }
 
-    private void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
+    /// <summary>Board keys, called from MainWindow's keyboard hook: Esc closes the topmost dialog,
+    /// dialog keys act only on the dialog that is open, board keys only when no dialog is.</summary>
+    internal bool HandleShortcut(Windows.System.VirtualKey key, Procure.Services.IKeyboardShortcutService s)
     {
-        if (e.Key == Windows.System.VirtualKey.Escape && Vm.CloseTopmostModal())
-            e.Handled = true;
+        if (key == Windows.System.VirtualKey.Escape) return Vm.CloseTopmostModal();
+
+        bool Is(string id) => ShortcutInput.Matches(s.GetCombo(id), key);
+        var typing = ShortcutInput.IsTextInputFocused(XamlRoot);
+
+        if (Vm.IsPcrPreviewVisible)
+        {
+            if (Is(Procure.Utilities.KeyboardShortcutIds.PcrPrint)) { Vm.PrintPcrPreviewCommand.Execute(null); return true; }
+            if (Is(Procure.Utilities.KeyboardShortcutIds.ModalSave)) { Vm.SavePcrPreviewCommand.Execute(null); return true; }
+            if (!typing && Vm.IsPcrPagerVisible && Is(Procure.Utilities.KeyboardShortcutIds.PcrPrevPage)) { Vm.PreviousPcrPreviewPageCommand.Execute(null); return true; }
+            if (!typing && Vm.IsPcrPagerVisible && Is(Procure.Utilities.KeyboardShortcutIds.PcrNextPage)) { Vm.NextPcrPreviewPageCommand.Execute(null); return true; }
+            // Same step and limits as Ctrl+wheel in the preview (PcrPreviewModal.OnWheel).
+            if (Is(Procure.Utilities.KeyboardShortcutIds.PcrZoomIn)) { Vm.PcrPreviewZoom = Math.Clamp(Vm.PcrPreviewZoom * 1.1, 0.25, 6.0); return true; }
+            if (Is(Procure.Utilities.KeyboardShortcutIds.PcrZoomOut)) { Vm.PcrPreviewZoom = Math.Clamp(Vm.PcrPreviewZoom / 1.1, 0.25, 6.0); return true; }
+            return false;
+        }
+
+        if (Is(Procure.Utilities.KeyboardShortcutIds.ModalSave))
+        {
+            if (Vm.IsEditModalVisible) { Vm.SavePrModalCommand.Execute(null); return true; }
+            if (Vm.IsAddRfqModalVisible) { Vm.SaveNewRfqCommand.Execute(null); return true; }
+            if (Vm.IsAddPoModalVisible) { Vm.SaveNewPoCommand.Execute(null); return true; }
+            if (Vm.IsApprovalConfigModalVisible) { Vm.SaveApprovalConfigModalCommand.Execute(null); return true; }
+            if (Vm.IsMergePrModalVisible) { Vm.ConfirmMergePrModalCommand.Execute(null); return true; }
+            if (Vm.IsSplitPrModalVisible) { Vm.ConfirmSplitPrModalCommand.Execute(null); return true; }
+            if (Vm.IsBatchCreateModalVisible) { Vm.SaveBatchPrsModalCommand.Execute(null); return true; }
+            if (Vm.IsBatchRfqModalVisible) { Vm.SaveBatchRfqModalCommand.Execute(null); return true; }
+            if (Vm.IsBatchPoModalVisible) { Vm.SaveBatchPoModalCommand.Execute(null); return true; }
+            return false;
+        }
+
+        if (!typing && Is(Procure.Utilities.KeyboardShortcutIds.ModalSelectAll))
+        {
+            if (Vm.IsBatchRfqModalVisible) { Vm.SelectAllBatchRfqItems(); return true; }
+            if (Vm.IsAddPoModalVisible) { Vm.SelectAllPoRfqs(); return true; }
+            return false;
+        }
+
+        if (Vm.IsAnyModalVisible) return false;
+
+        if (Is(Procure.Utilities.KeyboardShortcutIds.FocusSearch)) { SearchBox.Focus(FocusState.Keyboard); SearchBox.SelectAll(); return true; }
+        if (Is(Procure.Utilities.KeyboardShortcutIds.NewPr)) { Vm.OpenBatchCreateModalCommand.Execute(null); return true; }
+        if (Is(Procure.Utilities.KeyboardShortcutIds.RefreshBoard)) { Vm.RefreshBoardCommand.Execute(null); return true; }
+        if (Is(Procure.Utilities.KeyboardShortcutIds.ExportCsv)) { Vm.ExportCsvCommand.Execute(null); return true; }
+        return false;
     }
 
     private void OnPageTapped(object sender, TappedRoutedEventArgs e)
