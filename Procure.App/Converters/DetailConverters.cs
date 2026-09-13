@@ -35,7 +35,7 @@ sealed class PoFulfillmentColorConverter : IValueConverter
     public object Convert(object value, Type t, object p, string l)
     {
         var s = PoFulfil.Classify(value);
-        return BoardTheme.Brush(BoardTheme.IsDark ? PoFulfil.TextDark[s] : PoFulfil.TextLight[s]);
+        return BoardTheme.Pick(PoFulfil.TextDark[s], PoFulfil.TextLight[s]);
     }
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }
@@ -45,7 +45,7 @@ sealed class PoFulfillmentBgConverter : IValueConverter
     public object Convert(object value, Type t, object p, string l)
     {
         var s = PoFulfil.Classify(value);
-        return BoardTheme.Brush(BoardTheme.IsDark ? PoFulfil.BgDark[s] : PoFulfil.BgLight[s]);
+        return BoardTheme.Pick(PoFulfil.BgDark[s], PoFulfil.BgLight[s]);
     }
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }
@@ -55,7 +55,7 @@ sealed class PoFulfillmentStrokeConverter : IValueConverter
     public object Convert(object value, Type t, object p, string l)
     {
         var s = PoFulfil.Classify(value);
-        return BoardTheme.Brush(BoardTheme.IsDark ? PoFulfil.StrokeDark[s] : PoFulfil.StrokeLight[s]);
+        return BoardTheme.Pick(PoFulfil.StrokeDark[s], PoFulfil.StrokeLight[s]);
     }
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }

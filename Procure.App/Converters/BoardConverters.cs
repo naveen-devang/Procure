@@ -11,26 +11,76 @@ namespace Procure.App.Converters;
 /// <summary>
 /// WinUI ports of the MAUI board converters (Utilities/StatusColorConverter.cs,
 /// PriorityColorConverter.cs). WinUI can't bind a Color to a Brush property, so these
-/// return SolidColorBrush. Theme-varying pairs read <see cref="BoardTheme.IsDark"/>,
-/// which MainWindow keeps current and bumps on theme switch (the board rebuilds its
-/// item source then, since converter bindings don't re-run on RequestedTheme change).
+/// return SolidColorBrush.
+///
+/// Theme-varying colours are LIVE brushes: <see cref="Pick"/> and <see cref="Themed"/> hand out
+/// one brush per colour pair / resource key, and a theme switch recolours those brushes in place.
+/// Converter bindings don't re-run on a RequestedTheme change, and the old answer - rebuilding
+/// every list's items so they would - reset scroll, collapsed expanded rows and flickered the
+/// whole page. Recolouring a brush repaints everything holding it with no rebuild.
 /// </summary>
 public static class BoardTheme
 {
-    public static bool IsDark { get; set; }
+    private static bool _isDark;
+
+    /// <summary>Set on the UI thread (MainWindow does), since it recolours live brushes.</summary>
+    public static bool IsDark
+    {
+        get => _isDark;
+        set
+        {
+            if (_isDark == value && _painted) return;
+            _isDark = value;
+            _painted = true;
+            Repaint();
+        }
+    }
+    private static bool _painted;
+
+    /// <summary>Re-reads every theme-resource brush. Also called after an accent change.</summary>
+    public static void Repaint()
+    {
+        foreach (var (pair, brush) in Pairs) brush.Color = Parse(_isDark ? pair.Dark : pair.Light);
+        foreach (var (key, brush) in Keys) brush.Color = Lookup(key);
+    }
 
     private static readonly ConcurrentDictionary<string, SolidColorBrush> Cache = new();
+    private static readonly ConcurrentDictionary<(string Dark, string Light), SolidColorBrush> Pairs = new();
+    private static readonly ConcurrentDictionary<string, SolidColorBrush> Keys = new();
 
-    public static SolidColorBrush Brush(string hex) => Cache.GetOrAdd(hex, static s =>
+    private static Color Parse(string s)
     {
         s = s.TrimStart('#');
         byte a = 255;
         if (s.Length == 8) { a = Convert.ToByte(s[..2], 16); s = s[2..]; }
-        return new SolidColorBrush(Color.FromArgb(a,
-            Convert.ToByte(s[..2], 16), Convert.ToByte(s.Substring(2, 2), 16), Convert.ToByte(s.Substring(4, 2), 16)));
-    });
+        return Color.FromArgb(a, Convert.ToByte(s[..2], 16), Convert.ToByte(s.Substring(2, 2), 16), Convert.ToByte(s.Substring(4, 2), 16));
+    }
 
-    public static SolidColorBrush Pick(string dark, string light) => Brush(IsDark ? dark : light);
+    /// <summary>A brush that follows the app's theme resource <paramref name="key"/>. Needed in code
+    /// because Application.Current.Resources[key] resolves against the theme the app STARTED in,
+    /// not the one the window has been switched to.</summary>
+    public static SolidColorBrush Themed(string key) => Keys.GetOrAdd(key, static k => new SolidColorBrush(Lookup(k)));
+
+    private static Color Lookup(string key)
+    {
+        var dicts = Application.Current.Resources.MergedDictionaries;
+        for (var i = dicts.Count - 1; i >= 0; i--)
+        {
+            foreach (var name in _isDark ? new[] { "Dark", "Default" } : new[] { "Light" })
+                if (dicts[i].ThemeDictionaries.TryGetValue(name, out var td) && td is ResourceDictionary rd
+                    && rd.TryGetValue(key, out var v) && v is SolidColorBrush b)
+                    return Color.FromArgb((byte)(b.Color.A * b.Opacity), b.Color.R, b.Color.G, b.Color.B);
+        }
+        return Application.Current.Resources.TryGetValue(key, out var top) && top is SolidColorBrush tb
+            ? tb.Color : Microsoft.UI.Colors.Transparent;
+    }
+
+    /// <summary>A fixed colour, same in both themes.</summary>
+    public static SolidColorBrush Brush(string hex) => Cache.GetOrAdd(hex, static s => new SolidColorBrush(Parse(s)));
+
+    /// <summary>A live brush: <paramref name="dark"/> in dark mode, <paramref name="light"/> in light.</summary>
+    public static SolidColorBrush Pick(string dark, string light) =>
+        Pairs.GetOrAdd((dark, light), static p => new SolidColorBrush(Parse(_isDark ? p.Dark : p.Light)));
 }
 
 abstract class BrushConverter : IValueConverter

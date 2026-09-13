@@ -43,10 +43,8 @@ sealed class SegmentedSelectionTextConverter : IValueConverter
 {
     public object Convert(object value, Type t, object p, string l) =>
         string.Equals(value?.ToString(), p?.ToString(), StringComparison.OrdinalIgnoreCase)
-            ? Application.Current.Resources["TextOnAccentFillColorPrimaryBrush"] as Brush
-              ?? new SolidColorBrush(Microsoft.UI.Colors.White)
-            : Application.Current.Resources["AppTextPrimary"] as Brush
-              ?? new SolidColorBrush(Microsoft.UI.Colors.Gray);
+            ? BoardTheme.Pick("#FF000000", "#FFFFFFFF")   // TextOnAccentFillColorPrimary
+            : BoardTheme.Themed("AppTextPrimary");
 
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }
@@ -55,10 +53,8 @@ sealed class SegmentedSelectionBrushConverter : IValueConverter
 {
     public object Convert(object value, Type t, object p, string l) =>
         string.Equals(value?.ToString(), p?.ToString(), StringComparison.OrdinalIgnoreCase)
-            ? Application.Current.Resources["AccentFillColorDefaultBrush"] as Brush
-              ?? new SolidColorBrush(Microsoft.UI.Colors.SteelBlue)
-            : Application.Current.Resources["AppSubtleFill"] as Brush
-              ?? new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            ? BoardTheme.Themed("AccentFillColorDefaultBrush")
+            : BoardTheme.Themed("AppSubtleFill");
 
     public object ConvertBack(object value, Type t, object p, string l) => throw new NotSupportedException();
 }

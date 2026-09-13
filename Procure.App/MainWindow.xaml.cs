@@ -51,10 +51,7 @@ public sealed partial class MainWindow : Window
 
         _shell.ThemeChanged += (_, _) =>
         {
-            RefreshThemeState();                       // BoardTheme.IsDark, from the mode string
-            _themeSeq++;
-            RebindItemColors(ContentFrame.Content as DependencyObject);   // the visible page now
-            _reboundSeq[_current] = _themeSeq;
+            RefreshThemeState();   // BoardTheme.IsDark, from the mode string - recolours the live converter brushes
         };
         Activated += OnFirstActivated;
 
@@ -85,7 +82,7 @@ public sealed partial class MainWindow : Window
         RefreshThemeState();
     }
 
-    // The board / tasks / detail colour converters read BoardTheme.IsDark once per container.
+    // The board / tasks / detail colour converters hand out brushes that follow BoardTheme.IsDark.
     // Resolve it from the chosen mode, NOT from Content.ActualTheme - ActualTheme lags a
     // RequestedTheme change by a layout pass, so reading it here left the tags and status
     // buttons a theme behind until the next board reload ("Refresh").
@@ -95,25 +92,10 @@ public sealed partial class MainWindow : Window
         {
             "Light" => false,
             "Dark" => true,
-            _ => Application.Current.RequestedTheme == ApplicationTheme.Dark,
+            // System: the root sits on ElementTheme.Default, so its ActualTheme is the OS theme and is
+            // already settled when WatchOsTheme raises this. Application.RequestedTheme is frozen at launch.
+            _ => (Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
         };
-    }
-
-    // The board / tasks / detail colours come from IValueConverters that read BoardTheme.IsDark
-    // once, when the item container is realized - they don't re-run on a theme change. Bounce
-    // every ItemsControl's source on the visible page so the converters fire again. (Resets
-    // scroll position, which is fine for a manual theme toggle.)
-    private static void RebindItemColors(DependencyObject? root)
-    {
-        if (root is null) return;
-        if (root is ItemsControl { ItemsSource: { } src } ic)
-        {
-            ic.ItemsSource = null;
-            ic.ItemsSource = src;
-        }
-        var n = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
-        for (var i = 0; i < n; i++)
-            RebindItemColors(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i));
     }
 
     private void Nav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -126,8 +108,6 @@ public sealed partial class MainWindow : Window
     }
 
     private AppRoute _current = (AppRoute)(-1);
-    private int _themeSeq;
-    private readonly Dictionary<AppRoute, int> _reboundSeq = new();
 
     private void NavigateTo(AppRoute route, string? param)
     {
@@ -144,17 +124,6 @@ public sealed partial class MainWindow : Window
                 AppRoute.Settings => App.Services.GetService(typeof(SettingsPage))!,
                 _ => new StubPage(route.ToString()),
             };
-
-            // Pages are singletons: one whose containers were realized in a now-stale theme
-            // won't re-run its colour converters on its own. Rebind once when it's shown again.
-            if (_reboundSeq.GetValueOrDefault(route, 0) != _themeSeq)
-            {
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    RebindItemColors(ContentFrame.Content as DependencyObject);
-                    _reboundSeq[route] = _themeSeq;
-                });
-            }
         }
 
         if (route == AppRoute.Board && param == "new" && PrListPageModel.Current is { } b)

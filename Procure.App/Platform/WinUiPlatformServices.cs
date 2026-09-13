@@ -263,7 +263,10 @@ public sealed class WinUiAppHost : IAppHost
         {
             "Light" => false,
             "Dark" => true,
-            _ => Microsoft.UI.Xaml.Application.Current.RequestedTheme == ApplicationTheme.Dark,
+            // System: the root's ActualTheme is the OS theme (Application.RequestedTheme is frozen at launch).
+            _ => _shell.Window?.Content is FrameworkElement root
+                     ? root.ActualTheme == ElementTheme.Dark
+                     : Microsoft.UI.Xaml.Application.Current.RequestedTheme == ApplicationTheme.Dark,
         };
 
         var light = ParseHex(p.LightHex);   // deep accent, for text/fills on a light ground
@@ -282,6 +285,7 @@ public sealed class WinUiAppHost : IAppHost
             if (dict is null) continue;
             foreach (var key in AccentKeys) Recolour(dict, key, c);
         }
+        Procure.App.Converters.BoardTheme.Repaint();   // converter brushes copied from the accent keys
     }
 
     private static readonly string[] AccentKeys =
