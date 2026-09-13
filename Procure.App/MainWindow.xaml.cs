@@ -113,6 +113,7 @@ public sealed partial class MainWindow : Window
             _ => (Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark,
         };
         ApplyCaptionButtonColors(Procure.App.Converters.BoardTheme.IsDark);
+        PaintThemeSwitch(Procure.App.Converters.BoardTheme.IsDark);
     }
 
     // The sidebar toggle lives in the title bar; like Ctrl+B it flips the saved Compact sidebar setting

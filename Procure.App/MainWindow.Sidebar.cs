@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Procure.Abstractions;
 using Procure.Services;
 
@@ -38,6 +40,8 @@ public sealed partial class MainWindow
     {
         Nav.IsPaneOpen = !_settings.IsSidebarCompact;
         RefreshUpdateReadyVisibility();   // the update card only fits beside an open sidebar
+        ThemeSwitchExpanded.Visibility = Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+        CompactThemeBtn.Visibility = Nav.IsPaneOpen ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void AutoCollapseSidebar(double width)
@@ -45,6 +49,24 @@ public sealed partial class MainWindow
         if (!_settings.AutoCollapseSidebarOnNarrow || _sidebarToggledByHand || width <= 0) return;
         var narrow = width < AppConstants.ResponsiveCollapseBreakpoint;
         if (_settings.IsSidebarCompact != narrow) _settings.IsSidebarCompact = narrow;
+    }
+
+    // ---- Light / Dark switch ----
+    // Same path as Settings > Color Mode, so both stay in step (SettingsChanged updates the other).
+
+    private void SetTheme(string mode) => _ = App.Services.GetRequiredService<IAppHost>().ApplyThemeAsync(mode);
+    private void LightMode_Click(object sender, RoutedEventArgs e) => SetTheme("Light");
+    private void DarkMode_Click(object sender, RoutedEventArgs e) => SetTheme("Dark");
+    private void CompactTheme_Click(object sender, RoutedEventArgs e) => SetTheme(Converters.BoardTheme.IsDark ? "Light" : "Dark");
+
+    /// <summary>The current theme's button at full strength and the other dimmed (MAUI's look); the collapsed
+    /// toggle shows the current theme's icon. "System" follows whatever Windows is showing.</summary>
+    private void PaintThemeSwitch(bool dark)
+    {
+        LightModeBtn.Opacity = dark ? 0.4 : 1.0;
+        DarkModeBtn.Opacity = dark ? 1.0 : 0.4;
+        CompactThemeBtn.Content = dark ? "" : "";   // moon / sun
+        ToolTipService.SetToolTip(CompactThemeBtn, dark ? "Switch to Light Theme" : "Switch to Dark Theme");
     }
 
     private void ApplyRawPackingTab()

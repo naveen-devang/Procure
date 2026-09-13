@@ -93,6 +93,31 @@
                     </muxc:NavigationViewItem.InfoBadge>
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.FooterMenuItems>
+            <!-- Light / Dark switch under Settings, as in the MAUI sidebar: sun and moon side by side when the
+                 sidebar is open, one toggle when it is collapsed. Both rows are the same height - the pane
+                 misplaces its menu items when the footer changes height. Wired in MainWindow.Sidebar.cs. -->
+            <muxc:NavigationView.PaneFooter>
+                <Grid Height="48">
+                    <Grid x:Name="ThemeSwitchExpanded" Padding="16,0,12,0">
+                        <TextBlock Text="Theme" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   IsTextSelectionEnabled="False" Foreground="{ThemeResource AppTextSecondary}" />
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" Padding="3" CornerRadius="6" BorderThickness="1"
+                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <Button x:Name="LightModeBtn" Content="&#xE706;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                        Width="32" Height="26" Padding="0" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Light Theme" Click="LightMode_Click" />
+                                <Button x:Name="DarkModeBtn" Content="&#xE708;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                        Width="32" Height="26" Padding="0" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                        ToolTipService.ToolTip="Dark Theme" Click="DarkMode_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <Button x:Name="CompactThemeBtn" Visibility="Collapsed" FontFamily="Segoe Fluent Icons" FontSize="14"
+                            Width="36" Height="36" Padding="0" CornerRadius="8" Margin="6,0,0,0" HorizontalAlignment="Left"
+                            Background="Transparent" BorderThickness="0" Click="CompactTheme_Click" />
+                </Grid>
+            </muxc:NavigationView.PaneFooter>
 
             <Frame x:Name="ContentFrame">
                 <!-- Fires on a direct Content set too (NavigateTo assigns .Content to keep DI
@@ -109,7 +134,7 @@
              The card floats just above Settings while the sidebar is open; collapsed, a dot on Settings stands
              in. Not in NavigationView.PaneFooter: the pane laid its menu items out in the wrong place every
              time the footer changed height. -->
-        <Border x:Name="UpdateReadyCard" Grid.Row="1" Visibility="Collapsed" Width="160" Margin="10,0,0,56" Padding="12,10"
+        <Border x:Name="UpdateReadyCard" Grid.Row="1" Visibility="Collapsed" Width="160" Margin="10,0,0,104" Padding="12,10"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
                 CornerRadius="8" BorderThickness="1"
                 BorderBrush="{ThemeResource AccentButtonBackground}" Background="{ThemeResource AppSecondaryBackground}">
