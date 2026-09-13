@@ -47,6 +47,13 @@ namespace Procure.Services.Export
         /// prints exactly as it did.</summary>
         internal const double MinVendorPairWidth = 40;
 
+        /// <summary>The widest a vendor's Qty + Unit Price pair is laid out, before any value that
+        /// genuinely needs more borrows it. Without a cap the whole leftover page width was split
+        /// between however many vendors were picked, so a one-quote sheet drew a single vendor about
+        /// 400 pt wide. With it a vendor looks the same with one quote as with five, and the table
+        /// simply ends further left; the header and signature boxes stay full page width.</summary>
+        internal const double MaxVendorPairWidth = 130;
+
         /// <summary>
         /// How much the whole sheet has to shrink for its table to fit this content width, as a factor
         /// of 1.0 or less.
@@ -217,6 +224,15 @@ namespace Procure.Services.Export
             // ("AED 1,102,500.00"), so the pair splits unevenly - same proportions the Excel version
             // uses (10-wide Qty column against an 18-wide Unit Price column there).
             double basePairWidth = supplierCount > 0 ? remainingWidth / supplierCount : remainingWidth;
+            // Capped (see MaxVendorPairWidth). What the cap leaves over is not handed to anyone: the
+            // table just gets narrower, except that the borrow pass below spends it first when a value
+            // does not fit, before it squeezes the description.
+            double spareWidth = 0;
+            if (supplierCount > 0 && basePairWidth > MaxVendorPairWidth)
+            {
+                spareWidth = (basePairWidth - MaxVendorPairWidth) * supplierCount;
+                basePairWidth = MaxVendorPairWidth;
+            }
 
             // Per-vendor from here on, not one shared figure: the borrow pass below widens only the
             // columns whose own values don't fit, and leaves every other vendor exactly as it was.
@@ -352,7 +368,7 @@ namespace Procure.Services.Export
                         "Technical Approval"
                     }.Max(l => MeasureTextWidth(l, "F2", 7.5));
 
-                    double take = Math.Min(totalDeficit, Math.Max(0, descWidth - labelFloor));
+                    double take = Math.Min(totalDeficit, spareWidth + Math.Max(0, descWidth - labelFloor));
                     if (take > 0)
                     {
                         // Enough to go round: everyone short gets exactly their shortfall. Not
@@ -367,7 +383,8 @@ namespace Procure.Services.Export
                         }
                         qtyWidth += dPrq * f; granted += dPrq * f;
                         historicalWidth += dHist * f; granted += dHist * f;
-                        descWidth -= granted;
+                        // The cap's spare width goes first; only the rest comes out of description.
+                        descWidth -= Math.Max(0, granted - spareWidth);
                     }
                 }
             }
@@ -389,6 +406,10 @@ namespace Procure.Services.Export
                 }
                 colX.Add(x + historicalWidth);          // right edge
             }
+            // Where the table ends. Narrower than the page when the vendor cap applies; the grid is
+            // drawn to here, left-aligned, while the title, header lines, remarks and signature boxes
+            // keep using the full contentWidth.
+            double tableWidth = colX[^1] - marginLeft;
 
             var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "RW01" : pr.Plant.Trim();
             var cleanRfqList = selectedRfqs
@@ -710,7 +731,7 @@ namespace Procure.Services.Export
                 double rowH2 = tableHeaderRowH2;
                 currentPage.TableTopY = curY;
 
-                DrawRect(marginLeft, curY - rowH1 - rowH2, contentWidth, rowH1 + rowH2, lineWidth: 0.5, fillHex: "F2F4F7");
+                DrawRect(marginLeft, curY - rowH1 - rowH2, tableWidth, rowH1 + rowH2, lineWidth: 0.5, fillHex: "F2F4F7");
 
                 DrawText("Sl No.", colX[0], curY - 14, font: "F2", fontSize: 8, align: "center", width: slNoWidth);
                 DrawText("Item Description", colX[1], curY - 14, font: "F2", fontSize: 8, align: "center", width: descWidth);
@@ -731,7 +752,7 @@ namespace Procure.Services.Export
                 DrawCenteredBlock(historicalHeaderLines, colX[HistoricalColIdx()], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, historicalWidth);
                 DrawText("Unit Price", colX[HistoricalColIdx()], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: historicalWidth);
 
-                DrawLine(colX[3], curY - rowH1, marginLeft + contentWidth, curY - rowH1, width: 0.5);
+                DrawLine(colX[3], curY - rowH1, marginLeft + tableWidth, curY - rowH1, width: 0.5);
 
                 // The Qty|Unit Price divider starts under the merged vendor-name row, so the name
                 // stays uncut - the sub-header cells below it are real separate cells and do get it.
@@ -828,7 +849,7 @@ namespace Procure.Services.Export
             {
                 var fallbackDescLines = WrapItemName(pr.Description);
                 double rowH = Math.Max(18, 18 + (fallbackDescLines.Count - 1) * itemDescLineHeight);
-                DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
+                DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
                 double fbCenterY = curY - ((rowH - itemDescLineHeight) / 2.0) - (itemDescLineHeight * 0.75);
                 DrawText("1", colX[0], fbCenterY, font: "F1", fontSize: 8, align: "center", width: slNoWidth);
                 DrawCenteredBlock(fallbackDescLines, colX[1] + 4, curY, rowH, itemDescLineHeight, "F1", 8, descWidth - 4, align: "left");
@@ -865,7 +886,7 @@ namespace Procure.Services.Export
                         StartNewPage(isFirstPage: false);
                     }
 
-                    DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
+                    DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
 
                     // Same single-line vertical center DrawCenteredBlock computes for a 1-line
                     // block - shared here so the price cells line up with a wrapped 2-line
@@ -945,7 +966,7 @@ namespace Procure.Services.Export
             void DrawSummaryMoneyRow(string label, Func<RequestForQuotation, (decimal? amount, bool showZeroAsDash)> valFunc, bool isBold = false)
             {
                 double rowH = summaryRowH;
-                DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
+                DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
 
                 DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
 
@@ -965,7 +986,7 @@ namespace Procure.Services.Export
             void DrawSummaryTextRow(string label, Func<RequestForQuotation, string> valFunc, bool isBold = false)
             {
                 double rowH = summaryRowH;
-                DrawRect(marginLeft, curY - rowH, contentWidth, rowH, lineWidth: 0.5);
+                DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
 
                 DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
 
