@@ -71,13 +71,16 @@
         </Border>
 
         <!-- section panes (all built; the old page was always-built too) -->
-        <ScrollViewer Grid.Row="1" Grid.Column="1" Padding="28,16,28,32">
-            <Grid>
+        <!-- Each section is a fixed card that fills this area, rounded top and bottom; its contents
+             scroll inside the card. The page used to scroll as a whole, with the ScrollViewer's padding
+             cutting the card off short of the bottom edge. -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="28,16,28,28">
 
                 <!-- ===== Appearance ===== -->
                 <Border Style="{StaticResource Card}"
-                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Appearance}">
-                    <StackPanel Spacing="18">
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Appearance}" Padding="0">
+                  <ScrollViewer>
+                    <StackPanel Margin="20" Spacing="18">
                         <TextBlock Text="Appearance &amp; Theme Personalization" Style="{StaticResource SectionTitle}" />
 
                         <StackPanel Spacing="8">
@@ -153,12 +156,14 @@
                             </ItemsControl>
                         </StackPanel>
                     </StackPanel>
+                  </ScrollViewer>
                 </Border>
 
                 <!-- ===== Navigation ===== -->
                 <Border Style="{StaticResource Card}"
-                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Navigation}">
-                    <StackPanel Spacing="14">
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Navigation}" Padding="0">
+                  <ScrollViewer>
+                    <StackPanel Margin="20" Spacing="14">
                         <TextBlock Text="Navigation &amp; Sidebar" Style="{StaticResource SectionTitle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -194,11 +199,12 @@
                             <ToggleSwitch Grid.Column="1" IsOn="{Binding IsRawPackingTabEnabled, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
+                  </ScrollViewer>
                 </Border>
 
                 <!-- ===== Procurement ===== -->
-                <StackPanel Spacing="22"
-                            Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Procurement}">
+                <ScrollViewer Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Procurement}">
+                <StackPanel Spacing="22">
                     <Border Style="{StaticResource Card}">
                         <StackPanel Spacing="16">
                             <TextBlock Text="Procurement Defaults" Style="{StaticResource SectionTitle}" />
@@ -294,10 +300,11 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </ScrollViewer>
 
                 <!-- ===== Custom Columns ===== -->
-                <StackPanel Spacing="22"
-                            Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Columns}">
+                <ScrollViewer Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Columns}">
+                <StackPanel Spacing="22">
                   <StackPanel Spacing="22" DataContext="{Binding ColumnsModel}">
                     <Border Style="{StaticResource Card}">
                         <StackPanel Spacing="16">
@@ -368,11 +375,13 @@
                     </Border>
                   </StackPanel>
                 </StackPanel>
+                </ScrollViewer>
 
                 <!-- ===== Updates ===== -->
                 <Border Style="{StaticResource Card}"
-                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Updates}">
-                    <StackPanel Spacing="16">
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Updates}" Padding="0">
+                  <ScrollViewer>
+                    <StackPanel Margin="20" Spacing="16">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -411,12 +420,14 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
+                  </ScrollViewer>
                 </Border>
 
                 <!-- ===== Storage ===== -->
                 <Border Style="{StaticResource Card}"
-                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Storage}">
-                    <StackPanel Spacing="16">
+                        Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Storage}" Padding="0">
+                  <ScrollViewer>
+                    <StackPanel Margin="20" Spacing="16">
                         <TextBlock Text="SQLite Storage &amp; Database Location" Style="{StaticResource SectionTitle}" />
                         <StackPanel Spacing="4">
                             <TextBlock Text="Current Database File Path:" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
@@ -431,13 +442,18 @@
                             <Button Content="Change Database Location..." Command="{Binding ChangeDatabaseLocationCommand}" />
                         </StackPanel>
                     </StackPanel>
+                  </ScrollViewer>
                 </Border>
 
                 <!-- ===== Shortcuts ===== -->
-                <Border Style="{StaticResource Card}"
+                <Border Style="{StaticResource Card}" Padding="0"
                         Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Shortcuts}">
-                    <StackPanel Spacing="14">
-                        <Grid>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="20,20,20,14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -449,17 +465,13 @@
                             <Button Grid.Column="1" Content="Reset All to Defaults" FontSize="11" Height="32"
                                     Command="{Binding ResetAllShortcutsCommand}" />
                         </Grid>
-                        <ListView ItemsSource="{Binding ShortcutRows}" SelectionMode="None" MaxHeight="520">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0,0,0,6" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
+                        <!-- The rows scroll inside the card, under the fixed header. It was a ListView
+                             capped at 520 px inside a scrolling page, which cut the card off at the bottom. -->
+                        <ScrollViewer Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding ShortcutRows}" Margin="20,0,20,14">
+                            <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:ShortcutRowViewModel">
-                                    <Border Padding="12,8" BorderThickness="1" CornerRadius="6"
+                                    <Border Margin="0,0,0,6" Padding="12,8" BorderThickness="1" CornerRadius="6"
                                             BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
                                         <Grid ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
@@ -480,12 +492,12 @@
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
 
-            </Grid>
-        </ScrollViewer>
+        </Grid>
     </Grid>
 </Page>

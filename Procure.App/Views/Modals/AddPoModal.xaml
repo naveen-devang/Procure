@@ -436,10 +436,10 @@
                 </StackPanel>
 
                 <Grid Grid.Row="1">
-                    <ScrollViewer Padding="20,16" VerticalScrollBarVisibility="Visible"
+                    <ScrollViewer VerticalScrollBarVisibility="Visible"
                                   Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}">
                         <!-- ===== STEP 1 ===== -->
-                        <StackPanel Spacing="14" Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}">
+                        <StackPanel Spacing="14" Margin="20,16" Visibility="{Binding IsPoModalStep1, Converter={StaticResource BoolVis}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />

@@ -25,8 +25,9 @@
         </Style>
     </Page.Resources>
 
-    <ScrollViewer Padding="28,24,28,32" Background="{ThemeResource AppBackground}">
-        <StackPanel Spacing="24" MaxWidth="1600" HorizontalAlignment="Stretch">
+    <!-- Margin on the content, not Padding on the ScrollViewer - see SettingsPage.xaml. -->
+    <ScrollViewer Background="{ThemeResource AppBackground}">
+        <StackPanel Spacing="24" MaxWidth="1600" HorizontalAlignment="Stretch" Margin="28,24,28,32">
 
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions>

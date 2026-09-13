@@ -422,8 +422,8 @@
         <!-- RIGHT detail -->
         <Border Grid.Column="1" Style="{StaticResource Pane}"
                 Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}}">
-            <ScrollViewer Padding="18">
-                <StackPanel Spacing="12">
+            <ScrollViewer>
+                <StackPanel Spacing="12" Margin="18">
                     <TextBlock Text="Task" Style="{StaticResource FieldLabel}" />
                     <TextBox Text="{Binding SelectedTask.Title, Mode=TwoWay}" PlaceholderText="Task title" FontSize="14" />
 
