@@ -124,7 +124,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="PR Number *" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding SelectedBatchEntry.PrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" FontSize="12" />
+                                    <TextBox x:Name="FirstField" Text="{Binding SelectedBatchEntry.PrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" FontSize="12" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Description / Summary" Style="{StaticResource Lbl}" />
@@ -226,7 +226,15 @@
 
                             <StackPanel Spacing="8" Visibility="{Binding CustomColumnDefinitions.Count, Converter={StaticResource CountVis}}">
                                 <Border Height="1" Background="{ThemeResource AppHairline}" />
-                                <TextBlock Style="{StaticResource AppText}" Text="Custom Fields" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
+                                <Grid>
+                                    <TextBlock Style="{StaticResource AppText}" Text="Custom Fields" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource AppTextPrimary}" />
+                                    <!-- Adding several PRs: fills this row's values into rows that have none - never overwrites. -->
+                                    <Button Content="Copy to all rows" FontSize="11" Height="28" Padding="10,0" HorizontalAlignment="Right"
+                                            Command="{Binding CopyCustomFieldsToAllRowsCommand}" CommandParameter="{Binding SelectedBatchEntry}"
+                                            ToolTipService.ToolTip="Fills this value into any other row that doesn't already have one set - never overwrites"
+                                            Visibility="{Binding IsBulkMode, Converter={StaticResource BoolVis}}" />
+                                </Grid>
                                 <ItemsControl ItemsSource="{Binding SelectedBatchEntry.CustomValues}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>

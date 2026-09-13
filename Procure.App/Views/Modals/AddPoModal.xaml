@@ -4,7 +4,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Procure.Models"
-    xmlns:local="using:Procure.App.Views.Modals">
+    xmlns:local="using:Procure.App.Views.Modals"
+    xmlns:platform="using:Procure.App.Platform">
 
     <UserControl.Resources>
         <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
@@ -142,7 +143,14 @@
                         </Grid>
                     </StackPanel>
                 </Border>
-                <StackPanel Padding="0,0,0,8" Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}}">
+                <StackPanel Padding="0,0,0,8" Spacing="8" Visibility="{x:Bind HasItems, Converter={StaticResource BoolVis}}">
+                    <!-- Another line for a PR item that still has quantity to allocate, and select / deselect every
+                         line of this supplier at once (the MAUI wizard's two quick actions). -->
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                        <Button Content="+ Add line" FontSize="11" Height="28" Padding="10,0" Click="AddLine_Click" />
+                        <Button Content="{x:Bind local:AddPoModal.SelectAllText(AllItemsSelected), Mode=OneWay}" FontSize="11" Height="28" Padding="10,0"
+                                Click="ToggleAllLines_Click" />
+                    </StackPanel>
                     <!-- Header row: without it these are four unlabelled number boxes
                          per line and the computed total looks like another input. -->
                     <Grid ColumnSpacing="8" Padding="10,0">
@@ -203,7 +211,7 @@
                     <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
                     <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                     <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
-                    <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                    <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
                     <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                     <Button Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
@@ -328,7 +336,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="3" Spacing="2">
                             <TextBlock Text="Total Discount (-)" Style="{StaticResource Lbl}" />
-                            <TextBox Text="{x:Bind OverallDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" />
+                            <TextBox Text="{x:Bind OverallDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind BaseAmount, Mode=OneWay}" FontSize="11.5" />
                         </StackPanel>
                         <StackPanel Grid.Column="4" Spacing="2">
                             <TextBlock Text="VAT Type" Style="{StaticResource Lbl}" />
@@ -472,7 +480,7 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Center" />
+                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Center" Click="CardCheck_Click" />
                                                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="13.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />

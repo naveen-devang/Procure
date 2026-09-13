@@ -44,7 +44,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="PR Number *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBox Text="{Binding EditingPrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" />
+                                <TextBox x:Name="FirstField" Text="{Binding EditingPrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />

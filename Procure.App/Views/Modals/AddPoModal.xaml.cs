@@ -82,6 +82,24 @@ public sealed partial class AddPoModal : UserControl
             Vm?.AddLineTransportCommand.Execute(line);
     }
 
+    // A supplier card's selection has no recalculation hook of its own: without this, ticking a card left
+    // "Selected: 0 quote(s)" and Next disabled (the MAUI checkbox handler did the same).
+    private void CardCheck_Click(object sender, RoutedEventArgs e) => Vm?.RefreshPoRfqCardSelectionState();
+
+    private void AddLine_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is PoRfqSelection card)
+            Vm?.AddPoItemLineCommand.Execute(card);
+    }
+
+    private void ToggleAllLines_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is PoRfqSelection card)
+            Vm?.ToggleAllPoRfqItems(card);
+    }
+
+    public static string SelectAllText(bool allSelected) => allSelected ? "Deselect All Items" : "Select All Items";
+
     private void RemoveTransport_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is PoItemTransport allocation)

@@ -7,7 +7,11 @@ namespace Procure.App.Views.Modals;
 
 public sealed partial class AddRfqModal : UserControl
 {
-    public AddRfqModal() => InitializeComponent();
+    public AddRfqModal()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => Procure.App.Platform.FocusOnOpen.Apply(FirstField);   // x:Load builds this modal on every open
+    }
 
     private void RemoveItem_Click(object sender, RoutedEventArgs e)
     {

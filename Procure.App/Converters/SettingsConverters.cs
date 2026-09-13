@@ -56,22 +56,65 @@ sealed class EqualsToVisibilityConverter : IValueConverter
 /// half-typed "1." or "-", takes down the process with an access violation inside coreclr
 /// (seen entering a transport rate in the PO dialog). This parses instead, and maps anything
 /// unparseable onto a value the property can actually hold - null for a nullable, zero
-/// otherwise - so a cleared box means "no value" rather than a crash.</summary>
+/// otherwise - so a cleared box means "no value" rather than a crash.
+///
+/// Currency text is read too ("AED 1,200", "$50"), as the MAUI boxes did. A half-typed percentage
+/// ("5%") leaves the value alone: MoneyBox.PercentOf turns it into an amount.
+///
+/// A {Binding} (unlike x:Bind) does not say what type it is writing to, so those pass
+/// ConverterParameter=decimal? (or decimal) to say it.
+///
+/// While a box has the cursor, its text is left as typed. Writing the value pushes it straight back
+/// into the box, so without this "1." became "1", "AED" vanished as it was typed, and the cursor jumped
+/// to the start - typing "AED 1,200" produced "0021".</summary>
 public sealed class NumericTextConverter : IValueConverter
 {
-    public object Convert(object value, Type t, object p, string l) => value?.ToString() ?? string.Empty;
+    private static Procure.App.Platform.ShellContext? _shell;
+
+    public object Convert(object value, Type t, object p, string l)
+    {
+        if (TypedTextFor(value) is { } typed) return typed;
+        return value?.ToString() ?? string.Empty;
+    }
+
+    /// <summary>The focused box's own text, when it already stands for this value (or is still being typed
+    /// towards one: an unfinished "5%", or text with no number in it yet).</summary>
+    private static string? TypedTextFor(object? value)
+    {
+        _shell ??= App.Services.GetService(typeof(Procure.App.Platform.ShellContext)) as Procure.App.Platform.ShellContext;
+        if (_shell?.XamlRoot is not { } root
+            || Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) is not Microsoft.UI.Xaml.Controls.TextBox box) return null;
+
+        var text = box.Text;
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (text.Contains('%')) return text;
+        if (!Procure.App.Platform.MoneyBox.TryParseAmount(text, out var typed)) return value is null ? text : null;
+        return value switch
+        {
+            decimal d when d == typed => text,
+            double f when (decimal)f == typed => text,
+            int i when i == typed => text,
+            _ => null,
+        };
+    }
 
     public object ConvertBack(object value, Type t, object p, string l)
     {
         var s = (value as string)?.Trim();
+        if (p is "decimal?") t = typeof(decimal?);
+        else if (p is "decimal") t = typeof(decimal);
         var nullable = Nullable.GetUnderlyingType(t) is not null;
         var target = Nullable.GetUnderlyingType(t) ?? t;
 
         if (!string.IsNullOrEmpty(s))
         {
-            if (target == typeof(decimal) && decimal.TryParse(s, out var d)) return d;
-            if (target == typeof(double) && double.TryParse(s, out var f)) return f;
-            if (target == typeof(int) && int.TryParse(s, out var i)) return i;
+            if (s.Contains('%')) return Microsoft.UI.Xaml.DependencyProperty.UnsetValue;
+            if (Procure.App.Platform.MoneyBox.TryParseAmount(s, out var d))
+            {
+                if (target == typeof(decimal)) return d;
+                if (target == typeof(double)) return (double)d;
+                if (target == typeof(int) && d == Math.Truncate(d) && d is >= int.MinValue and <= int.MaxValue) return (int)d;
+            }
         }
 
         if (nullable) return null!;
