@@ -861,6 +861,29 @@ namespace Procure.Data
                 Assert(isPng, $"page {pageIndex + 1} of {pageSource.PageCount} renders on request as a PNG; got {png.Length} bytes");
             }
 
+            // Small paper. The column floors alone used to be wider than an A6 portrait page, so each
+            // vendor's columns came out with a NEGATIVE width and overprinted each other. Now the sheet
+            // is laid out on a larger virtual page and scaled down to fit.
+            Services.Export.PcrPdfOptions Opts(Services.Export.PdfPaperSize size, Services.Export.PdfOrientation o) =>
+                new() { PaperSize = size, Orientation = o };
+            var a4l = Services.Export.PcrPdfExporter.FitScaleFor(Opts(Services.Export.PdfPaperSize.A4, Services.Export.PdfOrientation.Landscape), 5);
+            Assert(a4l == 1.0, $"A4 landscape with five suppliers prints at full size, as it always has; got {a4l:P0}");
+            var a4p = Services.Export.PcrPdfExporter.FitScaleFor(Opts(Services.Export.PdfPaperSize.A4, Services.Export.PdfOrientation.Portrait), 5);
+            Assert(a4p == 1.0, $"A4 portrait with five suppliers is unchanged too - cramped but never overlapping; got {a4p:P0}");
+            var a6p = Services.Export.PcrPdfExporter.FitScaleFor(Opts(Services.Export.PdfPaperSize.A6, Services.Export.PdfOrientation.Portrait), 5);
+            Assert(a6p is > 0 and < 0.35, $"A6 portrait with five suppliers is scaled down to fit rather than overprinted; got {a6p:P0}");
+
+            var small = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, rfqs, "flow check",
+                Opts(Services.Export.PdfPaperSize.A6, Services.Export.PdfOrientation.Portrait));
+            var smallText = System.Text.Encoding.Latin1.GetString(small);
+            Assert(smallText.Contains("/MediaBox [0 0 298 420]"),
+                "a scaled A6 sheet still declares real A6 paper - the virtual layout page must never reach the MediaBox, or the printer picks the wrong paper");
+            Assert(System.Text.RegularExpressions.Regex.IsMatch(smallText, @"0\.\d{4} 0 0 0\.\d{4} 0 0 cm"),
+                "and every page carries the scale that fits it onto that paper");
+            var smallSource = await Services.Export.PcrPdfPageSource.OpenAsync(small);
+            var smallPng = await smallSource.RenderAsync(0);
+            Assert(smallPng.Length > 8 && smallPng[0] == 0x89, "the scaled A6 sheet still renders");
+
             // And the all-pages path printing uses still agrees with it on the count.
             var (allPages, _) = await Services.Export.PcrPdfRasterizer.RenderPagesAsync(pdf);
             Assert(allPages.Count == pageSource.PageCount,

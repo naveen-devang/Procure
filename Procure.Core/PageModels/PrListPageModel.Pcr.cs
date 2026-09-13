@@ -773,6 +773,14 @@ namespace Procure.PageModels
                 PcrPreviewPages.Clear();
                 for (var i = 0; i < source.PageCount; i++) PcrPreviewPages.Add(null!);
                 PcrPreviewPageSummary = source.PageCount == 1 ? "1 page" : $"{source.PageCount} pages";
+
+                // A sheet too wide for this paper is scaled down to fit rather than overprinting its own
+                // columns - so say so, with the size it will actually print at. Discovering 30%-size text
+                // after it comes out of the printer is the thing to avoid.
+                var fit = Services.Export.PcrPdfExporter.FitScaleFor(options, rfqs.Count);
+                if (fit < 1.0)
+                    PcrPreviewPageSummary += $" - scaled to {fit:P0} to fit {rfqs.Count} suppliers on this paper. " +
+                                             "Landscape or a larger paper size prints it bigger.";
                 IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();

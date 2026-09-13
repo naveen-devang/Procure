@@ -41,16 +41,49 @@ namespace Procure.Services.Export
         // ellipsis rather than letting one row swallow a page.
         private const int MaxItemNameLines = 8;
 
-        public static byte[] GeneratePdf(
-            PurchaseRequisition pr,
-            PriceComparisonRequest pcr,
-            IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks,
-            PcrPdfOptions? options = null)
-        {
-            options ??= new PcrPdfOptions();
-            bool shrink = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
+        /// <summary>The narrowest a vendor's Qty + Unit Price pair can be before a quantity and a price
+        /// collide. A4 portrait with five suppliers lays its pairs out at ~42.6 pt, which is cramped but
+        /// does not overlap, so it is deliberately just under that: every sheet that prints cleanly today
+        /// prints exactly as it did.</summary>
+        internal const double MinVendorPairWidth = 40;
 
+        /// <summary>
+        /// How much the whole sheet has to shrink for its table to fit this content width, as a factor
+        /// of 1.0 or less.
+        ///
+        /// The column budget below has hard floors - the description never narrower than 170 pt, the
+        /// fixed columns 140 pt between them - and on small portrait paper those floors alone are wider
+        /// than the page. A6 portrait has 226 pt of content width; with five suppliers the space left
+        /// for vendor columns came out at MINUS 84 pt, so each vendor's columns had a negative width and
+        /// were drawn on top of each other: prices, terms and lead times overprinted into unreadable
+        /// text. A5 portrait left 7.6 pt a vendor, which is positive and just as unreadable.
+        ///
+        /// When a pair would fall below <see cref="MinVendorPairWidth"/>, the sheet is laid out on a
+        /// virtual page wide enough for a normal table - the same widths A4 landscape uses - and scaled
+        /// down uniformly. Everything stays in proportion and nothing overlaps; the cost is that the
+        /// text gets small, which the preview says out loud rather than leaving the user to discover it
+        /// on paper.
+        /// </summary>
+        public static double HorizontalFitScale(double contentWidth, int supplierCount)
+        {
+            if (supplierCount <= 0 || contentWidth <= 0) return 1.0;
+
+            const double fixedColumns = 30 + 45 + 65;   // Sl No, PR Quantity, Historical Price
+            const double descFloor = 170;
+            const double comfortablePair = 95;         // the layout's own vendorPairWidthFloor
+
+            var pairIfUnscaled = (contentWidth - fixedColumns - descFloor) / supplierCount;
+            if (pairIfUnscaled >= MinVendorPairWidth) return 1.0;
+
+            var wanted = fixedColumns + descFloor + supplierCount * comfortablePair;
+            return Math.Min(1.0, contentWidth / wanted);
+        }
+
+        /// <summary>The paper in points and the margin, for these options. One definition, used by the
+        /// layout and by <see cref="FitScaleFor"/>, so the preview's warning can never disagree with the
+        /// sheet it describes.</summary>
+        private static (double Width, double Height, double Margin) PageGeometry(PcrPdfOptions options)
+        {
             // Base size is always expressed landscape (width > height); portrait swaps the two.
             // ISO sizes converted from mm at 72/25.4 pt/mm; US sizes from inches at 72 pt/in.
             var (baseWidth, baseHeight) = options.PaperSize switch
@@ -68,8 +101,6 @@ namespace Procure.Services.Export
                 _ => (842.0, 595.0) // A4
             };
             bool portrait = options.Orientation == PdfOrientation.Portrait;
-            double pageWidth = portrait ? baseHeight : baseWidth;
-            double pageHeight = portrait ? baseWidth : baseHeight;
 
             double margin = options.MarginPreset switch
             {
@@ -77,6 +108,45 @@ namespace Procure.Services.Export
                 PdfMarginPreset.Wide => 54,
                 _ => 36 // Normal
             };
+
+            return (portrait ? baseHeight : baseWidth, portrait ? baseWidth : baseHeight, margin);
+        }
+
+        /// <summary>The scale a sheet with these options and this many suppliers will be printed at.
+        /// 1.0 means full size.</summary>
+        public static double FitScaleFor(PcrPdfOptions options, int supplierCount)
+        {
+            var (width, _, margin) = PageGeometry(options);
+            return HorizontalFitScale(width - 2 * margin, supplierCount);
+        }
+
+        public static byte[] GeneratePdf(
+            PurchaseRequisition pr,
+            PriceComparisonRequest pcr,
+            IReadOnlyList<RequestForQuotation> selectedRfqs,
+            string remarks,
+            PcrPdfOptions? options = null)
+        {
+            options ??= new PcrPdfOptions();
+            bool shrink = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
+
+            var (pageWidth, pageHeight, margin) = PageGeometry(options);
+
+            // The paper as it really is - the MediaBox is written from these, whatever the layout does.
+            double realPageWidth = pageWidth;
+            double realPageHeight = pageHeight;
+
+            // Too narrow to hold the columns at all? Then lay the sheet out on a larger virtual page of
+            // the same shape and scale every page down to the real paper at the end - text, rules and
+            // boxes together, so nothing can land on top of anything else. See HorizontalFitScale.
+            double pageScale = HorizontalFitScale(pageWidth - 2 * margin, selectedRfqs.Count);
+            if (pageScale < 1.0)
+            {
+                pageWidth /= pageScale;
+                pageHeight /= pageScale;
+                margin /= pageScale;
+            }
+
             double marginLeft = margin;
             double marginRight = margin;
             double marginTop = margin;
@@ -1037,6 +1107,15 @@ namespace Procure.Services.Export
                 pages[0].Stream.Insert(0, $"{autoScale:F4} 0 0 {autoScale:F4} {tx:F2} {ty:F2} cm\n");
             }
 
+            // The horizontal fit. Inserted after the fit-to-one-page transform above, so it ends up
+            // FIRST in the stream: that one is expressed in the virtual page's coordinates, so it has
+            // to be applied inside this scale, not outside it.
+            if (pageScale < 1.0)
+            {
+                foreach (var page in pages)
+                    page.Stream.Insert(0, $"{pageScale.ToString("F4", CultureInfo.InvariantCulture)} 0 0 {pageScale.ToString("F4", CultureInfo.InvariantCulture)} 0 0 cm\n");
+            }
+
             // MULTI-PAGE PDF BINARY COMPILATION
             // Labels ("Page N of M", P.T.O.) come from the laid-out document; which pages are written
             // out is a separate, later decision (PagesToEmit), so a subset keeps its original numbering.
@@ -1098,7 +1177,7 @@ namespace Procure.Services.Export
 
                 offsets.Add(pdfMs.Position);
                 pdfWriter.WriteLine($"{pageObjId} 0 obj");
-                pdfWriter.WriteLine($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {pageWidth:F0} {pageHeight:F0}] /Resources << /Font << /F1 {font1ObjId} 0 R /F2 {font2ObjId} 0 R >> >> /Contents {streamObjId} 0 R >>");
+                pdfWriter.WriteLine($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {realPageWidth:F0} {realPageHeight:F0}] /Resources << /Font << /F1 {font1ObjId} 0 R /F2 {font2ObjId} 0 R >> >> /Contents {streamObjId} 0 R >>");
                 pdfWriter.WriteLine("endobj");
                 pdfWriter.Flush();
             }
