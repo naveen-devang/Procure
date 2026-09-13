@@ -1,9 +1,13 @@
 name: Release
 
-# Push a version tag (e.g. `git tag v1.4.0 && git push --tags`) and this handles the rest:
-# bump Windows App SDK if a newer stable version exists, publish, pack with Velopack, and
-# upload to GitHub Releases with notes generated from the commits since the last tag.
-# Everyone's already-installed app picks up the new release on its own next check.
+# Push a version tag (e.g. `git tag v2.0.1 && git push origin v2.0.1`) and this handles the rest:
+# publish the WinUI 3 app (Procure.App), pack with Velopack, and upload to GitHub Releases with notes
+# generated from the commits since the last tag.
+#
+# Every release is uploaded as a PRE-RELEASE. Installed apps only look at full releases
+# (GithubSource prerelease: false in UpdateService), so nobody receives it until it has been tested
+# and promoted by hand:
+#   gh release edit vX.Y.Z --prerelease=false --latest
 on:
   push:
     tags: ['v*']
@@ -20,33 +24,9 @@ jobs:
           ref: main
           fetch-depth: 0 # full history - needed to diff commits since the previous tag
 
-      - name: Bump Windows App SDK if a newer stable version exists
-        shell: pwsh
-        run: |
-          $csprojPath = "Procure.csproj"
-          $content = Get-Content $csprojPath -Raw
-          if ($content -notmatch 'Microsoft\.WindowsAppSDK"\s+Version="([\d\.]+)"') {
-            Write-Host "Could not find a pinned Microsoft.WindowsAppSDK version - skipping bump check."
-            exit 0
-          }
-          $current = $matches[1]
-
-          $versions = (Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk/index.json").versions
-          $latestStable = $versions | Where-Object { $_ -notmatch '-' } | Select-Object -Last 1
-
-          if ([version]$latestStable -gt [version]$current) {
-            Write-Host "Bumping Microsoft.WindowsAppSDK: $current -> $latestStable"
-            $updated = $content -replace [regex]::Escape("Microsoft.WindowsAppSDK`" Version=`"$current`""), "Microsoft.WindowsAppSDK`" Version=`"$latestStable`""
-            Set-Content -Path $csprojPath -Value $updated -NoNewline
-
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add $csprojPath
-            git commit -m "Bump Microsoft.WindowsAppSDK to $latestStable [automated]"
-            git push origin HEAD:main
-          } else {
-            Write-Host "Microsoft.WindowsAppSDK is already current ($current)."
-          }
+      # No Windows App SDK auto-bump any more: the WinUI app is pinned to the 1.8 line in
+      # Procure.App.csproj (the 2.x package's WinUI part does not restore here). Move it by hand, and
+      # test, when upgrading.
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -60,7 +40,9 @@ jobs:
           # prerequisites and no admin rights. A runtime id alone does NOT imply self-contained
           # since .NET 6 - the flag has to be explicit - and RuntimeIdentifier is the supported
           # knob (RuntimeIdentifierOverride is internal).
-          dotnet publish -f net10.0-windows10.0.19041.0 -c Release `
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          dotnet publish Procure.App/Procure.App.csproj -f net10.0-windows10.0.19041.0 -c Release `
+            -p:Version=$version `
             -p:RuntimeIdentifier=win-x64 `
             --self-contained `
             -p:WindowsPackageType=None `
@@ -78,14 +60,14 @@ jobs:
           }
           Get-Content notes.md
 
-      # Pinned to match the Velopack library version in Procure.csproj - a floating vpk could
+      # Pinned to match the Velopack library version in Procure.App.csproj - a floating vpk could
       # change delta / feed behaviour between releases with no corresponding code change. The
       # global tool persists across the steps below (same runner, same job).
       - name: Install Velopack CLI
         shell: pwsh
         run: dotnet tool install -g vpk --version 1.2.0
 
-      # Pulls the current latest release's full package + releases.win.json into .\Releases so the
+      # Pulls the current latest (full) release's package + releases.win.json into .\Releases so the
       # pack step can diff against it and emit a delta. continue-on-error: the very first delta
       # release has no base, and a transient GitHub 5xx must not fail a release - pack then just
       # produces a full-only package, exactly the old behaviour.
@@ -105,8 +87,10 @@ jobs:
             Write-Host "::warning::No delta base downloaded - this release will be full-only."
           }
           $version = "${{ github.ref_name }}" -replace '^v', ''
+          # Same package id (-u Procure) and exe name (-e Procure.exe) as every MAUI release: that is
+          # what makes an installed copy update in place.
           vpk pack -u Procure -v $version -e Procure.exe `
-            -p bin\Release\net10.0-windows10.0.19041.0\win-x64\publish `
+            -p Procure.App\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish `
             --releaseNotes notes.md
 
       # Surfaces the delta / full ratio in the run log so each release can be eyeballed. A ratio
@@ -123,11 +107,11 @@ jobs:
             Write-Host "::warning::Full-only release ($([math]::Round($full.Length/1MB,1)) MB) - no delta generated."
           }
 
-      - name: Upload to GitHub Releases
+      - name: Upload to GitHub Releases (as a pre-release)
         shell: pwsh
         run: |
           vpk upload github --repoUrl https://github.com/${{ github.repository }} `
-            --publish --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"
+            --publish --pre --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"
 
           # vpk always uploads a legacy Squirrel-compat "RELEASES" file itself (not read from
           # disk, so deleting it beforehand does nothing) - no client here uses it, strip it
