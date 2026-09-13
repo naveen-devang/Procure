@@ -217,29 +217,26 @@ low-risk and independently valuable even if the port is paused after it.
   Modals close on Esc + backdrop. MAUI settings migrate on first WinUI launch
   (`preferences.dat` → `settings.json`). PcrPreview render path verified headless.
 
-- **Phase 6 — cutover, NOT started. What it needs:**
-  1. `Procure.App.csproj`: add `<AssemblyName>Procure</AssemblyName>` so the exe is
-     `Procure.exe` (matches the MAUI releases + `vpk pack -e Procure.exe`), so an
-     installed MAUI copy updates *in place* instead of installing alongside.
-  2. Rewrite `.github/workflows/release.yml`: point the Publish step at
-     `Procure.App/Procure.App.csproj` (keep the same self-contained flags).
-     **Verified 2026-09-10:** `dotnet publish` on `Procure.App` does NOT hit the
-     WMC9999 XAML-compiler crash (that's a `dotnet build` incremental-Debug issue
-     only) — 222 MB self-contained folder, exe runs clean. So the CI step needs no
-     MSBuild call, just the project path change + drop the WindowsAppSDK-bump step's
-     `Procure.csproj` reference.
-  3. Keep `vpk pack -u Procure -e Procure.exe` unchanged; verify the in-place update
-     from the last MAUI release (v1.0.25) → v2.0.0 on a real installed copy
-     (§5 Risk 2) before tagging for real.
-  4. Move MAUI code to a `maui-legacy` branch; delete `Procure.csproj` from `main`.
-  5. Dogfood a week on 2-3 machines first (§5, Phase 5).
-- **Also outstanding:** ship Phase 1 as a no-op refactor release (tag) — independent.
+- **Phase 6 — cutover, in progress (13 Sep 2026).**
+  1. Done: `<AssemblyName>Procure</AssemblyName>` (exe is `Procure.exe`, as every MAUI
+     release) and the MAUI app icon.
+  2. Done: `release.yml` publishes `Procure.App/Procure.App.csproj` with the same
+     self-contained flags, no Windows App SDK auto-bump (WinUI stays on 1.8), and uploads
+     **every release as a pre-release**. Installed apps ignore pre-releases; promote with
+     `gh release edit vX.Y.Z --prerelease=false --latest`.
+  3. Done: MAUI code kept on the `maui-legacy` branch (= v1.0.27) and removed from `main`.
+  4. v2.0.0 pre-release: the maintainer installs its Setup.exe over their MAUI install
+     (the rehearsal the plan called for), dogfoods, then promotes it. Right after
+     promoting, confirm a real v1.0.27 → v2 in-app update; demote again if it fails.
+  5. Rollback if needed: release a higher version built from `maui-legacy`. The MAUI app
+     opens the upgraded database (additive columns) and still has its own settings file.
 
 ### Build commands
 
 - WinUI app (MSBuild only — the dotnet CLI crashes the XAML compiler here):
   `MSBuild.exe Procure.App\Procure.App.csproj -t:Build -p:Configuration=Debug -p:Platform=x64`
-- MAUI app (still builds): `dotnet build Procure.csproj -c Debug -f net10.0-windows10.0.19041.0`
+- Release publish (what CI runs; `dotnet publish` is fine): see `.github/workflows/release.yml`.
+- The MAUI app lives on the `maui-legacy` branch only.
 - WinUI pages must load from the `Loaded` event (MainWindow sets `Frame.Content`
   directly, so `OnNavigatedTo` never fires) and call `SqliteDatabase.InitializeAsync()`.
 
