@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -24,12 +25,27 @@ public sealed class WinUiDispatcher : IUiDispatcher
         else _queue.TryEnqueue(() => action());
     }
 
+    // Every timer that has been started and has not fired yet. Without this nothing holds the timer
+    // once PostDelayed returns: the managed wrapper is collectable, the GC takes it, and when Tick
+    // fires, t.Stop() calls into a released COM object - an access violation that kills the process
+    // outright (0xC0000005 in DispatcherQueueTimer.Stop), with no managed exception and nothing in the
+    // crash log. It only happens when a collection lands inside the delay, so it looked random: the
+    // app launched cleanly a dozen times and then died on startup, before any input at all.
+    private readonly HashSet<DispatcherQueueTimer> _pending = new();
+    private readonly object _pendingGate = new();
+
     public void PostDelayed(TimeSpan delay, Action action)
     {
         var timer = _queue.CreateTimer();
         timer.Interval = delay;
         timer.IsRepeating = false;
-        timer.Tick += (t, _) => { t.Stop(); action(); };
+        lock (_pendingGate) _pending.Add(timer);
+        timer.Tick += (t, _) =>
+        {
+            t.Stop();
+            lock (_pendingGate) _pending.Remove(t);
+            action();
+        };
         timer.Start();
     }
 }
