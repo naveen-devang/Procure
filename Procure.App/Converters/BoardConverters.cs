@@ -128,7 +128,7 @@ sealed class PriorityColorConverter : BrushConverter
 {
     protected override SolidColorBrush Map(object? v, object? p) =>
         string.Equals(v as string, ProcurementPriority.Urgent, StringComparison.OrdinalIgnoreCase)
-            ? BoardTheme.Pick("#FF99A4", "#A80000") : BoardTheme.Pick("#D2D0CE", "#494847");
+            ? BoardTheme.Pick("#FF99A4", "#E03E3E") : BoardTheme.Pick("#D2D0CE", "#D6D2CB");
 }
 
 sealed class PriorityBgConverter : BrushConverter
