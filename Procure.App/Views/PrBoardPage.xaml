@@ -311,23 +311,26 @@
 
     <!-- Detail slide-over. Was an inline expander inside the row; as a slide-over only one PR
          is open at a time and the board dims behind it. Stays wide (not the ~400px the audit
-         first drew) because the panel is three editable columns, not a summary. x:Load keeps
-         the old deferral - the heavy panel isn't built until a row is opened. -->
+         first drew) because the panel is three editable columns, not a summary. Built on the first
+         open (x:Load="False" + FindName in code-behind) and then only shown / hidden: rebuilding it on
+         every open, as x:Load bound to the open flag did, never gave all of its native memory back -
+         about 1 MB and 3 system handles more per open, measured over 60 opens. Its bindings are x:Bind;
+         see PrDetailPanel.Pr for why not {Binding}. -->
     <Grid x:Name="DetailOverlay" Background="#99000000" Tapped="DetailBackdrop_Tapped"
-          x:Load="{x:Bind Vm.IsDetailPanelOpen, Mode=OneWay}">
+          x:Load="False" Visibility="{x:Bind Vm.IsDetailPanelOpen, Converter={StaticResource BoolVis}, Mode=OneWay}">
         <!-- Sized by a left margin rather than a fixed Width: leaves a strip of board visible for
              context and never clips its own content on a smaller window (a fixed Width clips from
              the left once the window is narrower than it). The three columns carry a 212px date
              stack in the middle one, so the panel needs real width - at ~1000px the approval role
              names and vendor names truncate. -->
-        <Border HorizontalAlignment="Stretch" Margin="180,0,0,0" Tapped="Child_Tapped"
+        <Border x:Name="DetailSheet" HorizontalAlignment="Stretch" Margin="180,0,0,0" Tapped="Child_Tapped"
                 Background="{ThemeResource AppBackground}"
                 BorderThickness="1,0,0,0" BorderBrush="{ThemeResource AppHairline}">
-            <Border.Transitions>
-                <TransitionCollection>
-                    <EntranceThemeTransition FromHorizontalOffset="140" FromVerticalOffset="0" />
-                </TransitionCollection>
-            </Border.Transitions>
+            <!-- Slides in on every open (PrBoardPage.PlayDetailEntrance) - an EntranceThemeTransition only
+                 runs when the element is first built, and this one is now built once and then shown / hidden. -->
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="DetailSheetShift" />
+            </Border.RenderTransform>
             <Grid RowSpacing="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -342,19 +345,19 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="3">
                         <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="{Binding ExpandedPr.PrNo}" FontSize="18" FontWeight="SemiBold"
+                            <TextBlock Text="{x:Bind Vm.ExpandedPr.PrNo, Mode=OneWay}" FontSize="18" FontWeight="SemiBold"
                                        Foreground="{ThemeResource AppTextPrimary}" />
                             <Border Padding="10,3,10,5" CornerRadius="10" MinWidth="60" BorderThickness="0"
                                     VerticalAlignment="Center" HorizontalAlignment="Left"
-                                    Visibility="{Binding ExpandedPr.PrType, Converter={StaticResource NullOrEmptyVis}}"
-                                    Background="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBg}}"
-                                    BorderBrush="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeBorder}}">
-                                <TextBlock Text="{Binding ExpandedPr.PrType}" FontSize="9.5" FontWeight="SemiBold"
+                                    Visibility="{x:Bind Vm.ExpandedPr.PrType, Mode=OneWay, Converter={StaticResource NullOrEmptyVis}}"
+                                    Background="{x:Bind Vm.ExpandedPr.PrType, Mode=OneWay, Converter={StaticResource PrTypeBg}}"
+                                    BorderBrush="{x:Bind Vm.ExpandedPr.PrType, Mode=OneWay, Converter={StaticResource PrTypeBorder}}">
+                                <TextBlock Text="{x:Bind Vm.ExpandedPr.PrType, Mode=OneWay}" FontSize="9.5" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Foreground="{Binding ExpandedPr.PrType, Converter={StaticResource PrTypeColor}}" />
+                                           Foreground="{x:Bind Vm.ExpandedPr.PrType, Mode=OneWay, Converter={StaticResource PrTypeColor}}" />
                             </Border>
                         </StackPanel>
-                        <TextBlock Text="{Binding ExpandedPr.Description}" FontSize="12.5"
+                        <TextBlock Text="{x:Bind Vm.ExpandedPr.Description, Mode=OneWay}" FontSize="12.5"
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
@@ -362,12 +365,12 @@
                          own Close button on a maximised window, and aiming for this one quit the app. -->
                     <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE711;"
                             VerticalAlignment="Center" Margin="0,8,0,0" ToolTipService.ToolTip="Close (Esc)"
-                            Command="{Binding CloseDetailPanelCommand}" />
+                            Command="{x:Bind Vm.CloseDetailPanelCommand, Mode=OneWay}" />
                 </Grid>
 
                 <Grid Grid.Row="1">
-                    <ScrollViewer Visibility="{Binding IsDetailHydrating, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
-                        <views:PrDetailPanel x:Name="DetailPanel" DataContext="{Binding ExpandedPr}" />
+                    <ScrollViewer Visibility="{x:Bind Vm.IsDetailHydrating, Mode=OneWay, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                        <views:PrDetailPanel x:Name="DetailPanel" DataContext="{x:Bind Vm.ExpandedPr, Mode=OneWay}" />
                     </ScrollViewer>
 
                     <!-- The panel's quote and order lines are not read until a requisition is opened,
@@ -375,7 +378,7 @@
                          three columns empty and fills a moment later, which reads as a bug rather than
                          as loading. Shaped like the panel it replaces - three columns, a card or two
                          each - so the layout does not jump when the real thing arrives. -->
-                    <Border Visibility="{Binding IsDetailHydrating, Converter={StaticResource BoolVis}}"
+                    <Border Visibility="{x:Bind Vm.IsDetailHydrating, Mode=OneWay, Converter={StaticResource BoolVis}}"
                             Padding="20,18">
                         <Grid ColumnSpacing="14">
                             <Grid.ColumnDefinitions>

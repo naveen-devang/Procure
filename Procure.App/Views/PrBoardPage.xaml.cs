@@ -32,6 +32,10 @@ public sealed partial class PrBoardPage : Page
         // (the modal x:Load flags) evaluated against a null Vm. Re-run them now that Vm is set,
         // which also subscribes them to Vm.PropertyChanged.
         Bindings.Update();
+        Vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PrListPageModel.IsDetailPanelOpen) && Vm.IsDetailPanelOpen) ShowDetailPanel();
+        };
         _searchDebounce.Tick += (_, _) =>
         {
             _searchDebounce.Stop();
@@ -195,6 +199,32 @@ public sealed partial class PrBoardPage : Page
     private static PurchaseRequisition? Pr(object sender) => (sender as FrameworkElement)?.DataContext as PurchaseRequisition;
 
     private void Child_Tapped(object sender, TappedRoutedEventArgs e) => e.Handled = true;  // don't toggle expand
+
+    /// <summary>The detail slide-over is built the first time a PR is opened and kept after that; its
+    /// Visibility follows IsDetailPanelOpen (see the comment on DetailOverlay in the XAML for why).</summary>
+    private void ShowDetailPanel()
+    {
+        if (DetailOverlay is null) FindName(nameof(DetailOverlay));
+        PlayDetailEntrance();
+    }
+
+    // The slide-in the EntranceThemeTransition used to give it on each (re)build: 140 px from the right.
+    private void PlayDetailEntrance()
+    {
+        if (DetailSheet is null || DetailSheetShift is null) return;
+        var ease = new Microsoft.UI.Xaml.Media.Animation.ExponentialEase { EasingMode = Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseOut, Exponent = 6 };
+        var duration = new Duration(TimeSpan.FromMilliseconds(360));
+        var slide = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation { From = 140, To = 0, Duration = duration, EasingFunction = ease };
+        var fade = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation { From = 0, To = 1, Duration = new Duration(TimeSpan.FromMilliseconds(180)) };
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(slide, DetailSheetShift);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(slide, "X");
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(fade, DetailSheet);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(fade, "Opacity");
+        var sb = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        sb.Children.Add(slide);
+        sb.Children.Add(fade);
+        sb.Begin();
+    }
 
     /// <summary>Click the dimmed board behind the detail slide-over to close it. The panel itself
     /// swallows taps via Child_Tapped, so this only fires on the backdrop.</summary>

@@ -18,12 +18,23 @@ public sealed partial class PrDetailPanel : UserControl
 {
     private static PrListPageModel? Pm => PrListPageModel.Current;
 
+    /// <summary>The PR this panel shows, for x:Bind. The panel's own bindings are x:Bind rather than
+    /// {Binding}: a {Binding} listens for changes through the Windows UI, so every change notification
+    /// hands the PR to native code, and .NET 10.0.12's ComWrappers records each hand-off forever
+    /// (dotnet/runtime#133292, fixed in 10.0.13). Twenty opens of one PR left 1.18 million entries
+    /// behind. x:Bind listens in managed code, so nothing crosses over.</summary>
+    public PurchaseRequisition? Pr => DataContext as PurchaseRequisition;
+
     public PrDetailPanel()
     {
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += (_, _) => Procure.Utilities.TodoChangeNotifier.Changed -= OnTodoChanged;
-        DataContextChanged += (_, _) => _ = LoadLinkedTasks();
+        DataContextChanged += (_, _) =>
+        {
+            Bindings.Update();   // Pr is not observable - re-read it when the panel is pointed at another PR
+            _ = LoadLinkedTasks();
+        };
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -67,7 +78,6 @@ public sealed partial class PrDetailPanel : UserControl
     private Task LoadLinkedTasks(bool force = false) =>
         Pm is { } pm && DataContext is PurchaseRequisition pr ? pm.LoadLinkedTasksAsync(pr, force) : Task.CompletedTask;
 
-    private PurchaseRequisition? Pr => DataContext as PurchaseRequisition;
     private static T? Ctx<T>(object sender) where T : class => (sender as FrameworkElement)?.DataContext as T;
 
     // ---- PR-level ----

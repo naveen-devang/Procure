@@ -86,7 +86,7 @@
             <!-- consolidated-master banner -->
             <Border Padding="14,10" CornerRadius="8" BorderThickness="1"
                     BorderBrush="{ThemeResource BadgeCombinedPrBorder}" Background="{ThemeResource BadgeCombinedPrBg}"
-                    Visibility="{Binding IsConsolidatedMaster, Converter={StaticResource BoolVis}}">
+                    Visibility="{x:Bind Pr.IsConsolidatedMaster, Mode=OneWay, Converter={StaticResource BoolVis}}">
                 <Grid ColumnSpacing="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -98,7 +98,7 @@
                     <StackPanel Grid.Column="1" Spacing="2">
                         <TextBlock Style="{StaticResource AppText}" Text="Consolidated Master Requisition" FontWeight="SemiBold" FontSize="12"
                                    Foreground="{ThemeResource BadgeCombinedPrText}" />
-                        <TextBlock Style="{StaticResource AppText}" Text="{Binding ConsolidatedFrom, Converter={StaticResource Fmt}, ConverterParameter='Combined from source requisitions: {0}'}"
+                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.ConsolidatedFrom, Mode=OneWay, Converter={StaticResource Fmt}, ConverterParameter='Combined from source requisitions: {0}'}"
                                    FontSize="11" Foreground="{ThemeResource AppTextPrimary}" />
                     </StackPanel>
                     <Button Grid.Column="2" Content="Split PR" FontSize="11" Height="28" Padding="10,0" Click="SplitMasterPr_Click" />
@@ -128,7 +128,7 @@
                                     Background="{ThemeResource FluentTealBg}" Foreground="{ThemeResource FluentTeal}"
                                     BorderBrush="{ThemeResource BadgeSharedRfqBorder}" BorderThickness="0" />
                         </Grid>
-                        <ItemsControl ItemsSource="{Binding Rfqs}">
+                        <ItemsControl ItemsSource="{x:Bind Pr.Rfqs, Mode=OneWay}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:RequestForQuotation">
                                     <Border Style="{StaticResource ItemCard}" Padding="14,12">
@@ -232,7 +232,7 @@
                         </ItemsControl>
                         <TextBlock Style="{StaticResource AppText}" Text="No RFQs invited yet. Click '+ Add RFQ' to record vendor inquiries."
                                    FontSize="11" Foreground="{ThemeResource AppTextTertiary}" Padding="6,12" TextWrapping="Wrap"
-                                   Visibility="{Binding RfqCount, Converter={StaticResource ZeroVis}}" />
+                                   Visibility="{x:Bind Pr.RfqCount, Mode=OneWay, Converter={StaticResource ZeroVis}}" />
                     </StackPanel>
                 </Border>
 
@@ -252,13 +252,13 @@
                             <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="0"
                                     VerticalAlignment="Center"
                                     BorderBrush="{ThemeResource PillBorder}" Background="{ThemeResource PillBg}"
-                                    Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
-                                <TextBlock Style="{StaticResource AppText}" Text="{Binding Pcr.ApprovalSummary}" FontSize="11" FontWeight="SemiBold"
+                                    Visibility="{x:Bind Pr.HasPcr, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.Pcr.ApprovalSummary, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                            Foreground="{ThemeResource AppTextPrimary}" />
                             </Border>
                             <Button Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xEDE1;" FontSize="13" Width="28" Height="28"
-                                    Click="ExportPcr_Click" Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}"
+                                    Click="ExportPcr_Click" Visibility="{x:Bind Pr.HasPcr, Mode=OneWay, Converter={StaticResource BoolVis}}"
                                     Foreground="{ThemeResource AppTextPrimary}" ToolTipService.ToolTip="Export Price Comparison Sheet" />
                             <Button Grid.Column="3" Style="{StaticResource IconBtn}" Content="&#xE713;" FontSize="14" Width="28" Height="28"
                                     Click="ApprovalConfig_Click" Foreground="{ThemeResource AppTextPrimary}"
@@ -270,8 +270,8 @@
                              to expand inline inside a board row, where unbounded growth was a problem.
                              As a slide-over the outer ScrollViewer handles it, and nesting a second
                              scroll region here just truncated the last approval for no reason. -->
-                        <Grid Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}}">
-                            <ItemsControl ItemsSource="{Binding Pcr.Approvals}">
+                        <Grid Visibility="{x:Bind Pr.HasPcr, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                            <ItemsControl ItemsSource="{x:Bind Pr.Pcr.Approvals, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:Approval">
                                         <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
@@ -349,7 +349,7 @@
                         </Grid>
 
                         <Border Style="{StaticResource ItemCard}" Padding="16" Margin="0"
-                                Visibility="{Binding HasPcr, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                                Visibility="{x:Bind Pr.HasPcr, Mode=OneWay, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
                             <StackPanel Spacing="8" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource AppText}" Text="Ready to compare received quotes?" FontSize="12" Foreground="{ThemeResource AppTextTertiary}" />
                                 <Button Content="+ Create &amp; Submit PCR" Style="{StaticResource AccentButtonStyle}"
@@ -374,14 +374,14 @@
                                         BorderBrush="{ThemeResource BadgeCombinedPoBorder}" BorderThickness="0" />
                             </Grid>
                             <Border Style="{StaticResource Chip}" HorizontalAlignment="Left"
-                                    Visibility="{Binding HasItems, Converter={StaticResource BoolVis}}"
-                                    Background="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilBg}}"
-                                    BorderBrush="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilStroke}}">
-                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PoFulfillmentBadgeText}" FontSize="10" FontWeight="SemiBold"
-                                           Foreground="{Binding PoFulfillmentBadgeText, Converter={StaticResource FulfilColor}}" />
+                                    Visibility="{x:Bind Pr.HasItems, Mode=OneWay, Converter={StaticResource BoolVis}}"
+                                    Background="{x:Bind Pr.PoFulfillmentBadgeText, Mode=OneWay, Converter={StaticResource FulfilBg}}"
+                                    BorderBrush="{x:Bind Pr.PoFulfillmentBadgeText, Mode=OneWay, Converter={StaticResource FulfilStroke}}">
+                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.PoFulfillmentBadgeText, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{x:Bind Pr.PoFulfillmentBadgeText, Mode=OneWay, Converter={StaticResource FulfilColor}}" />
                             </Border>
                         </StackPanel>
-                        <ItemsControl ItemsSource="{Binding Pos}">
+                        <ItemsControl ItemsSource="{x:Bind Pr.Pos, Mode=OneWay}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:PurchaseOrder">
                                     <Border Style="{StaticResource ItemCard}" Padding="12,10">
@@ -425,20 +425,20 @@
                         </ItemsControl>
                         <TextBlock Style="{StaticResource AppText}" Text="No PO raised yet. Click '+ Add PO' once PCR approval is signed."
                                    FontSize="11" Foreground="{ThemeResource AppTextTertiary}" Padding="6,12" TextWrapping="Wrap"
-                                   Visibility="{Binding PoCount, Converter={StaticResource ZeroVis}}" />
+                                   Visibility="{x:Bind Pr.PoCount, Mode=OneWay, Converter={StaticResource ZeroVis}}" />
                     </StackPanel>
                 </Border>
             </Grid>
 
             <!-- line items -->
-            <Border Style="{StaticResource Col}" Visibility="{Binding HasItems, Converter={StaticResource BoolVis}}">
+            <Border Style="{StaticResource Col}" Visibility="{x:Bind Pr.HasItems, Mode=OneWay, Converter={StaticResource BoolVis}}">
                 <StackPanel Spacing="10">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="{ThemeResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         <TextBlock Text="Requisition Line Items" Style="{StaticResource ColTitle}" VerticalAlignment="Center" />
                         <Border Padding="6,2,6,4" CornerRadius="10" MinWidth="46" VerticalAlignment="Center"
                                 Background="{ThemeResource AppSubtleFill}">
-                            <TextBlock Style="{StaticResource AppText}" Text="{Binding ItemsCount, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items'}"
+                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.ItemsCount, Mode=OneWay, Converter={StaticResource Fmt}, ConverterParameter='{}{0} items'}"
                                        FontSize="11" FontWeight="SemiBold"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource AppTextSecondary}" />
@@ -446,14 +446,14 @@
                         <!-- Same muted amber as the per-line "Unordered / Pending" tags, not raw
                              FluentCaution (#FCE100 in dark - a near-fluorescent yellow). -->
                         <Border Style="{StaticResource Chip}" VerticalAlignment="Center"
-                                Background="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilBg}}"
-                                Visibility="{Binding HasPendingItemsSummary, Converter={StaticResource BoolVis}}">
-                            <TextBlock Style="{StaticResource AppText}" Text="{Binding PendingItemsSummaryText}" FontSize="10" FontWeight="SemiBold"
+                                Background="{x:Bind Pr.PendingItemsSummaryText, Mode=OneWay, Converter={StaticResource FulfilBg}}"
+                                Visibility="{x:Bind Pr.HasPendingItemsSummary, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.PendingItemsSummaryText, Mode=OneWay}" FontSize="10" FontWeight="SemiBold"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Foreground="{Binding PendingItemsSummaryText, Converter={StaticResource FulfilColor}}" />
+                                       Foreground="{x:Bind Pr.PendingItemsSummaryText, Mode=OneWay, Converter={StaticResource FulfilColor}}" />
                         </Border>
                     </StackPanel>
-                    <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl ItemsSource="{x:Bind Pr.Items, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:PrItem">
                                 <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
@@ -500,11 +500,11 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource AppText}" Text="{Binding Notes, Converter={StaticResource Fmt}, ConverterParameter='Notes: {0}'}"
+                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.Notes, Mode=OneWay, Converter={StaticResource Fmt}, ConverterParameter='Notes: {0}'}"
                                    FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Style="{StaticResource AppText}" Text="Team Fields:" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                            <ItemsControl ItemsSource="{Binding CustomValues}">
+                            <ItemsControl ItemsSource="{x:Bind Pr.CustomValues, Mode=OneWay}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><views:WrapPanel /></ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
@@ -530,8 +530,8 @@
             <!-- linked tasks -->
             <Border Style="{StaticResource Col}" Padding="14,12">
                 <StackPanel Spacing="8">
-                    <TextBlock Style="{StaticResource AppText}" Text="{Binding LinkedTaskCountLabel}" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                    <ItemsControl ItemsSource="{Binding LinkedTasks}">
+                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Pr.LinkedTaskCountLabel, Mode=OneWay}" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
+                    <ItemsControl ItemsSource="{x:Bind Pr.LinkedTasks, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:TodoTask">
                                 <Grid ColumnSpacing="2">
