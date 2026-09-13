@@ -298,8 +298,38 @@
                                                         <TextBlock Style="{StaticResource AppText}" Grid.Column="8" Text="TRANSPORT"
                                                                    Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                                                     </Grid>
-                                                    <ItemsControl ItemsSource="{x:Bind Items}">
-                                                        <ItemsControl.ItemTemplate>
+                                                    <!-- A ListView, not an ItemsControl, and capped in height: that is what makes it virtualize.
+                                                         An ItemsControl builds a row for every line it is given - measured at 150 lines across five
+                                                         quotes, opening this step froze the UI for 13.4 SECONDS and added ~350 MB, because it built
+                                                         750 editable rows up front. Inside the modal's own ScrollViewer a list only virtualizes if
+                                                         its viewport is bounded, hence MaxHeight. A normal requisition's few lines are shorter than
+                                                         the cap, so the list sizes to them and this card looks exactly as it did; only a long one
+                                                         scrolls inside its card. The item container is stripped back so a row keeps its own border
+                                                         and fill rather than picking up list selection and hover chrome. -->
+                                                    <ListView ItemsSource="{x:Bind Items}" MaxHeight="560" SelectionMode="None" IsItemClickEnabled="False"
+                                                              Padding="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <!-- Half a viewport of rows kept ready either side, not the default four. Opening this step
+                                                             measures all five supplier cards at once, and each list would otherwise realize its visible
+                                                             rows plus several screens more - that was most of the remaining one-second hitch, once the
+                                                             view-model side was timed at 15 ms. A row is heavy here: a checkbox and three input boxes. -->
+                                                        <ListView.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <ItemsStackPanel CacheLength="0.5" />
+                                                            </ItemsPanelTemplate>
+                                                        </ListView.ItemsPanel>
+                                                        <ListView.ItemContainerStyle>
+                                                            <Style TargetType="ListViewItem">
+                                                                <Setter Property="Padding" Value="0" />
+                                                                <Setter Property="Margin" Value="0" />
+                                                                <Setter Property="MinHeight" Value="0" />
+                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                            </Style>
+                                                        </ListView.ItemContainerStyle>
+                                                        <ListView.Resources>
+                                                            <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="Transparent" />
+                                                            <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="Transparent" />
+                                                        </ListView.Resources>
+                                                        <ListView.ItemTemplate>
                                                             <DataTemplate x:DataType="models:PoRfqItemSelection">
                                                                 <Border Padding="10,6" Margin="0,0,0,4" CornerRadius="4" BorderThickness="1"
                                                                         BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
@@ -423,8 +453,8 @@
                                                                   </StackPanel>
                                                                 </Border>
                                                             </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
+                                                        </ListView.ItemTemplate>
+                                                    </ListView>
                                                 </StackPanel>
 
                                                 <Border Padding="14,10" CornerRadius="6" BorderThickness="1"
