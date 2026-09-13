@@ -86,6 +86,11 @@
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#005FB8" Opacity="0.9" />
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#005FB8" Opacity="0.8" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#005FB8" />
+            <!-- Hover/press for plain Buttons. Here, not beside the styles: a brush
+                 outside the theme dictionaries keeps the colour of the theme the app STARTED in, so
+                 after a live Light/Dark switch every hover flashed the old theme's fill. -->
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F0EDE6" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#F5F3EE" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Default">
@@ -160,6 +165,11 @@
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#60CDFF" Opacity="0.9" />
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"  Color="#60CDFF" Opacity="0.8" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked"        Color="#60CDFF" />
+            <!-- Hover/press for plain Buttons. Here, not beside the styles: a brush
+                 outside the theme dictionaries keeps the colour of the theme the app STARTED in, so
+                 after a live Light/Dark switch every hover flashed the old theme's fill. -->
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#2A2A30" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#26262B" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

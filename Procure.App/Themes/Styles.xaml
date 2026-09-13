@@ -86,7 +86,7 @@
 
     <!-- Native ButtonBackgroundPointerOver/Pressed default to a Fluent-grey overlay that isn't
          one of our warm-neutral tokens - repoint to app tokens so hover/press is subtle and
-         theme-correct everywhere.
+         theme-correct everywhere. The brushes themselves live in AppColors.xaml's theme dictionaries.
          IMPORTANT: a Button whose own Background is a live Binding (segmented selectors -
          Tasks' view switcher, priority picker, PcrPreviewModal's layout pickers) must NOT bind
          Button.Background directly. Once the PointerOver/Pressed VisualState Setters below have
@@ -94,8 +94,6 @@
          stuck on its first-ever value (usually Transparent) and never shows "selected" again.
          Bind the selection fill on a plain Border behind/around the Button instead (Border isn't
          subject to Button's CommonStates VSM), and leave Button.Background a static Transparent. -->
-    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource AppSubtleFill}" />
-    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource AppTertiaryBackground}" />
 
     <!-- Plus Jakarta Sans's line box sits text higher than Segoe did, so text/placeholder in
          every text-entry control (TextBox, PasswordBox, RichEditBox, AutoSuggestBox all share

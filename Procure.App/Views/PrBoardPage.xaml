@@ -179,8 +179,19 @@
                      flashes, and this says "stale", which is what they are. -->
                 <ListView.Resources>
                     <!-- Neutral hover instead of the default accent-tinted one - a calmer scan surface. -->
-                    <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="{ThemeResource AppTertiaryBackground}" />
-                    <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="{ThemeResource AppTertiaryBackground}" />
+                    <!-- Per theme (AppTertiaryBackground's values), or the hover keeps the start-up theme's colour after a live switch. -->
+                    <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#F5F3EE" />
+                            <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#F5F3EE" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Default">
+                            <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#26262B" />
+                            <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#26262B" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                    </ResourceDictionary>
                 </ListView.Resources>
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
