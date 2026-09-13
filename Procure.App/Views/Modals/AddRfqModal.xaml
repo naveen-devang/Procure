@@ -130,7 +130,7 @@
                                  typing a price into the discount column is a money error. -->
                             <Grid ColumnSpacing="8" Padding="4,0,4,2">
                                 <Grid.Resources>
-                                    <Style TargetType="TextBlock">
+                                    <Style BasedOn="{StaticResource AppText}" TargetType="TextBlock">
                                         <Setter Property="FontSize" Value="10.5" />
                                         <Setter Property="FontWeight" Value="SemiBold" />
                                         <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
@@ -148,13 +148,13 @@
                                     <ColumnDefinition Width="90" />
                                     <ColumnDefinition Width="34" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="ITEM" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="UNIT" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="1" Text="ITEM" />
+                                <TextBlock Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="3" Text="UNIT" />
+                                <TextBlock Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
                             </Grid>
                             <Border Height="1" Background="{ThemeResource AppHairline}" />
                             <ItemsControl ItemsSource="{Binding EditingRfqItems}">

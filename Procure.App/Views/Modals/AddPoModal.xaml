@@ -147,7 +147,7 @@
                          per line and the computed total looks like another input. -->
                     <Grid ColumnSpacing="8" Padding="10,0">
                         <Grid.Resources>
-                            <Style TargetType="TextBlock">
+                            <Style BasedOn="{StaticResource AppText}" TargetType="TextBlock">
                                 <Setter Property="FontSize" Value="10" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                                 <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
@@ -164,13 +164,13 @@
                             <ColumnDefinition Width="28" />
                             <ColumnDefinition Width="{x:Bind TransportColumnWidth, Converter={StaticResource Px}, Mode=OneWay}" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="ITEM" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="QTY" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="UNIT" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="UNIT RATE" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="5" Text="DISCOUNT" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
-                        <TextBlock Style="{StaticResource AppText}" Grid.Column="8" Text="TRANSPORT"
+                        <TextBlock Grid.Column="1" Text="ITEM" />
+                        <TextBlock Grid.Column="2" Text="QTY" />
+                        <TextBlock Grid.Column="3" Text="UNIT" />
+                        <TextBlock Grid.Column="4" Text="UNIT RATE" />
+                        <TextBlock Grid.Column="5" Text="DISCOUNT" />
+                        <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="8" Text="TRANSPORT"
                                    Visibility="{x:Bind IsLineTransport, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                     </Grid>
                 </StackPanel>
@@ -228,7 +228,7 @@
                     <StackPanel Spacing="6">
                         <Grid ColumnSpacing="8">
                             <Grid.Resources>
-                                <Style TargetType="TextBlock">
+                                <Style BasedOn="{StaticResource AppText}" TargetType="TextBlock">
                                     <Setter Property="FontSize" Value="9.5" />
                                     <Setter Property="FontWeight" Value="SemiBold" />
                                     <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
@@ -242,11 +242,11 @@
                                 <ColumnDefinition Width="100" />
                                 <ColumnDefinition Width="28" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource AppText}" Text="QTY" />
-                            <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="CONTRACT" />
-                            <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="TRANSPORTER" />
-                            <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="RATE / UNIT" />
-                            <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="TOTAL" HorizontalAlignment="Right" />
+                            <TextBlock Text="QTY" />
+                            <TextBlock Grid.Column="1" Text="CONTRACT" />
+                            <TextBlock Grid.Column="2" Text="TRANSPORTER" />
+                            <TextBlock Grid.Column="3" Text="RATE / UNIT" />
+                            <TextBlock Grid.Column="4" Text="TOTAL" HorizontalAlignment="Right" />
                         </Grid>
                         <ItemsControl ItemsSource="{x:Bind Transports}">
                             <ItemsControl.ItemTemplate>

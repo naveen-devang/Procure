@@ -84,7 +84,7 @@
                             </Grid>
                             <Grid ColumnSpacing="8" Padding="0,0,0,2">
                                 <Grid.Resources>
-                                    <Style TargetType="TextBlock">
+                                    <Style BasedOn="{StaticResource AppText}" TargetType="TextBlock">
                                         <Setter Property="FontSize" Value="10.5" />
                                         <Setter Property="FontWeight" Value="SemiBold" />
                                         <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
@@ -97,10 +97,10 @@
                                     <ColumnDefinition Width="95" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource AppText}" Text="ITEM" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
-                                <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="EST. UNIT PRICE" />
+                                <TextBlock Text="ITEM" />
+                                <TextBlock Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="EST. UNIT PRICE" />
                                 <Border Grid.Column="4" Width="28" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding EditingPrItems}">
