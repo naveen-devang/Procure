@@ -17,7 +17,10 @@ namespace Procure.App.Views.Modals;
 // page change, which resets those, snaps the view back on its own).
 public sealed partial class PcrPreviewModal : UserControl
 {
-    private PrListPageModel? Vm => DataContext as PrListPageModel ?? PrListPageModel.Current;
+    // x:Bind source for the preview's fast-changing values (zoom, pan, page image, pager). Those were
+    // {Binding}s, which listen through native code: every pan step during a drag handed the page model
+    // to WinRT, and .NET 10.0.12 records each hand-off forever (see PrDetailPanel.Pr).
+    internal PrListPageModel? Vm => DataContext as PrListPageModel ?? PrListPageModel.Current;
 
     private bool _dragging;
     private Windows.Foundation.Point _dragStart;
@@ -27,6 +30,10 @@ public sealed partial class PcrPreviewModal : UserControl
     // collected before it fires.
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _detailTimer;
     private PrListPageModel? _watched;
+    // The XamlRoot subscribed to on Loaded. By Unloaded the control's own XamlRoot is already null, so
+    // unsubscribing through it never ran: the window's XamlRoot kept every closed preview - page images
+    // and all - alive for the rest of the session (17 previews: +300 MB).
+    private XamlRoot? _watchedRoot;
     private int _detailGeneration;
 
     public PcrPreviewModal()
@@ -41,22 +48,34 @@ public sealed partial class PcrPreviewModal : UserControl
         _detailTimer = DispatcherQueue.CreateTimer();
         _detailTimer.Interval = TimeSpan.FromMilliseconds(150);
         _detailTimer.IsRepeating = false;
-        _detailTimer.Tick += (_, _) => _ = RenderDetailTileAsync();
 
         Loaded += (_, _) =>
         {
+            Bindings.Update();
             Watch(Vm);
+            _detailTimer.Tick -= OnDetailTimerTick;
+            _detailTimer.Tick += OnDetailTimerTick;
             // Dragged to a screen with different scaling: the sharp tile was drawn for the old one.
-            if (XamlRoot != null) XamlRoot.Changed += OnXamlRootChanged;
+            if (_watchedRoot != null) _watchedRoot.Changed -= OnXamlRootChanged;
+            _watchedRoot = XamlRoot;
+            if (_watchedRoot != null) _watchedRoot.Changed += OnXamlRootChanged;
         };
         Unloaded += (_, _) =>
         {
             Watch(null);
-            if (XamlRoot != null) XamlRoot.Changed -= OnXamlRootChanged;
+            if (_watchedRoot != null) _watchedRoot.Changed -= OnXamlRootChanged;
+            _watchedRoot = null;
+            // The timer is a native WinRT object whose Tick handler points back at this control, while
+            // this control holds the timer: a cycle through native code that the GC cannot collect.
+            // Left hooked, every preview ever opened stayed in memory with its page images.
+            _detailTimer.Stop();
+            _detailTimer.Tick -= OnDetailTimerTick;
             ClearDetailTile();
         };
         DataContextChanged += (_, _) => { if (IsLoaded) Watch(Vm); };
     }
+
+    private void OnDetailTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args) => _ = RenderDetailTileAsync();
 
     private double _lastRasterizationScale;
 

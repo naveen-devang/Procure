@@ -50,7 +50,7 @@
                     <StackPanel Spacing="2">
                         <TextBlock Style="{StaticResource AppText}" Text="Preview Price Comparison Sheet" FontSize="16" FontWeight="SemiBold"
                                    Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPageSummary}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
+                        <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Vm.PcrPreviewPageSummary, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                     </StackPanel>
                     <Button ToolTipService.ToolTip="Close" Grid.Column="1" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12"
                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"
@@ -78,12 +78,12 @@
                                     RenderTransformOrigin="0.5,0.5">
                                 <Border.RenderTransform>
                                     <CompositeTransform x:Name="SheetTransform"
-                                                        ScaleX="{Binding PcrPreviewZoom}"
-                                                        ScaleY="{Binding PcrPreviewZoom}"
-                                                        TranslateX="{Binding PcrPreviewPanX}"
-                                                        TranslateY="{Binding PcrPreviewPanY}" />
+                                                        ScaleX="{x:Bind Vm.PcrPreviewZoom, Mode=OneWay}"
+                                                        ScaleY="{x:Bind Vm.PcrPreviewZoom, Mode=OneWay}"
+                                                        TranslateX="{x:Bind Vm.PcrPreviewPanX, Mode=OneWay}"
+                                                        TranslateY="{x:Bind Vm.PcrPreviewPanY, Mode=OneWay}" />
                                 </Border.RenderTransform>
-                                <Image x:Name="PageImage" Source="{Binding PcrPreviewCurrentPage, Converter={StaticResource PngImg}}"
+                                <Image x:Name="PageImage" Source="{x:Bind Vm.PcrPreviewCurrentPage, Mode=OneWay, Converter={StaticResource PngImg}}"
                                        Stretch="Uniform" Width="700" />
                             </Border>
 
@@ -93,10 +93,10 @@
                             <Image x:Name="DetailTile" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top"
                                    IsHitTestVisible="False" Visibility="Collapsed" />
 
-                            <StackPanel x:Name="BusyOverlay" Visibility="{Binding IsPcrPreviewBusy, Converter={StaticResource BoolVis}}"
+                            <StackPanel x:Name="BusyOverlay" Visibility="{x:Bind Vm.IsPcrPreviewBusy, Mode=OneWay, Converter={StaticResource BoolVis}}"
                                         Background="{ThemeResource AppSubtleFill}" Padding="18,14"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-                                <ProgressRing IsActive="{Binding IsPcrPreviewBusy}" />
+                                <ProgressRing IsActive="{x:Bind Vm.IsPcrPreviewBusy, Mode=OneWay}" />
                                 <TextBlock Style="{StaticResource AppText}" Text="Rendering preview…" FontSize="12" Foreground="{ThemeResource AppTextSecondary}" />
                             </StackPanel>
                         </Grid>
@@ -108,17 +108,17 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center"
-                                        Visibility="{Binding IsPcrPagerVisible, Converter={StaticResource BoolVis}}">
+                                        Visibility="{x:Bind Vm.IsPcrPagerVisible, Mode=OneWay, Converter={StaticResource BoolVis}}">
                                 <Button ToolTipService.ToolTip="Previous page" Content="&#x2039;" Command="{Binding PreviousPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
-                                <TextBlock Style="{StaticResource AppText}" Text="{Binding PcrPreviewPagerText}" FontSize="12.5" VerticalAlignment="Center"
+                                <TextBlock Style="{StaticResource AppText}" Text="{x:Bind Vm.PcrPreviewPagerText, Mode=OneWay}" FontSize="12.5" VerticalAlignment="Center"
                                            Foreground="{ThemeResource AppTextPrimary}" />
                                 <Button ToolTipService.ToolTip="Next page" Content="&#x203A;" Command="{Binding NextPcrPreviewPageCommand}"
                                         Width="30" Height="30" Padding="0" FontSize="14" />
                             </StackPanel>
                             <TextBlock Style="{StaticResource AppText}" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
                                        Foreground="{ThemeResource AppTextSecondary}"
-                                       Text="{Binding PcrPreviewZoomLabel}" />
+                                       Text="{x:Bind Vm.PcrPreviewZoomLabel, Mode=OneWay}" />
                         </Grid>
                     </Grid>
 
