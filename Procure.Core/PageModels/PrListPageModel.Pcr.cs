@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -436,17 +436,7 @@ namespace Procure.PageModels
         {
             if (e.PropertyName == nameof(ExportRfqSelection.IsSelected))
             {
-                var selectedCount = ExportRfqSelections.Count(s => s.IsSelected);
-                if (selectedCount > 5 && sender is ExportRfqSelection toggled)
-                {
-                    toggled.PropertyChanged -= OnExportRfqSelectionPropertyChanged;
-                    toggled.IsSelected = false;
-                    toggled.PropertyChanged += OnExportRfqSelectionPropertyChanged;
-
-                    {
-                        _ = _dialogs.DisplayAlertAsync("Limit Reached", "A maximum of 5 suppliers can be selected on the comparison sheet.", "OK");
-                    }
-                }
+                // No limit: past five suppliers the PDF fits every vendor across the page instead.
                 UpdateSelectedRfqCount();
             }
         }
@@ -454,7 +444,7 @@ namespace Procure.PageModels
         private void UpdateSelectedRfqCount()
         {
             var count = ExportRfqSelections.Count(s => s.IsSelected);
-            SelectedRfqCountMessage = $"{count} of 5 suppliers selected";
+            SelectedRfqCountMessage = $"{count} of {ExportRfqSelections.Count} suppliers selected";
         }
 
         [RelayCommand]
@@ -737,6 +727,32 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>Printed text below this is hard to read; the preview says so.</summary>
+        private const double PcrReadablePrintedPt = 5.0;
+
+        /// <summary>"scaled to 62% ... text prints at about 4.6 pt", plus a warning and a paper that
+        /// would do better when that is too small. Empty at full size. Uses the exporter's own scale
+        /// calculation, so it describes exactly the sheet being previewed.</summary>
+        private static string PcrFitNote(PurchaseRequisition pr, IReadOnlyList<RequestForQuotation> rfqs, PcrPdfOptions options)
+        {
+            const double bodyPt = 7.5;   // the sheet's item and price text
+            var scale = Services.Export.PcrPdfExporter.PrintScaleFor(pr, rfqs, options);
+            if (scale >= 1.0) return string.Empty;
+
+            var printedPt = bodyPt * scale;
+            var note = $" - scaled to {scale:P0} so all {rfqs.Count} suppliers fit across the page; text prints at about {printedPt:0.0} pt.";
+            if (printedPt >= PcrReadablePrintedPt) return note;
+
+            note += " That is hard to read.";
+            var a3 = options with { PaperSize = PdfPaperSize.A3, Orientation = PdfOrientation.Landscape };
+            var a3Pt = bodyPt * Services.Export.PcrPdfExporter.PrintScaleFor(pr, rfqs, a3);
+            bool alreadyA3OrBigger = options.Orientation == PdfOrientation.Landscape
+                && options.PaperSize is PdfPaperSize.A3 or PdfPaperSize.A2 or PdfPaperSize.A1 or PdfPaperSize.A0 or PdfPaperSize.Tabloid;
+            return alreadyA3OrBigger || a3Pt <= printedPt + 0.05
+                ? note + " A larger paper size prints it bigger."
+                : note + $" A3 landscape prints it at about {a3Pt:0.0} pt.";
+        }
+
         /// <summary>Regenerates the previewed PDF whenever a layout option changes. Guarded by a
         /// generation counter — same pattern as the board's page loads — so a quick double-toggle
         /// doesn't leave a stale render overwriting a newer one.</summary>
@@ -777,10 +793,7 @@ namespace Procure.PageModels
                 // A sheet too wide for this paper is scaled down to fit rather than overprinting its own
                 // columns - so say so, with the size it will actually print at. Discovering 30%-size text
                 // after it comes out of the printer is the thing to avoid.
-                var fit = Services.Export.PcrPdfExporter.FitScaleFor(options, rfqs.Count);
-                if (fit < 1.0)
-                    PcrPreviewPageSummary += $" - scaled to {fit:P0} to fit {rfqs.Count} suppliers on this paper. " +
-                                             "Landscape or a larger paper size prints it bigger.";
+                PcrPreviewPageSummary += PcrFitNote(pr, rfqs, options);
                 IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();

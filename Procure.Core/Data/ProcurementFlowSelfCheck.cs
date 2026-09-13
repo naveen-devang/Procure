@@ -884,6 +884,39 @@ namespace Procure.Data
             var smallPng = await smallSource.RenderAsync(0);
             Assert(smallPng.Length > 8 && smallPng[0] == 0x89, "the scaled A6 sheet still renders");
 
+            // More than five suppliers: every vendor is fitted across the page by shrinking the sheet,
+            // never split across pages; past six the currency moves into the column headings. Up to
+            // five, nothing about the sheet changes.
+            var a4Land = Opts(Services.Export.PdfPaperSize.A4, Services.Export.PdfOrientation.Landscape);
+            var upToFive = Services.Export.PcrPdfExporter.PrintScaleFor(read, rfqs, a4Land);
+            Assert(upToFive == Services.Export.PcrPdfExporter.FitScaleFor(a4Land, rfqs.Count),
+                $"with {rfqs.Count} suppliers the print scale is exactly what it always was; got {upToFive:P0}");
+
+            List<RequestForQuotation> Cycle(int count) => Enumerable.Range(0, count).Select(i => rfqs[i % rfqs.Count]).ToList();
+            var twelve = Cycle(12);
+            var twelveScale = Services.Export.PcrPdfExporter.PrintScaleFor(read, twelve, a4Land);
+            Assert(twelveScale is > 0.3 and < 1.0, $"twelve suppliers on A4 landscape are shrunk to fit, not overprinted or clipped; got {twelveScale:P0}");
+            var twelveA3 = Services.Export.PcrPdfExporter.PrintScaleFor(read, twelve,
+                Opts(Services.Export.PdfPaperSize.A3, Services.Export.PdfOrientation.Landscape));
+            Assert(twelveA3 > twelveScale, $"A3 prints twelve suppliers bigger than A4 does; got {twelveA3:P0} vs {twelveScale:P0}");
+
+            var wide = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, twelve, "fit check", a4Land);
+            var wideText = System.Text.Encoding.Latin1.GetString(wide);
+            Assert(wideText.Contains("/MediaBox [0 0 842 595]"), "a fitted sheet is still real A4 paper");
+            var wideSource = await Services.Export.PcrPdfPageSource.OpenAsync(wide);
+            var qtyHeadings = System.Text.RegularExpressions.Regex.Matches(wideText, @"\(Qty\) Tj").Count;
+            Assert(qtyHeadings == 12 * wideSource.PageCount,
+                $"every page carries all twelve vendors' columns; got {qtyHeadings} Qty headings over {wideSource.PageCount} page(s)");
+            Assert(wideText.Contains("(Price \\("),
+                "past six suppliers each vendor's price heading carries its currency");
+            var widePng = await wideSource.RenderAsync(0);
+            Assert(widePng.Length > 8 && widePng[0] == 0x89, "the fitted twelve-supplier sheet renders");
+
+            var sixText = System.Text.Encoding.Latin1.GetString(
+                Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, Cycle(6), "fit check", a4Land));
+            Assert(!sixText.Contains("(Price \\(") && sixText.Contains("(Unit Price) Tj"),
+                "six suppliers still print the currency in the cells, with plain Unit Price headings");
+
             // And the all-pages path printing uses still agrees with it on the count.
             var (allPages, _) = await Services.Export.PcrPdfRasterizer.RenderPagesAsync(pdf);
             Assert(allPages.Count == pageSource.PageCount,

@@ -67,7 +67,7 @@
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                     </Border>
                                 </Grid>
-                                <TextBlock Style="{StaticResource AppText}" Text="Choose up to 5 supplier quotations to display side-by-side:" FontSize="11.5"
+                                <TextBlock Style="{StaticResource AppText}" Text="Choose the supplier quotations to display side-by-side:" FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <ItemsControl ItemsSource="{Binding ExportRfqSelections}">
                                     <ItemsControl.ItemTemplate>

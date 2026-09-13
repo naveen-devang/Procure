@@ -33,11 +33,12 @@ namespace Procure.Services.Export
                 // 4. xl/styles.xml
                 AddStyles(archive);
 
-                // 5. xl/workbook.xml
-                AddWorkbook(archive);
+                // 5. xl/worksheets/sheet1.xml - first, because the workbook names its heading rows
+                // as print titles and only the sheet knows which rows those are.
+                var headingRow = AddWorksheet(archive, pr, pcr, selectedRfqs, remarks);
 
-                // 6. xl/worksheets/sheet1.xml
-                AddWorksheet(archive, pr, pcr, selectedRfqs, remarks);
+                // 6. xl/workbook.xml
+                AddWorkbook(archive, selectedRfqs.Count > PcrPdfExporter.FullSizeSupplierLimit ? headingRow : 0);
             }
 
             return ms.ToArray();
@@ -78,15 +79,23 @@ namespace Procure.Services.Export
 </Relationships>");
         }
 
-        private static void AddWorkbook(ZipArchive archive)
+        /// <param name="printTitleRow">The first of the two table heading rows to repeat at the top of
+        /// every printed page, or 0 for none.</param>
+        private static void AddWorkbook(ZipArchive archive, int printTitleRow)
         {
             var entry = archive.CreateEntry("xl/workbook.xml");
             using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
-            writer.Write(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+            var titles = printTitleRow > 0
+                ? $@"
+    <definedNames>
+        <definedName name=""_xlnm.Print_Titles"" localSheetId=""0"">'Price Comparison'!${printTitleRow}:${printTitleRow + 1}</definedName>
+    </definedNames>"
+                : string.Empty;
+            writer.Write($@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
 <workbook xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">
     <sheets>
         <sheet name=""Price Comparison"" sheetId=""1"" r:id=""rId1""/>
-    </sheets>
+    </sheets>{titles}
 </workbook>");
         }
 
@@ -204,7 +213,8 @@ namespace Procure.Services.Export
             return value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Max(l => l.Length);
         }
 
-        private static void AddWorksheet(
+        /// <returns>The first table heading row (1-based).</returns>
+        private static int AddWorksheet(
             ZipArchive archive,
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
@@ -751,10 +761,24 @@ namespace Procure.Services.Export
     </mergeCells>");
             }
 
+            // Past five suppliers the sheet prints the way the PDF does: landscape, every vendor column
+            // fitted onto one page wide, as many pages tall as the items need, with the table headings
+            // repeated on each page (the print titles in workbook.xml).
+            bool fitVendors = supplierCount > PcrPdfExporter.FullSizeSupplierLimit;
+            if (fitVendors)
+            {
+                sb.Append(@"
+    <pageMargins left=""0.4"" right=""0.4"" top=""0.5"" bottom=""0.5"" header=""0.3"" footer=""0.3""/>
+    <pageSetup orientation=""landscape"" fitToWidth=""1"" fitToHeight=""0""/>");
+                sb.Replace("<sheetViews>", @"<sheetPr><pageSetUpPr fitToPage=""1""/></sheetPr>
+    <sheetViews>");
+            }
+
             sb.Append(@"
 </worksheet>");
 
             writer.Write(sb.ToString());
+            return tableHeaderRow1;
         }
 
         private static string GetColumnLetter(int colIndex)

@@ -127,6 +127,167 @@ namespace Procure.Services.Export
             return HorizontalFitScale(width - 2 * margin, supplierCount);
         }
 
+        /// <summary>Up to this many suppliers the sheet is laid out exactly as it always was. Past it,
+        /// every vendor is fitted across the page: the sheet is laid out as wide as its columns need
+        /// and shrunk uniformly onto the paper (the way Acrobat's "shrink to fit" does), so all
+        /// vendors stay on every page and a long item list simply runs onto more pages.</summary>
+        internal const int FullSizeSupplierLimit = 5;
+
+        /// <summary>Past this many suppliers "AED" is printed once in each vendor's column heading
+        /// ("Price (AED)") instead of in every money cell - the widest saving there is, and the
+        /// difference between readable and not on A4.</summary>
+        internal const int CurrencyInCellsSupplierLimit = 6;
+
+        // The narrowest a fitted vendor pair is laid out at, however short its figures: below this a
+        // wrapped vendor name runs four lines deep.
+        private const double CompactVendorPairWidth = 60;
+
+        // 3pt left inset + 4pt right inset, as the cells draw.
+        private const double CellPad = 7;
+
+        /// <summary>What each column's own content needs, measured once and shared by the fit scale,
+        /// the column layout and the borrow pass - so the preview's "prints at N pt" can never
+        /// disagree with the sheet.</summary>
+        private sealed record ColumnNeeds(double[] Qty, double[] Price, double[] Pair, double PrQty, double Hist);
+
+        private static string CurrencyOf(RequestForQuotation rf) =>
+            string.IsNullOrWhiteSpace(rf.Currency) ? "AED" : rf.Currency.Trim();
+
+        private static string DefaultCurrencyOf(IReadOnlyList<RequestForQuotation> rfqs) =>
+            rfqs.Count == 0 ? "AED" : CurrencyOf(rfqs[0]);
+
+        // The currency sits hard left and the amount hard right, so budgeting only the insets sizes
+        // the column to where they touch - "AED1,102,500.00". MoneyCellPad adds the gap.
+        private static double MoneyWidth(string cur, decimal amount, string font, double size)
+            => MoneyCellPad + MeasureTextWidth(cur, font, size)
+               + MeasureTextWidth(amount.ToString("N2", CultureInfo.InvariantCulture), font, size);
+
+        /// <summary>Which RfqItem backs each (item, vendor) cell. Saved link wins, unlinked lines are
+        /// handed out one-to-one. Picking the first name match per PR line printed one vendor's single
+        /// price against two same-named PR lines and left the second line's real quote off the sheet.</summary>
+        private static RfqItem?[,] MatchRfqItems(List<PrItem> prItems, IReadOnlyList<RequestForQuotation> rfqs)
+        {
+            var matched = new RfqItem?[Math.Max(prItems.Count, 1), Math.Max(rfqs.Count, 1)];
+            for (int i = 0; i < rfqs.Count; i++)
+            {
+                var byLine = Procure.Utilities.PrLineMatcher.Map(rfqs[i].Items, prItems)
+                    .GroupBy(kv => kv.Value.Id)
+                    .ToDictionary(g => g.Key, g => g.First().Key);
+                for (int p = 0; p < prItems.Count; p++)
+                    matched[p, i] = byLine.TryGetValue(prItems[p].Id, out var hit) ? hit : null;
+            }
+            return matched;
+        }
+
+        private static ColumnNeeds MeasureColumnNeeds(List<PrItem> prItems, IReadOnlyList<RequestForQuotation> rfqs,
+            RfqItem?[,] matched, string defaultCurrency, bool fitVendors, bool currencyInHeader)
+        {
+            int n = rfqs.Count;
+            var qty = new double[n];
+            var price = new double[n];
+            var pair = new double[n];
+            string Cell(string cur) => currencyInHeader ? string.Empty : cur;
+
+            double prqNeed = 0, histNeed = 0;
+            for (int p = 0; p < prItems.Count; p++)
+            {
+                var item = prItems[p];
+                prqNeed = Math.Max(prqNeed, CellPad + MeasureTextWidth(
+                    $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}", "F1", 7.5));
+
+                decimal rowLast = item.EstimatedUnitPrice ?? 0m;
+                for (int i = 0; i < n; i++)
+                {
+                    var ri = matched[p, i];
+                    if (ri?.LastPrice > 0) { rowLast = ri.LastPrice.Value; break; }
+                }
+                if (rowLast > 0) histNeed = Math.Max(histNeed, MoneyWidth(Cell(defaultCurrency), rowLast, "F1", 7.5));
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                var rf = rfqs[i];
+                var cur = CurrencyOf(rf);
+                double qtyNeed = 0, priceNeed = 0;
+
+                for (int p = 0; p < prItems.Count; p++)
+                {
+                    var ri = matched[p, i];
+                    if (ri?.QuotedUnitPrice is not > 0) continue;
+                    qtyNeed = Math.Max(qtyNeed, CellPad + MeasureTextWidth(ri.FormattedQuantity, "F1", 7));
+                    var net = Math.Max(0m, ri.QuotedUnitPrice.Value - (ri.Discount ?? 0m));
+                    priceNeed = Math.Max(priceNeed, MoneyWidth(Cell(cur), net, "F1", 7.5));
+                }
+
+                // The summary rows draw across the vendor's whole pair, so they constrain the pair
+                // rather than either half.
+                var baseAmt = rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m);
+                double pairNeed = 0;
+                foreach (var amt in new[] { baseAmt, rf.Discount ?? 0m, baseAmt - (rf.Discount ?? 0m),
+                                            rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.TotalLandedCost })
+                {
+                    pairNeed = Math.Max(pairNeed, MoneyWidth(Cell(cur), amt, "F2", 7.5));
+                }
+                foreach (var text in new[] {
+                    string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType,
+                    string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "30 Days Net" : rf.PaymentTerms,
+                    string.IsNullOrWhiteSpace(rf.Incoterms) ? "DDP" : rf.Incoterms,
+                    string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime,
+                    string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty,
+                    string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval })
+                {
+                    pairNeed = Math.Max(pairNeed, CellPad + MeasureTextWidth(text, "F1", 7.5));
+                }
+
+                // A fitted sheet sizes each vendor to its own content, so its headings count too: the
+                // sub-headings, and the vendor name's longest word (the name itself wraps).
+                if (fitVendors)
+                {
+                    qtyNeed = Math.Max(qtyNeed, CellPad + MeasureTextWidth("Qty", "F2", 7));
+                    priceNeed = Math.Max(priceNeed, CellPad + MeasureTextWidth(currencyInHeader ? $"Price ({cur})" : "Unit Price", "F2", 7));
+                    var longestWord = (rf.Vendor ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(w => MeasureTextWidth(w, "F2", 7.5)).DefaultIfEmpty(0).Max();
+                    pairNeed = Math.Max(pairNeed, longestWord + 6);
+                }
+
+                qty[i] = qtyNeed;
+                price[i] = priceNeed;
+                pair[i] = pairNeed;
+            }
+
+            if (fitVendors)
+                histNeed = Math.Max(histNeed, CellPad + MeasureTextWidth(currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price", "F2", 7));
+
+            return new ColumnNeeds(qty, price, pair, prqNeed, histNeed);
+        }
+
+        private static double NaturalPairWidth(ColumnNeeds needs, int i) =>
+            Math.Clamp(Math.Max(needs.Qty[i] + needs.Price[i], needs.Pair[i]), CompactVendorPairWidth, MaxVendorPairWidth);
+
+        private static double PageScaleFor(double contentWidth, int supplierCount, ColumnNeeds needs)
+        {
+            if (supplierCount <= FullSizeSupplierLimit) return HorizontalFitScale(contentWidth, supplierCount);
+
+            // Sl No + PR Quantity + description at its floor + every vendor at its own width + Historical.
+            double wanted = 30 + Math.Max(45, needs.PrQty) + 170
+                            + Enumerable.Range(0, supplierCount).Sum(i => NaturalPairWidth(needs, i))
+                            + Math.Max(65, needs.Hist);
+            return contentWidth <= 0 ? 1.0 : Math.Min(1.0, contentWidth / wanted);
+        }
+
+        /// <summary>The scale this PR's sheet prints at with these suppliers and options - 1.0 is full
+        /// size. The same calculation <see cref="GeneratePdf"/> lays the sheet out with.</summary>
+        public static double PrintScaleFor(PurchaseRequisition pr, IReadOnlyList<RequestForQuotation> rfqs, PcrPdfOptions options)
+        {
+            var (width, _, margin) = PageGeometry(options);
+            if (rfqs.Count <= FullSizeSupplierLimit) return HorizontalFitScale(width - 2 * margin, rfqs.Count);
+
+            var items = pr.Items?.ToList() ?? new List<PrItem>();
+            var needs = MeasureColumnNeeds(items, rfqs, MatchRfqItems(items, rfqs), DefaultCurrencyOf(rfqs),
+                fitVendors: true, currencyInHeader: rfqs.Count > CurrencyInCellsSupplierLimit);
+            return PageScaleFor(width - 2 * margin, rfqs.Count, needs);
+        }
+
         public static byte[] GeneratePdf(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
@@ -146,7 +307,16 @@ namespace Procure.Services.Export
             // Too narrow to hold the columns at all? Then lay the sheet out on a larger virtual page of
             // the same shape and scale every page down to the real paper at the end - text, rules and
             // boxes together, so nothing can land on top of anything else. See HorizontalFitScale.
-            double pageScale = HorizontalFitScale(pageWidth - 2 * margin, selectedRfqs.Count);
+            int supplierCount = selectedRfqs.Count;
+            bool fitVendors = supplierCount > FullSizeSupplierLimit;
+            bool currencyInHeader = supplierCount > CurrencyInCellsSupplierLimit;
+            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
+            var defaultCurrency = DefaultCurrencyOf(selectedRfqs);
+            var matchedRfqItems = MatchRfqItems(prItems, selectedRfqs);
+            var needs = MeasureColumnNeeds(prItems, selectedRfqs, matchedRfqItems, defaultCurrency, fitVendors, currencyInHeader);
+
+            // Also the "fit every vendor across the page" scale past FullSizeSupplierLimit suppliers.
+            double pageScale = PageScaleFor(pageWidth - 2 * margin, supplierCount, needs);
             if (pageScale < 1.0)
             {
                 pageWidth /= pageScale;
@@ -176,17 +346,11 @@ namespace Procure.Services.Export
             double remarksGap = shrink ? 14 : 18;
             double signatureBoxHeight = shrink ? 58 : 75;
 
-            int supplierCount = selectedRfqs.Count;
             const double slNoWidth = 30;
 
             // Not const any more: both can be widened below out of the description column's slack
             // when their own content genuinely doesn't fit (see the borrow pass).
             double qtyWidth = 45;
-
-            // Fetched early (normally built alongside the item-render loop further down) purely so
-            // its item names can drive the description column's width below - content-driven, not
-            // just "how many vendor columns are there".
-            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
 
             // The description column only grows as wide as its own longest item name actually needs
             // - not simply however much space fewer vendor columns leave spare, which used to hand
@@ -207,6 +371,10 @@ namespace Procure.Services.Export
 
             double availableForDescAndVendors = contentWidth - slNoWidth - qtyWidth - historicalWidth;
             double maxDescWidthByVendorFloor = availableForDescAndVendors - (supplierCount * vendorPairWidthFloor);
+            // A fitted sheet was scaled for every vendor at its own width, so description only gets
+            // what is left after them.
+            double naturalPairsTotal = fitVendors ? Enumerable.Range(0, supplierCount).Sum(i => NaturalPairWidth(needs, i)) : 0;
+            if (fitVendors) maxDescWidthByVendorFloor = availableForDescAndVendors - naturalPairsTotal;
 
             // The widest single LINE of any item name - never the whole multi-line string - so a
             // tall spec grows the row down without ever widening this column.
@@ -228,7 +396,7 @@ namespace Procure.Services.Export
             // table just gets narrower, except that the borrow pass below spends it first when a value
             // does not fit, before it squeezes the description.
             double spareWidth = 0;
-            if (supplierCount > 0 && basePairWidth > MaxVendorPairWidth)
+            if (!fitVendors && supplierCount > 0 && basePairWidth > MaxVendorPairWidth)
             {
                 spareWidth = (basePairWidth - MaxVendorPairWidth) * supplierCount;
                 basePairWidth = MaxVendorPairWidth;
@@ -240,35 +408,28 @@ namespace Procure.Services.Export
             var vendorPriceW = new double[supplierCount];
             for (int i = 0; i < supplierCount; i++)
             {
-                vendorQtyW[i] = basePairWidth * 0.4;
-                vendorPriceW[i] = basePairWidth * 0.6;
+                if (!fitVendors)
+                {
+                    vendorQtyW[i] = basePairWidth * 0.4;
+                    vendorPriceW[i] = basePairWidth * 0.6;
+                    continue;
+                }
+
+                // Fitted: each vendor gets its own measured width, stretched evenly to fill the row
+                // (and capped like any vendor, the excess becoming spare), split between Qty and Price
+                // in the proportion their contents need.
+                double pairW = naturalPairsTotal > 0 ? NaturalPairWidth(needs, i) * remainingWidth / naturalPairsTotal : basePairWidth;
+                if (pairW > MaxVendorPairWidth) { spareWidth += pairW - MaxVendorPairWidth; pairW = MaxVendorPairWidth; }
+                double qNeed = Math.Max(needs.Qty[i], 1), pNeed = Math.Max(needs.Price[i], 1);
+                double qShare = Math.Clamp(qNeed / (qNeed + pNeed), 0.3, 0.5);
+                vendorQtyW[i] = pairW * qShare;
+                vendorPriceW[i] = pairW - vendorQtyW[i];
             }
             double VendorPairW(int i) => vendorQtyW[i] + vendorPriceW[i];
-
-            // Base currency for the Historical Price column.
-            var defaultCurrency = string.IsNullOrWhiteSpace(selectedRfqs.FirstOrDefault()?.Currency) ? "AED" : selectedRfqs.First().Currency.Trim();
 
             int VendorQtyColIdx(int i) => 3 + (i * 2);
             int VendorPriceColIdx(int i) => 3 + (i * 2) + 1;
             int HistoricalColIdx() => 3 + (supplierCount * 2);
-
-            // Which RfqItem backs each (item, vendor) cell. Resolved once here for the measuring
-            // pass and reused by the render loop, rather than matching twice with the same rules.
-            var matchedRfqItems = new RfqItem?[Math.Max(prItems.Count, 1), Math.Max(supplierCount, 1)];
-            for (int i = 0; i < supplierCount; i++)
-            {
-                // Saved link wins, unlinked lines are handed out one-to-one. Picking the first
-                // name match per PR line printed one vendor's single price against two same-named
-                // PR lines and left the second line's real quote off the comparison entirely.
-                var byLine = Procure.Utilities.PrLineMatcher.Map(selectedRfqs[i].Items, prItems)
-                    .GroupBy(kv => kv.Value.Id)
-                    .ToDictionary(g => g.Key, g => g.First().Key);
-
-                for (int p = 0; p < prItems.Count; p++)
-                {
-                    matchedRfqItems[p, i] = byLine.TryGetValue(prItems[p].Id, out var hit) ? hit : null;
-                }
-            }
 
             // ---- Borrow pass -------------------------------------------------------------------
             // Every column is a fixed slice decided before a single value is measured, so a value
@@ -279,78 +440,19 @@ namespace Procure.Services.Export
             // the columns actually short, and only when there is one. On roomier paper (A3 and up)
             // nothing is ever short, so this pass computes a zero deficit and changes nothing.
             {
-                const double cellPad = 7;   // 3pt left inset + 4pt right inset, as the cells draw
-                string Cur(RequestForQuotation rf) => string.IsNullOrWhiteSpace(rf.Currency) ? "AED" : rf.Currency.Trim();
-
-                // MoneyCellPad, not cellPad: the currency sits hard left and the amount hard right,
-                // so budgeting only the two insets sizes the column to the width where they exactly
-                // touch - "AED1,102,500.00". The extra is the gap that keeps them two words.
-                double MoneyW(string cur, decimal amount, string font, double size)
-                    => MoneyCellPad + MeasureTextWidth(cur, font, size)
-                       + MeasureTextWidth(amount.ToString("N2", CultureInfo.InvariantCulture), font, size);
-
+                // What each column needs was measured up front (MeasureColumnNeeds); here it is only
+                // compared with what the layout handed out.
                 var dQty = new double[supplierCount];
                 var dPrice = new double[supplierCount];
-                double dPrq = 0, dHist = 0;
-
-                double prqNeed = 0, histNeed = 0;
-                for (int p = 0; p < prItems.Count; p++)
-                {
-                    var item = prItems[p];
-                    prqNeed = Math.Max(prqNeed, cellPad + MeasureTextWidth(
-                        $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}", "F1", 7.5));
-
-                    decimal rowLast = item.EstimatedUnitPrice ?? 0m;
-                    for (int i = 0; i < supplierCount; i++)
-                    {
-                        var ri = matchedRfqItems[p, i];
-                        if (ri?.LastPrice > 0) { rowLast = ri.LastPrice.Value; break; }
-                    }
-                    if (rowLast > 0) histNeed = Math.Max(histNeed, MoneyW(defaultCurrency, rowLast, "F1", 7.5));
-                }
-                dPrq = Math.Max(0, prqNeed - qtyWidth);
-                dHist = Math.Max(0, histNeed - historicalWidth);
+                double dPrq = Math.Max(0, needs.PrQty - qtyWidth);
+                double dHist = Math.Max(0, needs.Hist - historicalWidth);
 
                 for (int i = 0; i < supplierCount; i++)
                 {
-                    var rf = selectedRfqs[i];
-                    var cur = Cur(rf);
-                    double qtyNeed = 0, priceNeed = 0;
-
-                    for (int p = 0; p < prItems.Count; p++)
-                    {
-                        var ri = matchedRfqItems[p, i];
-                        if (ri?.QuotedUnitPrice is not > 0) continue;
-                        qtyNeed = Math.Max(qtyNeed, cellPad + MeasureTextWidth(ri.FormattedQuantity, "F1", 7));
-                        var net = Math.Max(0m, ri.QuotedUnitPrice.Value - (ri.Discount ?? 0m));
-                        priceNeed = Math.Max(priceNeed, MoneyW(cur, net, "F1", 7.5));
-                    }
-
-                    dQty[i] = Math.Max(0, qtyNeed - vendorQtyW[i]);
-                    dPrice[i] = Math.Max(0, priceNeed - vendorPriceW[i]);
-
-                    // The summary rows draw across the vendor's whole pair, so they constrain the
-                    // pair rather than either half; any extra goes to the money side.
-                    var baseAmt = rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m);
-                    double pairNeed = 0;
-                    foreach (var amt in new[] { baseAmt, rf.Discount ?? 0m, baseAmt - (rf.Discount ?? 0m),
-                                                rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.TotalLandedCost })
-                    {
-                        pairNeed = Math.Max(pairNeed, MoneyW(cur, amt, "F2", 7.5));
-                    }
-                    foreach (var text in new[] {
-                        string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType,
-                        string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "30 Days Net" : rf.PaymentTerms,
-                        string.IsNullOrWhiteSpace(rf.Incoterms) ? "DDP" : rf.Incoterms,
-                        string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime,
-                        string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty,
-                        string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval })
-                    {
-                        pairNeed = Math.Max(pairNeed, cellPad + MeasureTextWidth(text, "F1", 7.5));
-                    }
-
+                    dQty[i] = Math.Max(0, needs.Qty[i] - vendorQtyW[i]);
+                    dPrice[i] = Math.Max(0, needs.Price[i] - vendorPriceW[i]);
                     var pairHave = vendorQtyW[i] + dQty[i] + vendorPriceW[i] + dPrice[i];
-                    if (pairNeed > pairHave) dPrice[i] += pairNeed - pairHave;
+                    if (needs.Pair[i] > pairHave) dPrice[i] += needs.Pair[i] - pairHave;
                 }
 
                 double totalDeficit = dQty.Sum() + dPrice.Sum() + dPrq + dHist;
@@ -649,11 +751,14 @@ namespace Procure.Services.Export
             // own price cell, so flagging it again on the header would be redundant.
             const double vendorHeaderLineHeight = 9.0;
             var vendorHeaderLines = new List<List<string>>();
+            // Past CurrencyInCellsSupplierLimit the money cells carry just the figure; the currency is
+            // in each column's heading instead.
+            string CellCur(string cur) => currencyInHeader ? string.Empty : cur;
             for (int i = 0; i < supplierCount; i++)
             {
                 // Vendor name spans the whole pair (Qty + Unit Price), same as the merged header
                 // cell the Excel version already draws.
-                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, VendorPairW(i) - 6, maxLines: 2));
+                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, VendorPairW(i) - 6, maxLines: fitVendors ? 3 : 2));
             }
             var historicalHeaderLines = WrapText("Historical Price", "F2", 7.5, historicalWidth - 6, maxLines: 2);
 
@@ -746,11 +851,11 @@ namespace Procure.Services.Export
                     // reads the same as Excel's merged header cell.
                     DrawCenteredBlock(vendorHeaderLines[i], colX[VendorQtyColIdx(i)], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, VendorPairW(i));
                     DrawText("Qty", colX[VendorQtyColIdx(i)], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: vendorQtyW[i]);
-                    DrawText("Unit Price", colX[VendorPriceColIdx(i)], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: vendorPriceW[i]);
+                    DrawText(currencyInHeader ? $"Price ({CurrencyOf(selectedRfqs[i])})" : "Unit Price", colX[VendorPriceColIdx(i)], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: vendorPriceW[i]);
                 }
 
                 DrawCenteredBlock(historicalHeaderLines, colX[HistoricalColIdx()], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, historicalWidth);
-                DrawText("Unit Price", colX[HistoricalColIdx()], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: historicalWidth);
+                DrawText(currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price", colX[HistoricalColIdx()], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: historicalWidth);
 
                 DrawLine(colX[3], curY - rowH1, marginLeft + tableWidth, curY - rowH1, width: 0.5);
 
@@ -863,9 +968,9 @@ namespace Procure.Services.Export
                     // No PrItem row exists in this fallback, so there's no matched RfqItem to read a
                     // quantity from.
                     DrawText("-", colX[VendorQtyColIdx(i)], fbCenterY, font: "F1", fontSize: 8, align: "center", width: vendorQtyW[i]);
-                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], fbCenterY, cur, amt, fontSize: 8);
+                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], fbCenterY, CellCur(cur), amt, fontSize: 8);
                 }
-                DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, fbCenterY, defaultCur, 0.00m, fontSize: 8);
+                DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, fbCenterY, CellCur(defaultCur), 0.00m, fontSize: 8);
                 curY -= rowH;
             }
             else
@@ -916,7 +1021,7 @@ namespace Procure.Services.Export
                             // not necessarily the PR Quantity column two cells to the left - in its
                             // own real column now, not stacked into the price cell.
                             DrawFittedText(rfqItem.FormattedQuantity, colX[VendorQtyColIdx(i)] + 3, singleLineCenterY, font: "F1", baseFontSize: 7, align: "center", maxWidth: vendorQtyW[i] - 6, minFontSize: 5.0);
-                            DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], singleLineCenterY, cur, netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
+                            DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], singleLineCenterY, CellCur(cur), netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
                         }
                         else
                         {
@@ -935,7 +1040,7 @@ namespace Procure.Services.Export
 
                     if (rowLastPrice > 0)
                     {
-                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, defaultCur, rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
+                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, CellCur(defaultCur), rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
                     }
                     else
                     {
@@ -977,7 +1082,7 @@ namespace Procure.Services.Export
                     var (amt, showDash) = valFunc(rfq);
                     // Spans the vendor's whole Qty+Price pair - no divider drawn through this band
                     // (see CloseCurrentPageTable), so the total reads as one merged figure.
-                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), curY - 9.5, cur, amt, isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash);
+                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), curY - 9.5, CellCur(cur), amt, isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash);
                 }
 
                 curY -= rowH;
