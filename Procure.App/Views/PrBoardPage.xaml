@@ -204,7 +204,7 @@
 
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:PurchaseRequisition">
-                        <StackPanel>
+                        <StackPanel x:DefaultBindMode="OneWay">
                             <!-- row (tap to expand) - borderless, hairline below, hover fill from the
                                  container's own PointerOver state (see ListView.Resources above). -->
                             <Grid ColumnSpacing="14" Padding="12,10" Tapped="Card_Tapped" Background="Transparent">

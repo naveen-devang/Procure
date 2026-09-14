@@ -109,7 +109,7 @@
                     <ItemsControl ItemsSource="{Binding Metrics.NeedsAttentionPrs}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:PurchaseRequisition">
-                                <Border Margin="0,0,0,10" Padding="14,10" BorderThickness="1" CornerRadius="6"
+                                <Border x:DefaultBindMode="OneWay" Margin="0,0,0,10" Padding="14,10" BorderThickness="1" CornerRadius="6"
                                         BorderBrush="{ThemeResource AppHairline}"
                                         Background="{ThemeResource AppTertiaryBackground}">
                                     <Grid ColumnSpacing="12">

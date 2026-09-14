@@ -61,11 +61,11 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="RFQ Number" Style="{StaticResource Lbl}" />
-                                    <TextBox x:Name="FirstField" Text="{Binding NewRfqNo, Mode=TwoWay}" PlaceholderText="e.g. RFQ-001-A" />
+                                    <TextBox x:Name="FirstField" Text="{Binding NewRfqNo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. RFQ-001-A" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Vendor Name *" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding NewRfqVendor, Mode=TwoWay}" PlaceholderText="e.g. Dell Enterprise Systems" />
+                                    <TextBox Text="{Binding NewRfqVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Dell Enterprise Systems" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
@@ -88,7 +88,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding NewRfqPaymentTerms, Mode=TwoWay}" PlaceholderText="30 Days Net" />
+                                    <TextBox Text="{Binding NewRfqPaymentTerms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="30 Days Net" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />
@@ -97,11 +97,11 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Spacing="4">
                                     <TextBlock Text="Delivery / Lead Time" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding NewRfqDeliveryLeadTime, Mode=TwoWay}" PlaceholderText="e.g. 2 Weeks" />
+                                    <TextBox Text="{Binding NewRfqDeliveryLeadTime, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. 2 Weeks" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4" Spacing="4">
                                     <TextBlock Text="Warranty" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding NewRfqWarranty, Mode=TwoWay}" PlaceholderText="e.g. 12 Months" />
+                                    <TextBox Text="{Binding NewRfqWarranty, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. 12 Months" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -175,18 +175,18 @@
                                                 <ColumnDefinition Width="34" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" />
-                                            <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
+                                            <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Qty" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Right" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00" FontSize="12"
                                                      TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <Button ToolTipService.ToolTip="Remove Item" Grid.Column="8" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28"
                                                     Padding="0" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}"

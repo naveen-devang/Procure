@@ -41,7 +41,7 @@
         </Style>
 
         <DataTemplate x:Key="CallOffLineRow" x:DataType="models:CallOffLine">
-            <Grid Padding="8,6" Margin="0,0,2,0" CornerRadius="6" Tapped="Line_Tapped" Background="Transparent">
+            <Grid x:DefaultBindMode="OneWay" Padding="8,6" Margin="0,0,2,0" CornerRadius="6" Tapped="Line_Tapped" Background="Transparent">
                 <Grid.Resources>
                     <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
                     <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
@@ -129,7 +129,7 @@
                                  card, since none of that text is selectable either. A line row inside
                                  marks its own tap handled, so expanding does not make the lines
                                  collapse the group. -->
-                            <Border Padding="12,10" BorderThickness="1" CornerRadius="8" Tapped="Group_Tapped"
+                            <Border x:DefaultBindMode="OneWay" Padding="12,10" BorderThickness="1" CornerRadius="8" Tapped="Group_Tapped"
                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
                                 <Border.Resources>
                                     <!-- Clicked, not read (see Styles.xaml). -->
@@ -317,10 +317,10 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <CalendarDatePicker Date="{Binding NewCallOffDate, Converter={StaticResource Dto}, Mode=TwoWay}" />
-                    <TextBox Grid.Column="1" PlaceholderText="Qty" Height="34" Text="{Binding NewCallOffQuantity, Mode=TwoWay}" />
+                    <TextBox Grid.Column="1" PlaceholderText="Qty" Height="34" Text="{Binding NewCallOffQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <TextBlock Grid.Column="2" Text="{Binding SelectedLine.Unit}" VerticalAlignment="Center" FontSize="12"
                                Foreground="{ThemeResource AppTextSecondary}" />
-                    <TextBox Grid.Column="3" PlaceholderText="Note (optional)" Height="34" Text="{Binding NewCallOffNote, Mode=TwoWay}" />
+                    <TextBox Grid.Column="3" PlaceholderText="Note (optional)" Height="34" Text="{Binding NewCallOffNote, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Grid.Column="4" Content="+ Log Delivery" Style="{StaticResource AccentButtonStyle}"
                             Command="{Binding LogCallOffCommand}" />
                 </Grid>
@@ -368,7 +368,7 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:PoItemCallOff">
-                                <Grid Padding="0,8" ColumnSpacing="0">
+                                <Grid x:DefaultBindMode="OneWay" Padding="0,8" ColumnSpacing="0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="90" />
                                         <ColumnDefinition Width="100" />

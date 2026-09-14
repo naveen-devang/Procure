@@ -229,12 +229,12 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="Urgent Priority (days)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBox Text="{Binding UrgentDays, Mode=TwoWay}" />
+                                    <TextBox Text="{Binding UrgentDays, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBlock Style="{StaticResource RowHint}" Text="Flagged as overdue after this many days" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Normal Priority (days)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBox Text="{Binding NormalDays, Mode=TwoWay}" />
+                                    <TextBox Text="{Binding NormalDays, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBlock Style="{StaticResource RowHint}" Text="Standard PR overdue warning threshold" />
                                 </StackPanel>
                             </Grid>
@@ -330,7 +330,7 @@
                             </Grid>
                             <StackPanel Spacing="4" Visibility="{Binding ShowOptionsField, Converter={StaticResource BoolVis}}">
                                 <TextBlock Text="Dropdown Options (comma-separated)" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBox Text="{Binding NewColumnOptions, Mode=TwoWay}" PlaceholderText="e.g. IT, Engineering, Operations, Finance, HR" />
+                                <TextBox Text="{Binding NewColumnOptions, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. IT, Engineering, Operations, Finance, HR" />
                             </StackPanel>
                             <Button Content="Add Column" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Right"
                                     Command="{Binding AddColumnCommand}" />

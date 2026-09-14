@@ -141,12 +141,12 @@
                                     </StackPanel>
                                     <StackPanel Spacing="6">
                                         <TextBlock Text="Pages to Print" Style="{StaticResource H}" />
-                                        <TextBox Text="{Binding PcrPageRangeText, Mode=TwoWay}"
+                                        <TextBox Text="{Binding PcrPageRangeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  PlaceholderText="All pages (e.g. 1-3, 5)" FontSize="12" />
                                     </StackPanel>
                                     <StackPanel Spacing="6">
                                         <TextBlock Text="Copies" Style="{StaticResource H}" />
-                                        <TextBox Text="{Binding PcrCopiesText, Mode=TwoWay}" MaxLength="2" FontSize="12" Width="64"
+                                        <TextBox Text="{Binding PcrCopiesText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="2" FontSize="12" Width="64"
                                                  HorizontalAlignment="Left" />
                                     </StackPanel>
                                     <CheckBox Content="Print on both sides" IsChecked="{Binding PcrDoubleSided, Mode=TwoWay}" />

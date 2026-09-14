@@ -44,16 +44,16 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="PR Number *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBox x:Name="FirstField" Text="{Binding EditingPrNo, Mode=TwoWay}" PlaceholderText="e.g. PR-2026-001" />
+                                <TextBox x:Name="FirstField" Text="{Binding EditingPrNo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. PR-2026-001" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="Requestor Name *" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBox Text="{Binding EditingPrRequestor, Mode=TwoWay}" PlaceholderText="e.g. Sarah Lin" />
+                                <TextBox Text="{Binding EditingPrRequestor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Sarah Lin" />
                             </StackPanel>
                             <!-- Printed on the PCR as "Requested For". Blank prints the E&I default. -->
                             <StackPanel Grid.Column="2" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="Requested For" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBox Text="{Binding EditingPrRequestedFor, Mode=TwoWay}" PlaceholderText="e.g. E&amp;I" />
+                                <TextBox Text="{Binding EditingPrRequestedFor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. E&amp;I" />
                             </StackPanel>
                             <StackPanel Grid.Column="3" Spacing="4">
                                 <TextBlock Style="{StaticResource AppText}" Text="Plant" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
@@ -69,7 +69,7 @@
 
                         <StackPanel Spacing="4">
                             <TextBlock Style="{StaticResource AppText}" Text="Description" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBox Text="{Binding EditingPrDescription, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                            <TextBox Text="{Binding EditingPrDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
                                      PlaceholderText="Item or service requested..." />
                         </StackPanel>
 
@@ -120,13 +120,13 @@
                                                 <ColumnDefinition Width="95" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
+                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Qty" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay}" PlaceholderText="pcs" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12"
                                                      TextAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="Price" FontSize="12"
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price" FontSize="12"
                                                      />
                                             <Button ToolTipService.ToolTip="Remove Item" Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11"
                                                     Width="28" Height="28" Padding="0" Background="Transparent" BorderThickness="0"
@@ -157,7 +157,7 @@
 
                         <StackPanel Spacing="4">
                             <TextBlock Style="{StaticResource AppText}" Text="Notes &amp; Justification" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBox Text="{Binding EditingPrNotes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
+                            <TextBox Text="{Binding EditingPrNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"
                                      PlaceholderText="Additional procurement details or notes..." />
                         </StackPanel>
 

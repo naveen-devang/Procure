@@ -435,6 +435,7 @@ namespace Procure.Models
             OnPropertyChanged(nameof(FormattedPaymentTermsBadge));
             OnPropertyChanged(nameof(HasDeliveryLeadTime));
             OnPropertyChanged(nameof(FormattedLeadTimeBadge));
+            OnPropertyChanged(nameof(HasIncoterms));
             OnPropertyChanged(nameof(HasCommercialDetails));
         }
     }

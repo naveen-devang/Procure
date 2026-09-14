@@ -40,7 +40,7 @@
         </Style>
 
         <DataTemplate x:Key="TaskRow" x:DataType="models:TodoTask">
-            <Grid Padding="6,3" ColumnSpacing="4" Tapped="Row_Tapped">
+            <Grid x:DefaultBindMode="OneWay" Padding="6,3" ColumnSpacing="4" Tapped="Row_Tapped">
                 <Grid.Resources>
                     <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
                     <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
@@ -85,7 +85,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="BoardCard" x:DataType="models:TodoTask">
-            <Border Padding="9,7" Margin="0,0,0,6" BorderThickness="1" CornerRadius="7"
+            <Border x:DefaultBindMode="OneWay" Padding="9,7" Margin="0,0,0,6" BorderThickness="1" CornerRadius="7"
                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}"
                     Tapped="Row_Tapped">
                 <Border.Resources>
@@ -112,7 +112,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="WeekChip" x:DataType="models:TodoTask">
-            <Border Padding="6,5" Margin="0,0,0,4" BorderThickness="1" CornerRadius="6"
+            <Border x:DefaultBindMode="OneWay" Padding="6,5" Margin="0,0,0,4" BorderThickness="1" CornerRadius="6"
                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}"
                     Tapped="Row_Tapped">
                 <Border.Resources>
@@ -311,7 +311,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" Margin="0,6,0,0" />
                                 <TextBox Grid.Column="1" PlaceholderText="Optional notes" FontSize="12.5" Height="36"
-                                         Text="{Binding NewTaskNotes, Mode=TwoWay}" />
+                                         Text="{Binding NewTaskNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                 <Button Content="Cancel" FontSize="12" Height="34" Background="Transparent" BorderThickness="0"
@@ -344,7 +344,7 @@
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
                                     <DataTemplate x:DataType="models:TodoTaskGroup">
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Padding="4,14,4,4">
+                                        <StackPanel x:DefaultBindMode="OneWay" Orientation="Horizontal" Spacing="8" Padding="4,14,4,4">
                                             <TextBlock Text="{x:Bind Header}" FontWeight="SemiBold" FontSize="10.5"
                                                        CharacterSpacing="90" Foreground="{ThemeResource AppTextSecondary}" />
                                             <Border Padding="6,1" CornerRadius="8" Background="{ThemeResource AppSubtleFill}">
@@ -469,7 +469,7 @@
                                   Visibility="{Binding SelectedTask.HasLinks, Converter={StaticResource BoolVis}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:TaskLink">
-                                <Grid ColumnSpacing="6" Margin="0,0,0,5">
+                                <Grid x:DefaultBindMode="OneWay" ColumnSpacing="6" Margin="0,0,0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
@@ -494,7 +494,7 @@
                                   ItemClick="LinkResult_Click" IsItemClickEnabled="True">
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TaskLinkTarget">
-                                    <Grid Padding="4,4" ColumnSpacing="8">
+                                    <Grid x:DefaultBindMode="OneWay" Padding="4,4" ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -514,7 +514,7 @@
                     <ItemsControl ItemsSource="{Binding SelectedSubtasks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:TodoTask">
-                                <Grid ColumnSpacing="2" Margin="0,0,0,4">
+                                <Grid x:DefaultBindMode="OneWay" ColumnSpacing="2" Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="28" />
                                         <ColumnDefinition Width="*" />

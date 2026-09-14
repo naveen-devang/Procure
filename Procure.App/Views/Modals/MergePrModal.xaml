@@ -67,7 +67,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="4">
                             <TextBlock Style="{StaticResource AppText}" Text="Combined PR Number *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                            <TextBox Text="{Binding MergeMasterPrNo, Mode=TwoWay}" PlaceholderText="e.g. 12345/6780" />
+                            <TextBox Text="{Binding MergeMasterPrNo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. 12345/6780" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="4">
                             <TextBlock Style="{StaticResource AppText}" Text="Priority" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
@@ -78,11 +78,11 @@
 
                     <StackPanel Spacing="4">
                         <TextBlock Style="{StaticResource AppText}" Text="Requestor / Department" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBox Text="{Binding MergeRequestor, Mode=TwoWay}" PlaceholderText="e.g. Consolidated Procurement" />
+                        <TextBox Text="{Binding MergeRequestor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Consolidated Procurement" />
                     </StackPanel>
                     <StackPanel Spacing="4">
                         <TextBlock Style="{StaticResource AppText}" Text="Combined Description / Line Items *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBox Text="{Binding MergeDescription, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="90"
+                        <TextBox Text="{Binding MergeDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="90"
                                  PlaceholderText="Consolidated item list..." />
                     </StackPanel>
 
@@ -100,7 +100,7 @@
 
                     <StackPanel Spacing="4">
                         <TextBlock Style="{StaticResource AppText}" Text="Consolidation Notes &amp; Lineage" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                        <TextBox Text="{Binding MergeNotes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
+                        <TextBox Text="{Binding MergeNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="60"
                                  PlaceholderText="Lineage details..." />
                     </StackPanel>
 

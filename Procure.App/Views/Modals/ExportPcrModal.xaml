@@ -89,7 +89,7 @@
                             <StackPanel Spacing="8">
                                 <TextBlock Text="2. Collective Number" Style="{StaticResource H}" />
                                 <TextBlock Style="{StaticResource AppText}" Text="Optional. Printed on the sheet as-is; blank shows a dash." FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
-                                <TextBox Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay}" PlaceholderText="e.g. PCR-2026-014" FontSize="12" />
+                                <TextBox Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. PCR-2026-014" FontSize="12" />
                             </StackPanel>
                         </Border>
 
@@ -98,7 +98,7 @@
                                 <TextBlock Text="3. Remarks / Justification" Style="{StaticResource H}" />
                                 <TextBlock Style="{StaticResource AppText}" Text="Additional justification for the approvers. Saved for future exports." FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
-                                <TextBox Text="{Binding ExportPcrRemarks, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
+                                <TextBox Text="{Binding ExportPcrRemarks, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
                                          PlaceholderText="e.g. Required by Electrical Dept. on urgent basis" FontSize="12" />
                             </StackPanel>
                         </Border>

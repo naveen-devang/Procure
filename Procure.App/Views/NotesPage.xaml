@@ -31,7 +31,7 @@
         </Style>
 
         <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
-            <Grid Padding="11,8" Tapped="Note_Tapped">
+            <Grid x:DefaultBindMode="OneWay" Padding="11,8" Tapped="Note_Tapped">
                 <Grid.Resources>
                     <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
                     <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
@@ -158,7 +158,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:NoteLink">
-                                <Border Margin="0,0,6,4" Padding="8,3" CornerRadius="9" BorderThickness="0"
+                                <Border x:DefaultBindMode="OneWay" Margin="0,0,6,4" Padding="8,3" CornerRadius="9" BorderThickness="0"
                                         Background="{ThemeResource AppSubtleFill}">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="{x:Bind Label}" FontSize="10.5" Foreground="{ThemeResource PrimaryTextBrush}"
@@ -180,7 +180,7 @@
                                   IsItemClickEnabled="True" ItemClick="LinkResult_Click">
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TaskLinkTarget">
-                                    <Grid Padding="4,3" ColumnSpacing="8">
+                                    <Grid x:DefaultBindMode="OneWay" Padding="4,3" ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />

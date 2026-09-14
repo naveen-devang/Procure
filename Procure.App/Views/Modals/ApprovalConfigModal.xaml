@@ -51,7 +51,7 @@
                                     </Grid.ColumnDefinitions>
                                     <CheckBox IsChecked="{x:Bind IsIncluded, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Center"
                                               ToolTipService.ToolTip="Include this stage" />
-                                    <TextBox Grid.Column="1" Text="{x:Bind Role, Mode=TwoWay}" PlaceholderText="Stage Title (e.g. Finance Controller)"
+                                    <TextBox Grid.Column="1" Text="{x:Bind Role, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Stage Title (e.g. Finance Controller)"
                                              FontSize="13" VerticalAlignment="Center" />
                                     <Button Grid.Column="2" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="12"
                                             Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0"

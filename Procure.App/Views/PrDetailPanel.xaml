@@ -131,7 +131,7 @@
                         <ItemsControl ItemsSource="{x:Bind Pr.Rfqs, Mode=OneWay}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:RequestForQuotation">
-                                    <Border Style="{StaticResource ItemCard}" Padding="14,12">
+                                    <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="14,12">
                                         <StackPanel Spacing="10">
                                             <!-- Vendor, its quote status, and the row actions on one line:
                                                  the status belongs next to the vendor it describes. -->
@@ -274,7 +274,7 @@
                             <ItemsControl ItemsSource="{x:Bind Pr.Pcr.Approvals, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:Approval">
-                                        <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
+                                        <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
                                             <Grid ColumnSpacing="12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -384,7 +384,7 @@
                         <ItemsControl ItemsSource="{x:Bind Pr.Pos, Mode=OneWay}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:PurchaseOrder">
-                                    <Border Style="{StaticResource ItemCard}" Padding="12,10">
+                                    <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="12,10">
                                         <Grid ColumnSpacing="10" RowSpacing="4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -456,7 +456,7 @@
                     <ItemsControl ItemsSource="{x:Bind Pr.Items, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:PrItem">
-                                <Border Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
+                                <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="12,8" Margin="0,0,0,6">
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -510,7 +510,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:CustomFieldValue">
-                                        <Border Style="{StaticResource Chip}" Background="{ThemeResource AppSubtleFill}"
+                                        <Border x:DefaultBindMode="OneWay" Style="{StaticResource Chip}" Background="{ThemeResource AppSubtleFill}"
                                                 Visibility="{x:Bind HasValue, Converter={StaticResource BoolVis}}">
                                             <StackPanel Orientation="Horizontal" Spacing="4">
                                                 <TextBlock Style="{StaticResource AppText}" Text="{x:Bind ColumnName}" FontSize="11" Foreground="{ThemeResource AppTextTertiary}" />
@@ -534,7 +534,7 @@
                     <ItemsControl ItemsSource="{x:Bind Pr.LinkedTasks, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:TodoTask">
-                                <Grid ColumnSpacing="2">
+                                <Grid x:DefaultBindMode="OneWay" ColumnSpacing="2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="26" />
                                         <ColumnDefinition Width="*" />
