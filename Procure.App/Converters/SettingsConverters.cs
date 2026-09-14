@@ -64,41 +64,47 @@ sealed class EqualsToVisibilityConverter : IValueConverter
 /// A {Binding} (unlike x:Bind) does not say what type it is writing to, so those pass
 /// ConverterParameter=decimal? (or decimal) to say it.
 ///
-/// While a box has the cursor, its text is left as typed. Writing the value pushes it straight back
-/// into the box, so without this "1." became "1", "AED" vanished as it was typed, and the cursor jumped
-/// to the start - typing "AED 1,200" produced "0021".</summary>
+/// A box's text is left as typed. Writing the value pushes it straight back into the same box, so without
+/// this "1." became "1" and the cursor jumped to the start - typing "AED 1,200" produced "0021".
+///
+/// Only the number box being typed in keeps its text: ConvertBack notes which focused box it read from,
+/// and Convert hands that box's text back only while that box still has the cursor and its text stands
+/// for the very number being shown. The first version copied the text of whatever box had the cursor -
+/// a vendor name typed or pasted appeared in every empty price, discount and last-price box, and in a
+/// quantity box whose value matched digits in the name. Text without a number is never handed back.</summary>
 public sealed class NumericTextConverter : IValueConverter
 {
     private static Procure.App.Platform.ShellContext? _shell;
+    private static WeakReference<Microsoft.UI.Xaml.Controls.TextBox>? _typingBox;   // UI thread only
+
+    private static Microsoft.UI.Xaml.Controls.TextBox? FocusedTextBox()
+    {
+        _shell ??= App.Services.GetService(typeof(Procure.App.Platform.ShellContext)) as Procure.App.Platform.ShellContext;
+        return _shell?.XamlRoot is { } root
+            ? Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) as Microsoft.UI.Xaml.Controls.TextBox
+            : null;
+    }
 
     public object Convert(object value, Type t, object p, string l)
     {
-        if (TypedTextFor(value) is { } typed) return typed;
+        if (value is not null
+            && _typingBox is not null && _typingBox.TryGetTarget(out var typing)
+            && ReferenceEquals(FocusedTextBox(), typing) && typing.Text is { Length: > 0 } text
+            && !text.Contains('%')
+            && Procure.App.Platform.MoneyBox.TryParseAmount(text, out var typed)
+            && value switch { decimal d => d == typed, double f => (decimal)f == typed, int i => i == typed, _ => false })
+            return text;
         return value?.ToString() ?? string.Empty;
     }
 
-    /// <summary>The focused box's own text, when it already stands for this value (or is still being typed
-    /// towards one: an unfinished "5%", or text with no number in it yet).</summary>
-    private static string? TypedTextFor(object? value)
+    public object ConvertBack(object value, Type t, object p, string l)
     {
-        _shell ??= App.Services.GetService(typeof(Procure.App.Platform.ShellContext)) as Procure.App.Platform.ShellContext;
-        if (_shell?.XamlRoot is not { } root
-            || Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) is not Microsoft.UI.Xaml.Controls.TextBox box) return null;
-
-        var text = box.Text;
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        if (text.Contains('%')) return text;
-        if (!Procure.App.Platform.MoneyBox.TryParseAmount(text, out var typed)) return value is null ? text : null;
-        return value switch
-        {
-            decimal d when d == typed => text,
-            double f when (decimal)f == typed => text,
-            int i when i == typed => text,
-            _ => null,
-        };
+        // The box being typed in is the focused one; remember it so only it keeps its own text.
+        if (FocusedTextBox() is { } box) _typingBox = new WeakReference<Microsoft.UI.Xaml.Controls.TextBox>(box);
+        return ParseBack(value, t, p);
     }
 
-    public object ConvertBack(object value, Type t, object p, string l)
+    private static object ParseBack(object value, Type t, object p)
     {
         var s = (value as string)?.Trim();
         if (p is "decimal?") t = typeof(decimal?);

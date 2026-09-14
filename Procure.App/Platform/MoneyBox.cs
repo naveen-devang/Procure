@@ -2,22 +2,18 @@ using System;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Procure.Models;
-using Procure.PageModels;
-using Procure.Utilities;
 
 namespace Procure.App.Platform;
 
 /// <summary>
-/// Two behaviours for the money boxes in the RFQ and PO dialogs, ported from the MAUI modals' code-behind.
+/// Money boxes in the RFQ and PO dialogs.
 ///
 /// <c>MoneyBox.PercentOf</c> on a discount box: typing a number followed by % turns it into that share of
 /// the given amount ("5%" of a 250.00 unit price becomes 12.50), there and then. Resolved once, like
 /// MAUI: it does not re-scale if the price changes afterwards.
 ///
-/// <c>MoneyBox.PasteColumn</c> on an RFQ line's price, discount or last-price box: pasting (Ctrl+V or the
-/// context menu) runs the page model's Excel paste, which fills this row and the rows below it from a
-/// copied column. The same parser MAUI used; a single value just fills this row.
+/// Ctrl+V into these boxes is a plain paste: taking over a paste to spread an Excel column across the
+/// rows is only done by the dialogs' "Paste ... from Excel" buttons (the user's rule).
 /// </summary>
 public static class MoneyBox
 {
@@ -67,50 +63,6 @@ public static class MoneyBox
         foreach (var c in raw)
             if (char.IsDigit(c) || c is '.' or '-') chars.Append(c);
         return decimal.TryParse(chars.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out value);
-    }
-
-    // ---- Excel column paste ----
-
-    public static readonly DependencyProperty PasteColumnProperty = DependencyProperty.RegisterAttached(
-        "PasteColumn", typeof(string), typeof(MoneyBox), new PropertyMetadata(null, OnPasteColumnChanged));
-
-    public static string? GetPasteColumn(DependencyObject d) => (string?)d.GetValue(PasteColumnProperty);
-    public static void SetPasteColumn(DependencyObject d, string? value) => d.SetValue(PasteColumnProperty, value);
-
-    private static void OnPasteColumnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is TextBox box && e.OldValue is null) box.Paste += OnPaste;
-    }
-
-    private static async void OnPaste(object sender, TextControlPasteEventArgs e)
-    {
-        if (sender is not TextBox { DataContext: RfqItem item } box
-            || PrListPageModel.Current is not { } vm
-            || !Enum.TryParse<RfqPricingColumn>(GetPasteColumn(box), out var column)) return;
-
-        Windows.ApplicationModel.DataTransfer.DataPackageView content;
-        try
-        {
-            content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
-            if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text)) return;
-        }
-        catch
-        {
-            return;   // clipboard busy - let the box paste normally
-        }
-
-        e.Handled = true;   // the page model writes the values; the boxes show them through their bindings
-        try
-        {
-            var text = await content.GetTextAsync();
-            if (string.IsNullOrEmpty(text)) return;
-            if (vm.IsBatchRfqModalVisible) vm.HandleBatchRfqPricingPaste(item, text, column);
-            else vm.HandleRfqPricingPaste(item, text, column);
-        }
-        catch (Exception ex)
-        {
-            CrashLog.Write("RFQ price paste failed", ex);
-        }
     }
 }
 

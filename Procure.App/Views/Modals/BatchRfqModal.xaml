@@ -108,7 +108,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2">
                                     <TextBlock Style="{StaticResource AppText}" Text="Consolidated Line Items &amp; Quoted Unit Rates" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
-                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices (paste from Excel supported)." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
+                                    <TextBlock Style="{StaticResource AppText}" Text="Select items quoted by the vendor and enter unit prices." FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button Content="{Binding AllBatchRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
@@ -171,13 +171,13 @@
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PasteColumn="UnitPrice"
+                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
-                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PasteColumn="Discount" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
+                                            <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right" platform:MoneyBox.PasteColumn="LastPrice"
+                                            <TextBox Grid.Column="7" Text="{x:Bind LastPrice, Mode=TwoWay, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="12" TextAlignment="Right"
                                                      IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                         </Grid>
                                     </DataTemplate>
