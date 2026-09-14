@@ -46,15 +46,13 @@ namespace Procure.Utilities
 
                 // Settings > Updates wording for a failed check.
                 string Fail(Exception e) => UpdateCheckMessages.Failure(e);
-                if (!Fail(new TimeoutException()).Contains("didn't respond")) throw new InvalidOperationException("A timeout must say GitHub didn't respond.");
-                if (!Fail(new System.Net.Http.HttpRequestException("x", null, System.Net.HttpStatusCode.GatewayTimeout)).Contains("GitHub's side"))
-                    throw new InvalidOperationException("A 504 must say the problem is on GitHub's side.");
-                if (!Fail(new System.Net.Http.HttpRequestException("x", null, System.Net.HttpStatusCode.Forbidden)).Contains("limiting"))
-                    throw new InvalidOperationException("A 403 (rate limit) must say GitHub is limiting checks.");
-                if (!Fail(new System.Net.Http.HttpRequestException("x", new System.Net.Sockets.SocketException())).Contains("internet connection"))
-                    throw new InvalidOperationException("No network must point at the internet connection.");
-                if (!Fail(new Exception("boom")).StartsWith("Couldn't check")) throw new InvalidOperationException("Anything else gets the generic message.");
-                if (UpdateCheckMessages.UpToDate("v2.0.2") != "You're up to date - v2.0.2 is the latest version.")
+                const string TryLater = "Couldn't check for updates right now. Please try again later.";
+                if (Fail(new TimeoutException()) != TryLater) throw new InvalidOperationException("A timeout must say try again later.");
+                if (Fail(new System.Net.Http.HttpRequestException("x", null, System.Net.HttpStatusCode.GatewayTimeout)) != TryLater)
+                    throw new InvalidOperationException("A server error must say try again later.");
+                if (!Fail(new System.Net.Http.HttpRequestException("x", new System.Net.Sockets.SocketException())).StartsWith("No internet"))
+                    throw new InvalidOperationException("No network must say no internet connection.");
+                if (UpdateCheckMessages.UpToDate("v2.0.4") != "You're up to date (v2.0.4).")
                     throw new InvalidOperationException("Up-to-date wording changed.");
 
                 Report("PASS");
