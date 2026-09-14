@@ -94,7 +94,16 @@ public sealed class UpdateService : IUpdateService
                 return result;
             }
 
-            _pendingUpdate = await mgr.CheckForUpdatesAsync();
+            // GitHub's release list is sometimes slow or down (a 504 after 11 s) and Velopack's own request
+            // has no short timeout, so Settings sat on "Checking..." for a long time. Give up after
+            // UpdateCheckMessages.Timeout; the abandoned request finishes (or fails) unobserved.
+            var check = mgr.CheckForUpdatesAsync();
+            if (await Task.WhenAny(check, Task.Delay(Procure.Utilities.UpdateCheckMessages.Timeout)) != check)
+            {
+                _ = check.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                throw new TimeoutException("Update check timed out.");
+            }
+            _pendingUpdate = await check;
             if (_pendingUpdate == null)
             {
                 return result;

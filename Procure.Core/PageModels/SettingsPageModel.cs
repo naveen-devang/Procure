@@ -356,14 +356,15 @@ namespace Procure.PageModels
                 else
                 {
                     IsUpdateAvailable = false;
-                    UpdateStatusMessage = $"You are up to date. ({CurrentVersion})";
+                    UpdateStatusMessage = Utilities.UpdateCheckMessages.UpToDate(CurrentVersion);
                 }
             }
             catch (Exception ex)
             {
                 IsStatusError = true;
                 IsUpdateAvailable = false;
-                UpdateStatusMessage = $"Failed to check for updates: {ex.Message}";
+                UpdateStatusMessage = Utilities.UpdateCheckMessages.Failure(ex);
+                Utilities.CrashLog.Write("Update check failed", ex);   // the technical detail, for diagnosis
             }
             finally
             {

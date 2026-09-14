@@ -44,6 +44,19 @@ namespace Procure.Utilities
                 if (UpdateCheckScheduler.ShouldCheckNow(future, now))
                     throw new InvalidOperationException("A last-check time in the future must not trigger a check, and must not throw.");
 
+                // Settings > Updates wording for a failed check.
+                string Fail(Exception e) => UpdateCheckMessages.Failure(e);
+                if (!Fail(new TimeoutException()).Contains("didn't respond")) throw new InvalidOperationException("A timeout must say GitHub didn't respond.");
+                if (!Fail(new System.Net.Http.HttpRequestException("x", null, System.Net.HttpStatusCode.GatewayTimeout)).Contains("GitHub's side"))
+                    throw new InvalidOperationException("A 504 must say the problem is on GitHub's side.");
+                if (!Fail(new System.Net.Http.HttpRequestException("x", null, System.Net.HttpStatusCode.Forbidden)).Contains("limiting"))
+                    throw new InvalidOperationException("A 403 (rate limit) must say GitHub is limiting checks.");
+                if (!Fail(new System.Net.Http.HttpRequestException("x", new System.Net.Sockets.SocketException())).Contains("internet connection"))
+                    throw new InvalidOperationException("No network must point at the internet connection.");
+                if (!Fail(new Exception("boom")).StartsWith("Couldn't check")) throw new InvalidOperationException("Anything else gets the generic message.");
+                if (UpdateCheckMessages.UpToDate("v2.0.2") != "You're up to date - v2.0.2 is the latest version.")
+                    throw new InvalidOperationException("Up-to-date wording changed.");
+
                 Report("PASS");
             }
             catch (Exception ex)
@@ -56,6 +69,7 @@ namespace Procure.Utilities
         private static void Report(string result)
         {
             Debug.WriteLine("UpdateCheckSchedulerSelfCheck: " + result);
+            CrashLog.Write("UPDATE CHECK SCHEDULER + MESSAGES SELF-CHECK " + result);
         }
     }
 }
