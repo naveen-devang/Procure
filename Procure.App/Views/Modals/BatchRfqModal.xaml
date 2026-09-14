@@ -81,7 +81,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Payment Terms" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding BatchRfqPaymentTerms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="30 Days Net" />
+                                    <TextBox Text="{Binding BatchRfqPaymentTerms, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. 30 Days Net" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Incoterms" Style="{StaticResource Lbl}" />

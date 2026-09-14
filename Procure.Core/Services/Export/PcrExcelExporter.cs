@@ -276,7 +276,7 @@ namespace Procure.Services.Export
             var merges = new List<string>();
 
             // 1. Title: PRICE COMPARISON-{Plant}
-            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "RW01" : pr.Plant.Trim();
+            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
             var title = $"PRICE COMPARISON-{plantCode}";
             sb.Append($@"
         <row r=""{r}"" ht=""28"">
@@ -289,7 +289,7 @@ namespace Procure.Services.Export
             var collectiveNo = string.IsNullOrWhiteSpace(pcr.PcrNo) ? "-" : pcr.PcrNo;
             var dateStr = DateTime.Today.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             // Raw string here — EscapeXml at the point of use escapes it exactly once.
-            var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "E&I" : pr.RequestedFor.Trim();
+            var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "-" : pr.RequestedFor.Trim();
             var prDisplay = PcrPdfExporter.FormatPrNumbers(pr);
             var rfqDisplay = PcrPdfExporter.FormatRfqNumbers(selectedRfqs);
 
@@ -308,7 +308,7 @@ namespace Procure.Services.Export
             // Row 2: Requested By & Requested For
             sb.Append($@"
         <row r=""{r}"" ht=""20"">
-            <c r=""A{r}"" s=""2"" t=""inlineStr""><is><t>Requested By : {EscapeXml(pr.Requestor)}</t></is></c>
+            <c r=""A{r}"" s=""2"" t=""inlineStr""><is><t>Requested By : {EscapeXml(string.IsNullOrWhiteSpace(pr.Requestor) ? "-" : pr.Requestor.Trim())}</t></is></c>
             <c r=""{rightColLetter}{r}"" s=""2"" t=""inlineStr""><is><t>Requested For : {EscapeXml(reqFor)}</t></is></c>
         </row>");
             if (totalCols > rightCol) merges.Add($"{rightColLetter}{r}:{lastColLetter}{r}");
@@ -616,7 +616,7 @@ namespace Procure.Services.Export
 
             // Row 6: VAT
             AddSummaryRow("VAT",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType),
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType),
                 (false, 0m, historicalVatType));
 
             // Row 7: Total Price Incl. VAT
@@ -627,12 +627,12 @@ namespace Procure.Services.Export
 
             // Row 8: Payment Terms
             AddSummaryRow("Payment Terms",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "30 Days Net" : rf.PaymentTerms),
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "-" : rf.PaymentTerms),
                 (false, 0m, "-"));
 
             // Row 9: Delivery Terms
             AddSummaryRow("Delivery Terms",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Incoterms) ? "DDP" : rf.Incoterms),
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Incoterms) ? "-" : rf.Incoterms),
                 (false, 0m, "-"));
 
             // Row 10: Lead Time (Days)

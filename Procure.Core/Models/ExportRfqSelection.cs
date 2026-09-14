@@ -10,7 +10,7 @@ namespace Procure.Models
         [ObservableProperty]
         public partial bool IsSelected { get; set; }
 
-        public string VendorName => string.IsNullOrWhiteSpace(Rfq.Vendor) ? "Unnamed Supplier" : Rfq.Vendor;
+        public string VendorName => string.IsNullOrWhiteSpace(Rfq.Vendor) ? "-" : Rfq.Vendor;
 
         public string DisplaySummary
         {

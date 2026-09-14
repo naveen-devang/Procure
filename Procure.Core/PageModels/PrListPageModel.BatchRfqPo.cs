@@ -46,13 +46,13 @@ namespace Procure.PageModels
         public partial decimal? BatchRfqDiscount { get; set; }
 
         [ObservableProperty]
-        public partial string BatchRfqPaymentTerms { get; set; } = "30 Days Net";
+        public partial string BatchRfqPaymentTerms { get; set; } = string.Empty;
 
         [ObservableProperty]
         public partial string BatchRfqVatType { get; set; } = "5%";
 
         [ObservableProperty]
-        public partial string BatchRfqIncoterms { get; set; } = "DDP";
+        public partial string BatchRfqIncoterms { get; set; } = string.Empty;
 
         [ObservableProperty]
         public partial string BatchRfqDeliveryLeadTime { get; set; } = string.Empty;
@@ -307,9 +307,9 @@ namespace Procure.PageModels
             BatchRfqFreight = null;
             BatchRfqOtherCharges = null;
             BatchRfqDiscount = null;
-            BatchRfqPaymentTerms = "30 Days Net";
+            BatchRfqPaymentTerms = string.Empty;
             BatchRfqVatType = "5%";
-            BatchRfqIncoterms = "DDP";
+            BatchRfqIncoterms = string.Empty;
             BatchRfqDeliveryLeadTime = string.Empty;
             BatchRfqWarranty = string.Empty;
             BatchRfqTechnicalApproval = TechnicalApprovalNotSet;
@@ -389,12 +389,12 @@ namespace Procure.PageModels
                     Vendor = BatchRfqVendor.Trim(),
                     Currency = string.IsNullOrWhiteSpace(BatchRfqCurrency) ? "AED" : BatchRfqCurrency.Trim(),
                     QuoteAmount = CalculatedBatchRfqBaseTotal > 0 ? CalculatedBatchRfqBaseTotal : BatchRfqQuoteAmount,
-                    PaymentTerms = string.IsNullOrWhiteSpace(BatchRfqPaymentTerms) ? "30 Days Net" : BatchRfqPaymentTerms.Trim(),
+                    PaymentTerms = (BatchRfqPaymentTerms ?? string.Empty).Trim(),
                     VatType = string.IsNullOrWhiteSpace(BatchRfqVatType) ? "5%" : BatchRfqVatType,
                     Freight = BatchRfqFreight,
                     OtherCharges = BatchRfqOtherCharges,
                     Discount = BatchRfqDiscount,
-                    Incoterms = string.IsNullOrWhiteSpace(BatchRfqIncoterms) ? "DDP" : BatchRfqIncoterms,
+                    Incoterms = BatchRfqIncoterms ?? string.Empty,
                     DeliveryLeadTime = BatchRfqDeliveryLeadTime?.Trim() ?? string.Empty,
                     Warranty = BatchRfqWarranty?.Trim() ?? string.Empty,
                     TechnicalApproval = StoredApproval(BatchRfqTechnicalApproval),

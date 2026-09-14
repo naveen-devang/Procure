@@ -46,11 +46,11 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial decimal? NewRfqDiscount { get; set; }
         [ObservableProperty]
-        public partial string NewRfqPaymentTerms { get; set; } = "30 Days Net";
+        public partial string NewRfqPaymentTerms { get; set; } = string.Empty;
         [ObservableProperty]
         public partial string NewRfqVatType { get; set; } = "5%";
         [ObservableProperty]
-        public partial string NewRfqIncoterms { get; set; } = "DDP";
+        public partial string NewRfqIncoterms { get; set; } = string.Empty;
         [ObservableProperty]
         public partial string NewRfqDeliveryLeadTime { get; set; } = string.Empty;
 
@@ -372,9 +372,9 @@ namespace Procure.PageModels
             NewRfqFreight = null;
             NewRfqOtherCharges = null;
             NewRfqDiscount = null;
-            NewRfqPaymentTerms = "30 Days Net";
+            NewRfqPaymentTerms = string.Empty;
             NewRfqVatType = "5%";
-            NewRfqIncoterms = "DDP";
+            NewRfqIncoterms = string.Empty;
             NewRfqDeliveryLeadTime = string.Empty;
             NewRfqWarranty = string.Empty;
             NewRfqTechnicalApproval = TechnicalApprovalNotSet;
@@ -429,9 +429,9 @@ namespace Procure.PageModels
             NewRfqFreight = rfq.Freight;
             NewRfqOtherCharges = rfq.OtherCharges;
             NewRfqDiscount = rfq.Discount;
-            NewRfqPaymentTerms = string.IsNullOrWhiteSpace(rfq.PaymentTerms) ? "30 Days Net" : rfq.PaymentTerms;
+            NewRfqPaymentTerms = rfq.PaymentTerms ?? string.Empty;
             NewRfqVatType = string.IsNullOrWhiteSpace(rfq.VatType) ? "5%" : rfq.VatType;
-            NewRfqIncoterms = string.IsNullOrWhiteSpace(rfq.Incoterms) ? "DDP" : rfq.Incoterms;
+            NewRfqIncoterms = rfq.Incoterms ?? string.Empty;
             NewRfqDeliveryLeadTime = rfq.DeliveryLeadTime ?? string.Empty;
             NewRfqWarranty = rfq.Warranty ?? string.Empty;
             NewRfqTechnicalApproval = ShownApproval(rfq.TechnicalApproval);
@@ -536,9 +536,9 @@ namespace Procure.PageModels
                     EditingRfq.Freight = NewRfqFreight;
                     EditingRfq.OtherCharges = NewRfqOtherCharges;
                     EditingRfq.Discount = NewRfqDiscount;
-                    EditingRfq.PaymentTerms = string.IsNullOrWhiteSpace(NewRfqPaymentTerms) ? "30 Days Net" : NewRfqPaymentTerms.Trim();
+                    EditingRfq.PaymentTerms = (NewRfqPaymentTerms ?? string.Empty).Trim();
                     EditingRfq.VatType = string.IsNullOrWhiteSpace(NewRfqVatType) ? "5%" : NewRfqVatType;
-                    EditingRfq.Incoterms = string.IsNullOrWhiteSpace(NewRfqIncoterms) ? "DDP" : NewRfqIncoterms;
+                    EditingRfq.Incoterms = NewRfqIncoterms ?? string.Empty;
                     EditingRfq.DeliveryLeadTime = NewRfqDeliveryLeadTime?.Trim() ?? string.Empty;
                     EditingRfq.Warranty = NewRfqWarranty?.Trim() ?? string.Empty;
                     EditingRfq.TechnicalApproval = StoredApproval(NewRfqTechnicalApproval);
@@ -584,12 +584,12 @@ namespace Procure.PageModels
                     Vendor = NewRfqVendor.Trim(),
                     Currency = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency.Trim(),
                     QuoteAmount = CalculatedRfqBaseTotal > 0 ? CalculatedRfqBaseTotal : NewRfqQuoteAmount,
-                    PaymentTerms = string.IsNullOrWhiteSpace(NewRfqPaymentTerms) ? "30 Days Net" : NewRfqPaymentTerms.Trim(),
+                    PaymentTerms = (NewRfqPaymentTerms ?? string.Empty).Trim(),
                     VatType = string.IsNullOrWhiteSpace(NewRfqVatType) ? "5%" : NewRfqVatType,
                     Freight = NewRfqFreight,
                     OtherCharges = NewRfqOtherCharges,
                     Discount = NewRfqDiscount,
-                    Incoterms = string.IsNullOrWhiteSpace(NewRfqIncoterms) ? "DDP" : NewRfqIncoterms,
+                    Incoterms = NewRfqIncoterms ?? string.Empty,
                     DeliveryLeadTime = NewRfqDeliveryLeadTime?.Trim() ?? string.Empty,
                     Warranty = NewRfqWarranty?.Trim() ?? string.Empty,
                     TechnicalApproval = StoredApproval(NewRfqTechnicalApproval),

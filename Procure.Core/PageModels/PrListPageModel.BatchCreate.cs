@@ -348,7 +348,7 @@ namespace Procure.PageModels
                     PrNo = entry.PrNo.Trim(),
                     Description = desc,
                     RequestedFor = entry.RequestedFor?.Trim() ?? string.Empty,
-                    Requestor = string.IsNullOrWhiteSpace(entry.Requestor) ? (string.IsNullOrWhiteSpace(BatchSharedRequestor) ? "Unassigned" : BatchSharedRequestor.Trim()) : entry.Requestor.Trim(),
+                    Requestor = string.IsNullOrWhiteSpace(entry.Requestor) ? (string.IsNullOrWhiteSpace(BatchSharedRequestor) ? string.Empty : BatchSharedRequestor.Trim()) : entry.Requestor.Trim(),
                     Plant = string.IsNullOrWhiteSpace(entry.Plant) ? (string.IsNullOrWhiteSpace(BatchSharedPlant) ? ProcurementPlant.RW01 : BatchSharedPlant) : entry.Plant,
                     PrType = prType,
                     Priority = string.IsNullOrWhiteSpace(entry.Priority) ? BatchSharedPriority : entry.Priority,

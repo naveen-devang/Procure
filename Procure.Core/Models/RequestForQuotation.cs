@@ -40,7 +40,7 @@ namespace Procure.Models
         public partial decimal? QuoteAmount { get; set; }
 
         [ObservableProperty]
-        public partial string PaymentTerms { get; set; } = "30 Days Net";
+        public partial string PaymentTerms { get; set; } = string.Empty;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(EffectiveVatAmount))]
@@ -91,7 +91,7 @@ namespace Procure.Models
         public partial decimal? Discount { get; set; }
 
         [ObservableProperty]
-        public partial string Incoterms { get; set; } = "DDP";
+        public partial string Incoterms { get; set; } = string.Empty;
 
         [ObservableProperty]
         public partial string DeliveryLeadTime { get; set; } = string.Empty;

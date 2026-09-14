@@ -546,7 +546,7 @@ namespace Procure.Models
             ? $"{SelectedItemsCount} of {TotalItemsCount} items selected"
             : "Lump Sum Quote";
 
-        public string VendorName => string.IsNullOrWhiteSpace(Vendor) ? "Unnamed Supplier" : Vendor;
+        public string VendorName => string.IsNullOrWhiteSpace(Vendor) ? "-" : Vendor;
         public string RfqNumber => string.IsNullOrWhiteSpace(Rfq?.RfqNo) ? string.Empty : Rfq.RfqNo;
         public bool HasRfqNumber => !string.IsNullOrWhiteSpace(RfqNumber);
 

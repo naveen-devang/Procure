@@ -385,7 +385,7 @@ namespace Procure.PageModels
             // The comparison prints every quote's lines.
             pr = await EnsureHydratedAsync(pr);
             ExportTargetPr = pr;
-            var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "RW01" : pr.Plant.Trim();
+            var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
             ExportPcrSubtitle = $"Requisition {pr.PrNo} — {plant}";
 
             if (pr.Pcr != null && !string.IsNullOrWhiteSpace(pr.Pcr.Remarks))

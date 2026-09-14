@@ -347,12 +347,12 @@ ON CONFLICT(Id) DO UPDATE SET
                 cmd.Parameters.AddWithValue("@SentDate", rfq.SentDate.HasValue ? rfq.SentDate.Value.ToString("o") : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@QuoteReceivedDate", rfq.QuoteReceivedDate.HasValue ? rfq.QuoteReceivedDate.Value.ToString("o") : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@QuoteAmount", rfq.BaseAmount > 0 ? (object)rfq.BaseAmount : (rfq.QuoteAmount.HasValue ? rfq.QuoteAmount.Value : (object)DBNull.Value));
-                cmd.Parameters.AddWithValue("@PaymentTerms", rfq.PaymentTerms ?? "30 Days Net");
+                cmd.Parameters.AddWithValue("@PaymentTerms", rfq.PaymentTerms ?? string.Empty);
                 cmd.Parameters.AddWithValue("@VatType", rfq.VatType ?? "5%");
                 cmd.Parameters.AddWithValue("@Freight", rfq.Freight.HasValue ? rfq.Freight.Value : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@OtherCharges", rfq.OtherCharges.HasValue ? rfq.OtherCharges.Value : (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@Discount", rfq.Discount.HasValue ? rfq.Discount.Value : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@Incoterms", rfq.Incoterms ?? "DDP");
+                cmd.Parameters.AddWithValue("@Incoterms", rfq.Incoterms ?? string.Empty);
                 cmd.Parameters.AddWithValue("@DeliveryLeadTime", rfq.DeliveryLeadTime ?? string.Empty);
                 cmd.Parameters.AddWithValue("@Currency", rfq.Currency ?? "AED");
                 cmd.Parameters.AddWithValue("@SharedPrs", rfq.SharedPrs ?? string.Empty);

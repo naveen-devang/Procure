@@ -229,9 +229,9 @@ namespace Procure.Services.Export
                     pairNeed = Math.Max(pairNeed, MoneyWidth(Cell(cur), amt, "F2", 7.5));
                 }
                 foreach (var text in new[] {
-                    string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType,
-                    string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "30 Days Net" : rf.PaymentTerms,
-                    string.IsNullOrWhiteSpace(rf.Incoterms) ? "DDP" : rf.Incoterms,
+                    string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType,
+                    string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "-" : rf.PaymentTerms,
+                    string.IsNullOrWhiteSpace(rf.Incoterms) ? "-" : rf.Incoterms,
                     string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime,
                     string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty,
                     string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval })
@@ -528,7 +528,7 @@ namespace Procure.Services.Export
             // keep using the full contentWidth.
             double tableWidth = colX[^1] - marginLeft;
 
-            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "RW01" : pr.Plant.Trim();
+            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
             var cleanRfqList = selectedRfqs
                 .Select(rf => rf.RfqNo.Replace("RFQ-", "").Trim())
                 .Where(num => !string.IsNullOrWhiteSpace(num))
@@ -860,8 +860,8 @@ namespace Procure.Services.Export
                     curY -= metaLineGap;
 
                     // Row 2: Requested By (Left) & Requested For (Right)
-                    DrawText($"Requested By : {pr.Requestor}", marginLeft, curY, font: "F2", fontSize: 8.5);
-                    var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "E&I" : pr.RequestedFor.Trim();
+                    DrawText($"Requested By : {(string.IsNullOrWhiteSpace(pr.Requestor) ? "-" : pr.Requestor.Trim())}", marginLeft, curY, font: "F2", fontSize: 8.5);
+                    var reqFor = string.IsNullOrWhiteSpace(pr.RequestedFor) ? "-" : pr.RequestedFor.Trim();
                     DrawFittedText($"Requested For : {reqFor}", rightColX, curY, font: "F2", baseFontSize: 8.5, align: "left", maxWidth: rightColWidth);
                     curY -= metaLineGap;
 
@@ -1184,17 +1184,17 @@ namespace Procure.Services.Export
                 rf => (rf.OtherCharges, true));
 
             DrawSummaryTextRow("VAT",
-                rf => (string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType));
+                rf => (string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType));
 
             DrawSummaryMoneyRow("Total Price Incl. VAT",
                 rf => (HasQuote(rf) ? rf.TotalLandedCost : (decimal?)null, false),
                 isBold: true);
 
             DrawSummaryTextRow("Payment Terms",
-                rf => (string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "30 Days Net" : rf.PaymentTerms));
+                rf => (string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "-" : rf.PaymentTerms));
 
             DrawSummaryTextRow("Delivery Terms",
-                rf => (string.IsNullOrWhiteSpace(rf.Incoterms) ? "DDP" : rf.Incoterms));
+                rf => (string.IsNullOrWhiteSpace(rf.Incoterms) ? "-" : rf.Incoterms));
 
             DrawSummaryTextRow("Lead Time (Days)",
                 rf => (string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime));
