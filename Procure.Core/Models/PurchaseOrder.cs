@@ -78,6 +78,10 @@ namespace Procure.Models
         [ObservableProperty]
         public partial ObservableCollection<PurchaseOrderItem> Items { get; set; } = new();
 
+        /// <summary>False on an order from the board's header-only read, whose Items are not fetched
+        /// yet. See <see cref="RequestForQuotation.ItemsLoaded"/>.</summary>
+        public bool ItemsLoaded { get; set; } = true;
+
         public bool IsCombinedPo => !string.IsNullOrWhiteSpace(CombinedPrs);
         public bool HasItems => Items != null && Items.Count > 0;
         public int ItemsCount => Items?.Count ?? 0;

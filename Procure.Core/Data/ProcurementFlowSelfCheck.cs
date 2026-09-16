@@ -92,6 +92,8 @@ namespace Procure.Data
                 await Measure("07 shared RFQ across PRs", () => SharedRfqFlowAsync(db, repo));
                 await Measure("08 combined PO across PRs", () => CombinedPoFlowAsync(db, repo));
                 await Measure("09 PR edit syncs into open quotes", () => QuoteSyncFlowAsync(db, repo));
+                await Measure("09b board refresh then PR edit keeps prices", () => RefreshThenEditKeepsPricesAsync(db, repo));
+                await Measure("09c one edit travels one hop (PR->RFQ->PO)", () => FieldLevelDownstreamSyncAsync(db, repo));
                 await Measure("10 guard decisions (ordered / quoted)", () => GuardDecisionsAsync(db, repo));
                 await Measure("11 deletes and cascade", () => DeleteFlowAsync(db, repo));
                 await Measure("12 PCR export (Excel + PDF)", () => PcrExportFlowAsync(db, repo));
@@ -559,22 +561,170 @@ namespace Procure.Data
             var addedLine = openAfter.Items.Single(i => i.ItemName.EndsWith("-new-line", StringComparison.Ordinal));
             Assert(addedLine.PrItemId.HasValue, "correctly linked");
             Assert(!addedLine.QuotedUnitPrice.HasValue, "and unpriced, so no money moved");
-            Assert(openAfter.BaseAmount == 12m * 15m, $"the quote total is unchanged; got {openAfter.BaseAmount}");
 
             var renamedInOpen = openAfter.Items.Single(i => i.PrItemId == pr.Items[0].Id);
             Assert(renamedInOpen.ItemName.EndsWith("(RENAMED)", StringComparison.Ordinal),
                 $"the rename reached the open quote; got '{renamedInOpen.ItemName}'");
-            Assert(renamedInOpen.Quantity == 12m,
-                $"but a priced line keeps the vendor's own quantity; got {renamedInOpen.Quantity}");
 
-            Assert(orderedAfter.Items.Count == 1, "the ordered quote gained nothing - it is a paper trail now");
-            Assert(!orderedAfter.Items[0].ItemName.EndsWith("(RENAMED)", StringComparison.Ordinal),
-                "and kept its wording, because a raised order must not rewrite itself");
+            // The quote line was asking for the requisition's quantity, so the edited quantity
+            // follows it. The vendor's rate is theirs and stays put; the total is simply the two
+            // multiplied, which is what "only the box I changed moved" means here.
+            Assert(renamedInOpen.Quantity == 20m,
+                $"and so did the new quantity, which this line was tracking; got {renamedInOpen.Quantity}");
+            Assert(renamedInOpen.QuotedUnitPrice == 15m,
+                $"while the vendor's rate is untouched; got {renamedInOpen.QuotedUnitPrice}");
+            Assert(openAfter.BaseAmount == 20m * 15m, $"so the quote total follows the quantity; got {openAfter.BaseAmount}");
+
+            // An ordered quote takes edited fields too, but never gains or loses a line.
+            Assert(orderedAfter.Items.Count == 1, "the ordered quote gained no line - it is a document that went out");
+            Assert(orderedAfter.Items[0].ItemName.EndsWith("(RENAMED)", StringComparison.Ordinal),
+                "but the corrected description did reach it");
 
             after.NotifyHierarchyChanged();
-            Assert(orderedAfter.HasQuantityDrift, "the ordered quote is flagged as needing a re-ask");
             Assert(!string.IsNullOrEmpty(summary), $"and the user is told what moved; got '{summary}'");
             Assert(summary.Contains("added", StringComparison.OrdinalIgnoreCase), $"summary names the addition; got '{summary}'");
+        }
+
+        /// <summary>The reported bug, start to finish: price a quote, let the board refresh over the
+        /// open requisition (a header-only read, which carries quotes but not their lines), then edit
+        /// the requisition. The refresh used to empty the quote in memory and the edit then deleted
+        /// the vendor's priced rows from the database, leaving the stored total behind to hide it.
+        /// Also covers the other half: the requisition's estimated price reaching the quote.</summary>
+        private static async Task RefreshThenEditKeepsPricesAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 09b: the PR board page model was not available from the container.");
+                return;
+            }
+
+            var pr = NewPr("refresh", (Brush, 10m));
+            await repo.SaveAsync(pr);
+
+            var rfq = NewRfq(pr, "refresh-vendor");
+            rfq.Items.Add(NewRfqLine(pr.Items[0], price: 25m));
+            await repo.SaveRfqAsync(rfq);
+
+            // The open requisition, lines and all - what the user has on screen.
+            var live = await Reload(repo, pr.Id);
+            Assert(live.Rfqs.Single().Items.Count == 1, "the quote starts with its priced line");
+
+            // The board's own refresh: a header-only page read merged onto that live instance.
+            var page = await repo.GetPageAsync(new PrQuery(_marker, null, false, false, false, 10, 5, 0, 50));
+            var shallow = page.Rows.FirstOrDefault(r => r.Id == pr.Id);
+            Assert(shallow != null, "the board refresh returns the requisition");
+            if (shallow == null) return;
+            Assert(shallow.Rfqs.Single().Items.Count == 0, "and carries its quote without lines, as designed");
+            live.MergeFrom(shallow);
+
+            Assert(live.Rfqs.Single().Items.Count == 1,
+                $"the refresh leaves the quote's priced line in place; got {live.Rfqs.Single().Items.Count}");
+
+            // Now the edit the user makes: filling in the historical price they forgot, nothing else.
+            var edited = live.Items.Select(i => new PrItem
+            {
+                Id = i.Id,
+                PrId = i.PrId,
+                ItemName = i.ItemName,
+                Quantity = i.Quantity,
+                Unit = i.Unit,
+                EstimatedUnitPrice = 22m,
+                SortOrder = i.SortOrder
+            }).ToList();
+
+            var preEdit = live.Items.ToList();
+            live.Items = new ObservableCollection<PrItem>(edited);
+            await repo.SaveAsync(live);
+            await model.RunQuoteSyncForTestAsync(live, preEdit, edited);
+            await AssertDerivedDataFreshAsync(db, "after a refresh-then-edit save");
+
+            var after = await Reload(repo, pr.Id);
+            var quote = after.Rfqs.Single();
+
+            Assert(quote.Items.Count == 1, $"the quote still has exactly its one line; got {quote.Items.Count}");
+            Assert(quote.Items[0].QuotedUnitPrice == 25m,
+                $"and the vendor's unit price survived the edit; got {quote.Items[0].QuotedUnitPrice}");
+            Assert(quote.Items[0].IsQuoted, "and the line is still quoted");
+            Assert(quote.BaseAmount == 10m * 25m, $"so the quote total still adds up from its lines; got {quote.BaseAmount}");
+            Assert(quote.Items[0].LastPrice == 22m,
+                $"the requisition's estimated price reached the quote's last price; got {quote.Items[0].LastPrice}");
+            Assert(quote.Items[0].Quantity == 10m,
+                $"and nothing else on the line moved; got quantity {quote.Items[0].Quantity}");
+        }
+
+        /// <summary>One edit travels one hop: a changed quoted rate reaches the order raised from that
+        /// quote, and only that field. An order line carrying its own quantity (a part order) keeps
+        /// it. Nothing travels back up - the requisition's own figures are untouched throughout.</summary>
+        private static async Task FieldLevelDownstreamSyncAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 09c: the PR board page model was not available from the container.");
+                return;
+            }
+
+            var pr = NewPr("downstream", (Brush, 100m));
+            pr.Items[0].EstimatedUnitPrice = 9m;
+            await repo.SaveAsync(pr);
+
+            var rfq = NewRfq(pr, "down-vendor");
+            rfq.Items.Add(NewRfqLine(pr.Items[0], price: 50m));
+            await repo.SaveRfqAsync(rfq);
+
+            var mid = await Reload(repo, pr.Id);
+            var quote = mid.Rfqs.Single();
+
+            // A part order: 40 of the 100 quoted, at the quoted rate.
+            var po = NewPo(mid, quote, "PO-DOWN");
+            var poLine = NewPoLine(mid.Items[0], 40m, 50m);
+            poLine.RfqItemId = quote.Items[0].Id;
+            po.Items.Add(poLine);
+            await repo.SavePoAsync(po);
+
+            // A second order taking the whole quoted quantity, so both rules are exercised.
+            var poFull = NewPo(mid, quote, "PO-DOWN-FULL");
+            var fullLine = NewPoLine(mid.Items[0], 100m, 50m);
+            fullLine.RfqItemId = quote.Items[0].Id;
+            poFull.Items.Add(fullLine);
+            await repo.SavePoAsync(poFull);
+
+            var live = await Reload(repo, pr.Id);
+            var liveQuote = live.Rfqs.Single();
+            var preEdit = liveQuote.Items.Select(i => new RfqItem
+            {
+                Id = i.Id,
+                ItemName = i.ItemName,
+                Quantity = i.Quantity,
+                Unit = i.Unit,
+                QuotedUnitPrice = i.QuotedUnitPrice,
+                Discount = i.Discount
+            }).ToList();
+
+            // The vendor revises their rate. Nothing else on the quote is touched.
+            liveQuote.Items[0].QuotedUnitPrice = 55m;
+            await repo.SaveRfqAsync(liveQuote);
+            var summary = await model.RunOrderSyncForTestAsync(live, liveQuote, preEdit);
+            await AssertDerivedDataFreshAsync(db, "after syncing a quote edit into its orders");
+
+            var after = await Reload(repo, pr.Id);
+            var partOrder = after.Pos.Single(p => p.PoNo.EndsWith("PO-DOWN", StringComparison.Ordinal));
+            var fullOrder = after.Pos.Single(p => p.PoNo.EndsWith("PO-DOWN-FULL", StringComparison.Ordinal));
+
+            Assert(partOrder.Items[0].UnitPrice == 55m,
+                $"the new rate reached the part order; got {partOrder.Items[0].UnitPrice}");
+            Assert(partOrder.Items[0].Quantity == 40m,
+                $"but the part order kept its own quantity; got {partOrder.Items[0].Quantity}");
+            Assert(partOrder.Value == 40m * 55m * 1.05m,
+                $"and its value was rebuilt from its own lines; got {partOrder.Value}");
+            Assert(fullOrder.Items[0].UnitPrice == 55m && fullOrder.Items[0].Quantity == 100m,
+                "the full order followed the rate too, on the quantity it always had");
+
+            Assert(after.Items[0].EstimatedUnitPrice == 9m,
+                $"the requisition's own estimated price is untouched; got {after.Items[0].EstimatedUnitPrice}");
+            Assert(after.Items[0].Quantity == 100m, "and so is its quantity - nothing travels upward");
+            Assert(!string.IsNullOrEmpty(summary), $"and the user is told what moved; got '{summary}'");
         }
 
         private static async Task GuardDecisionsAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)

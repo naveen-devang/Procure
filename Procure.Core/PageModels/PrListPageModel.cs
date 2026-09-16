@@ -1044,7 +1044,7 @@ namespace Procure.PageModels
         /// bound to it keeps its identity and nothing on screen rebuilds.</summary>
         public async Task<PurchaseRequisition> EnsureHydratedAsync(PurchaseRequisition pr)
         {
-            if (pr.LineItemsLoaded) return pr;
+            if (pr.LineItemsLoaded && QuoteAndOrderLinesLoaded(pr)) return pr;
 
             try
             {
@@ -1064,9 +1064,17 @@ namespace Procure.PageModels
         /// <summary>The same for a set of requisitions - the batch and merge commands act on the
         /// selection, which comes straight out of the loaded window and is therefore shallow. One read
         /// for all of them rather than one each.</summary>
+        /// <summary>A requisition can hold its own lines and still be carrying quotes or orders whose
+        /// lines have never been read - a quote created on a board row, or one that arrived through a
+        /// header-only reload. Saving against those reads "no lines" as "no lines wanted", so a
+        /// requisition is only fully hydrated when its children have their lines too.</summary>
+        private static bool QuoteAndOrderLinesLoaded(PurchaseRequisition pr) =>
+            (pr.Rfqs == null || pr.Rfqs.All(r => r.ItemsLoaded)) &&
+            (pr.Pos == null || pr.Pos.All(p => p.ItemsLoaded));
+
         public async Task EnsureHydratedAsync(IReadOnlyCollection<PurchaseRequisition> prs)
         {
-            var missing = prs.Where(p => !p.LineItemsLoaded).ToList();
+            var missing = prs.Where(p => !p.LineItemsLoaded || !QuoteAndOrderLinesLoaded(p)).ToList();
             if (missing.Count == 0) return;
 
             try
@@ -1098,7 +1106,7 @@ namespace Procure.PageModels
             pr.IsExpanded = true;
             ExpandedPr = pr;
 
-            if (pr.LineItemsLoaded) return;
+            if (pr.LineItemsLoaded && QuoteAndOrderLinesLoaded(pr)) return;
 
             // Opened before its lines are in memory: show the panel now with a skeleton in it rather
             // than holding the click until the read comes back.

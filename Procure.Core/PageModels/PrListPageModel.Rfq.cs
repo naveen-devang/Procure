@@ -571,10 +571,27 @@ namespace Procure.PageModels
             // that quantity for ever. Offer to put it on the PR before anything is written.
             await ReconcileNewQuoteLinesToPrAsync(savedRfqItems);
 
+            // The orders on this requisition have to be in memory with their lines before the save
+            // can carry a change down into them.
+            await EnsureHydratedAsync(TargetPrForRfq);
+
             try
             {
                 if (IsEditingRfq && EditingRfq != null)
                 {
+                    // The quote's lines as they stand before this save. The order sync below needs
+                    // them to tell which box the user actually changed - the modal edits clones, so
+                    // the live quote still holds the pre-edit values right up to this point.
+                    var preEditQuoteLines = EditingRfq.Items?.Select(i => new RfqItem
+                    {
+                        Id = i.Id,
+                        ItemName = i.ItemName,
+                        Quantity = i.Quantity,
+                        Unit = i.Unit,
+                        QuotedUnitPrice = i.QuotedUnitPrice,
+                        Discount = i.Discount
+                    }).ToList() ?? new List<RfqItem>();
+
                     // Update existing RFQ
                     EditingRfq.RfqNo = string.IsNullOrWhiteSpace(NewRfqNo) ? EditingRfq.RfqNo : NewRfqNo.Trim();
                     EditingRfq.Vendor = NewRfqVendor.Trim();
@@ -610,9 +627,17 @@ namespace Procure.PageModels
                     }
 
                     await _prRepo.SaveRfqAsync(EditingRfq);
+
+                    // What changed on this quote now reaches the orders raised from it - the same
+                    // field-by-field rule, one step further down. Nothing travels back up.
+                    var orderSummary = await SyncOrdersToQuoteAsync(TargetPrForRfq, EditingRfq, preEditQuoteLines);
+
                     EditingRfq.NotifyCalculationsChanged();
                     TargetPrForRfq.NotifyHierarchyChanged();
-                    DataChangeNotifier.Notify(ProcurementChange.Rfq);
+                    DataChangeNotifier.Notify(orderSummary.Length > 0
+                        ? ProcurementChange.Rfq | ProcurementChange.Po
+                        : ProcurementChange.Rfq);
+                    if (orderSummary.Length > 0) ShowToast(orderSummary);
 
                     foreach (var item in EditingRfqItems)
                         item.PropertyChanged -= OnEditingRfqItemPropertyChanged;

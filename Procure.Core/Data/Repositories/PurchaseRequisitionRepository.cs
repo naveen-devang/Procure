@@ -148,6 +148,7 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                         Discount = reader.IsDBNull(18) ? null : reader.GetDecimal(18)
                     };
 
+                    rfq.ItemsLoaded = includeLineItems;
                     rfqList.Add(rfq);
                     rfqById[rfq.Id] = rfq;
                 }
@@ -278,7 +279,8 @@ FROM PurchaseOrder" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                         TransporterName = (reader.FieldCount > 16 && !reader.IsDBNull(16)) ? reader.GetString(16) : null,
                         TransportRatePerUnit = (reader.FieldCount > 17 && !reader.IsDBNull(17)) ? (decimal?)reader.GetDouble(17) : null,
                         TransportTotal = (reader.FieldCount > 18 && !reader.IsDBNull(18)) ? (decimal?)reader.GetDouble(18) : null,
-                        TransportMode = (reader.FieldCount > 19 && !reader.IsDBNull(19)) ? reader.GetString(19) : TransportModes.Order
+                        TransportMode = (reader.FieldCount > 19 && !reader.IsDBNull(19)) ? reader.GetString(19) : TransportModes.Order,
+                        ItemsLoaded = includeLineItems
                     });
                 }
             }

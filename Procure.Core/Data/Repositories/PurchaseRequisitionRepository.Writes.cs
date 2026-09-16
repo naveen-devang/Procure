@@ -365,7 +365,12 @@ ON CONFLICT(Id) DO UPDATE SET
             // Save RfqItems
             if (rfq.Items != null)
             {
-                await DeleteDepartedChildrenAsync(connection, tx, "RfqItem", "RfqId", rfq.Id, rfq.Items.Select(i => i.Id).ToList()).ConfigureAwait(false);
+                // Only a quote whose lines were actually read can say which lines are gone. Deleting
+                // against a list that was never loaded wiped the vendor's priced lines.
+                if (rfq.ItemsLoaded)
+                {
+                    await DeleteDepartedChildrenAsync(connection, tx, "RfqItem", "RfqId", rfq.Id, rfq.Items.Select(i => i.Id).ToList()).ConfigureAwait(false);
+                }
 
                 int sortOrder = 0;
                 foreach (var item in rfq.Items)
@@ -613,7 +618,11 @@ ON CONFLICT(Id) DO UPDATE SET
                 // whose items did not change writes no item rows at all.
                 // Line order is persisted in SortOrder, so it survives the switch from
                 // delete-and-reinsert to UPSERT.
-                await DeleteDepartedChildrenAsync(connection, tx, "PurchaseOrderItem", "PoId", po.Id, po.Items?.Select(i => i.Id).ToList() ?? new List<Guid>()).ConfigureAwait(false);
+                // As for quotes: an order whose lines were never read cannot say which are departed.
+                if (po.ItemsLoaded)
+                {
+                    await DeleteDepartedChildrenAsync(connection, tx, "PurchaseOrderItem", "PoId", po.Id, po.Items?.Select(i => i.Id).ToList() ?? new List<Guid>()).ConfigureAwait(false);
+                }
 
                 if (po.Items != null && po.Items.Count > 0)
                 {

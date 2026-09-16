@@ -494,6 +494,10 @@ namespace Procure.Models
                             // from a shallow read would mark a requisition whose lines are still in
                             // memory as needing them fetched again.
                             && p.Name != nameof(LineItemsLoaded)
+                            // Same reasoning for a quote's / an order's own flag: it describes the
+                            // instance, and copying "not loaded" from a shallow read onto a live
+                            // object that does hold its lines would hide them from the next save.
+                            && p.Name != nameof(RequestForQuotation.ItemsLoaded)
                             // UI-helper setters with side effects (they rewrite the persisted
                             // properties they wrap); merging them would depend on reflection
                             // returning the raw properties first, which is not guaranteed.
@@ -526,6 +530,19 @@ namespace Procure.Models
                     p.SetValue(target, incoming);
                     changed = true;
                 }
+            }
+
+            // The "lines were read" marker only ever travels upward, exactly like the requisition's
+            // own LineItemsLoaded: a full read tells a shallow-loaded quote that its lines are here
+            // now, and a shallow read says nothing. Leaving it out of the merge entirely was worse
+            // than copying it - a quote loaded shallowly stayed marked unloaded for the rest of the
+            // session, so the sync skipped it and a PR edit reached none of its lines.
+            if (mergeLineItems)
+            {
+                if (target is RequestForQuotation liveRfq && fresh is RequestForQuotation freshRfq && freshRfq.ItemsLoaded)
+                    liveRfq.ItemsLoaded = true;
+                else if (target is PurchaseOrder livePo && fresh is PurchaseOrder freshPo && freshPo.ItemsLoaded)
+                    livePo.ItemsLoaded = true;
             }
 
             return changed;
@@ -577,7 +594,10 @@ namespace Procure.Models
                     continue;
                 }
 
-                changed |= MergeInto(target[existing]!, fresh[i]!);
+                // The flag has to travel down: a shallow read carries quotes and orders, but not
+                // their lines. Without it the nested merge saw an empty Items list as "every line
+                // deleted" and stripped the vendor's priced lines out of the open requisition.
+                changed |= MergeInto(target[existing]!, fresh[i]!, mergeLineItems);
                 if (existing != i)
                 {
                     var moved = target[existing];

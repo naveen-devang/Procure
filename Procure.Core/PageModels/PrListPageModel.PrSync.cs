@@ -65,6 +65,9 @@ namespace Procure.PageModels
         internal Task<string> RunQuoteSyncForTestAsync(PurchaseRequisition pr, List<PrItem> oldItems, List<PrItem> newItems)
             => SyncQuotesToPrAsync(pr, oldItems, newItems);
 
+        internal Task<string> RunOrderSyncForTestAsync(PurchaseRequisition pr, RequestForQuotation rfq, List<RfqItem> preEditLines)
+            => SyncOrdersToQuoteAsync(pr, rfq, preEditLines);
+
         internal static int OrderedLineCountForTest(PurchaseRequisition pr, PrItem prItem) => OrdersFor(pr, prItem).Count();
 
         internal static int QuotedLineCountForTest(PurchaseRequisition pr, PrItem prItem) => QuotesFor(pr, prItem).Count(q => IsPriced(q.Line));
@@ -153,13 +156,22 @@ namespace Procure.PageModels
 
             var newById = newItems.ToDictionary(i => i.Id);
 
-            int addedLines = 0, retitled = 0, requantified = 0, purged = 0, needsRepricing = 0;
+            int addedLines = 0, retitled = 0, requantified = 0, purged = 0, needsRepricing = 0, lastPriceUpdated = 0;
             var touchedRfqs = new List<RequestForQuotation>();
 
             foreach (var rfq in pr.Rfqs)
             {
-                if (!IsQuoteOpen(pr, rfq)) continue;
                 if (rfq.Items == null) continue;
+
+                // Lines never read cannot be reconciled: every requisition line would look missing
+                // and be added a second time. The caller hydrates first (EnsureHydratedAsync); this
+                // is the backstop if one ever slips through.
+                if (!rfq.ItemsLoaded) continue;
+
+                // A quote with an order against it still takes the fields the user actually edited -
+                // a corrected description or historical price belongs on it too. What it does not
+                // take is structure: no line is added to it and none is removed from it.
+                var quoteOpen = IsQuoteOpen(pr, rfq);
 
                 var changed = false;
 
@@ -176,7 +188,7 @@ namespace Procure.PageModels
                     // Removed from the requisition, and the user asked for the quote lines to go too.
                     if (!newById.ContainsKey(oldLine.Id))
                     {
-                        if (_prItemsToPurgeFromQuotes.Contains(oldLine.Id))
+                        if (quoteOpen && _prItemsToPurgeFromQuotes.Contains(oldLine.Id))
                         {
                             rfq.Items.RemoveAt(i);
                             purged++;
@@ -187,28 +199,54 @@ namespace Procure.PageModels
 
                     var updated = newById[oldLine.Id];
 
-                    if (!PrLineMatcher.NameEquals(line.ItemName, updated.ItemName))
+                    // Field by field, and only the fields the user actually changed in the edit
+                    // dialog: each is compared against the PRE-edit requisition line, never against
+                    // what the quote happens to hold. A box left alone upstream changes nothing
+                    // downstream, so the vendor's own wording, quantity or price survives untouched.
+                    if (!PrLineMatcher.NameEquals(oldLine.ItemName, updated.ItemName))
                     {
                         line.ItemName = updated.ItemName;
                         retitled++;
                         changed = true;
                     }
 
-                    if (line.Quantity != updated.Quantity)
+                    // The requisition's estimated price is the reference figure the quote shows as
+                    // "Last Price" - the requisition's number, not the vendor's. It reaches every
+                    // quote, priced or ordered; the vendor's own columns are what stay off limits.
+                    // The one place a value travels down without having just been edited: a quote line
+                    // that has never carried a last price at all. Quotes written before this synced
+                    // would otherwise show an empty column until someone typed the estimate twice.
+                    if (oldLine.EstimatedUnitPrice != updated.EstimatedUnitPrice
+                        || (line.LastPrice is null && updated.EstimatedUnitPrice.HasValue))
                     {
-                        if (IsPriced(line))
-                        {
-                            // Keep the number the vendor actually quoted. The card flags it instead
-                            // (RequestForQuotation.QuantityDriftBadge) so it gets re-asked.
-                            needsRepricing++;
-                        }
-                        else
+                        line.LastPrice = updated.EstimatedUnitPrice;
+                        lastPriceUpdated++;
+                        changed = true;
+                    }
+
+                    if (oldLine.Quantity != updated.Quantity)
+                    {
+                        // Only where this quote was asking for the requisition's quantity. A vendor
+                        // who quoted a part of it (1,000 of the 3,000 asked for) chose that number
+                        // themselves, and overwriting it would destroy what they actually offered -
+                        // the quote is flagged for a re-ask instead.
+                        if (line.Quantity == oldLine.Quantity)
                         {
                             line.Quantity = updated.Quantity;
-                            line.Unit = updated.Unit;
                             requantified++;
                             changed = true;
                         }
+                        else
+                        {
+                            needsRepricing++;
+                        }
+                    }
+
+                    if (!string.Equals(oldLine.Unit, updated.Unit, StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(updated.Unit))
+                    {
+                        line.Unit = updated.Unit;
+                        changed = true;
                     }
 
                     // The link itself: a line that was only ever found by its text is pinned now, so
@@ -222,8 +260,12 @@ namespace Procure.PageModels
 
                 // Lines the requisition has that this quote does not. Added unpriced, which changes
                 // no money (only priced lines count towards a quote's total) and shows up as
-                // "Partial (1 of 2)" until someone fills the price in.
-                var covered = new HashSet<Guid>(PrLineMatcher.Map(rfq.Items, newItems).Values.Select(v => v.Id));
+                // "Partial (1 of 2)" until someone fills the price in. Only onto an open quote: an
+                // order has been raised against the other kind, and a document that went out does
+                // not grow a line by itself.
+                var covered = quoteOpen
+                    ? new HashSet<Guid>(PrLineMatcher.Map(rfq.Items, newItems).Values.Select(v => v.Id))
+                    : new HashSet<Guid>(newItems.Select(i => i.Id));
                 var sortOrder = rfq.Items.Count == 0 ? 0 : rfq.Items.Max(x => x.SortOrder) + 1;
                 foreach (var item in newItems)
                 {
@@ -275,10 +317,119 @@ namespace Procure.PageModels
                 }
             }
 
-            return BuildSyncSummary(touchedRfqs.Count, addedLines, retitled, requantified, purged, needsRepricing);
+            return BuildSyncSummary(touchedRfqs.Count, addedLines, retitled, requantified, purged, needsRepricing, lastPriceUpdated);
         }
 
-        private static string BuildSyncSummary(int quoteCount, int added, int retitled, int requantified, int purged, int needsRepricing)
+        /// <summary>The same rule one step further down: what the user changed on a quote line reaches
+        /// the order lines raised from it, field by field, and nothing else does. An order line that
+        /// carries its own figure - half the quoted quantity, a negotiated rate - keeps it, because
+        /// that number was entered on the order and the order is the document that went out.
+        ///
+        /// <paramref name="preEditLines"/> is the quote's lines as they were before this save, which
+        /// is what makes "the user changed this box" answerable at all.</summary>
+        private async Task<string> SyncOrdersToQuoteAsync(PurchaseRequisition pr, RequestForQuotation rfq,
+                                                          IReadOnlyList<RfqItem> preEditLines)
+        {
+            if (pr.Pos == null || pr.Pos.Count == 0 || rfq.Items == null) return string.Empty;
+
+            var oldById = preEditLines.ToDictionary(i => i.Id);
+            int lines = 0, kept = 0;
+            var touchedPos = new List<PurchaseOrder>();
+
+            foreach (var po in pr.Pos)
+            {
+                if (po.Items == null || po.Items.Count == 0) continue;
+                if (!po.ItemsLoaded) continue;              // never delete or rewrite what was not read
+                if (po.LinkedRfqId != rfq.Id) continue;     // an order raised from a different quote
+
+                var changed = false;
+
+                foreach (var poLine in po.Items)
+                {
+                    if (!poLine.RfqItemId.HasValue) continue;
+                    if (!oldById.TryGetValue(poLine.RfqItemId.Value, out var before)) continue;
+
+                    var after = rfq.Items.FirstOrDefault(i => i.Id == poLine.RfqItemId.Value);
+                    if (after == null) continue;            // the quote line is gone; the order keeps its own
+
+                    var touched = false;
+
+                    if (!PrLineMatcher.NameEquals(before.ItemName, after.ItemName))
+                    {
+                        poLine.ItemName = after.ItemName;
+                        touched = true;
+                    }
+
+                    if (!string.Equals(before.Unit, after.Unit, StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(after.Unit))
+                    {
+                        poLine.Unit = after.Unit;
+                        touched = true;
+                    }
+
+                    if (before.Quantity != after.Quantity)
+                    {
+                        // Only an order that was taking the whole quoted quantity follows it. A part
+                        // order (500 of the 1,000 quoted) is its own decision.
+                        if (poLine.Quantity == before.Quantity)
+                        {
+                            poLine.Quantity = after.Quantity;
+                            touched = true;
+                        }
+                        else kept++;
+                    }
+
+                    if (before.QuotedUnitPrice != after.QuotedUnitPrice)
+                    {
+                        if (poLine.UnitPrice == before.QuotedUnitPrice)
+                        {
+                            poLine.UnitPrice = after.QuotedUnitPrice;
+                            touched = true;
+                        }
+                        else kept++;
+                    }
+
+                    if (before.Discount != after.Discount)
+                    {
+                        if (poLine.Discount == before.Discount)
+                        {
+                            poLine.Discount = after.Discount;
+                            touched = true;
+                        }
+                        else kept++;
+                    }
+
+                    if (touched) { lines++; changed = true; }
+                }
+
+                if (!changed) continue;
+
+                // The order's money is rebuilt from its own lines, exactly as the PO wizard does it:
+                // base, then freight and other charges in, discount out, then VAT on what is left.
+                var baseAmount = po.Items.Sum(i => i.LineTotal);
+                var net = Math.Max(0m, baseAmount + (po.Freight ?? 0m) + (po.OtherCharges ?? 0m) - (po.Discount ?? 0m));
+                po.BaseAmount = baseAmount;
+                po.Value = net + (po.VatType == "5%" ? net * 0.05m : 0m);
+
+                touchedPos.Add(po);
+            }
+
+            foreach (var po in touchedPos)
+            {
+                await _prRepo.SavePoAsync(po);
+                po.NotifyCalculationsChanged();
+            }
+
+            if (touchedPos.Count == 0) return string.Empty;
+
+            var orderWord = touchedPos.Count == 1 ? "1 order" : $"{touchedPos.Count} orders";
+            var lineWord = lines == 1 ? "1 line" : $"{lines} lines";
+            var summary = $"{lineWord} updated on {orderWord}";
+            if (kept > 0) summary += kept == 1 ? " · 1 order line kept its own figure" : $" · {kept} order lines kept their own figures";
+            return summary;
+        }
+
+        private static string BuildSyncSummary(int quoteCount, int added, int retitled, int requantified, int purged, int needsRepricing, int lastPriceUpdated)
         {
             if (quoteCount == 0 && needsRepricing == 0) return string.Empty;
 
@@ -287,6 +438,7 @@ namespace Procure.PageModels
             if (requantified > 0) parts.Add(requantified == 1 ? "1 quantity updated" : $"{requantified} quantities updated");
             if (retitled > 0) parts.Add(retitled == 1 ? "1 description updated" : $"{retitled} descriptions updated");
             if (purged > 0) parts.Add(purged == 1 ? "1 line removed" : $"{purged} lines removed");
+            if (lastPriceUpdated > 0) parts.Add(lastPriceUpdated == 1 ? "1 last price updated" : $"{lastPriceUpdated} last prices updated");
 
             var head = parts.Count == 0
                 ? string.Empty

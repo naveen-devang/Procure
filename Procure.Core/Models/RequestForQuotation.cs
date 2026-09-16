@@ -117,6 +117,11 @@ namespace Procure.Models
         [ObservableProperty]
         public partial ObservableCollection<RfqItem> Items { get; set; } = new();
 
+        /// <summary>False on a quote that came from the board's header-only read, whose Items are
+        /// simply not fetched yet. "Not loaded" must never be mistaken for "the user deleted every
+        /// line": a save that acts on that reading deletes the vendor's prices for good.</summary>
+        public bool ItemsLoaded { get; set; } = true;
+
         public int PricedItemsCount => Items?.Count(i => i.IsQuoted && (i.QuotedUnitPrice.HasValue && i.QuotedUnitPrice.Value > 0 || i.LineTotal > 0)) ?? 0;
         public int QuotedItemsCount => Items?.Count(i => i.IsQuoted) ?? 0;
         public int TotalItemsCount => Items?.Count ?? 0;
