@@ -306,18 +306,64 @@ namespace Procure.PageModels
             }
         }
 
-        public void HandleRfqPricingPaste(RfqItem startItem, string rawText, RfqPricingColumn targetColumn)
+        /// <summary>"Paste Prices from Excel": the copied Unit Price column (with Discount and Last
+        /// Price beside it, if they were copied too) applied down the quote lines from the first one.
+        /// Button only - Ctrl+V inside a price box stays a plain text paste.</summary>
+        [RelayCommand]
+        public async Task PasteRfqPricingFromClipboardAsync()
         {
-            if (string.IsNullOrWhiteSpace(rawText) || EditingRfqItems == null || EditingRfqItems.Count == 0) return;
+            try
+            {
+                if (EditingRfqItems == null || EditingRfqItems.Count == 0)
+                {
+                    await _dialogs.DisplayAlertAsync("No Lines", "There are no quote lines to paste prices into.", "OK");
+                    return;
+                }
+
+                if (!await _clipboard.HasTextAsync())
+                {
+                    await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the price column from Excel first.", "OK");
+                    return;
+                }
+
+                var text = await _clipboard.GetTextAsync();
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    await _dialogs.DisplayAlertAsync("Clipboard Empty", "Clipboard text is empty.", "OK");
+                    return;
+                }
+
+                var applied = HandleRfqPricingPaste(EditingRfqItems[0], text, RfqPricingColumn.UnitPrice);
+                if (applied == 0)
+                {
+                    await _dialogs.DisplayAlertAsync("No Prices Found", "Could not read any prices from the copied text.", "OK");
+                    return;
+                }
+
+                ShowToast($"Pasted prices into {applied} line(s)");
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>Applies pasted pricing rows down from <paramref name="startItem"/>; returns the
+        /// number of lines written.</summary>
+        public int HandleRfqPricingPaste(RfqItem startItem, string rawText, RfqPricingColumn targetColumn)
+        {
+            if (string.IsNullOrWhiteSpace(rawText) || EditingRfqItems == null || EditingRfqItems.Count == 0) return 0;
 
             var rows = ClipboardItemParser.ParseRfqPricingData(rawText, targetColumn);
-            if (rows.Count == 0) return;
+            if (rows.Count == 0) return 0;
 
             var startIndex = EditingRfqItems.IndexOf(startItem);
             if (startIndex < 0) startIndex = 0;
 
+            int applied = 0;
             for (int i = 0; i < rows.Count && (startIndex + i) < EditingRfqItems.Count; i++)
             {
+                applied++;
                 var targetItem = EditingRfqItems[startIndex + i];
                 var row = rows[i];
 
@@ -341,6 +387,7 @@ namespace Procure.PageModels
             }
 
             RecalculateRfqTotals();
+            return applied;
         }
 
         // "5%" pasted into the per-unit discount column carries a percentage; storing the bare

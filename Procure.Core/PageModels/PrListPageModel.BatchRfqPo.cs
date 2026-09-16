@@ -240,18 +240,63 @@ namespace Procure.PageModels
             }
         }
 
-        public void HandleBatchRfqPricingPaste(RfqItem startItem, string rawText, RfqPricingColumn targetColumn)
+        /// <summary>The batch dialog's "Paste Prices from Excel" - same rule as the single RFQ one:
+        /// button only, never Ctrl+V inside a price box.</summary>
+        [RelayCommand]
+        public async Task PasteBatchRfqPricingFromClipboardAsync()
         {
-            if (string.IsNullOrWhiteSpace(rawText) || BatchEditingRfqItems == null || BatchEditingRfqItems.Count == 0) return;
+            try
+            {
+                if (BatchEditingRfqItems == null || BatchEditingRfqItems.Count == 0)
+                {
+                    await _dialogs.DisplayAlertAsync("No Lines", "There are no quote lines to paste prices into.", "OK");
+                    return;
+                }
+
+                if (!await _clipboard.HasTextAsync())
+                {
+                    await _dialogs.DisplayAlertAsync("Clipboard Empty", "No text found on clipboard. Copy the price column from Excel first.", "OK");
+                    return;
+                }
+
+                var text = await _clipboard.GetTextAsync();
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    await _dialogs.DisplayAlertAsync("Clipboard Empty", "Clipboard text is empty.", "OK");
+                    return;
+                }
+
+                var applied = HandleBatchRfqPricingPaste(BatchEditingRfqItems[0], text, RfqPricingColumn.UnitPrice);
+                if (applied == 0)
+                {
+                    await _dialogs.DisplayAlertAsync("No Prices Found", "Could not read any prices from the copied text.", "OK");
+                    return;
+                }
+
+                ShowToast($"Pasted prices into {applied} line(s)");
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        /// <summary>Applies pasted pricing rows down from <paramref name="startItem"/>; returns the
+        /// number of lines written.</summary>
+        public int HandleBatchRfqPricingPaste(RfqItem startItem, string rawText, RfqPricingColumn targetColumn)
+        {
+            if (string.IsNullOrWhiteSpace(rawText) || BatchEditingRfqItems == null || BatchEditingRfqItems.Count == 0) return 0;
 
             var rows = ClipboardItemParser.ParseRfqPricingData(rawText, targetColumn);
-            if (rows.Count == 0) return;
+            if (rows.Count == 0) return 0;
 
             var startIndex = BatchEditingRfqItems.IndexOf(startItem);
             if (startIndex < 0) startIndex = 0;
 
+            int applied = 0;
             for (int i = 0; i < rows.Count && (startIndex + i) < BatchEditingRfqItems.Count; i++)
             {
+                applied++;
                 var targetItem = BatchEditingRfqItems[startIndex + i];
                 var row = rows[i];
 
@@ -274,6 +319,7 @@ namespace Procure.PageModels
             }
 
             RecalculateBatchRfqTotals();
+            return applied;
         }
 
         [RelayCommand]

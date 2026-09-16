@@ -122,6 +122,9 @@
                                     <Button Content="+ Add Line" FontSize="11" Height="28" Padding="8,0" ToolTipService.ToolTip="Add a line item (e.g. when a vendor splits one PR line into two quoted rows)" Command="{Binding AddEditingRfqItemCommand}" />
                                     <Button Content="{Binding AllRfqItemsSelected, Converter={StaticResource SelAll}}" FontSize="11" Height="28" Padding="8,0"
                                             Command="{Binding ToggleAllRfqItemsCommand}" />
+                                    <Button Content="Paste Prices from Excel" FontSize="11" Height="28" Padding="10,0"
+                                            ToolTipService.ToolTip="Copy the unit price column in Excel (discount and last price beside it come too), then click here to fill the lines from the top"
+                                            Command="{Binding PasteRfqPricingFromClipboardCommand}" />
                                     <Button Content="Copy for Email" FontSize="11" Height="28" Padding="10,0"
                                             ToolTipService.ToolTip="Copy selected items as a formatted table ready to paste into an email to supplier"
                                             Command="{Binding CopySelectedRfqItemsForEmailCommand}" />

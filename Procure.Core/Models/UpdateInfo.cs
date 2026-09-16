@@ -20,15 +20,5 @@ namespace Procure.Models
         // True when the download will be a small Velopack delta (patched against the installed
         // version) rather than the full package. SizeBytes then holds the delta size, not the full.
         public bool IsDeltaDownload { get; set; }
-
-        public string FormattedSize
-        {
-            get
-            {
-                if (SizeBytes <= 0) return string.Empty;
-                double mb = SizeBytes / (1024.0 * 1024.0);
-                return IsDeltaDownload ? $"{mb:F1} MB (delta)" : $"{mb:F1} MB";
-            }
-        }
     }
 }

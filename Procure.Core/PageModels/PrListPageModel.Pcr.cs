@@ -217,28 +217,9 @@ namespace Procure.PageModels
             }
         }
 
-        [RelayCommand]
-        public void ToggleApprovalInclusion(Approval approval)
-        {
-            if (approval != null)
-            {
-                approval.IsIncluded = !approval.IsIncluded;
-            }
-        }
-
-        public void ReorderApprovalStages(Approval source, Approval target)
-        {
-            int oldIndex = ConfiguringApprovals.IndexOf(source);
-            int newIndex = ConfiguringApprovals.IndexOf(target);
-            if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex)
-            {
-                ConfiguringApprovals.Move(oldIndex, newIndex);
-                for (int i = 0; i < ConfiguringApprovals.Count; i++)
-                {
-                    ConfiguringApprovals[i].SortOrder = i;
-                }
-            }
-        }
+        // Include/exclude and reordering need no view-model code in WinUI: the stage row's checkbox
+        // binds straight to Approval.IsIncluded, the list reorders ConfiguringApprovals itself
+        // (CanReorderItems), and SaveApprovalConfigModalAsync renumbers SortOrder from list order.
 
         [RelayCommand]
         public async Task SaveApprovalConfigModalAsync()
