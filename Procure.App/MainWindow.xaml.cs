@@ -69,6 +69,13 @@ public sealed partial class MainWindow : Window
             CompositionTarget.Rendering += OnRendering;
         }
 
+        // A dev build is not a Velopack install, so no real update check can ever run here and the
+        // update window would be unreachable. PROCURE_UPDATE_UI=1 opens it with stand-in text.
+        if (Environment.GetEnvironmentVariable("PROCURE_UPDATE_UI") == "1")
+        {
+            ShowUpdateDialogPreview();
+        }
+
         // Before first render: the pane does not re-theme reliably once it has loaded.
         (_appHost as WinUiAppHost)?.ApplyCurrentTheme();
         RefreshThemeState();   // caption button colours right from the first frame, not after activation

@@ -415,8 +415,15 @@
                                 <TextBlock Text="{Binding UpdateInfo.ReleaseNotes}" FontSize="12" MaxLines="6" TextTrimming="CharacterEllipsis"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <!-- Once the download is done, the update window is where the
+                                         install happens: it says the app is about to close before
+                                         it does. Until then this is the button that starts it. -->
                                     <Button Content="Download &amp; Install" Style="{StaticResource AccentButtonStyle}"
-                                            Command="{Binding DownloadAndInstallUpdateCommand}" />
+                                            Command="{Binding DownloadAndInstallUpdateCommand}"
+                                            Visibility="{Binding IsUpdateDownloaded, Converter={StaticResource BoolVis}, ConverterParameter=invert}" />
+                                    <Button Content="Install and restart" Style="{StaticResource AccentButtonStyle}"
+                                            Click="OpenUpdateWindow_Click"
+                                            Visibility="{Binding IsUpdateDownloaded, Converter={StaticResource BoolVis}}" />
                                     <Button Content="View Release on GitHub" Command="{Binding OpenReleasePageCommand}" />
                                 </StackPanel>
                             </StackPanel>

@@ -141,4 +141,12 @@ public sealed partial class SettingsPage : Page
         if ((sender as FrameworkElement)?.DataContext is CustomColumnDefinition def)
             Vm.ColumnsModel.DeleteColumnCommand.Execute(def);
     }
+
+    // The update is downloaded; the window over the whole app is where it gets installed, because
+    // it is the only place that can say "this closes now" before the app closes.
+    private void OpenUpdateWindow_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.Services.GetRequiredService<Procure.App.Platform.ShellContext>().Window is MainWindow main)
+            main.ShowUpdateDialog();
+    }
 }

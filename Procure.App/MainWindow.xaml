@@ -165,6 +165,52 @@
                 </Grid>
             </StackPanel>
         </Border>
+        <!-- The update window. Same scene as the installer's splash, minus the painted-on title:
+             here the title, status and buttons are live. Opened from the sidebar's Update ready
+             card or from Settings; never opened on its own while someone is working. -->
+        <Grid x:Name="UpdateOverlay" Grid.RowSpan="2" Visibility="Collapsed" Background="#B3000000">
+            <Border Width="520" CornerRadius="10" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
+                <Grid Height="292" CornerRadius="10">
+                    <Grid.Clip>
+                        <RectangleGeometry Rect="0,0,520,292" />
+                    </Grid.Clip>
+                    <Image Stretch="UniformToFill" VerticalAlignment="Center">
+                        <Image.Source>
+                            <BitmapImage UriSource="ms-appx:///Assets/update-backdrop.gif" AutoPlay="True" />
+                        </Image.Source>
+                    </Image>
+                    <!-- Without this wash, white text over a moving scene is unreadable the moment a
+                         bright frame comes round. -->
+                    <Border VerticalAlignment="Bottom" Height="190">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                <GradientStop Color="#F2080A0E" Offset="0" />
+                                <GradientStop Color="#C4080A0E" Offset="0.45" />
+                                <GradientStop Color="#00080A0E" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <StackPanel VerticalAlignment="Bottom" Margin="22,0,22,18" Spacing="8">
+                        <TextBlock x:Name="UpdateDialogTitle" Style="{StaticResource AppText}" Text="Update ready"
+                                   FontSize="21" FontWeight="SemiBold" Foreground="White" />
+                        <TextBlock x:Name="UpdateDialogStatus" Style="{StaticResource AppText}" Text="Downloaded and waiting to be installed."
+                                   FontSize="12.5" TextWrapping="Wrap" Foreground="#D6D9E0" />
+                        <ProgressBar x:Name="UpdateDialogProgress" Height="6" Minimum="0" Maximum="100" Value="100"
+                                     Foreground="{ThemeResource AccentButtonBackground}" Background="#3AFFFFFF" />
+                        <TextBlock x:Name="UpdateDialogHint" Style="{StaticResource AppText}" Text="The app will close and reopen by itself."
+                                   FontSize="11.5" Foreground="#AEB4C0" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,4,0,0">
+                            <Button x:Name="UpdateDialogLater" Content="Later" Click="UpdateDialogLater_Click" />
+                            <Button x:Name="UpdateDialogInstall" Content="Install and restart" Style="{StaticResource AccentButtonStyle}"
+                                    Click="UpdateDialogInstall_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
              Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
         <Border x:Name="Hud" Grid.Row="1" Visibility="Collapsed"

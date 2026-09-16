@@ -63,6 +63,11 @@ public sealed partial class MainWindow
         {
             var updates = App.Services.GetRequiredService<IUpdateService>();
             var current = updates.CurrentVersionString;
+
+            // A dev build reports "Dev build" as its version, which never matches what was last
+            // shown - so every F5 popped a "What's New in vDev build" box over the app.
+            if (current == "Dev build") return;
+
             var lastShown = UpdateStateStore.GetLastWhatsNewVersionShown();
             if (string.IsNullOrEmpty(lastShown))
             {
@@ -109,10 +114,112 @@ public sealed partial class MainWindow
         RefreshUpdateReadyVisibility();
     }
 
-    // Already downloaded; Velopack applies it and relaunches, exiting this process on success.
-    private void UpdateRestart_Click(object sender, RoutedEventArgs e)
+    // The sidebar card's "Restart" no longer quits on the spot: it opens the update window, which
+    // says what is about to happen before anything closes.
+    private void UpdateRestart_Click(object sender, RoutedEventArgs e) => ShowUpdateDialog();
+
+    /// <summary>Opens the update window. Safe to call whether the download has finished or is still
+    /// running - it reads the shared update state rather than keeping its own.</summary>
+    public void ShowUpdateDialog()
     {
-        if (!App.Services.GetRequiredService<IUpdateService>().LaunchInstaller(string.Empty))
-            UpdateLater_Click(sender, e);
+        var updates = App.Services.GetRequiredService<IUpdateService>();
+        RefreshUpdateDialog(updates);
+
+        if (!_updateDialogHooked)
+        {
+            updates.UpdateStateChanged += OnUpdateServiceStateChanged;
+            _updateDialogHooked = true;
+        }
+
+        UpdateOverlay.Visibility = Visibility.Visible;
+    }
+
+    private bool _updateDialogHooked;
+    private bool _updateInstalling;
+
+    private void OnUpdateServiceStateChanged(object? sender, EventArgs e) =>
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (UpdateOverlay.Visibility == Visibility.Visible)
+                RefreshUpdateDialog(App.Services.GetRequiredService<IUpdateService>());
+        });
+
+    private void RefreshUpdateDialog(IUpdateService updates)
+    {
+        if (_updateInstalling) return;   // the closing message must not be overwritten mid-handover
+
+        var tag = updates.PendingUpdateTag ?? updates.LastKnownUpdate?.TagName;
+        UpdateDialogTitle.Text = string.IsNullOrWhiteSpace(tag) ? "Update ready" : $"Update ready - {tag}";
+
+        var downloading = updates.DownloadStatus == UpdateDownloadStatus.Running;
+        UpdateDialogProgress.IsIndeterminate = false;
+        UpdateDialogProgress.Value = downloading ? updates.DownloadProgress * 100 : 100;
+
+        UpdateDialogStatus.Text = updates.DownloadStatus switch
+        {
+            UpdateDownloadStatus.Running => $"Downloading… {updates.DownloadProgress * 100:F0}%",
+            UpdateDownloadStatus.Failed => "The download did not finish. Try again from Settings.",
+            _ => "Downloaded and waiting to be installed."
+        };
+
+        UpdateDialogHint.Text = "The app will close and reopen by itself.";
+        UpdateDialogInstall.IsEnabled = updates.DownloadStatus == UpdateDownloadStatus.Done;
+        UpdateDialogLater.IsEnabled = true;
+    }
+
+    /// <summary>The same window with stand-in text, for looking at it on a dev build where no real
+    /// update exists (PROCURE_UPDATE_UI=1). Installing does nothing but show the closing message.</summary>
+    private void ShowUpdateDialogPreview()
+    {
+        _updatePreview = true;
+        _updateInstalling = true;   // keeps the live refresh from overwriting the stand-in text
+        UpdateDialogTitle.Text = "Update ready - v2.0.9";
+        UpdateDialogStatus.Text = "Downloaded and waiting to be installed.";
+        UpdateDialogHint.Text = "The app will close and reopen by itself.";
+        UpdateDialogProgress.IsIndeterminate = false;
+        UpdateDialogProgress.Value = 100;
+        UpdateDialogInstall.IsEnabled = true;
+        UpdateDialogLater.IsEnabled = true;
+        UpdateOverlay.Visibility = Visibility.Visible;
+    }
+
+    private bool _updatePreview;
+
+    private void UpdateDialogLater_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateOverlay.Visibility = Visibility.Collapsed;
+        _updateInstalling = false;
+        _updatePreview = false;
+    }
+
+    // Already downloaded; Velopack applies it and relaunches, exiting this process on success. The
+    // message is set BEFORE the call, which is the only moment left to explain the app vanishing.
+    private void UpdateDialogInstall_Click(object sender, RoutedEventArgs e)
+    {
+        _updateInstalling = true;
+        UpdateDialogStatus.Text = "Installing the update…";
+        UpdateDialogHint.Text = "This window will close and the app will reopen on its own.";
+        UpdateDialogProgress.IsIndeterminate = true;
+        UpdateDialogInstall.IsEnabled = false;
+        UpdateDialogLater.IsEnabled = false;
+
+        // Give the frame a chance to paint the message above before the process is taken down.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (_updatePreview)
+            {
+                UpdateDialogHint.Text = "Preview only - nothing is being installed.";
+                return;
+            }
+
+            if (App.Services.GetRequiredService<IUpdateService>().LaunchInstaller(string.Empty)) return;
+
+            _updateInstalling = false;
+            UpdateDialogStatus.Text = "The update could not be installed. Try again from Settings.";
+            UpdateDialogHint.Text = "Your work is untouched.";
+            UpdateDialogProgress.IsIndeterminate = false;
+            UpdateDialogLater.IsEnabled = true;
+            UpdateDialogInstall.IsEnabled = true;
+        });
     }
 }

@@ -88,9 +88,17 @@ jobs:
           }
           $version = "${{ github.ref_name }}" -replace '^v', ''
           # Same package id (-u Procure) and exe name (-e Procure.exe) as every MAUI release: that is
-          # what makes an installed copy update in place.
+          # what makes an installed copy update in place. Do NOT change -u.
+          #
+          # The setup window is the splash image and nothing else - Velopack draws no title and no
+          # buttons over it, which is why Assets\splash.gif carries the app name in its own frames
+          # and leaves a clear band at the bottom for the progress bar tinted below.
           vpk pack -u Procure -v $version -e Procure.exe `
             -p Procure.App\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish `
+            --packTitle "RWC MM Tracker" `
+            --icon Procure.App\Assets\appicon.ico `
+            --splashImage Procure.App\Assets\splash.gif `
+            --splashProgressColor "#005FB8" `
             --releaseNotes notes.md
 
       # Surfaces the delta / full ratio in the run log so each release can be eyeballed. A ratio
