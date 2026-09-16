@@ -484,15 +484,24 @@
                                                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <TextBlock Style="{StaticResource AppText}" Text="{x:Bind VendorName}" FontSize="13.5" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
-                                                        <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}"
+                                                        <!-- No MinWidth: an RFQ number can be one character, and a minimum
+                                                             left it sitting against the left edge of a half-empty pill.
+                                                             The padding sets the shape instead, and the radius stays at or
+                                                             under half the pill's height so short labels still read as a
+                                                             stadium rather than the oval this replaced (e8abca8). -->
+                                                        <Border Padding="9,2" CornerRadius="8" BorderThickness="0" BorderBrush="{ThemeResource AppControlBorder}"
                                                                 Background="{ThemeResource AppSubtleFill}"
                                                                 Visibility="{x:Bind HasRfqNumber, Converter={StaticResource BoolVis}}">
-                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RfqNumber}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondary}" />
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RfqNumber}" FontSize="10" FontWeight="SemiBold"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                                                       Foreground="{ThemeResource AppTextSecondary}" />
                                                         </Border>
-                                                        <Border Padding="6,1" CornerRadius="10" MinWidth="46" BorderThickness="0" BorderBrush="{ThemeResource FluentSuccess}"
+                                                        <Border Padding="9,2" CornerRadius="8" BorderThickness="0" BorderBrush="{ThemeResource FluentSuccess}"
                                                                 Background="{ThemeResource FluentSuccessBg}"
                                                                 Visibility="{x:Bind HasTechnicalApproval, Converter={StaticResource BoolVis}}">
-                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind TechnicalApproval}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                                                            <TextBlock Style="{StaticResource AppText}" Text="{x:Bind TechnicalApproval}" FontSize="10" FontWeight="SemiBold"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                                                       Foreground="{ThemeResource FluentSuccess}" />
                                                         </Border>
                                                     </StackPanel>
                                                     <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}">
