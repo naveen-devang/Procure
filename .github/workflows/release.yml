@@ -4,10 +4,11 @@ name: Release
 # publish the WinUI 3 app (Procure.App), pack with Velopack, and upload to GitHub Releases with notes
 # generated from the commits since the last tag.
 #
-# Every release is uploaded as a PRE-RELEASE. Installed apps only look at full releases
-# (GithubSource prerelease: false in UpdateService), so nobody receives it until it has been tested
-# and promoted by hand:
-#   gh release edit vX.Y.Z --prerelease=false --latest
+# Every release is published as a FULL release, so installed apps pick it up on their next check
+# (GithubSource prerelease: false in UpdateService). This was a hand-promoted pre-release through
+# the v2.0.x testing run; since v2.0.9 the app is what colleagues are meant to have, so tagging is
+# the whole act of shipping. To hold one back for testing instead:
+#   vpk upload github ... --pre        (then: gh release edit vX.Y.Z --prerelease=false --latest)
 on:
   push:
     tags: ['v*']
@@ -115,11 +116,13 @@ jobs:
             Write-Host "::warning::Full-only release ($([math]::Round($full.Length/1MB,1)) MB) - no delta generated."
           }
 
-      - name: Upload to GitHub Releases (as a pre-release)
+      - name: Upload to GitHub Releases
         shell: pwsh
         run: |
+          # No --pre: a pushed tag is a shipped release, and installed apps see it on their next
+          # check. Tag only what has been tested.
           vpk upload github --repoUrl https://github.com/${{ github.repository }} `
-            --publish --pre --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"
+            --publish --tag "${{ github.ref_name }}" --token "${{ secrets.GITHUB_TOKEN }}"
 
           # vpk always uploads a legacy Squirrel-compat "RELEASES" file itself (not read from
           # disk, so deleting it beforehand does nothing) - no client here uses it, strip it
