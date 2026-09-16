@@ -101,11 +101,13 @@ public sealed partial class MainWindow
         RefreshUpdateReadyVisibility();
     }
 
-    // Card when the sidebar is open, dot on Settings when it is collapsed to icons.
+    // Card when the sidebar is open, dot on Settings when it is collapsed to icons. Neither shows
+    // while the update window is up: one update was being offered in three places at once.
     private void RefreshUpdateReadyVisibility()
     {
-        UpdateReadyCard.Visibility = _updateReady && Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
-        UpdateReadyDot.Visibility = _updateReady && !Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+        var windowUp = UpdateOverlay.Visibility == Visibility.Visible;
+        UpdateReadyCard.Visibility = _updateReady && !windowUp && Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+        UpdateReadyDot.Visibility = _updateReady && !windowUp && !Nav.IsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateLater_Click(object sender, RoutedEventArgs e)
@@ -132,6 +134,7 @@ public sealed partial class MainWindow
         }
 
         UpdateOverlay.Visibility = Visibility.Visible;
+        RefreshUpdateReadyVisibility();
     }
 
     private bool _updateDialogHooked;
@@ -190,6 +193,7 @@ public sealed partial class MainWindow
         UpdateOverlay.Visibility = Visibility.Collapsed;
         _updateInstalling = false;
         _updatePreview = false;
+        RefreshUpdateReadyVisibility();   // the quiet card comes back once the window is dismissed
     }
 
     // Already downloaded; Velopack applies it and relaunches, exiting this process on success. The

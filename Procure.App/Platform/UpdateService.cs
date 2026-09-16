@@ -196,7 +196,14 @@ public sealed class UpdateService : IUpdateService
 
         try
         {
-            mgr.ApplyUpdatesAndRestart(_pendingUpdate.TargetFullRelease);
+            // silent: true keeps Velopack's own "Installing Update… [OK]" message box off the
+            // screen. ApplyUpdatesAndRestart shows it, which put a second, plainer progress window
+            // in front of the update window this app just showed. Same work, no stock dialog:
+            // hand over, then exit so Update.exe can swap the files - which is exactly what
+            // ApplyUpdatesAndRestart does internally, minus the box.
+            mgr.WaitExitThenApplyUpdates(_pendingUpdate.TargetFullRelease, silent: true, restart: true);
+            _logger?.LogInformation("Velopack update handed over; exiting for the swap.");
+            Environment.Exit(0);
             return true;
         }
         catch (Exception ex)

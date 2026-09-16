@@ -401,11 +401,15 @@
                         </Grid>
                         <CheckBox Content="Automatically check for new releases when app starts"
                                   IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}" />
-                        <StackPanel Orientation="Horizontal" Spacing="10"
-                                    Visibility="{Binding UpdateStatusMessage, Converter={StaticResource NullVis}}">
-                            <ProgressRing IsActive="{Binding IsCheckingForUpdates}" Width="18" Height="18" />
-                            <TextBlock Text="{Binding UpdateStatusMessage}" FontSize="12" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                        <!-- Once the download is finished the card below says the same thing and
+                             carries the button, so this line stands down rather than repeating it. -->
+                        <StackPanel Visibility="{Binding IsUpdateDownloaded, Converter={StaticResource BoolVis}, ConverterParameter=invert}">
+                            <StackPanel Orientation="Horizontal" Spacing="10"
+                                        Visibility="{Binding UpdateStatusMessage, Converter={StaticResource NullVis}}">
+                                <ProgressRing IsActive="{Binding IsCheckingForUpdates}" Width="18" Height="18" />
+                                <TextBlock Text="{Binding UpdateStatusMessage}" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
+                            </StackPanel>
                         </StackPanel>
                         <Border BorderThickness="1" CornerRadius="6" Padding="16" BorderBrush="{ThemeResource PrimaryTextBrush}"
                                 Background="{ThemeResource AppTertiaryBackground}"
