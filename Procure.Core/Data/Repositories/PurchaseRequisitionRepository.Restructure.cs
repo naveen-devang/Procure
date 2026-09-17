@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -186,6 +186,7 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                                     QuotedUnitPrice = srcRfqItem.QuotedUnitPrice,
                                     Discount = srcRfqItem.Discount,
                                     LastPrice = srcRfqItem.LastPrice,
+                                    PriceNote = srcRfqItem.PriceNote,
                                     Notes = srcRfqItem.Notes,
                                     SortOrder = rfqItemSort++
                                 };
@@ -194,8 +195,8 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                                 using var rfqItemCmd = connection.CreateCommand();
                                 rfqItemCmd.Transaction = tx;
                                 rfqItemCmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @Notes, @SortOrder);";
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder);";
 
                                 rfqItemCmd.Parameters.AddWithValue("@Id", newRfqItem.Id.ToString());
                                 rfqItemCmd.Parameters.AddWithValue("@RfqId", newRfq.Id.ToString());
@@ -207,6 +208,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                                 rfqItemCmd.Parameters.AddWithValue("@QuotedUnitPrice", newRfqItem.QuotedUnitPrice.HasValue ? (double)newRfqItem.QuotedUnitPrice.Value : (object)DBNull.Value);
                                 rfqItemCmd.Parameters.AddWithValue("@Discount", newRfqItem.Discount.HasValue ? (double)newRfqItem.Discount.Value : (object)DBNull.Value);
                                 rfqItemCmd.Parameters.AddWithValue("@LastPrice", newRfqItem.LastPrice.HasValue ? (double)newRfqItem.LastPrice.Value : (object)DBNull.Value);
+                                rfqItemCmd.Parameters.AddWithValue("@PriceNote", newRfqItem.PriceNote ?? string.Empty);
                                 rfqItemCmd.Parameters.AddWithValue("@Notes", newRfqItem.Notes ?? string.Empty);
                                 rfqItemCmd.Parameters.AddWithValue("@SortOrder", newRfqItem.SortOrder);
 
@@ -618,8 +620,8 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                     using var itemCmd = connection.CreateCommand();
                     itemCmd.Transaction = tx;
                     itemCmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @Notes, @SortOrder);";
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder);";
 
                     itemCmd.Parameters.AddWithValue("@Id", rfqItem.Id.ToString());
                     itemCmd.Parameters.AddWithValue("@RfqId", rfq.Id.ToString());
@@ -631,6 +633,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                     itemCmd.Parameters.AddWithValue("@QuotedUnitPrice", rfqItem.QuotedUnitPrice.HasValue ? (double)rfqItem.QuotedUnitPrice.Value : (object)DBNull.Value);
                     itemCmd.Parameters.AddWithValue("@Discount", rfqItem.Discount.HasValue ? (double)rfqItem.Discount.Value : (object)DBNull.Value);
                     itemCmd.Parameters.AddWithValue("@LastPrice", rfqItem.LastPrice.HasValue ? (double)rfqItem.LastPrice.Value : (object)DBNull.Value);
+                    itemCmd.Parameters.AddWithValue("@PriceNote", rfqItem.PriceNote ?? string.Empty);
                     itemCmd.Parameters.AddWithValue("@Notes", rfqItem.Notes ?? string.Empty);
                     itemCmd.Parameters.AddWithValue("@SortOrder", rfqItem.SortOrder);
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -378,8 +378,8 @@ ON CONFLICT(Id) DO UPDATE SET
                     using var cmd = connection.CreateCommand();
                     cmd.Transaction = tx;
                     cmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @Notes, @SortOrder)
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder)
 ON CONFLICT(Id) DO UPDATE SET
     ItemName = excluded.ItemName,
     Quantity = excluded.Quantity,
@@ -388,6 +388,7 @@ ON CONFLICT(Id) DO UPDATE SET
     QuotedUnitPrice = excluded.QuotedUnitPrice,
     Discount = excluded.Discount,
     LastPrice = excluded.LastPrice,
+    PriceNote = excluded.PriceNote,
     Notes = excluded.Notes,
     SortOrder = excluded.SortOrder;";
 
@@ -401,6 +402,7 @@ ON CONFLICT(Id) DO UPDATE SET
                     cmd.Parameters.AddWithValue("@QuotedUnitPrice", item.QuotedUnitPrice.HasValue ? (double)item.QuotedUnitPrice.Value : (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Discount", item.Discount.HasValue ? (double)item.Discount.Value : (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@LastPrice", item.LastPrice.HasValue ? (double)item.LastPrice.Value : (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PriceNote", item.PriceNote ?? string.Empty);
                     cmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
                     cmd.Parameters.AddWithValue("@SortOrder", sortOrder++);
 

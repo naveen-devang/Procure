@@ -50,6 +50,16 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedLastPrice))]
         public partial decimal? LastPrice { get; set; }
 
+        /// <summary>What the vendor said instead of a price - "Regret", "No bid", "Item discontinued".
+        /// Deliberately not a number and never part of any total: it prints where the dash would
+        /// otherwise print, so a blank cell in the comparison says why it is blank.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedQuotedUnitPrice))]
+        [NotifyPropertyChangedFor(nameof(HasPriceNote))]
+        public partial string PriceNote { get; set; } = string.Empty;
+
+        public bool HasPriceNote => !string.IsNullOrWhiteSpace(PriceNote);
+
         [ObservableProperty]
         public partial string Notes { get; set; } = string.Empty;
 
@@ -77,8 +87,60 @@ namespace Procure.Models
                 {
                     return QuotedUnitPrice.Value.ToString("N2", CultureInfo.InvariantCulture);
                 }
-                return string.Empty;
+                return HasPriceNote ? PriceNote.Trim() : string.Empty;
             }
+        }
+
+        /// <summary>What the Unit Rate box reads and writes. A number is a price; anything else is
+        /// kept verbatim as the note, with the price left empty so no total can pick it up.
+        ///
+        /// The setter does NOT raise its own change notification: the box would then be rewritten
+        /// mid-word with the parsed value and the caret would jump to the end. Changes from
+        /// elsewhere - a paste, a reload - do refresh it, through the two properties below.</summary>
+        public string QuotedUnitPriceText
+        {
+            get => QuotedUnitPrice.HasValue
+                ? QuotedUnitPrice.Value.ToString("0.####", CultureInfo.InvariantCulture)
+                : (PriceNote ?? string.Empty);
+            set
+            {
+                var text = (value ?? string.Empty).Trim();
+                _suppressPriceTextEcho = true;
+                try
+                {
+                    if (text.Length == 0)
+                    {
+                        QuotedUnitPrice = null;
+                        PriceNote = string.Empty;
+                    }
+                    else if (decimal.TryParse(text, NumberStyles.Any, CultureInfo.CurrentCulture, out var parsed)
+                          || decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+                    {
+                        QuotedUnitPrice = parsed;
+                        PriceNote = string.Empty;
+                    }
+                    else
+                    {
+                        QuotedUnitPrice = null;
+                        PriceNote = text;
+                    }
+                }
+                finally
+                {
+                    _suppressPriceTextEcho = false;
+                }
+            }
+        }
+
+        private bool _suppressPriceTextEcho;
+
+        partial void OnQuotedUnitPriceChanged(decimal? value) => RaisePriceTextChanged();
+        partial void OnPriceNoteChanged(string value) => RaisePriceTextChanged();
+
+        private void RaisePriceTextChanged()
+        {
+            if (_suppressPriceTextEcho) return;
+            OnPropertyChanged(nameof(QuotedUnitPriceText));
         }
 
         public string FormattedDiscount

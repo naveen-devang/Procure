@@ -174,8 +174,10 @@
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind FormattedQuantity}" FontSize="11.5" HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
-                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
+                                            <!-- Price, or the vendor's words instead of one - see AddRfqModal. -->
+                                            <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00 or note"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center"
+                                                     ToolTipService.ToolTip="A price, or what the vendor said instead - e.g. Regret" />
                                             <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"

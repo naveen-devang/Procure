@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -94,6 +94,7 @@ namespace Procure.Data
                 await Measure("09 PR edit syncs into open quotes", () => QuoteSyncFlowAsync(db, repo));
                 await Measure("09b board refresh then PR edit keeps prices", () => RefreshThenEditKeepsPricesAsync(db, repo));
                 await Measure("09c one edit travels one hop (PR->RFQ->PO)", () => FieldLevelDownstreamSyncAsync(db, repo));
+                await Measure("09d words instead of a price on a quote line", () => PriceNoteFlowAsync(db, repo));
                 await Measure("10 guard decisions (ordered / quoted)", () => GuardDecisionsAsync(db, repo));
                 await Measure("11 deletes and cascade", () => DeleteFlowAsync(db, repo));
                 await Measure("12 PCR export (Excel + PDF)", () => PcrExportFlowAsync(db, repo));
@@ -725,6 +726,86 @@ namespace Procure.Data
                 $"the requisition's own estimated price is untouched; got {after.Items[0].EstimatedUnitPrice}");
             Assert(after.Items[0].Quantity == 100m, "and so is its quantity - nothing travels upward");
             Assert(!string.IsNullOrEmpty(summary), $"and the user is told what moved; got '{summary}'");
+        }
+
+        /// <summary>A vendor who replies "Regret" instead of a price. The words are kept on the line
+        /// and survive a save and reload; the price stays empty, so the quote's own total, and every
+        /// total built from it, counts only the lines that really carry money.</summary>
+        private static async Task PriceNoteFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var pr = NewPr("regret", (Brush, 10m), (Gasket, 4m));
+            await repo.SaveAsync(pr);
+
+            var rfq = NewRfq(pr, "regret-vendor");
+            rfq.Items.Add(NewRfqLine(pr.Items[0], price: 30m));
+            rfq.Items.Add(NewRfqLine(pr.Items[1], price: 0m));
+            await repo.SaveRfqAsync(rfq);
+
+            var live = await Reload(repo, pr.Id);
+            var quote = live.Rfqs.Single();
+            var second = quote.Items.Single(i => i.PrItemId == pr.Items[1].Id);
+
+            // Typed into the Unit Rate box: not a number, so it is kept as the vendor's words.
+            second.QuotedUnitPriceText = "Regret - cannot supply";
+            Assert(!second.QuotedUnitPrice.HasValue, "words in the rate box leave the price empty");
+            Assert(second.PriceNote == "Regret - cannot supply", $"and are kept verbatim; got '{second.PriceNote}'");
+            Assert(second.LineTotal == 0m, $"so the line is worth nothing; got {second.LineTotal}");
+
+            var expectedBase = 10m * 30m;
+            Assert(quote.BaseAmount == expectedBase, $"and the quote total counts only the priced line; got {quote.BaseAmount}");
+
+            await repo.SaveRfqAsync(quote);
+            await AssertDerivedDataFreshAsync(db, "after saving a quote line with a note instead of a price");
+
+            var after = await Reload(repo, pr.Id);
+            var reloaded = after.Rfqs.Single().Items.Single(i => i.PrItemId == pr.Items[1].Id);
+            Assert(reloaded.PriceNote == "Regret - cannot supply", $"the note survives a save and reload; got '{reloaded.PriceNote}'");
+            Assert(!reloaded.QuotedUnitPrice.HasValue, "and the price is still empty");
+            Assert(after.Rfqs.Single().BaseAmount == expectedBase, "and the quote total is unchanged by it");
+
+            // A number typed over the note is a price again, and the words go.
+            reloaded.QuotedUnitPriceText = "12.5";
+            Assert(reloaded.QuotedUnitPrice == 12.5m, $"a number types back over the note; got {reloaded.QuotedUnitPrice}");
+            Assert(string.IsNullOrEmpty(reloaded.PriceNote), "and clears it");
+
+            // And clearing the box empties both.
+            reloaded.QuotedUnitPriceText = "";
+            Assert(!reloaded.QuotedUnitPrice.HasValue && string.IsNullOrEmpty(reloaded.PriceNote), "clearing the box empties both");
+
+            // A note typed over a price that has already been ordered must not empty the order.
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 09d (order half): the PR board page model was not available.");
+                return;
+            }
+
+            var ordered = await Reload(repo, pr.Id);
+            var orderedQuote = ordered.Rfqs.Single();
+            var pricedLine = orderedQuote.Items.Single(i => i.PrItemId == pr.Items[0].Id);
+
+            var po = NewPo(ordered, orderedQuote, "PO-REGRET");
+            var poLine = NewPoLine(ordered.Items[0], 10m, 30m);
+            poLine.RfqItemId = pricedLine.Id;
+            po.Items.Add(poLine);
+            po.BaseAmount = 10m * 30m;
+            po.Value = 10m * 30m * 1.05m;      // as the PO wizard would have written it
+            await repo.SavePoAsync(po);
+
+            var live2 = await Reload(repo, pr.Id);
+            var quote2 = live2.Rfqs.Single();
+            var line2 = quote2.Items.Single(i => i.Id == pricedLine.Id);
+            var pre = new List<RfqItem> { new() { Id = line2.Id, ItemName = line2.ItemName, Quantity = line2.Quantity,
+                                                 Unit = line2.Unit, QuotedUnitPrice = line2.QuotedUnitPrice, Discount = line2.Discount } };
+
+            line2.QuotedUnitPriceText = "Regret - withdrawn";
+            await repo.SaveRfqAsync(quote2);
+            await model.RunOrderSyncForTestAsync(live2, quote2, pre);
+
+            var afterOrder = (await Reload(repo, pr.Id)).Pos.Single(p => p.PoNo.EndsWith("PO-REGRET", StringComparison.Ordinal));
+            Assert(afterOrder.Items[0].UnitPrice == 30m,
+                $"an order keeps its rate when the quote's price becomes words; got {afterOrder.Items[0].UnitPrice}");
+            Assert(afterOrder.Value == 10m * 30m * 1.05m, $"and its value is untouched; got {afterOrder.Value}");
         }
 
         private static async Task GuardDecisionsAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)

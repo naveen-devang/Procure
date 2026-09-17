@@ -505,6 +505,7 @@ namespace Procure.PageModels
                         QuotedUnitPrice = rfqItem.QuotedUnitPrice,
                         Discount = rfqItem.Discount,
                         LastPrice = rfqItem.LastPrice,
+                        PriceNote = rfqItem.PriceNote,
                         Notes = rfqItem.Notes,
                         SortOrder = rfqItem.SortOrder
                     };

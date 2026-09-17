@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -160,7 +160,7 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Notes, SortOrder, Discount, LastPrice
+SELECT Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Notes, SortOrder, Discount, LastPrice, PriceNote
 FROM RfqItem" + Scope(cmd, "RfqId", "@Rfq", scoped ? rfqById.Keys : null) + @"
 ORDER BY SortOrder ASC;";
 
@@ -183,7 +183,8 @@ ORDER BY SortOrder ASC;";
                             Notes = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
                             SortOrder = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
                             Discount = reader.IsDBNull(10) ? null : (decimal)reader.GetDouble(10),
-                            LastPrice = reader.IsDBNull(11) ? null : (decimal)reader.GetDouble(11)
+                            LastPrice = reader.IsDBNull(11) ? null : (decimal)reader.GetDouble(11),
+                            PriceNote = reader.IsDBNull(12) ? string.Empty : reader.GetString(12)
                         });
                     }
                 }

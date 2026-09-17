@@ -213,7 +213,14 @@ namespace Procure.Services.Export
                 for (int p = 0; p < prItems.Count; p++)
                 {
                     var ri = matched[p, i];
-                    if (ri?.QuotedUnitPrice is not > 0) continue;
+                    if (ri?.QuotedUnitPrice is not > 0)
+                    {
+                        // A line with words instead of a price still has to fit the column, or the
+                        // note prints shrunk to nothing.
+                        if (ri is { HasPriceNote: true })
+                            priceNeed = Math.Max(priceNeed, CellPad + MeasureTextWidth(ri.PriceNote.Trim(), "F1", 7));
+                        continue;
+                    }
                     qtyNeed = Math.Max(qtyNeed, CellPad + MeasureTextWidth(ri.FormattedQuantity, "F1", 7));
                     var net = Math.Max(0m, ri.QuotedUnitPrice.Value - (ri.Discount ?? 0m));
                     priceNeed = Math.Max(priceNeed, MoneyWidth(Cell(cur), net, "F1", 7.5));
@@ -1079,7 +1086,18 @@ namespace Procure.Services.Export
                         else
                         {
                             DrawText("-", colX[VendorQtyColIdx(i)], singleLineCenterY, font: "F1", fontSize: 8, align: "center", width: vendorQtyW[i]);
-                            DrawText("-", colX[VendorPriceColIdx(i)], singleLineCenterY, font: "F1", fontSize: 8, align: "center", width: vendorPriceW[i]);
+
+                            // What the vendor said instead of a price ("Regret") where they said
+                            // anything; the dash otherwise. Never a number, so no total changes.
+                            if (rfqItem is { HasPriceNote: true })
+                            {
+                                DrawFittedText(rfqItem.PriceNote.Trim(), colX[VendorPriceColIdx(i)] + 3, singleLineCenterY,
+                                    font: "F1", baseFontSize: 7, align: "center", maxWidth: vendorPriceW[i] - 6, minFontSize: 5.0);
+                            }
+                            else
+                            {
+                                DrawText("-", colX[VendorPriceColIdx(i)], singleLineCenterY, font: "F1", fontSize: 8, align: "center", width: vendorPriceW[i]);
+                            }
                         }
 
                         // First supplier in fixed order wins; last-wins made the printed

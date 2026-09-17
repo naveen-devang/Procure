@@ -379,7 +379,10 @@ namespace Procure.PageModels
                         else kept++;
                     }
 
-                    if (before.QuotedUnitPrice != after.QuotedUnitPrice)
+                    // A price that became words ("Regret") or was simply cleared is NOT pushed down:
+                    // an order that was placed at a rate keeps that rate, rather than losing its
+                    // value because the quote it came from no longer states one.
+                    if (before.QuotedUnitPrice != after.QuotedUnitPrice && after.QuotedUnitPrice.HasValue)
                     {
                         if (poLine.UnitPrice == before.QuotedUnitPrice)
                         {

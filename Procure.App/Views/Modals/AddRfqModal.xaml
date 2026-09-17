@@ -183,8 +183,12 @@
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Right" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00"
-                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
+                                            <!-- A number is a price; anything else is kept as the vendor's
+                                                 words ("Regret", "No bid") and the price stays empty, so no
+                                                 total can pick it up. See RfqItem.QuotedUnitPriceText. -->
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="4" Text="{x:Bind QuotedUnitPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00 or note"
+                                                     FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}"
+                                                     ToolTipService.ToolTip="A price, or what the vendor said instead - e.g. Regret" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"

@@ -492,9 +492,12 @@ namespace Procure.Services.Export
                         }
                         else
                         {
+                            // The vendor's words where they gave them ("Regret"), the dash otherwise.
+                            // Written as text, never a number, so no sum on the sheet picks it up.
+                            var priceCell = rfqItem is { HasPriceNote: true } ? rfqItem.PriceNote.Trim() : "-";
                             sb.Append($@"
             <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>
-            <c r=""{priceColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>");
+            <c r=""{priceColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(priceCell)}</t></is></c>");
                         }
 
                         // First supplier (in fixed pr.Rfqs order) with a historical price wins;

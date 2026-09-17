@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
@@ -269,6 +269,9 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "SharedPrs", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "Discount", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "LastPrice", "REAL").ConfigureAwait(false);
+            // v21: what a vendor said instead of a price ("Regret", "No bid"). Text, never a number,
+            // and never part of a total.
+            await EnsureColumnExistsAsync(connection, "RfqItem", "PriceNote", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PriceComparisonRequest", "Remarks", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "Currency", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "BaseAmount", "REAL").ConfigureAwait(false);
