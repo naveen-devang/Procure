@@ -359,6 +359,17 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string SelectedRfqCountMessage { get; set; } = string.Empty;
 
+        // ================= ITEM SELECTION STEP =================
+
+        [ObservableProperty]
+        public partial bool IsExportItemsModalVisible { get; set; }
+
+        [ObservableProperty]
+        public partial ObservableCollection<ExportItemSelection> ExportItemSelections { get; set; } = new();
+
+        [ObservableProperty]
+        public partial string SelectedItemCountMessage { get; set; } = string.Empty;
+
         [RelayCommand]
         public async Task OpenExportPcrModalAsync(PurchaseRequisition pr)
         {
@@ -436,9 +447,77 @@ namespace Procure.PageModels
                 sel.PropertyChanged -= OnExportRfqSelectionPropertyChanged;
             }
             ExportRfqSelections.Clear();
+            ClearExportItemSelections();
             IsExportPcrModalVisible = false;
+            IsExportItemsModalVisible = false;
             ExportTargetPr = null;
             ReleasePcrPreview();
+        }
+
+        private void ClearExportItemSelections()
+        {
+            foreach (var sel in ExportItemSelections)
+            {
+                sel.PropertyChanged -= OnExportItemSelectionPropertyChanged;
+            }
+            ExportItemSelections.Clear();
+        }
+
+        // Step 2 of the export flow: which of the PR's items go on the sheet. Some are still
+        // out for quotes and get processed in a later PCR - those get unchecked, not deleted.
+        [RelayCommand]
+        public async Task OpenExportItemsModalAsync()
+        {
+            if (ExportTargetPr == null) return;
+
+            if (!ExportRfqSelections.Any(s => s.IsSelected))
+            {
+                await _dialogs.DisplayAlertAsync("No Supplier Selected", "Please select at least 1 supplier quotation to export.", "OK");
+                return;
+            }
+
+            ClearExportItemSelections();
+            if (ExportTargetPr.Items != null)
+            {
+                foreach (var item in ExportTargetPr.Items)
+                {
+                    var sel = new ExportItemSelection(item, isSelected: true);
+                    sel.PropertyChanged += OnExportItemSelectionPropertyChanged;
+                    ExportItemSelections.Add(sel);
+                }
+            }
+            UpdateSelectedItemCount();
+
+            IsExportPcrModalVisible = false;
+            IsExportItemsModalVisible = true;
+        }
+
+        [RelayCommand]
+        public void BackToExportPcrModal()
+        {
+            IsExportItemsModalVisible = false;
+            IsExportPcrModalVisible = true;
+        }
+
+        private void OnExportItemSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(ExportItemSelection.IsSelected)) return;
+
+            // At least 1 item must stay on the sheet - unchecking the last one snaps it back on
+            // instead of leaving the export with nothing to print.
+            if (sender is ExportItemSelection sel && !sel.IsSelected && !ExportItemSelections.Any(s => s.IsSelected))
+            {
+                sel.IsSelected = true;
+                return;
+            }
+
+            UpdateSelectedItemCount();
+        }
+
+        private void UpdateSelectedItemCount()
+        {
+            var count = ExportItemSelections.Count(s => s.IsSelected);
+            SelectedItemCountMessage = $"{count} of {ExportItemSelections.Count} items selected";
         }
 
         /// <summary>Drops the rendered preview's memory: one LOH-sized PNG per page, the PDF bytes,
@@ -454,6 +533,7 @@ namespace Procure.PageModels
             PcrPreviewSource = null;
             _pcrPreviewPr = null;
             _pcrPreviewRfqs = null;
+            _pcrPreviewItems = null;
         }
 
         // The modal promises "This is saved for future exports" — previously a PR without a PCR
@@ -497,11 +577,20 @@ namespace Procure.PageModels
                 return;
             }
 
+            var selectedItems = ExportItemSelections.Where(s => s.IsSelected).Select(s => s.Item).ToList();
+            if (selectedItems.Count == 0)
+            {
+                {
+                    await _dialogs.DisplayAlertAsync("No Items Selected", "Please select at least 1 item to export.", "OK");
+                }
+                return;
+            }
+
             try
             {
                 var pcr = await GetOrCreateSavedPcrAsync(ExportTargetPr);
 
-                var filePath = await _pcrExportService.ExportPcrToExcelAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks);
+                var filePath = await _pcrExportService.ExportPcrToExcelAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks, selectedItems);
                 CloseExportPcrModal();
 
                 // The exporter already opened the file; the result is visible, so no blocking dialog.
@@ -610,6 +699,7 @@ namespace Procure.PageModels
         private double _pcrPreviewTextScale = 1.0;
         private PurchaseRequisition? _pcrPreviewPr;
         private List<RequestForQuotation>? _pcrPreviewRfqs;
+        private List<PrItem>? _pcrPreviewItems;
         private string _pcrPreviewRemarksSnapshot = string.Empty;
         private int _pcrPreviewGeneration;
 
@@ -688,16 +778,27 @@ namespace Procure.PageModels
                 return;
             }
 
+            var selectedItems = ExportItemSelections.Where(s => s.IsSelected).Select(s => s.Item).ToList();
+            if (selectedItems.Count == 0)
+            {
+                {
+                    await _dialogs.DisplayAlertAsync("No Items Selected", "Please select at least 1 item to export.", "OK");
+                }
+                return;
+            }
+
             try
             {
                 var pcr = await GetOrCreateSavedPcrAsync(ExportTargetPr);
 
                 _pcrPreviewPr = ExportTargetPr;
                 _pcrPreviewRfqs = selected;
+                _pcrPreviewItems = selectedItems;
                 _pcrPreviewRemarksSnapshot = ExportPcrRemarks;
                 ExportTargetPr.Pcr = pcr;
 
                 IsExportPcrModalVisible = false;
+                IsExportItemsModalVisible = false;
                 IsPcrPreviewVisible = true;
 
                 PcrDoubleSided = false;
@@ -724,7 +825,7 @@ namespace Procure.PageModels
         /// would do better when that is too small. Empty at full size. Uses the exporter's own scale
         /// calculation, so it describes exactly the sheet being previewed.</summary>
         private static string PcrFitNote(PurchaseRequisition pr, PriceComparisonRequest pcr, IReadOnlyList<RequestForQuotation> rfqs,
-            string remarks, PcrPdfOptions options, double scale)
+            string remarks, PcrPdfOptions options, double scale, IReadOnlyList<PrItem>? selectedItems)
         {
             const double bodyPt = 7.5;   // the sheet's item and price text
             if (scale >= 1.0) return string.Empty;
@@ -738,7 +839,7 @@ namespace Procure.PageModels
 
             note += " That is hard to read.";
             var a3 = options with { PaperSize = PdfPaperSize.A3, Orientation = PdfOrientation.Landscape };
-            var a3Pt = bodyPt * PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, a3).TextScale;
+            var a3Pt = bodyPt * PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, a3, selectedItems).TextScale;
             bool alreadyA3OrBigger = options.Orientation == PdfOrientation.Landscape
                 && options.PaperSize is PdfPaperSize.A3 or PdfPaperSize.A2 or PdfPaperSize.A1 or PdfPaperSize.A0 or PdfPaperSize.Tabloid;
             return alreadyA3OrBigger || a3Pt <= printedPt + 0.05
@@ -762,6 +863,7 @@ namespace Procure.PageModels
                 var pr = _pcrPreviewPr;
                 var pcr = pr.Pcr!;
                 var rfqs = _pcrPreviewRfqs;
+                var items = _pcrPreviewItems;
                 var remarks = _pcrPreviewRemarksSnapshot;
 
                 // The PDF itself is cheap; rasterizing it is what takes the time. So build and open it
@@ -769,7 +871,7 @@ namespace Procure.PageModels
                 // render every page before displaying any, and again on every option change.
                 var (document, source) = await Task.Run(async () =>
                 {
-                    var doc = PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, options);
+                    var doc = PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, options, items);
                     return (doc, await PcrPdfPageSource.OpenAsync(doc.Bytes));
                 });
                 var bytes = document.Bytes;
@@ -791,7 +893,7 @@ namespace Procure.PageModels
                 // A sheet too wide for this paper is scaled down to fit rather than overprinting its own
                 // columns - so say so, with the size it will actually print at. Discovering 30%-size text
                 // after it comes out of the printer is the thing to avoid.
-                PcrPreviewPageSummary += PcrFitNote(pr, pcr, rfqs, remarks, options, document.TextScale);
+                PcrPreviewPageSummary += PcrFitNote(pr, pcr, rfqs, remarks, options, document.TextScale, items);
                 IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();
@@ -855,13 +957,13 @@ namespace Procure.PageModels
             IncludeSignatureBoxes = PcrIncludeSignatureBoxes
         };
 
-        /// <summary>Returns to the supplier-selection modal without losing the rendered preview's
-        /// source selection — suppliers/remarks are untouched, so reopening regenerates instantly.</summary>
+        /// <summary>Returns to the item-selection step without losing the rendered preview's source
+        /// selections — suppliers/items/remarks are untouched, so reopening regenerates instantly.</summary>
         [RelayCommand]
         public void BackToPcrExportModal()
         {
             IsPcrPreviewVisible = false;
-            IsExportPcrModalVisible = true;
+            IsExportItemsModalVisible = true;
         }
 
         [RelayCommand]
@@ -944,7 +1046,7 @@ namespace Procure.PageModels
                     var rfqs = _pcrPreviewRfqs;
                     var remarks = _pcrPreviewRemarksSnapshot;
                     var options = BuildPcrPdfOptions() with { PagesToEmit = pageIndices };
-                    pdfBytes = await Task.Run(() => _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options));
+                    pdfBytes = await Task.Run(() => _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options, _pcrPreviewItems));
                 }
 
                 var copies = ParseCopies(PcrCopiesText);

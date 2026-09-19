@@ -307,15 +307,17 @@ namespace Procure.Services.Export
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
-            PcrPdfOptions? options = null)
-            => GeneratePdfDocument(pr, pcr, selectedRfqs, remarks, options).Bytes;
+            PcrPdfOptions? options = null,
+            IReadOnlyList<PrItem>? selectedItems = null)
+            => GeneratePdfDocument(pr, pcr, selectedRfqs, remarks, options, selectedItems).Bytes;
 
         public static PcrPdfDocument GeneratePdfDocument(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
-            PcrPdfOptions? options = null)
+            PcrPdfOptions? options = null,
+            IReadOnlyList<PrItem>? selectedItems = null)
         {
             options ??= new PcrPdfOptions();
             bool shrink = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
@@ -332,7 +334,7 @@ namespace Procure.Services.Export
             int supplierCount = selectedRfqs.Count;
             bool fitVendors = supplierCount > FullSizeSupplierLimit;
             bool currencyInHeader = supplierCount > CurrencyInCellsSupplierLimit;
-            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
+            var prItems = (selectedItems ?? pr.Items)?.ToList() ?? new List<PrItem>();
             var defaultCurrency = DefaultCurrencyOf(selectedRfqs);
             var matchedRfqItems = MatchRfqItems(prItems, selectedRfqs);
             var needs = MeasureColumnNeeds(prItems, selectedRfqs, matchedRfqItems, defaultCurrency, fitVendors, currencyInHeader);

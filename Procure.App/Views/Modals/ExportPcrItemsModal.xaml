@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <UserControl
-    x:Class="Procure.App.Views.Modals.ExportPcrModal"
+    x:Class="Procure.App.Views.Modals.ExportPcrItemsModal"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Procure.Models">
@@ -58,20 +58,20 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="1. Select Suppliers to Compare" Style="{StaticResource H}" />
+                                    <TextBlock Text="Select Items to Include" Style="{StaticResource H}" />
                                     <Border Grid.Column="1" Padding="8,2,8,4" CornerRadius="11" MinWidth="54" BorderThickness="0"
                                             VerticalAlignment="Center"
                                             BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSubtleFill}">
-                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding SelectedRfqCountMessage}" FontSize="11" FontWeight="SemiBold"
+                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding SelectedItemCountMessage}" FontSize="11" FontWeight="SemiBold"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                                    Foreground="{ThemeResource AppTextPrimary}" />
                                     </Border>
                                 </Grid>
-                                <TextBlock Style="{StaticResource AppText}" Text="Choose the supplier quotations to display side-by-side:" FontSize="11.5"
+                                <TextBlock Style="{StaticResource AppText}" Text="Leave out items already processed in an earlier PCR, or not ready for this round:" FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
-                                <ItemsControl ItemsSource="{Binding ExportRfqSelections}">
+                                <ItemsControl ItemsSource="{Binding ExportItemSelections}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="models:ExportRfqSelection">
+                                        <DataTemplate x:DataType="models:ExportItemSelection">
                                             <Border Padding="10,6" Margin="0,0,0,6" CornerRadius="4" BorderThickness="1"
                                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
                                                 <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}">
@@ -84,24 +84,6 @@
                                 </ItemsControl>
                             </StackPanel>
                         </Border>
-
-                        <Border Style="{StaticResource Sec}">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="2. Collective Number" Style="{StaticResource H}" />
-                                <TextBlock Style="{StaticResource AppText}" Text="Optional. Printed on the sheet as-is; blank shows a dash." FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
-                                <TextBox Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. PCR-2026-014" FontSize="12" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource Sec}">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="3. Remarks / Justification" Style="{StaticResource H}" />
-                                <TextBlock Style="{StaticResource AppText}" Text="Additional justification for the approvers. Saved for future exports." FontSize="11.5"
-                                           TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
-                                <TextBox Text="{Binding ExportPcrRemarks, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"
-                                         PlaceholderText="e.g. Required by Electrical Dept. on urgent basis" FontSize="12" />
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -110,9 +92,11 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button Content="Cancel" Command="{Binding CloseExportPcrModalCommand}" />
-                    <Button Grid.Column="2" Content="Next" Style="{StaticResource AccentButtonStyle}" Command="{Binding OpenExportItemsModalCommand}" />
+                    <Button Content="&#x2190; Back" Command="{Binding BackToExportPcrModalCommand}" />
+                    <Button Grid.Column="2" Content="Export / Print PDF" Command="{Binding ExportPcrPdfCommand}" />
+                    <Button Grid.Column="3" Content="Export Excel (.xlsx)" Style="{StaticResource AccentButtonStyle}" Command="{Binding ExportPcrExcelCommand}" />
                 </Grid>
             </Grid>
         </Border>

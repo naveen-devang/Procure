@@ -16,7 +16,8 @@ namespace Procure.Services.Export
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks)
+            string remarks,
+            IReadOnlyList<PrItem>? selectedItems = null)
         {
             using var ms = new MemoryStream();
             using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
@@ -35,7 +36,7 @@ namespace Procure.Services.Export
 
                 // 5. xl/worksheets/sheet1.xml - first, because the workbook names its heading rows
                 // as print titles and only the sheet knows which rows those are.
-                var headingRow = AddWorksheet(archive, pr, pcr, selectedRfqs, remarks);
+                var headingRow = AddWorksheet(archive, pr, pcr, selectedRfqs, remarks, selectedItems);
 
                 // 6. xl/workbook.xml
                 AddWorkbook(archive, selectedRfqs.Count > PcrPdfExporter.FullSizeSupplierLimit ? headingRow : 0);
@@ -219,7 +220,8 @@ namespace Procure.Services.Export
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks)
+            string remarks,
+            IReadOnlyList<PrItem>? selectedItems)
         {
             var entry = archive.CreateEntry("xl/worksheets/sheet1.xml");
             using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
@@ -244,7 +246,8 @@ namespace Procure.Services.Export
             const int descColWidthCap = 70;
             const int vendorQtyColWidth = 10;
             const int vendorPriceColWidth = 18;
-            var widestItemNameLength = pr.Items?.Count > 0 ? pr.Items.Max(i => LongestLineLength(i.ItemName)) : 0;
+            var exportItems = (selectedItems ?? pr.Items)?.ToList() ?? new List<PrItem>();
+            var widestItemNameLength = exportItems.Count > 0 ? exportItems.Max(i => LongestLineLength(i.ItemName)) : 0;
             int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
 
             var sb = new StringBuilder();
@@ -400,7 +403,7 @@ namespace Procure.Services.Export
             r++;
 
             // 6. Line Item Rows
-            var prItems = pr.Items?.ToList() ?? new List<PrItem>();
+            var prItems = exportItems;
             int itemIndex = 1;
             decimal totalLastPriceSum = 0m;
 

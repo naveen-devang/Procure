@@ -10,14 +10,16 @@ namespace Procure.Services.Export
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
-            string remarks);
+            string remarks,
+            IReadOnlyList<PrItem>? selectedItems = null);
 
         byte[] GeneratePcrPdfBytes(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
-            PcrPdfOptions options);
+            PcrPdfOptions options,
+            IReadOnlyList<PrItem>? selectedItems = null);
 
         // Null return means the user cancelled the save dialog.
         Task<string?> SavePcrPdfAsync(byte[] pdfBytes, string suggestedFileName);
