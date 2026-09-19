@@ -18,33 +18,6 @@ namespace Procure.Data.Repositories
             _db = db;
         }
 
-        public async Task<List<PurchaseRequisition>> GetAllAsync()
-        {
-            await _db.InitializeAsync().ConfigureAwait(false);
-            var prs = new List<PurchaseRequisition>();
-
-            using var connection = _db.CreateConnection();
-            await connection.OpenAsync().ConfigureAwait(false);
-
-            // 1. Load PRs
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = @"
-SELECT Id, PrNo, Description, Requestor, Plant, Priority, Status, Notes, CreatedAt, UpdatedAt, ParentPrId, ConsolidatedFrom, PrType, RequestedFor
-FROM PurchaseRequisition
-ORDER BY CreatedAt DESC;";
-
-                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await reader.ReadAsync().ConfigureAwait(false))
-                {
-                    prs.Add(ReadPr(reader));
-                }
-            }
-
-            await LoadChildrenAsync(connection, prs, scoped: false).ConfigureAwait(false);
-            return prs;
-        }
-
         /// <summary>Every PR, in batches, for the one caller that genuinely wants the whole table -
         /// the CSV export. Same rows and same order as GetAllAsync, but only one batch is in memory
         /// at a time, so the export no longer needs the entire object graph resident before it can

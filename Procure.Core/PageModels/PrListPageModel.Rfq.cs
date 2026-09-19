@@ -777,41 +777,6 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public async Task MarkQuoteReceivedAsync(RequestForQuotation rfq)
-        {
-
-            var amountStr = await _dialogs.DisplayPromptAsync(
-                "Quote Received",
-                $"Enter quote amount for {rfq.Vendor}:",
-                "Save",
-                "Cancel",
-                "Quote Amount (e.g. 5000)");
-
-            if (amountStr == null) return;
-
-            if (decimal.TryParse(amountStr, out var amount))
-            {
-                rfq.QuoteAmount = amount;
-                rfq.QuoteReceivedDate = DateTime.Today;
-                rfq.Status = RfqStatus.QuoteReceived;
-
-                await _prRepo.SaveRfqAsync(rfq);
-
-                // Update parent PR status if all quotes received
-                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
-                if (parentPr != null)
-                {
-                    if (parentPr.Rfqs.All(r => r.Status == RfqStatus.QuoteReceived))
-                    {
-                        parentPr.Status = ProcurementStatus.QuotesReceived;
-                        await _prRepo.SavePrFieldsAsync(parentPr);
-                    }
-                    parentPr.NotifyHierarchyChanged();
-                }
-            }
-        }
-
-        [RelayCommand]
         public async Task DeleteRfqAsync(RequestForQuotation rfq)
         {
 

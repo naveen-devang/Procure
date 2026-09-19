@@ -541,15 +541,6 @@ namespace Procure.PageModels
             OnPropertyChanged(nameof(HasActiveFilters));
         }
 
-        [RelayCommand]
-        public void ToggleFilterOverdue() => FilterOverdueOnly = !FilterOverdueOnly;
-
-        [RelayCommand]
-        public void ToggleFilterPcrPending() => FilterPcrPendingOnly = !FilterPcrPendingOnly;
-
-        [RelayCommand]
-        public void ToggleFilterUrgent() => FilterUrgentOnly = !FilterUrgentOnly;
-
         /// <summary>Bound to the empty state's "Reset Filters" button. Each setter triggers its own
         /// ApplyFilters pass; the generation counter retires the superseded ones.</summary>
         [RelayCommand]
@@ -890,22 +881,6 @@ namespace Procure.PageModels
                 var existing = FilteredPrs.IndexOf(rows[i]);
                 if (existing < 0) FilteredPrs.Insert(i, rows[i]);
                 else if (existing != i) FilteredPrs.Move(existing, i);
-            }
-        }
-
-        [RelayCommand]
-        public async Task ChangePrStatusAsync(PurchaseRequisition pr)
-        {
-
-            var selected = await _dialogs.DisplayActionSheetAsync(
-                $"Update Status for {pr.PrNo}",
-                "Cancel",
-                null,
-                ProcurementStatus.SelectableStatuses);
-
-            if (selected != null && selected != "Cancel" && selected != pr.Status)
-            {
-                await UpdatePrStatusDirectAsync(pr, selected);
             }
         }
 

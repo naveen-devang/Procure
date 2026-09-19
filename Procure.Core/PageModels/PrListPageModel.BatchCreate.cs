@@ -72,15 +72,12 @@ namespace Procure.PageModels
         public partial string RequisitionsSectionLabel { get; set; } = "Requisition Details";
 
         // The row currently shown in the detail pane. Null only when BatchPrEntries is empty
-        // (never true while the modal is open - there's always at least one row). Selection is
-        // driven by an explicit TapGestureRecognizer + command on each row, not CollectionView's
-        // own SelectionMode - the native selection VisualStateManager "Selected" state is
-        // unreliable on WinUI, so the row's highlight is a plain identity check instead.
+        // (never true while the modal is open - there's always at least one row). Selection is a
+        // plain TwoWay SelectedItem binding on the row list (BatchCreateModal.xaml) rather than
+        // CollectionView's own SelectionMode - the native selection VisualStateManager "Selected"
+        // state is unreliable on WinUI, so the row's highlight is a plain identity check instead.
         [ObservableProperty]
         public partial BatchPrEntry? SelectedBatchEntry { get; set; }
-
-        [RelayCommand]
-        public void SelectBatchPrRow(BatchPrEntry row) => SelectedBatchEntry = row;
 
         // ================= BULK / MULTI-PR CREATION OPERATIONS =================
 

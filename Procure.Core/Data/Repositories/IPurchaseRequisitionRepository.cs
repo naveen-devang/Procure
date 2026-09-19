@@ -29,7 +29,7 @@ namespace Procure.Data.Repositories
     public interface IPurchaseRequisitionRepository
     {
         /// <summary>One page of the board with its full child graph. This is the board's read path;
-        /// GetAllAsync remains only for the CSV export, which genuinely wants every row.</summary>
+        /// StreamAllAsync remains only for the CSV export, which genuinely wants every row.</summary>
         Task<PrPage> GetPageAsync(PrQuery query);
 
         /// <summary>Specific PRs with their child graph - how the board keeps a selection loaded once it
@@ -39,8 +39,6 @@ namespace Procure.Data.Repositories
         /// <summary>The source PRs behind a merged master. Merged children are hidden from the board's
         /// default view, so this cannot be answered from the loaded window.</summary>
         Task<List<PurchaseRequisition>> GetChildPrsAsync(Guid masterPrId, IReadOnlyCollection<string> fallbackPrNos);
-
-        Task<List<PurchaseRequisition>> GetAllAsync();
 
         /// <summary>The same rows, a batch at a time, so a caller that has to visit all of them does
         /// not have to hold all of them. The CSV export writes each batch out and drops it.</summary>

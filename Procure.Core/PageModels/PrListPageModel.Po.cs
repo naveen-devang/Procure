@@ -862,43 +862,6 @@ namespace Procure.PageModels
         }
 
         [RelayCommand]
-        public async Task UpdatePoStatusAsync(PurchaseOrder po)
-        {
-
-            var action = await _dialogs.DisplayActionSheetAsync(
-                $"Update Status for {po.PoNo}",
-                "Cancel",
-                null,
-                PoStatus.Raised,
-                PoStatus.Delivered,
-                PoStatus.Closed);
-
-            if (action == null || action == "Cancel" || action == po.Status) return;
-
-            try
-            {
-                po.Status = action;
-                await _prRepo.SavePoAsync(po);
-                DataChangeNotifier.NotifyPoChanged();
-
-                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId);
-                if (parentPr != null)
-                {
-                    if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
-                    {
-                        parentPr.Status = ProcurementStatus.Delivered;
-                        await _prRepo.SavePrFieldsAsync(parentPr);
-                    }
-                    parentPr.NotifyHierarchyChanged();
-                }
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
-        }
-
-        [RelayCommand]
         public async Task DeletePoAsync(PurchaseOrder po)
         {
 
