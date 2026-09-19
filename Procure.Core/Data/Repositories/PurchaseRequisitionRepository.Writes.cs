@@ -169,11 +169,12 @@ ON CONFLICT(Id) DO UPDATE SET
 
             await DeleteDepartedChildrenAsync(connection, tx, "PrItem", "PrId", pr.Id, kept.Select(i => i.Id).ToList()).ConfigureAwait(false);
 
-            foreach (var item in kept)
-            {
-                using var insItemCmd = connection.CreateCommand();
-                insItemCmd.Transaction = tx;
-                insItemCmd.CommandText = @"
+            // One prepared statement reused across every item, rather than a new command - and a
+            // fresh SQLite parse/plan of the same UPSERT - per row. Matters for a consolidated PR or
+            // a bulk-pasted line list, where "every item" can run to the hundreds.
+            using var insItemCmd = connection.CreateCommand();
+            insItemCmd.Transaction = tx;
+            insItemCmd.CommandText = @"
 INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
 VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder)
 ON CONFLICT(Id) DO UPDATE SET
@@ -185,14 +186,25 @@ ON CONFLICT(Id) DO UPDATE SET
     Notes = excluded.Notes,
     SortOrder = excluded.SortOrder;";
 
-                insItemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
-                insItemCmd.Parameters.AddWithValue("@PrId", item.PrId.ToString());
-                insItemCmd.Parameters.AddWithValue("@ItemName", item.ItemName.Trim());
-                insItemCmd.Parameters.AddWithValue("@Quantity", (double)item.Quantity);
-                insItemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim());
-                insItemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value);
-                insItemCmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
-                insItemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
+            var pId = insItemCmd.Parameters.Add("@Id", SqliteType.Text);
+            var pPrId = insItemCmd.Parameters.Add("@PrId", SqliteType.Text);
+            var pItemName = insItemCmd.Parameters.Add("@ItemName", SqliteType.Text);
+            var pQuantity = insItemCmd.Parameters.Add("@Quantity", SqliteType.Real);
+            var pUnit = insItemCmd.Parameters.Add("@Unit", SqliteType.Text);
+            var pEstimatedUnitPrice = insItemCmd.Parameters.Add("@EstimatedUnitPrice", SqliteType.Real);
+            var pNotes = insItemCmd.Parameters.Add("@Notes", SqliteType.Text);
+            var pSortOrder = insItemCmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+
+            foreach (var item in kept)
+            {
+                pId.Value = item.Id.ToString();
+                pPrId.Value = item.PrId.ToString();
+                pItemName.Value = item.ItemName.Trim();
+                pQuantity.Value = (double)item.Quantity;
+                pUnit.Value = string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim();
+                pEstimatedUnitPrice.Value = item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value;
+                pNotes.Value = item.Notes ?? string.Empty;
+                pSortOrder.Value = item.SortOrder;
 
                 await insItemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
@@ -372,12 +384,11 @@ ON CONFLICT(Id) DO UPDATE SET
                     await DeleteDepartedChildrenAsync(connection, tx, "RfqItem", "RfqId", rfq.Id, rfq.Items.Select(i => i.Id).ToList()).ConfigureAwait(false);
                 }
 
-                int sortOrder = 0;
-                foreach (var item in rfq.Items)
-                {
-                    using var cmd = connection.CreateCommand();
-                    cmd.Transaction = tx;
-                    cmd.CommandText = @"
+                // One prepared statement reused across every line, rather than a new command - and a
+                // fresh SQLite parse/plan of the same UPSERT - per row.
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
 INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
 VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder)
 ON CONFLICT(Id) DO UPDATE SET
@@ -392,19 +403,36 @@ ON CONFLICT(Id) DO UPDATE SET
     Notes = excluded.Notes,
     SortOrder = excluded.SortOrder;";
 
-                    cmd.Parameters.AddWithValue("@Id", item.Id.ToString());
-                    cmd.Parameters.AddWithValue("@RfqId", rfq.Id.ToString());
-                    cmd.Parameters.AddWithValue("@PrItemId", item.PrItemId.HasValue ? item.PrItemId.Value.ToString() : (object)DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ItemName", item.ItemName);
-                    cmd.Parameters.AddWithValue("@Quantity", (double)item.Quantity);
-                    cmd.Parameters.AddWithValue("@Unit", item.Unit ?? "pcs");
-                    cmd.Parameters.AddWithValue("@IsQuoted", item.IsQuoted ? 1 : 0);
-                    cmd.Parameters.AddWithValue("@QuotedUnitPrice", item.QuotedUnitPrice.HasValue ? (double)item.QuotedUnitPrice.Value : (object)DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Discount", item.Discount.HasValue ? (double)item.Discount.Value : (object)DBNull.Value);
-                    cmd.Parameters.AddWithValue("@LastPrice", item.LastPrice.HasValue ? (double)item.LastPrice.Value : (object)DBNull.Value);
-                    cmd.Parameters.AddWithValue("@PriceNote", item.PriceNote ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
-                    cmd.Parameters.AddWithValue("@SortOrder", sortOrder++);
+                var pId = cmd.Parameters.Add("@Id", SqliteType.Text);
+                var pRfqId = cmd.Parameters.Add("@RfqId", SqliteType.Text);
+                var pPrItemId = cmd.Parameters.Add("@PrItemId", SqliteType.Text);
+                var pItemName = cmd.Parameters.Add("@ItemName", SqliteType.Text);
+                var pQuantity = cmd.Parameters.Add("@Quantity", SqliteType.Real);
+                var pUnit = cmd.Parameters.Add("@Unit", SqliteType.Text);
+                var pIsQuoted = cmd.Parameters.Add("@IsQuoted", SqliteType.Integer);
+                var pQuotedUnitPrice = cmd.Parameters.Add("@QuotedUnitPrice", SqliteType.Real);
+                var pDiscount = cmd.Parameters.Add("@Discount", SqliteType.Real);
+                var pLastPrice = cmd.Parameters.Add("@LastPrice", SqliteType.Real);
+                var pPriceNote = cmd.Parameters.Add("@PriceNote", SqliteType.Text);
+                var pNotes = cmd.Parameters.Add("@Notes", SqliteType.Text);
+                var pSortOrder = cmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+
+                int sortOrder = 0;
+                foreach (var item in rfq.Items)
+                {
+                    pId.Value = item.Id.ToString();
+                    pRfqId.Value = rfq.Id.ToString();
+                    pPrItemId.Value = item.PrItemId.HasValue ? item.PrItemId.Value.ToString() : (object)DBNull.Value;
+                    pItemName.Value = item.ItemName;
+                    pQuantity.Value = (double)item.Quantity;
+                    pUnit.Value = item.Unit ?? "pcs";
+                    pIsQuoted.Value = item.IsQuoted ? 1 : 0;
+                    pQuotedUnitPrice.Value = item.QuotedUnitPrice.HasValue ? (double)item.QuotedUnitPrice.Value : (object)DBNull.Value;
+                    pDiscount.Value = item.Discount.HasValue ? (double)item.Discount.Value : (object)DBNull.Value;
+                    pLastPrice.Value = item.LastPrice.HasValue ? (double)item.LastPrice.Value : (object)DBNull.Value;
+                    pPriceNote.Value = item.PriceNote ?? string.Empty;
+                    pNotes.Value = item.Notes ?? string.Empty;
+                    pSortOrder.Value = sortOrder++;
 
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -482,9 +510,10 @@ ON CONFLICT(Id) DO UPDATE SET
                 await DeleteDepartedChildrenAsync(connection, tx, "Approval", "PcrId", pcr.Id, pcr.Approvals.Select(a => a.Id).ToList()).ConfigureAwait(false);
             }
 
-            foreach (var approval in pcr.Approvals)
+            // One prepared statement reused across every stage, rather than a new command - and a
+            // fresh SQLite parse/plan of the same UPSERT - per row.
+            using (var cmd = connection.CreateCommand())
             {
-                using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
 INSERT INTO Approval (Id, PcrId, Role, SignedByName, Signed, SignedDate, SentDate, ReceivedDate, SortOrder, RequiresMultipleDates)
@@ -499,18 +528,32 @@ ON CONFLICT(Id) DO UPDATE SET
     SortOrder = excluded.SortOrder,
     RequiresMultipleDates = excluded.RequiresMultipleDates;";
 
-                cmd.Parameters.AddWithValue("@Id", approval.Id.ToString());
-                cmd.Parameters.AddWithValue("@PcrId", pcr.Id.ToString());
-                cmd.Parameters.AddWithValue("@Role", approval.Role);
-                cmd.Parameters.AddWithValue("@SignedByName", (object?)approval.SignedByName ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@Signed", (approval.Signed || approval.ReceivedDate.HasValue) ? 1 : 0);
-                cmd.Parameters.AddWithValue("@SignedDate", approval.SignedDate.HasValue ? approval.SignedDate.Value.ToString("o") : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@SentDate", approval.SentDate.HasValue ? approval.SentDate.Value.ToString("o") : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@ReceivedDate", approval.ReceivedDate.HasValue ? approval.ReceivedDate.Value.ToString("o") : (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@SortOrder", approval.SortOrder);
-                cmd.Parameters.AddWithValue("@RequiresMultipleDates", approval.RequiresMultipleDates ? 1 : 0);
+                var pId = cmd.Parameters.Add("@Id", SqliteType.Text);
+                var pPcrId = cmd.Parameters.Add("@PcrId", SqliteType.Text);
+                var pRole = cmd.Parameters.Add("@Role", SqliteType.Text);
+                var pSignedByName = cmd.Parameters.Add("@SignedByName", SqliteType.Text);
+                var pSigned = cmd.Parameters.Add("@Signed", SqliteType.Integer);
+                var pSignedDate = cmd.Parameters.Add("@SignedDate", SqliteType.Text);
+                var pSentDate = cmd.Parameters.Add("@SentDate", SqliteType.Text);
+                var pReceivedDate = cmd.Parameters.Add("@ReceivedDate", SqliteType.Text);
+                var pSortOrder = cmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+                var pRequiresMultipleDates = cmd.Parameters.Add("@RequiresMultipleDates", SqliteType.Integer);
 
-                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                foreach (var approval in pcr.Approvals)
+                {
+                    pId.Value = approval.Id.ToString();
+                    pPcrId.Value = pcr.Id.ToString();
+                    pRole.Value = approval.Role;
+                    pSignedByName.Value = (object?)approval.SignedByName ?? DBNull.Value;
+                    pSigned.Value = (approval.Signed || approval.ReceivedDate.HasValue) ? 1 : 0;
+                    pSignedDate.Value = approval.SignedDate.HasValue ? approval.SignedDate.Value.ToString("o") : (object)DBNull.Value;
+                    pSentDate.Value = approval.SentDate.HasValue ? approval.SentDate.Value.ToString("o") : (object)DBNull.Value;
+                    pReceivedDate.Value = approval.ReceivedDate.HasValue ? approval.ReceivedDate.Value.ToString("o") : (object)DBNull.Value;
+                    pSortOrder.Value = approval.SortOrder;
+                    pRequiresMultipleDates.Value = approval.RequiresMultipleDates ? 1 : 0;
+
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
             }
 
             await tx.CommitAsync().ConfigureAwait(false);
@@ -628,13 +671,11 @@ ON CONFLICT(Id) DO UPDATE SET
 
                 if (po.Items != null && po.Items.Count > 0)
                 {
-                    int poSortOrder = 0;
-                    foreach (var item in po.Items)
-                    {
-                        item.SortOrder = poSortOrder++;
-                        using var itemCmd = connection.CreateCommand();
-                        itemCmd.Transaction = tx;
-                        itemCmd.CommandText = @"
+                    // One prepared statement reused across every line, rather than a new command -
+                    // and a fresh SQLite parse/plan of the same UPSERT - per row.
+                    using var itemCmd = connection.CreateCommand();
+                    itemCmd.Transaction = tx;
+                    itemCmd.CommandText = @"
 INSERT INTO PurchaseOrderItem (Id, PoId, PrItemId, RfqItemId, ItemName, Quantity, Unit, UnitPrice, Discount, LineTotal, SortOrder)
 VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPrice, @Discount, @LineTotal, @SortOrder)
 ON CONFLICT(Id) DO UPDATE SET
@@ -649,17 +690,56 @@ ON CONFLICT(Id) DO UPDATE SET
     LineTotal = excluded.LineTotal,
     SortOrder = excluded.SortOrder;";
 
-                        itemCmd.Parameters.AddWithValue("@SortOrder", item.SortOrder);
-                        itemCmd.Parameters.AddWithValue("@Id", item.Id.ToString());
-                        itemCmd.Parameters.AddWithValue("@PoId", po.Id.ToString());
-                        itemCmd.Parameters.AddWithValue("@PrItemId", item.PrItemId.HasValue ? item.PrItemId.Value.ToString() : (object)DBNull.Value);
-                        itemCmd.Parameters.AddWithValue("@RfqItemId", item.RfqItemId.HasValue ? item.RfqItemId.Value.ToString() : (object)DBNull.Value);
-                        itemCmd.Parameters.AddWithValue("@ItemName", item.ItemName ?? string.Empty);
-                        itemCmd.Parameters.AddWithValue("@Quantity", item.Quantity);
-                        itemCmd.Parameters.AddWithValue("@Unit", item.Unit ?? "pcs");
-                        itemCmd.Parameters.AddWithValue("@UnitPrice", item.UnitPrice.HasValue ? (object)item.UnitPrice.Value : DBNull.Value);
-                        itemCmd.Parameters.AddWithValue("@Discount", item.Discount.HasValue ? (object)item.Discount.Value : DBNull.Value);
-                        itemCmd.Parameters.AddWithValue("@LineTotal", item.LineTotal);
+                    var iSortOrder = itemCmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+                    var iId = itemCmd.Parameters.Add("@Id", SqliteType.Text);
+                    var iPoId = itemCmd.Parameters.Add("@PoId", SqliteType.Text);
+                    var iPrItemId = itemCmd.Parameters.Add("@PrItemId", SqliteType.Text);
+                    var iRfqItemId = itemCmd.Parameters.Add("@RfqItemId", SqliteType.Text);
+                    var iItemName = itemCmd.Parameters.Add("@ItemName", SqliteType.Text);
+                    var iQuantity = itemCmd.Parameters.Add("@Quantity", SqliteType.Real);
+                    var iUnit = itemCmd.Parameters.Add("@Unit", SqliteType.Text);
+                    var iUnitPrice = itemCmd.Parameters.Add("@UnitPrice", SqliteType.Real);
+                    var iDiscount = itemCmd.Parameters.Add("@Discount", SqliteType.Real);
+                    var iLineTotal = itemCmd.Parameters.Add("@LineTotal", SqliteType.Real);
+
+                    // Same reuse for the nested transport-allocation UPSERT, shared across every
+                    // item's allocations rather than rebuilt per item or per allocation.
+                    using var tCmd = connection.CreateCommand();
+                    tCmd.Transaction = tx;
+                    tCmd.CommandText = @"
+INSERT INTO PoItemTransport (Id, PoItemId, Quantity, ContractNumber, TransporterName, RatePerUnit, SortOrder)
+VALUES (@Id, @PoItemId, @Quantity, @ContractNumber, @TransporterName, @RatePerUnit, @SortOrder)
+ON CONFLICT(Id) DO UPDATE SET
+    PoItemId = excluded.PoItemId,
+    Quantity = excluded.Quantity,
+    ContractNumber = excluded.ContractNumber,
+    TransporterName = excluded.TransporterName,
+    RatePerUnit = excluded.RatePerUnit,
+    SortOrder = excluded.SortOrder;";
+                    var tId = tCmd.Parameters.Add("@Id", SqliteType.Text);
+                    var tPoItemId = tCmd.Parameters.Add("@PoItemId", SqliteType.Text);
+                    var tQuantity = tCmd.Parameters.Add("@Quantity", SqliteType.Real);
+                    var tContractNumber = tCmd.Parameters.Add("@ContractNumber", SqliteType.Text);
+                    var tTransporterName = tCmd.Parameters.Add("@TransporterName", SqliteType.Text);
+                    var tRatePerUnit = tCmd.Parameters.Add("@RatePerUnit", SqliteType.Real);
+                    var tSortOrder = tCmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+
+                    int poSortOrder = 0;
+                    foreach (var item in po.Items)
+                    {
+                        item.SortOrder = poSortOrder++;
+
+                        iSortOrder.Value = item.SortOrder;
+                        iId.Value = item.Id.ToString();
+                        iPoId.Value = po.Id.ToString();
+                        iPrItemId.Value = item.PrItemId.HasValue ? item.PrItemId.Value.ToString() : (object)DBNull.Value;
+                        iRfqItemId.Value = item.RfqItemId.HasValue ? item.RfqItemId.Value.ToString() : (object)DBNull.Value;
+                        iItemName.Value = item.ItemName ?? string.Empty;
+                        iQuantity.Value = item.Quantity;
+                        iUnit.Value = item.Unit ?? "pcs";
+                        iUnitPrice.Value = item.UnitPrice.HasValue ? (object)item.UnitPrice.Value : DBNull.Value;
+                        iDiscount.Value = item.Discount.HasValue ? (object)item.Discount.Value : DBNull.Value;
+                        iLineTotal.Value = item.LineTotal;
 
                         await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
 
@@ -678,25 +758,14 @@ ON CONFLICT(Id) DO UPDATE SET
                         {
                             t.PoItemId = item.Id;
                             t.SortOrder = transportSort++;
-                            using var tCmd = connection.CreateCommand();
-                            tCmd.Transaction = tx;
-                            tCmd.CommandText = @"
-INSERT INTO PoItemTransport (Id, PoItemId, Quantity, ContractNumber, TransporterName, RatePerUnit, SortOrder)
-VALUES (@Id, @PoItemId, @Quantity, @ContractNumber, @TransporterName, @RatePerUnit, @SortOrder)
-ON CONFLICT(Id) DO UPDATE SET
-    PoItemId = excluded.PoItemId,
-    Quantity = excluded.Quantity,
-    ContractNumber = excluded.ContractNumber,
-    TransporterName = excluded.TransporterName,
-    RatePerUnit = excluded.RatePerUnit,
-    SortOrder = excluded.SortOrder;";
-                            tCmd.Parameters.AddWithValue("@Id", t.Id.ToString());
-                            tCmd.Parameters.AddWithValue("@PoItemId", item.Id.ToString());
-                            tCmd.Parameters.AddWithValue("@Quantity", t.Quantity);
-                            tCmd.Parameters.AddWithValue("@ContractNumber", (object?)t.ContractNumber ?? DBNull.Value);
-                            tCmd.Parameters.AddWithValue("@TransporterName", (object?)t.TransporterName ?? DBNull.Value);
-                            tCmd.Parameters.AddWithValue("@RatePerUnit", t.RatePerUnit.HasValue ? (object)t.RatePerUnit.Value : DBNull.Value);
-                            tCmd.Parameters.AddWithValue("@SortOrder", t.SortOrder);
+
+                            tId.Value = t.Id.ToString();
+                            tPoItemId.Value = item.Id.ToString();
+                            tQuantity.Value = t.Quantity;
+                            tContractNumber.Value = (object?)t.ContractNumber ?? DBNull.Value;
+                            tTransporterName.Value = (object?)t.TransporterName ?? DBNull.Value;
+                            tRatePerUnit.Value = t.RatePerUnit.HasValue ? (object)t.RatePerUnit.Value : DBNull.Value;
+                            tSortOrder.Value = t.SortOrder;
                             await tCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                         }
                     }
