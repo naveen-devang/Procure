@@ -320,7 +320,14 @@ namespace Procure.Services.Export
             IReadOnlyList<PrItem>? selectedItems = null)
         {
             options ??= new PcrPdfOptions();
-            bool shrink = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
+            // "Fit sheet to one page" never changes the layout itself - the sheet is always built at
+            // one natural, full size (same row heights, gaps and font sizes either way), then - if
+            // requested and it doesn't already fit - scaled down as a single whole-page transform at
+            // the very end (see useAutoScale below). That's how Acrobat/Word's own "shrink to fit"
+            // works: it shrinks a finished page, it never re-lays-out a smaller one. Doing it any other
+            // way means every row, header and signature box needs its own centering math re-solved at
+            // a second size, which is exactly what used to drift off-center here.
+            bool fitToOnePage = options.LayoutMode == PdfLayoutMode.ShrinkToFit;
 
             var (pageWidth, pageHeight, margin) = PageGeometry(options);
 
@@ -354,21 +361,19 @@ namespace Procure.Services.Export
             double contentWidth = pageWidth - marginLeft - marginRight;
             double bottomLimit = margin;
 
-            // Shrink-to-fit tightens every gap and row height below so a short comparison sheet has a
-            // real chance of landing on one page instead of spilling a near-empty footer onto its own
-            // page: the totals block (12 summary rows + remarks + signature boxes) is ~270-285pt tall,
-            // more than half a landscape page, so the un-tightened layout only ever fits ~10-item lists.
-            double titleGap = shrink ? 18 : 22;
-            double metaLineGap = shrink ? 11 : 14;
-            double metaGapAfter = shrink ? 13 : 18;
-            double continuationHeaderGap = shrink ? 13 : 16;
-            double tableHeaderRowH1 = shrink ? 17 : 20;
-            double tableHeaderRowH2 = shrink ? 11 : 14;
-            double itemRowH = shrink ? 17 : 20;
-            double summaryRowH = shrink ? 11.5 : 13.5;
-            double afterTableGap = shrink ? 8 : 14;
-            double remarksGap = shrink ? 14 : 18;
-            double signatureBoxHeight = shrink ? 58 : 75;
+            // Always the natural, full size - "Fit sheet to one page" scales the finished page down
+            // uniformly instead (see useAutoScale below), so these never need a second, smaller set.
+            double titleGap = 22;
+            double metaLineGap = 14;
+            double metaGapAfter = 18;
+            double continuationHeaderGap = 16;
+            double tableHeaderRowH1 = 20;
+            double tableHeaderRowH2 = 14;
+            double itemRowH = 20;
+            double summaryRowH = 13.5;
+            double afterTableGap = 14;
+            double remarksGap = 18;
+            double signatureBoxHeight = 75;
 
             const double slNoWidth = 30;
 
@@ -900,24 +905,26 @@ namespace Procure.Services.Export
 
                 DrawRect(marginLeft, curY - rowH1 - rowH2, tableWidth, rowH1 + rowH2, lineWidth: 0.5, fillHex: "F2F4F7");
 
-                DrawText("Sl No.", colX[0], curY - 14, font: "F2", fontSize: 8, align: "center", width: slNoWidth);
-                DrawText("Item Description", colX[1], curY - 14, font: "F2", fontSize: 8, align: "center", width: descWidth);
+                // Every header cell is centered within its own row band via DrawCenteredBlock, whose
+                // formula scales with rowH1/rowH2 - hand-placed baseline offsets tuned only for the
+                // unshrunk row heights used to drift off-center once "Fit sheet to one page" shrank them.
+                DrawCenteredBlock(new List<string> { "Sl No." }, colX[0], curY, rowH1, vendorHeaderLineHeight, "F2", 8, slNoWidth);
+                DrawCenteredBlock(new List<string> { "Item Description" }, colX[1], curY, rowH1, vendorHeaderLineHeight, "F2", 8, descWidth);
                 // Two lines at full header size instead of one line shrunk to fit - same size as
                 // every other header on the sheet, just wrapped like a long vendor name already is.
-                DrawText("PR", colX[2], curY - 13, font: "F2", fontSize: 8, align: "center", width: qtyWidth);
-                DrawText("Quantity", colX[2], curY - 22, font: "F2", fontSize: 8, align: "center", width: qtyWidth);
+                DrawCenteredBlock(new List<string> { "PR", "Quantity" }, colX[2], curY, rowH1, vendorHeaderLineHeight, "F2", 8, qtyWidth);
 
                 for (int i = 0; i < supplierCount; i++)
                 {
                     // Vendor name centered across the pair's full width, no divider drawn through it -
                     // reads the same as Excel's merged header cell.
                     DrawCenteredBlock(vendorHeaderLines[i], colX[VendorQtyColIdx(i)], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, VendorPairW(i));
-                    DrawText("Qty", colX[VendorQtyColIdx(i)], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: vendorQtyW[i]);
-                    DrawText(currencyInHeader ? $"Price ({CurrencyOf(selectedRfqs[i])})" : "Unit Price", colX[VendorPriceColIdx(i)], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: vendorPriceW[i]);
+                    DrawCenteredBlock(new List<string> { "Qty" }, colX[VendorQtyColIdx(i)], curY - rowH1, rowH2, vendorHeaderLineHeight, "F2", 7, vendorQtyW[i]);
+                    DrawCenteredBlock(new List<string> { currencyInHeader ? $"Price ({CurrencyOf(selectedRfqs[i])})" : "Unit Price" }, colX[VendorPriceColIdx(i)], curY - rowH1, rowH2, vendorHeaderLineHeight, "F2", 7, vendorPriceW[i]);
                 }
 
                 DrawCenteredBlock(historicalHeaderLines, colX[HistoricalColIdx()], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, historicalWidth);
-                DrawText(currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price", colX[HistoricalColIdx()], curY - rowH1 - 10, font: "F2", fontSize: 7, align: "center", width: historicalWidth);
+                DrawCenteredBlock(new List<string> { currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price" }, colX[HistoricalColIdx()], curY - rowH1, rowH2, vendorHeaderLineHeight, "F2", 7, historicalWidth);
 
                 DrawLine(colX[3], curY - rowH1, marginLeft + tableWidth, curY - rowH1, width: 0.5);
 
@@ -975,7 +982,7 @@ namespace Procure.Services.Export
             // Remarks are free text and can run long - wrap over the full content width with no
             // truncation, and let the real line count feed the footer budget below so the block
             // either scales or paginates rather than clipping at the page edge.
-            double remarksLineH = shrink ? 9.5 : 11.0;
+            double remarksLineH = 11.0;
             var remarksBody = string.IsNullOrWhiteSpace(remarks) ? "None" : remarks.Trim();
             var remarksLines = WrapText($"Remarks : {remarksBody}", "F2", 8.5, contentWidth, int.MaxValue, truncate: false);
             double remarksBlockH = remarksLines.Count * remarksLineH;
@@ -984,16 +991,14 @@ namespace Procure.Services.Export
             double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
-            // Shrink-to-fit's tightened row heights above only buy back so much - a long item list
-            // still overflows the tightened layout onto a second, near-empty page (the original bug
-            // report). Rather than tune row heights further, work out exactly how much extra uniform
-            // scale the WHOLE page needs to make everything fit, then apply it as a single PDF
-            // transform at the end - the same "shrink the whole sheet" effect as a photocopier or
-            // Word's own Fit-to-Page, and it always lands on exactly one page for any item count that
-            // clears the legibility floor below.
+            // "Fit sheet to one page": work out how much the WHOLE natural-size page needs to shrink to
+            // land on one page, then apply that as a single uniform PDF transform at the end - the same
+            // "shrink the whole sheet" effect as a photocopier or Word/Acrobat's own Fit-to-Page. Every
+            // element (rows, headers, signature boxes) scales together by construction, so nothing needs
+            // its own centering math re-solved at a smaller size.
             bool useAutoScale = false;
             double autoScale = 1.0;
-            if (shrink && prItems.Count > 0)
+            if (fitToOnePage && prItems.Count > 0)
             {
                 double headerBlockHeight = titleGap + ((2 + numberRowLines - 1) * metaLineGap) + metaGapAfter + tableHeaderRowH1 + tableHeaderRowH2;
                 double neededHeight = headerBlockHeight + itemRowHeights.Sum() + footerBlockNeeded;
@@ -1141,12 +1146,17 @@ namespace Procure.Services.Export
             // Historical Price prints nothing at all from here down - it's a per-item reference
             // price, not a real quote carried through the same discount/VAT/total math as an actual
             // vendor, so neither helper takes a value for it any more.
+            // Vertically centers the row's single line of text within rowH - scales with shrink,
+            // unlike a hand-placed "curY - 9.5" baseline that only ever fit the unshrunk row height.
+            double SummaryTextY(double rowH) => curY - ((rowH - vendorHeaderLineHeight) / 2.0) - (vendorHeaderLineHeight * 0.75);
+
             void DrawSummaryMoneyRow(string label, Func<RequestForQuotation, (decimal? amount, bool showZeroAsDash)> valFunc, bool isBold = false)
             {
                 double rowH = summaryRowH;
                 DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
+                var textY = SummaryTextY(rowH);
 
-                DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
+                DrawText(label, colX[1] + 4, textY, font: isBold ? "F2" : "F1", fontSize: 7.5);
 
                 for (int i = 0; i < supplierCount; i++)
                 {
@@ -1155,7 +1165,7 @@ namespace Procure.Services.Export
                     var (amt, showDash) = valFunc(rfq);
                     // Spans the vendor's whole Qty+Price pair - no divider drawn through this band
                     // (see CloseCurrentPageTable), so the total reads as one merged figure.
-                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), curY - 9.5, CellCur(cur), amt, isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash);
+                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), textY, CellCur(cur), amt, isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash);
                 }
 
                 curY -= rowH;
@@ -1165,13 +1175,14 @@ namespace Procure.Services.Export
             {
                 double rowH = summaryRowH;
                 DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
+                var textY = SummaryTextY(rowH);
 
-                DrawText(label, colX[1] + 4, curY - 9.5, font: isBold ? "F2" : "F1", fontSize: 7.5);
+                DrawText(label, colX[1] + 4, textY, font: isBold ? "F2" : "F1", fontSize: 7.5);
 
                 for (int i = 0; i < supplierCount; i++)
                 {
                     var text = valFunc(selectedRfqs[i]);
-                    DrawFittedText(text, colX[VendorQtyColIdx(i)] + 3, curY - 9.5, font: isBold ? "F2" : "F1", baseFontSize: 7.5, align: "center", maxWidth: VendorPairW(i) - 6, minFontSize: 5.0);
+                    DrawFittedText(text, colX[VendorQtyColIdx(i)] + 3, textY, font: isBold ? "F2" : "F1", baseFontSize: 7.5, align: "center", maxWidth: VendorPairW(i) - 6, minFontSize: 5.0);
                 }
 
                 curY -= rowH;
