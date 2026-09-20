@@ -219,6 +219,14 @@ sealed class BoolToFilterChipTextConverter : BrushConverter
         v is true ? BoardTheme.Pick("#60CDFF", "#004E8C") : BoardTheme.Pick("#FFFFFF", "#1A1A1A");
 }
 
+/// <summary>A lighter fill on the selected row of a plain list (Notes) - subtler than the filter
+/// chip's accent tint, since here every unselected row is already its own bordered card.</summary>
+sealed class BoolToSelectedRowBgConverter : BrushConverter
+{
+    protected override SolidColorBrush Map(object? v, object? p) =>
+        v is true ? BoardTheme.Pick("#35353D", "#E4EDFA") : BoardTheme.Pick("#26262B", "#F5F3EE");
+}
+
 // --- non-brush helpers ---
 
 sealed class NullOrEmptyToVisibilityConverter : IValueConverter

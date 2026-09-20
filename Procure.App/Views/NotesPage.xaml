@@ -12,6 +12,7 @@
 
     <Page.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolVis" />
+        <conv:BoolToSelectedRowBgConverter x:Key="SelectedRowBg" />
 
         <Style x:Key="Pane" TargetType="Border">
             <Setter Property="BorderThickness" Value="1" />
@@ -31,12 +32,18 @@
         </Style>
 
         <DataTemplate x:Key="NoteRow" x:DataType="models:NoteListItem">
-            <Grid x:DefaultBindMode="OneWay" Padding="11,8" Tapped="Note_Tapped">
-                <Grid.Resources>
-                    <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
-                    <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
-                </Grid.Resources>
-                <StackPanel Spacing="1">
+            <!-- One card per note - previously a bare padded row with nothing to mark where one
+                 note ended and the next began. The open note (IsSelected, kept in step by
+                 NotePageModel) gets a lighter fill across the whole card rather than a separate
+                 accent marker. -->
+            <Border x:DefaultBindMode="OneWay" Tapped="Note_Tapped" CornerRadius="8" Margin="0,0,0,6"
+                    BorderThickness="1" Background="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource SelectedRowBg}}"
+                    BorderBrush="{ThemeResource AppHairline}">
+                <StackPanel Spacing="1" Padding="11,8">
+                    <StackPanel.Resources>
+                        <!-- Clicked, not read: selectable text here would swallow the tap (see Styles.xaml). -->
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}" />
+                    </StackPanel.Resources>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <Ellipse Width="5" Height="5" VerticalAlignment="Center" Fill="{ThemeResource PrimaryTextBrush}"
                                  Visibility="{x:Bind Pinned, Converter={StaticResource BoolVis}, Mode=OneWay}" />
@@ -48,7 +55,7 @@
                                Visibility="{x:Bind HasSnippet, Converter={StaticResource BoolVis}, Mode=OneWay}" />
                     <TextBlock Text="{x:Bind WhenLabel, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextTertiary}" />
                 </StackPanel>
-            </Grid>
+            </Border>
         </DataTemplate>
     </Page.Resources>
 
@@ -82,7 +89,18 @@
                 <TextBox Grid.Row="1" PlaceholderText="Search notes" FontSize="12.5" Margin="14,0,14,10" Height="34"
                          Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <ListView Grid.Row="2" x:Name="NoteList" ItemsSource="{Binding Notes}" SelectionMode="None"
-                          Margin="6,0,6,8" ItemTemplate="{StaticResource NoteRow}" />
+                          Margin="14,0,14,8" Padding="0" ItemTemplate="{StaticResource NoteRow}">
+                    <!-- The default ListViewItem has its own padding and left-aligns content instead
+                         of stretching it - without this override each note card sat indented from
+                         the search box above and never reached the row's own right edge. -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                </ListView>
                 <StackPanel Grid.Row="2" Visibility="{Binding Notes.Count, Converter={StaticResource ZeroVis}}" Spacing="6"
                             HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,40">
                     <FontIcon Glyph="&#xE70B;" FontSize="26" Foreground="{ThemeResource AppTextTertiary}" />
