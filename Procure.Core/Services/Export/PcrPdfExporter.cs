@@ -984,7 +984,14 @@ namespace Procure.Services.Export
             // either scales or paginates rather than clipping at the page edge.
             double remarksLineH = 11.0;
             var remarksBody = string.IsNullOrWhiteSpace(remarks) ? "None" : remarks.Trim();
-            var remarksLines = WrapText($"Remarks : {remarksBody}", "F2", 8.5, contentWidth, int.MaxValue, truncate: false);
+            // Preserve the user's own line breaks (paragraphs, manual newlines) before soft-wrapping
+            // each of them to contentWidth - otherwise \n is just whitespace to the wrapper and the
+            // whole remarks blob gets reflowed into one continuous paragraph.
+            var remarksHardLines = HardLines(remarksBody, int.MaxValue);
+            var remarksLines = new List<string>();
+            remarksLines.AddRange(WrapText($"Remarks : {remarksHardLines[0]}", "F2", 8.5, contentWidth, int.MaxValue, truncate: false));
+            foreach (var hard in remarksHardLines.Skip(1))
+                remarksLines.AddRange(WrapText(hard, "F2", 8.5, contentWidth, int.MaxValue, truncate: false));
             double remarksBlockH = remarksLines.Count * remarksLineH;
 
             const int summaryRowsCount = 12;
