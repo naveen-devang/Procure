@@ -424,7 +424,7 @@ namespace Procure.PageModels
             NewRfqDiscount = null;
             NewRfqPaymentTerms = string.Empty;
             NewRfqVatType = "5%";
-            NewRfqIncoterms = string.Empty;
+            NewRfqIncoterms = "DDP";
             NewRfqDeliveryLeadTime = string.Empty;
             NewRfqWarranty = string.Empty;
             NewRfqTechnicalApproval = TechnicalApprovalNotSet;

@@ -355,7 +355,7 @@ namespace Procure.PageModels
             BatchRfqDiscount = null;
             BatchRfqPaymentTerms = string.Empty;
             BatchRfqVatType = "5%";
-            BatchRfqIncoterms = string.Empty;
+            BatchRfqIncoterms = "DDP";
             BatchRfqDeliveryLeadTime = string.Empty;
             BatchRfqWarranty = string.Empty;
             BatchRfqTechnicalApproval = TechnicalApprovalNotSet;
