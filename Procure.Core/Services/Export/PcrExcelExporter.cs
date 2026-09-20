@@ -371,9 +371,8 @@ namespace Procure.Services.Export
             }
 
             string lastPriceColLetter = GetColumnLetter(totalCols);
-            var historicalCur = selectedRfqs.Count > 0 && !string.IsNullOrWhiteSpace(selectedRfqs[0].Currency) ? selectedRfqs[0].Currency : "AED";
             sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""3"" t=""inlineStr""><is><t>{EscapeXml($"Historical Price ({historicalCur})")}</t></is></c>
+            <c r=""{lastPriceColLetter}{r}"" s=""3"" t=""inlineStr""><is><t>Historical Price</t></is></c>
         </row>");
             r++;
 
@@ -464,6 +463,7 @@ namespace Procure.Services.Export
             <c r=""C{r}"" s=""6"" t=""inlineStr""><is><t>{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {EscapeXml(item.Unit)}</t></is></c>");
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;
+                    string? rowLastPriceCurrency = item.EstimatedCurrency;
                     bool rowLastPriceFromQuote = false;
 
                     for (int i = 0; i < supplierCount; i++)
@@ -508,6 +508,7 @@ namespace Procure.Services.Export
                         if (!rowLastPriceFromQuote && rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
                         {
                             rowLastPrice = rfqItem.LastPrice.Value;
+                            rowLastPriceCurrency = rfqItem.LastPriceCurrency;
                             rowLastPriceFromQuote = true;
                         }
                     }
@@ -516,8 +517,13 @@ namespace Procure.Services.Export
 
                     if (rowLastPrice > 0)
                     {
+                        // Printed as its own currency, not a bare number under one column-wide
+                        // guess - the row this price came from (the PR's own estimate, or whichever
+                        // vendor's quote carried the historical figure) may not share this RFQ's
+                        // currency at all.
+                        var cur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? "AED" : rowLastPriceCurrency;
                         sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""7""><v>{rowLastPrice.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{lastPriceColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{rowLastPrice.ToString("N2", CultureInfo.InvariantCulture)} {EscapeXml(cur)}</t></is></c>");
                     }
                     else
                     {

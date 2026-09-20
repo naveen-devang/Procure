@@ -95,6 +95,7 @@ namespace Procure.Data
                 await Measure("09b board refresh then PR edit keeps prices", () => RefreshThenEditKeepsPricesAsync(db, repo));
                 await Measure("09c one edit travels one hop (PR->RFQ->PO)", () => FieldLevelDownstreamSyncAsync(db, repo));
                 await Measure("09d words instead of a price on a quote line", () => PriceNoteFlowAsync(db, repo));
+                await Measure("09e historical price currency travels with it", () => HistoricalPriceCurrencyFlowAsync(db, repo));
                 await Measure("10 guard decisions (ordered / quoted)", () => GuardDecisionsAsync(db, repo));
                 await Measure("11 deletes and cascade", () => DeleteFlowAsync(db, repo));
                 await Measure("12 PCR export (Excel + PDF)", () => PcrExportFlowAsync(db, repo));
@@ -806,6 +807,83 @@ namespace Procure.Data
             Assert(afterOrder.Items[0].UnitPrice == 30m,
                 $"an order keeps its rate when the quote's price becomes words; got {afterOrder.Items[0].UnitPrice}");
             Assert(afterOrder.Value == 10m * 30m * 1.05m, $"and its value is untouched; got {afterOrder.Value}");
+        }
+
+        /// <summary>A historical price is not always in the RFQ's own currency - a past purchase in
+        /// USD compared against a fresh AED quote. Covers the smart-parse box (typing a currency
+        /// alongside the number, or leaving it out and keeping what was already there), the sync from
+        /// a requisition's estimate into its open quotes, and that a PR with items in two different
+        /// currencies keeps each one distinct rather than collapsing to one guess.</summary>
+        private static async Task HistoricalPriceCurrencyFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            SmartPriceParser.Demo();
+
+            // The smart-parse box itself: a currency typed with the number is kept; a bare number
+            // leaves whatever currency the row already had.
+            var probe = new PrItem { Id = Guid.NewGuid(), ItemName = "probe" };
+            probe.EstimatedPriceText = "86.75 usd";
+            Assert(probe.EstimatedUnitPrice == 86.75m && probe.EstimatedCurrency == "USD",
+                $"typing a currency with the price sets both; got {probe.EstimatedUnitPrice} {probe.EstimatedCurrency}");
+            probe.EstimatedPriceText = "90";
+            Assert(probe.EstimatedUnitPrice == 90m && probe.EstimatedCurrency == "USD",
+                $"a bare number afterwards keeps the currency already there; got {probe.EstimatedUnitPrice} {probe.EstimatedCurrency}");
+
+            // The box shows the currency back, capitalised, so reopening it later still says what
+            // it was priced in - not just a bare number that could be anything by then.
+            Assert(probe.EstimatedPriceText == "90 USD",
+                $"the box displays the currency alongside the number; got '{probe.EstimatedPriceText}'");
+
+            // A PR with two items priced in two different currencies - the case the bug report was
+            // actually about: one column that guessed a single currency for the whole sheet.
+            var pr = NewPr("fx", (Brush, 10m), (Gasket, 5m));
+            pr.Items[0].EstimatedUnitPrice = 45m;
+            pr.Items[0].EstimatedCurrency = "AED";
+            pr.Items[1].EstimatedUnitPrice = 86.75m;
+            pr.Items[1].EstimatedCurrency = "USD";
+            await repo.SaveAsync(pr);
+
+            var rfq = NewRfq(pr, "fx-vendor");
+            var line0 = NewRfqLine(pr.Items[0], price: 50m);
+            line0.LastPrice = pr.Items[0].EstimatedUnitPrice;
+            line0.LastPriceCurrency = pr.Items[0].EstimatedCurrency;
+            var line1 = NewRfqLine(pr.Items[1], price: 340m);
+            line1.LastPrice = pr.Items[1].EstimatedUnitPrice;
+            line1.LastPriceCurrency = pr.Items[1].EstimatedCurrency;
+            rfq.Items.Add(line0);
+            rfq.Items.Add(line1);
+            await repo.SaveRfqAsync(rfq);
+
+            var live = await Reload(repo, pr.Id);
+            var quote = live.Rfqs.Single();
+            Assert(quote.Items.Single(i => i.PrItemId == pr.Items[0].Id).LastPriceCurrency == "AED",
+                "the AED item's historical currency survives a save and reload");
+            Assert(quote.Items.Single(i => i.PrItemId == pr.Items[1].Id).LastPriceCurrency == "USD",
+                "and the USD item's stays distinct, not collapsed to the RFQ's own AED");
+
+            // Editing the requisition's estimate pushes the currency into the open quote too, the
+            // same hop QuoteSyncFlowAsync already checks for the bare number.
+            var edited = live.Items.Select(i => new PrItem
+            {
+                Id = i.Id, PrId = i.PrId, ItemName = i.ItemName, Quantity = i.Quantity, Unit = i.Unit,
+                EstimatedUnitPrice = i.Id == pr.Items[1].Id ? 92m : i.EstimatedUnitPrice,
+                EstimatedCurrency = i.Id == pr.Items[1].Id ? "EUR" : i.EstimatedCurrency,
+                SortOrder = i.SortOrder
+            }).ToList();
+            var preEdit = live.Items.ToList();
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 09e (sync half): the PR board page model was not available.");
+                return;
+            }
+            live.Items = new ObservableCollection<PrItem>(edited);
+            await repo.SaveAsync(live);
+            await model.RunQuoteSyncForTestAsync(live, preEdit, edited);
+
+            var after = await Reload(repo, pr.Id);
+            var afterLine1 = after.Rfqs.Single().Items.Single(i => i.PrItemId == pr.Items[1].Id);
+            Assert(afterLine1.LastPriceCurrency == "EUR",
+                $"a currency change to the requisition's estimate reaches the open quote; got {afterLine1.LastPriceCurrency}");
         }
 
         private static async Task GuardDecisionsAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)

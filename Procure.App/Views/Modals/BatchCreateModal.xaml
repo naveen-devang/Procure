@@ -215,7 +215,8 @@
                                                      FontSize="12" VerticalAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" TextAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedUnitPrice, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price" FontSize="12" />
+                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price or 0.00 usd" FontSize="12"
+                                                     ToolTipService.ToolTip="A currency typed with the number - e.g. 86.75 usd - is kept; otherwise the row keeps its last currency" />
                                             <Button ToolTipService.ToolTip="Remove Item" Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28" Padding="0"
                                                     Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Top" Margin="0,4,0,0"
                                                     Click="RemoveItem_Click" />

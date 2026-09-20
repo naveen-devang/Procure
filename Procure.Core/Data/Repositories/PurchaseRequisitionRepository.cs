@@ -133,7 +133,7 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Notes, SortOrder, Discount, LastPrice, PriceNote
+SELECT Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Notes, SortOrder, Discount, LastPrice, PriceNote, LastPriceCurrency
 FROM RfqItem" + Scope(cmd, "RfqId", "@Rfq", scoped ? rfqById.Keys : null) + @"
 ORDER BY SortOrder ASC;";
 
@@ -157,7 +157,8 @@ ORDER BY SortOrder ASC;";
                             SortOrder = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
                             Discount = reader.IsDBNull(10) ? null : (decimal)reader.GetDouble(10),
                             LastPrice = reader.IsDBNull(11) ? null : (decimal)reader.GetDouble(11),
-                            PriceNote = reader.IsDBNull(12) ? string.Empty : reader.GetString(12)
+                            PriceNote = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+                            LastPriceCurrency = reader.IsDBNull(13) ? null : reader.GetString(13)
                         });
                     }
                 }
@@ -389,7 +390,7 @@ ORDER BY d.SortOrder ASC, d.Name ASC;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder
+SELECT Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder, EstimatedCurrency
 FROM PrItem" + Scope(cmd, "PrId", "@Pr", prIds) + @"
 ORDER BY SortOrder ASC;";
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -411,7 +412,8 @@ ORDER BY SortOrder ASC;";
                         Unit = reader.IsDBNull(4) ? "pcs" : reader.GetString(4),
                         EstimatedUnitPrice = reader.IsDBNull(5) ? null : (decimal)reader.GetDouble(5),
                         Notes = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-                        SortOrder = reader.IsDBNull(7) ? 0 : reader.GetInt32(7)
+                        SortOrder = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                        EstimatedCurrency = reader.IsDBNull(8) ? null : reader.GetString(8)
                     });
                 }
             }

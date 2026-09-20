@@ -383,6 +383,9 @@ namespace Procure.PageModels
                 if (row.HasLastPrice)
                 {
                     targetItem.LastPrice = row.LastPrice;
+                    // A currency named in the pasted cell wins; a bare number leaves whatever
+                    // currency the row already had rather than silently resetting it.
+                    if (row.LastPriceCurrency != null) targetItem.LastPriceCurrency = row.LastPriceCurrency;
                 }
             }
 
@@ -449,6 +452,7 @@ namespace Procure.PageModels
                         QuotedUnitPrice = null,
                         Discount = null,
                         LastPrice = prItem.EstimatedUnitPrice,
+                        LastPriceCurrency = prItem.EstimatedCurrency,
                         SortOrder = sortOrder++
                     };
                     rfqItem.PropertyChanged += OnEditingRfqItemPropertyChanged;
@@ -505,6 +509,7 @@ namespace Procure.PageModels
                         QuotedUnitPrice = rfqItem.QuotedUnitPrice,
                         Discount = rfqItem.Discount,
                         LastPrice = rfqItem.LastPrice,
+                        LastPriceCurrency = rfqItem.LastPriceCurrency,
                         PriceNote = rfqItem.PriceNote,
                         Notes = rfqItem.Notes,
                         SortOrder = rfqItem.SortOrder
@@ -531,6 +536,7 @@ namespace Procure.PageModels
                         QuotedUnitPrice = null,
                         Discount = null,
                         LastPrice = prItem.EstimatedUnitPrice,
+                        LastPriceCurrency = prItem.EstimatedCurrency,
                         SortOrder = sortOrder++
                     };
                     rfqItem.PropertyChanged += OnEditingRfqItemPropertyChanged;

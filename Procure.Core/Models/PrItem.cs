@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Procure.Utilities;
 
 namespace Procure.Models
 {
@@ -36,6 +37,13 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(EstimatedTotalPrice))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial decimal? EstimatedUnitPrice { get; set; }
+
+        /// <summary>What the last purchase of this item was actually priced in - not always the PR's
+        /// own currency. Null means "not yet typed"; <see cref="EstimatedPriceText"/> resolves it to
+        /// "AED" the same way <see cref="Utilities.MoneyFormat"/> does everywhere else.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
+        public partial string? EstimatedCurrency { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PendingQuantity))]
@@ -96,6 +104,45 @@ namespace Procure.Models
             }
         }
 
+        /// <summary>What the estimated-price box reads and writes. Typing a currency alongside the
+        /// number - "86.75 usd", "$86.75" - sets <see cref="EstimatedCurrency"/> too; a bare number
+        /// leaves whatever currency was already there. The setter does not echo its own change back
+        /// (mirrors <see cref="RfqItem.LastPriceText"/>) so mid-type the caret never jumps.
+        ///
+        /// Always shows the currency, not just the number - reopening this row after months away
+        /// with a bare "86.75" left no way to tell what it was actually priced in.</summary>
+        public string EstimatedPriceText
+        {
+            get => EstimatedUnitPrice.HasValue
+                ? $"{EstimatedUnitPrice.Value.ToString("0.####", CultureInfo.InvariantCulture)} {(string.IsNullOrWhiteSpace(EstimatedCurrency) ? "AED" : EstimatedCurrency.ToUpperInvariant())}"
+                : string.Empty;
+            set
+            {
+                _suppressEstimatedPriceTextEcho = true;
+                try
+                {
+                    var (amount, currency) = SmartPriceParser.Parse(value, EstimatedCurrency ?? "AED");
+                    EstimatedUnitPrice = amount;
+                    EstimatedCurrency = currency;
+                }
+                finally
+                {
+                    _suppressEstimatedPriceTextEcho = false;
+                }
+            }
+        }
+
+        private bool _suppressEstimatedPriceTextEcho;
+
+        partial void OnEstimatedUnitPriceChanged(decimal? value) => RaiseEstimatedPriceTextChanged();
+        partial void OnEstimatedCurrencyChanged(string? value) => RaiseEstimatedPriceTextChanged();
+
+        private void RaiseEstimatedPriceTextChanged()
+        {
+            if (_suppressEstimatedPriceTextEcho) return;
+            OnPropertyChanged(nameof(EstimatedPriceText));
+        }
+
         public string FormattedDisplay
         {
             get
@@ -103,7 +150,7 @@ namespace Procure.Models
                 var name = string.IsNullOrWhiteSpace(ItemName) ? "Unnamed Item" : ItemName;
                 if (EstimatedUnitPrice.HasValue && EstimatedUnitPrice.Value > 0)
                 {
-                    return $"{name} — {FormattedQuantity} @ {EstimatedUnitPrice.Value:N2}";
+                    return $"{name} — {FormattedQuantity} @ {MoneyFormat.Format(EstimatedCurrency, EstimatedUnitPrice.Value)}";
                 }
                 return $"{name} — {FormattedQuantity}";
             }

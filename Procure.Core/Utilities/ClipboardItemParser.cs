@@ -330,9 +330,10 @@ namespace Procure.Utilities
                     : (!string.IsNullOrWhiteSpace(unitFromQty) ? unitFromQty : "pcs");
 
                 decimal? price = null;
+                string? priceCurrency = null;
                 if (columns.Length > 3 && !string.IsNullOrWhiteSpace(columns[3]))
                 {
-                    price = ParsePrice(columns[3]);
+                    (price, priceCurrency) = SmartPriceParser.ParseWithDetectedCurrency(columns[3]);
                 }
 
                 string notes = columns.Length > 4 ? columns[4].Trim() : string.Empty;
@@ -345,6 +346,7 @@ namespace Procure.Utilities
                     Quantity = quantity <= 0 ? 1 : quantity,
                     Unit = string.IsNullOrWhiteSpace(unit) ? "pcs" : unit,
                     EstimatedUnitPrice = price,
+                    EstimatedCurrency = priceCurrency,
                     Notes = notes,
                     SortOrder = sortOrder
                 };
@@ -681,7 +683,7 @@ namespace Procure.Utilities
                     }
                     if (cols.Length > 2)
                     {
-                        row.LastPrice = ParsePrice(cols[2]);
+                        (row.LastPrice, row.LastPriceCurrency) = SmartPriceParser.ParseWithDetectedCurrency(cols[2]);
                         row.HasLastPrice = true;
                     }
                 }
@@ -695,7 +697,7 @@ namespace Procure.Utilities
                     }
                     if (cols.Length > 1)
                     {
-                        row.LastPrice = ParsePrice(cols[1]);
+                        (row.LastPrice, row.LastPriceCurrency) = SmartPriceParser.ParseWithDetectedCurrency(cols[1]);
                         row.HasLastPrice = true;
                     }
                 }
@@ -703,7 +705,7 @@ namespace Procure.Utilities
                 {
                     if (cols.Length > 0)
                     {
-                        row.LastPrice = ParsePrice(cols[0]);
+                        (row.LastPrice, row.LastPriceCurrency) = SmartPriceParser.ParseWithDetectedCurrency(cols[0]);
                         row.HasLastPrice = true;
                     }
                 }
@@ -730,46 +732,7 @@ namespace Procure.Utilities
             return matchCount > 0 && (matchCount >= 2 || (cols.Length == 1 && (PricingHeaderKeywords.Contains(cols[0].Trim()) || HeaderKeywords.Contains(cols[0].Trim()))));
         }
 
-        private static decimal? ParsePrice(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-                return null;
-
-            // Strip currency symbols and formatting (e.g. "$", "AED", "€", "£", ",", " ", "%")
-            var sanitized = Regex.Replace(raw, @"[^\d\.\,\-]", "").Trim();
-            if (string.IsNullOrWhiteSpace(sanitized))
-                return null;
-
-            // Handle comma separators: "1,250" / "12,345,678" are thousands groups (Excel copies
-            // numbers as displayed) — rewriting them as decimal commas understated prices 1000x.
-            // Only a lone comma with 1-2 trailing digits reads as a European decimal comma.
-            if (sanitized.Contains(',') && !sanitized.Contains('.'))
-            {
-                if (Regex.IsMatch(sanitized, @"^-?\d{1,3}(?:,\d{3})+$"))
-                {
-                    sanitized = sanitized.Replace(",", "");
-                }
-                else if (Regex.IsMatch(sanitized, @"^-?\d+,\d{1,2}$"))
-                {
-                    sanitized = sanitized.Replace(",", ".");
-                }
-                else
-                {
-                    sanitized = sanitized.Replace(",", "");
-                }
-            }
-            else if (sanitized.Contains(',') && sanitized.Contains('.'))
-            {
-                sanitized = sanitized.Replace(",", "");
-            }
-
-            if (decimal.TryParse(sanitized, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal result))
-            {
-                return result;
-            }
-
-            return null;
-        }
+        private static decimal? ParsePrice(string raw) => SmartPriceParser.ParseAmount(raw);
     }
 
     public enum RfqPricingColumn
@@ -784,6 +747,7 @@ namespace Procure.Utilities
         public decimal? UnitPrice { get; set; }
         public decimal? Discount { get; set; }
         public decimal? LastPrice { get; set; }
+        public string? LastPriceCurrency { get; set; }
         public bool HasUnitPrice { get; set; }
         public bool HasDiscount { get; set; }
         public bool HasLastPrice { get; set; }

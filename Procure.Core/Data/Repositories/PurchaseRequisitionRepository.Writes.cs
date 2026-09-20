@@ -175,8 +175,8 @@ ON CONFLICT(Id) DO UPDATE SET
             using var insItemCmd = connection.CreateCommand();
             insItemCmd.Transaction = tx;
             insItemCmd.CommandText = @"
-INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder)
+INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder, EstimatedCurrency)
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder, @EstimatedCurrency)
 ON CONFLICT(Id) DO UPDATE SET
     PrId = excluded.PrId,
     ItemName = excluded.ItemName,
@@ -184,7 +184,8 @@ ON CONFLICT(Id) DO UPDATE SET
     Unit = excluded.Unit,
     EstimatedUnitPrice = excluded.EstimatedUnitPrice,
     Notes = excluded.Notes,
-    SortOrder = excluded.SortOrder;";
+    SortOrder = excluded.SortOrder,
+    EstimatedCurrency = excluded.EstimatedCurrency;";
 
             var pId = insItemCmd.Parameters.Add("@Id", SqliteType.Text);
             var pPrId = insItemCmd.Parameters.Add("@PrId", SqliteType.Text);
@@ -194,6 +195,7 @@ ON CONFLICT(Id) DO UPDATE SET
             var pEstimatedUnitPrice = insItemCmd.Parameters.Add("@EstimatedUnitPrice", SqliteType.Real);
             var pNotes = insItemCmd.Parameters.Add("@Notes", SqliteType.Text);
             var pSortOrder = insItemCmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+            var pEstimatedCurrency = insItemCmd.Parameters.Add("@EstimatedCurrency", SqliteType.Text);
 
             foreach (var item in kept)
             {
@@ -205,6 +207,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 pEstimatedUnitPrice.Value = item.EstimatedUnitPrice.HasValue ? (double)item.EstimatedUnitPrice.Value : (object)DBNull.Value;
                 pNotes.Value = item.Notes ?? string.Empty;
                 pSortOrder.Value = item.SortOrder;
+                pEstimatedCurrency.Value = (object?)item.EstimatedCurrency ?? DBNull.Value;
 
                 await insItemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
@@ -389,8 +392,8 @@ ON CONFLICT(Id) DO UPDATE SET
                 using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder)
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder, LastPriceCurrency)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder, @LastPriceCurrency)
 ON CONFLICT(Id) DO UPDATE SET
     ItemName = excluded.ItemName,
     Quantity = excluded.Quantity,
@@ -401,7 +404,8 @@ ON CONFLICT(Id) DO UPDATE SET
     LastPrice = excluded.LastPrice,
     PriceNote = excluded.PriceNote,
     Notes = excluded.Notes,
-    SortOrder = excluded.SortOrder;";
+    SortOrder = excluded.SortOrder,
+    LastPriceCurrency = excluded.LastPriceCurrency;";
 
                 var pId = cmd.Parameters.Add("@Id", SqliteType.Text);
                 var pRfqId = cmd.Parameters.Add("@RfqId", SqliteType.Text);
@@ -416,6 +420,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 var pPriceNote = cmd.Parameters.Add("@PriceNote", SqliteType.Text);
                 var pNotes = cmd.Parameters.Add("@Notes", SqliteType.Text);
                 var pSortOrder = cmd.Parameters.Add("@SortOrder", SqliteType.Integer);
+                var pLastPriceCurrency = cmd.Parameters.Add("@LastPriceCurrency", SqliteType.Text);
 
                 int sortOrder = 0;
                 foreach (var item in rfq.Items)
@@ -433,6 +438,7 @@ ON CONFLICT(Id) DO UPDATE SET
                     pPriceNote.Value = item.PriceNote ?? string.Empty;
                     pNotes.Value = item.Notes ?? string.Empty;
                     pSortOrder.Value = sortOrder++;
+                    pLastPriceCurrency.Value = (object?)item.LastPriceCurrency ?? DBNull.Value;
 
                     await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }

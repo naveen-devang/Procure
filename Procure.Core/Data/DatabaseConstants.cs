@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 21;
+        public const int SchemaVersion = 22;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS PrItem (
     Quantity REAL NOT NULL DEFAULT 1,
     Unit TEXT NOT NULL DEFAULT 'pcs',
     EstimatedUnitPrice REAL,
+    EstimatedCurrency TEXT,
     Notes TEXT,
     SortOrder INTEGER DEFAULT 0
 );
@@ -268,6 +269,7 @@ CREATE TABLE IF NOT EXISTS RfqItem (
     QuotedUnitPrice REAL,
     Discount REAL,
     LastPrice REAL,
+    LastPriceCurrency TEXT,
     PriceNote TEXT,
     Notes TEXT,
     SortOrder INTEGER DEFAULT 0

@@ -220,6 +220,7 @@ namespace Procure.PageModels
                         || (line.LastPrice is null && updated.EstimatedUnitPrice.HasValue))
                     {
                         line.LastPrice = updated.EstimatedUnitPrice;
+                        line.LastPriceCurrency = updated.EstimatedCurrency;
                         lastPriceUpdated++;
                         changed = true;
                     }

@@ -72,6 +72,7 @@ VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes
                             Quantity = srcItem.Quantity,
                             Unit = srcItem.Unit,
                             EstimatedUnitPrice = srcItem.EstimatedUnitPrice,
+                            EstimatedCurrency = srcItem.EstimatedCurrency,
                             Notes = string.IsNullOrWhiteSpace(srcItem.Notes) ? $"From {sourcePr.PrNo}" : $"{srcItem.Notes} (From {sourcePr.PrNo})",
                             SortOrder = itemSort++
                         };
@@ -81,8 +82,8 @@ VALUES (@Id, @PrNo, @Description, @Requestor, @Plant, @Priority, @Status, @Notes
                         using var itemCmd = connection.CreateCommand();
                         itemCmd.Transaction = tx;
                         itemCmd.CommandText = @"
-INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder);";
+INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder, EstimatedCurrency)
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder, @EstimatedCurrency);";
 
                         itemCmd.Parameters.AddWithValue("@Id", masterItem.Id.ToString());
                         itemCmd.Parameters.AddWithValue("@PrId", masterItem.PrId.ToString());
@@ -92,6 +93,7 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                         itemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", masterItem.EstimatedUnitPrice.HasValue ? (double)masterItem.EstimatedUnitPrice.Value : (object)DBNull.Value);
                         itemCmd.Parameters.AddWithValue("@Notes", masterItem.Notes ?? string.Empty);
                         itemCmd.Parameters.AddWithValue("@SortOrder", masterItem.SortOrder);
+                        itemCmd.Parameters.AddWithValue("@EstimatedCurrency", (object?)masterItem.EstimatedCurrency ?? DBNull.Value);
 
                         await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
@@ -186,6 +188,7 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                                     QuotedUnitPrice = srcRfqItem.QuotedUnitPrice,
                                     Discount = srcRfqItem.Discount,
                                     LastPrice = srcRfqItem.LastPrice,
+                                    LastPriceCurrency = srcRfqItem.LastPriceCurrency,
                                     PriceNote = srcRfqItem.PriceNote,
                                     Notes = srcRfqItem.Notes,
                                     SortOrder = rfqItemSort++
@@ -195,8 +198,8 @@ VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @Qu
                                 using var rfqItemCmd = connection.CreateCommand();
                                 rfqItemCmd.Transaction = tx;
                                 rfqItemCmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder);";
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder, LastPriceCurrency)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder, @LastPriceCurrency);";
 
                                 rfqItemCmd.Parameters.AddWithValue("@Id", newRfqItem.Id.ToString());
                                 rfqItemCmd.Parameters.AddWithValue("@RfqId", newRfq.Id.ToString());
@@ -211,6 +214,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                                 rfqItemCmd.Parameters.AddWithValue("@PriceNote", newRfqItem.PriceNote ?? string.Empty);
                                 rfqItemCmd.Parameters.AddWithValue("@Notes", newRfqItem.Notes ?? string.Empty);
                                 rfqItemCmd.Parameters.AddWithValue("@SortOrder", newRfqItem.SortOrder);
+                                rfqItemCmd.Parameters.AddWithValue("@LastPriceCurrency", (object?)newRfqItem.LastPriceCurrency ?? DBNull.Value);
 
                                 await rfqItemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                             }
@@ -612,6 +616,7 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                         QuotedUnitPrice = bi.QuotedUnitPrice,
                         Discount = bi.Discount,
                         LastPrice = bi.LastPrice,
+                        LastPriceCurrency = bi.LastPriceCurrency,
                         Notes = bi.Notes,
                         SortOrder = sort++
                     };
@@ -620,8 +625,8 @@ UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE 
                     using var itemCmd = connection.CreateCommand();
                     itemCmd.Transaction = tx;
                     itemCmd.CommandText = @"
-INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder)
-VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder);";
+INSERT INTO RfqItem (Id, RfqId, PrItemId, ItemName, Quantity, Unit, IsQuoted, QuotedUnitPrice, Discount, LastPrice, PriceNote, Notes, SortOrder, LastPriceCurrency)
+VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedUnitPrice, @Discount, @LastPrice, @PriceNote, @Notes, @SortOrder, @LastPriceCurrency);";
 
                     itemCmd.Parameters.AddWithValue("@Id", rfqItem.Id.ToString());
                     itemCmd.Parameters.AddWithValue("@RfqId", rfq.Id.ToString());
@@ -636,6 +641,7 @@ VALUES (@Id, @RfqId, @PrItemId, @ItemName, @Quantity, @Unit, @IsQuoted, @QuotedU
                     itemCmd.Parameters.AddWithValue("@PriceNote", rfqItem.PriceNote ?? string.Empty);
                     itemCmd.Parameters.AddWithValue("@Notes", rfqItem.Notes ?? string.Empty);
                     itemCmd.Parameters.AddWithValue("@SortOrder", rfqItem.SortOrder);
+                    itemCmd.Parameters.AddWithValue("@LastPriceCurrency", (object?)rfqItem.LastPriceCurrency ?? DBNull.Value);
 
                     await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                 }
@@ -954,15 +960,16 @@ WHERE Id = @Id;";
                         using var itemCmd = connection.CreateCommand();
                         itemCmd.Transaction = tx;
                         itemCmd.CommandText = @"
-INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder)
-VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder)
+INSERT INTO PrItem (Id, PrId, ItemName, Quantity, Unit, EstimatedUnitPrice, Notes, SortOrder, EstimatedCurrency)
+VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @SortOrder, @EstimatedCurrency)
 ON CONFLICT(Id) DO UPDATE SET
     ItemName = excluded.ItemName,
     Quantity = excluded.Quantity,
     Unit = excluded.Unit,
     EstimatedUnitPrice = excluded.EstimatedUnitPrice,
     Notes = excluded.Notes,
-    SortOrder = excluded.SortOrder;";
+    SortOrder = excluded.SortOrder,
+    EstimatedCurrency = excluded.EstimatedCurrency;";
 
                         itemCmd.Parameters.AddWithValue("@Id", itemId.ToString());
                         itemCmd.Parameters.AddWithValue("@PrId", masterPrId.ToString());
@@ -971,6 +978,7 @@ ON CONFLICT(Id) DO UPDATE SET
                         itemCmd.Parameters.AddWithValue("@Unit", string.IsNullOrWhiteSpace(srcItem.Unit) ? "pcs" : srcItem.Unit.Trim());
                         itemCmd.Parameters.AddWithValue("@EstimatedUnitPrice", srcItem.EstimatedUnitPrice.HasValue ? (double)srcItem.EstimatedUnitPrice.Value : (object)DBNull.Value);
                         itemCmd.Parameters.AddWithValue("@Notes", string.IsNullOrWhiteSpace(srcItem.Notes) ? $"From {keptPr.PrNo}" : $"{srcItem.Notes} (From {keptPr.PrNo})");
+                        itemCmd.Parameters.AddWithValue("@EstimatedCurrency", (object?)srcItem.EstimatedCurrency ?? DBNull.Value);
                         itemCmd.Parameters.AddWithValue("@SortOrder", itemSort++);
 
                         await itemCmd.ExecuteNonQueryAsync().ConfigureAwait(false);

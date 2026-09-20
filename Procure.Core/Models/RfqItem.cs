@@ -50,6 +50,14 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedLastPrice))]
         public partial decimal? LastPrice { get; set; }
 
+        /// <summary>What that last price was actually quoted in - may differ from this RFQ's own
+        /// currency (a past purchase in USD compared against a fresh AED quote). Null means "not yet
+        /// typed"; formatting falls back to "AED" the same way <see cref="Utilities.MoneyFormat"/>
+        /// does everywhere else.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(FormattedLastPrice))]
+        public partial string? LastPriceCurrency { get; set; }
+
         /// <summary>What the vendor said instead of a price - "Regret", "No bid", "Item discontinued".
         /// Deliberately not a number and never part of any total: it prints where the dash would
         /// otherwise print, so a blank cell in the comparison says why it is blank.</summary>
@@ -161,10 +169,49 @@ namespace Procure.Models
             {
                 if (LastPrice.HasValue && LastPrice.Value > 0)
                 {
-                    return LastPrice.Value.ToString("N2", CultureInfo.InvariantCulture);
+                    return Utilities.MoneyFormat.Format(LastPriceCurrency, LastPrice.Value);
                 }
                 return string.Empty;
             }
+        }
+
+        /// <summary>What the Last Price box reads and writes. Typing a currency alongside the number
+        /// - "86.75 usd", "$86.75", "USD 86.75" - sets <see cref="LastPriceCurrency"/> too; a bare
+        /// number leaves whatever currency the row already had. Mirrors
+        /// <see cref="QuotedUnitPriceText"/>: no self-echo, so the caret never jumps mid-type.
+        ///
+        /// Always shows the currency, not just the number - reopening this row after months away
+        /// with a bare "86.75" left no way to tell what it was actually priced in.</summary>
+        public string LastPriceText
+        {
+            get => LastPrice.HasValue
+                ? $"{LastPrice.Value.ToString("0.####", CultureInfo.InvariantCulture)} {(string.IsNullOrWhiteSpace(LastPriceCurrency) ? "AED" : LastPriceCurrency.ToUpperInvariant())}"
+                : string.Empty;
+            set
+            {
+                _suppressLastPriceTextEcho = true;
+                try
+                {
+                    var (amount, currency) = Utilities.SmartPriceParser.Parse(value, LastPriceCurrency ?? "AED");
+                    LastPrice = amount;
+                    LastPriceCurrency = currency;
+                }
+                finally
+                {
+                    _suppressLastPriceTextEcho = false;
+                }
+            }
+        }
+
+        private bool _suppressLastPriceTextEcho;
+
+        partial void OnLastPriceChanged(decimal? value) => RaiseLastPriceTextChanged();
+        partial void OnLastPriceCurrencyChanged(string? value) => RaiseLastPriceTextChanged();
+
+        private void RaiseLastPriceTextChanged()
+        {
+            if (_suppressLastPriceTextEcho) return;
+            OnPropertyChanged(nameof(LastPriceText));
         }
 
         public string FormattedLineTotal

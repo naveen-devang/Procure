@@ -269,6 +269,8 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "RequestForQuotation", "SharedPrs", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "Discount", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "LastPrice", "REAL").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RfqItem", "LastPriceCurrency", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "PrItem", "EstimatedCurrency", "TEXT").ConfigureAwait(false);
             // v21: what a vendor said instead of a price ("Regret", "No bid"). Text, never a number,
             // and never part of a total.
             await EnsureColumnExistsAsync(connection, "RfqItem", "PriceNote", "TEXT").ConfigureAwait(false);

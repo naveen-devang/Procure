@@ -924,7 +924,11 @@ namespace Procure.Services.Export
                 }
 
                 DrawCenteredBlock(historicalHeaderLines, colX[HistoricalColIdx()], curY, rowH1, vendorHeaderLineHeight, "F2", 7.5, historicalWidth);
-                DrawCenteredBlock(new List<string> { currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price" }, colX[HistoricalColIdx()], curY - rowH1, rowH2, vendorHeaderLineHeight, "F2", 7, historicalWidth);
+                // Never "Price (CUR)" here, even when currencyInHeader collapses every vendor
+                // column that way - this figure's own currency can differ row to row, so it always
+                // prints in the cell itself (see DrawMoneyCell above) instead of being claimed once
+                // for the whole column.
+                DrawCenteredBlock(new List<string> { "Unit Price" }, colX[HistoricalColIdx()], curY - rowH1, rowH2, vendorHeaderLineHeight, "F2", 7, historicalWidth);
 
                 DrawLine(colX[3], curY - rowH1, marginLeft + tableWidth, curY - rowH1, width: 0.5);
 
@@ -1079,6 +1083,7 @@ namespace Procure.Services.Export
                     DrawFittedText(qtyStr, colX[2] + 3, singleLineCenterY, font: "F1", baseFontSize: 7.5, align: "center", maxWidth: qtyWidth - 6, minFontSize: 5.0);
 
                     decimal rowLastPrice = item.EstimatedUnitPrice ?? 0m;
+                    string? rowLastPriceCurrency = item.EstimatedCurrency;
                     bool rowLastPriceFromQuote = false;
 
                     for (int i = 0; i < supplierCount; i++)
@@ -1119,13 +1124,18 @@ namespace Procure.Services.Export
                         if (!rowLastPriceFromQuote && rfqItem?.LastPrice != null && rfqItem.LastPrice.Value > 0)
                         {
                             rowLastPrice = rfqItem.LastPrice.Value;
+                            rowLastPriceCurrency = rfqItem.LastPriceCurrency;
                             rowLastPriceFromQuote = true;
                         }
                     }
 
                     if (rowLastPrice > 0)
                     {
-                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, CellCur(defaultCur), rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
+                        // Always carries its own currency in the cell, never the column heading -
+                        // unlike a vendor's quote, this figure's currency can differ row to row (the
+                        // PR's estimate or a past purchase, not this RFQ's own quote currency).
+                        var rowCur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? defaultCur : rowLastPriceCurrency;
+                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, rowCur, rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
                     }
                     else
                     {
