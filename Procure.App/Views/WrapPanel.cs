@@ -20,6 +20,9 @@ public sealed class WrapPanel : Panel
         {
             child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var d = child.DesiredSize;
+            // A collapsed child measures to zero size - skip its spacing too, or a hidden chip
+            // still leaves a phantom gap where its HorizontalSpacing would have gone.
+            if (d.Width <= 0 && d.Height <= 0) continue;
             if (lineW > 0 && lineW + HorizontalSpacing + d.Width > max)
             {
                 totalW = Math.Max(totalW, lineW);
@@ -40,6 +43,13 @@ public sealed class WrapPanel : Panel
         foreach (var child in Children)
         {
             var d = child.DesiredSize;
+            // Still arranged (every child must be, even at zero size) but never advances x/wraps -
+            // a collapsed chip must not leave a phantom HorizontalSpacing gap behind it.
+            if (d.Width <= 0 && d.Height <= 0)
+            {
+                child.Arrange(new Rect(x, y, 0, 0));
+                continue;
+            }
             if (x > 0 && x + d.Width > final.Width)
             {
                 x = 0; y += lineH + VerticalSpacing; lineH = 0;

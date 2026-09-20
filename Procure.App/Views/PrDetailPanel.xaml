@@ -74,6 +74,7 @@
         </Style>
         <Style x:Key="ChipText" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
             <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
         </Style>
     </UserControl.Resources>
@@ -281,7 +282,7 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RoleDisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AppTextPrimary}" />
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind RoleDisplayName}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" Foreground="{ThemeResource AppTextPrimary}" />
                                                     <!-- Wraps: "Sent Sep 10, 2026 (Pending)" is longer than the column
                                                          the date pickers leave, and it was being cut mid-word. -->
                                                     <TextBlock Style="{StaticResource AppText}" Text="{x:Bind StatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
