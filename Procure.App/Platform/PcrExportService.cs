@@ -22,9 +22,10 @@ public sealed class PcrExportService : IPcrExportService
         PriceComparisonRequest pcr,
         IReadOnlyList<RequestForQuotation> selectedRfqs,
         string remarks,
-        IReadOnlyList<PrItem>? selectedItems = null)
+        IReadOnlyList<PrItem>? selectedItems = null,
+        PcrCurrencyConversionOptions? conversion = null)
     {
-        var bytes = PcrExcelExporter.GenerateExcel(pr, pcr, selectedRfqs, remarks, selectedItems);
+        var bytes = PcrExcelExporter.GenerateExcel(pr, pcr, selectedRfqs, remarks, selectedItems, conversion);
         var safePrNo = string.IsNullOrWhiteSpace(pr.PrNo) ? "PR" : pr.PrNo.Replace("/", "-").Replace("\\", "-");
         var filename = $"PriceComparison_{safePrNo}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
         return await SaveAndOpenFileAsync(bytes, filename);
@@ -36,8 +37,9 @@ public sealed class PcrExportService : IPcrExportService
         IReadOnlyList<RequestForQuotation> selectedRfqs,
         string remarks,
         PcrPdfOptions options,
-        IReadOnlyList<PrItem>? selectedItems = null)
-        => PcrPdfExporter.GeneratePdf(pr, pcr, selectedRfqs, remarks, options, selectedItems);
+        IReadOnlyList<PrItem>? selectedItems = null,
+        PcrCurrencyConversionOptions? conversion = null)
+        => PcrPdfExporter.GeneratePdf(pr, pcr, selectedRfqs, remarks, options, selectedItems, conversion);
 
     public async Task<string?> SavePcrPdfAsync(byte[] pdfBytes, string suggestedFileName)
     {

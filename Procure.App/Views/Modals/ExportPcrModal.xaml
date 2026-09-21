@@ -86,8 +86,28 @@
                         </Border>
 
                         <Border Style="{StaticResource Sec}">
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Currency Conversion" Style="{StaticResource H}" />
+                                    <TextBlock Text="{Binding ExportPcrToggleLabel}"
+                                               FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                    <TextBlock Style="{StaticResource AppText}"
+                                               Text="Converts foreign-currency figures using the rates in Settings."
+                                               FontSize="11.5" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{Binding ExportPcrShowLocalEquivalent, Mode=TwoWay}"
+                                              VerticalAlignment="Center"
+                                              OnContent="On" OffContent="Off" />
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource Sec}">
                             <StackPanel Spacing="8">
-                                <TextBlock Text="2. Collective Number" Style="{StaticResource H}" />
+                                    <TextBlock Text="2. Collective Number" Style="{StaticResource H}" />
                                 <TextBlock Style="{StaticResource AppText}" Text="Optional. Printed on the sheet as-is; blank shows a dash." FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
                                 <TextBox Text="{Binding ExportPcrCollectiveNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. PCR-2026-014" FontSize="12" />
                             </StackPanel>
@@ -95,7 +115,7 @@
 
                         <Border Style="{StaticResource Sec}">
                             <StackPanel Spacing="8">
-                                <TextBlock Text="3. Remarks / Justification" Style="{StaticResource H}" />
+                                    <TextBlock Text="3. Remarks / Justification" Style="{StaticResource H}" />
                                 <TextBlock Style="{StaticResource AppText}" Text="Additional justification for the approvers. Saved for future exports." FontSize="11.5"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <TextBox Text="{Binding ExportPcrRemarks, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80"

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="Procure.App.Views.SettingsPage"
+    x:Name="SettingsRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Procure.Models"
@@ -297,6 +298,89 @@
                                 <Button Grid.Column="1" Content="+ Add Default Stage" Style="{StaticResource AccentButtonStyle}"
                                         Command="{Binding AddNewDefaultStageCommand}" />
                             </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                </ScrollViewer>
+
+                <!-- ===== Currency ===== -->
+                <ScrollViewer Visibility="{Binding SelectedSection, Converter={StaticResource EqVis}, ConverterParameter=Currency}">
+                <StackPanel Spacing="22">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Currency &amp; Conversion Rates" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}"
+                                           Text="Choose the local currency and enter how much one unit of each foreign currency equals in it. Blank standard rows are not converted." />
+                            </StackPanel>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="150" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Local Currency" Style="{StaticResource RowTitle}" />
+                                    <TextBlock Style="{StaticResource RowHint}" Text="Used for optional equivalents in PCR preview and export." />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurrencies}"
+                                          SelectedItem="{Binding LocalCurrency, Mode=TwoWay}" />
+                            </Grid>
+
+                            <TextBlock Text="Standard currencies" Style="{StaticResource RowTitle}" />
+                            <ItemsControl ItemsSource="{Binding CurrencyRates}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CurrencyRateRow">
+                                        <Border Margin="0,0,0,6" Padding="10,6" CornerRadius="4" BorderThickness="1"
+                                                BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppTertiaryBackground}">
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind Currency}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource AppTextPrimary}" />
+                                                <TextBox Grid.Column="1" Text="{x:Bind RateText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         PlaceholderText="Enter rate" />
+                                                <TextBlock Grid.Column="2" Text="{Binding DataContext.LocalCurrency, ElementName=SettingsRoot}" VerticalAlignment="Center" FontSize="11"
+                                                           Foreground="{ThemeResource AppTextSecondary}" />
+                                                <Button Grid.Column="3" Content="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                        FontSize="11" Width="28" Height="28" Padding="0" CornerRadius="4"
+                                                        Background="{ThemeResource FluentCriticalBg}" Foreground="{ThemeResource FluentCritical}"
+                                                        Click="DeleteCurrencyRate_Click" ToolTipService.ToolTip="Delete custom rate"
+                                                        Visibility="{x:Bind IsCustom, Converter={StaticResource BoolVis}, Mode=OneWay}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Additional currencies" Style="{StaticResource RowTitle}" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding NewRateCurrency, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         PlaceholderText="XYZ" MaxLength="3" />
+                                <TextBox Grid.Column="1" Text="{Binding NewRateText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         PlaceholderText="Rate to local currency" />
+                                <Button Grid.Column="2" Content="+ Add Rate" Command="{Binding AddCurrencyRateCommand}"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                            </Grid>
+                            <TextBlock Text="{Binding CurrencyRateError}" Style="{StaticResource RowHint}"
+                                       Foreground="{ThemeResource FluentCritical}"
+                                       Visibility="{Binding CurrencyRateError, Converter={StaticResource NullVis}}" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding SavedMessage}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource FluentSuccess}"
+                                           Visibility="{Binding SavedMessage, Converter={StaticResource NullVis}}" />
+                                <Button Content="Save Rates" Style="{StaticResource AccentButtonStyle}" Command="{Binding SaveSettingsCommand}" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </StackPanel>

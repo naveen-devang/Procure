@@ -89,7 +89,26 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string DefaultCurrency { get; set; } = "AED";
 
-        public IReadOnlyList<string> AvailableCurrencies => AppConstants.SupportedCurrencies;
+        [ObservableProperty]
+        public partial string LocalCurrency { get; set; } = "AED";
+
+        public ObservableCollection<CurrencyRateRow> CurrencyRates { get; } = new();
+
+        [ObservableProperty]
+        public partial string NewRateCurrency { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string NewRateText { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        public partial string CurrencyRateError { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> AvailableCurrencies => AppConstants.SupportedCurrencies
+            .Concat(CurrencyRates.Select(x => x.Currency))
+            .Append(LocalCurrency)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToArray();
 
         // Updates State
         [ObservableProperty]
@@ -191,6 +210,8 @@ namespace Procure.PageModels
             AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
             IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
             DefaultCurrency = _settingsService.DefaultCurrency;
+            LocalCurrency = _settingsService.LocalCurrency;
+            LoadCurrencyRates();
             CurrentVersion = $"v{_updateService.CurrentVersionString}";
 
             LoadDefaultApprovalStages();
@@ -222,6 +243,12 @@ namespace Procure.PageModels
                     case nameof(ISettingsService.DefaultCurrency):
                         DefaultCurrency = _settingsService.DefaultCurrency;
                         break;
+                    case nameof(ISettingsService.LocalCurrency):
+                        LocalCurrency = _settingsService.LocalCurrency;
+                        break;
+                    case nameof(ISettingsService.CurrencyRates):
+                        LoadCurrencyRates();
+                        break;
                     case nameof(ISettingsService.GetDefaultApprovalRoles):
                         // This model's own stage commands mutate DefaultApprovalStages in place and
                         // then persist, which raises this key - only a genuinely different list
@@ -249,6 +276,86 @@ namespace Procure.PageModels
             {
                 _settingsService.DefaultCurrency = value;
             }
+        }
+
+        partial void OnLocalCurrencyChanged(string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && _settingsService.LocalCurrency != value)
+                _settingsService.LocalCurrency = value;
+        }
+
+        private void LoadCurrencyRates()
+        {
+            var stored = _settingsService.CurrencyRates;
+            CurrencyRates.Clear();
+            foreach (var code in AppConstants.SupportedCurrencies
+                .Where(x => !string.Equals(x, LocalCurrency, StringComparison.OrdinalIgnoreCase)))
+            {
+                CurrencyRates.Add(new CurrencyRateRow
+                {
+                    Currency = code,
+                    RateText = stored.TryGetValue(code, out var rate)
+                        ? rate.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture)
+                        : string.Empty,
+                    IsCustom = false
+                });
+            }
+
+            foreach (var rate in stored
+                .Where(x => !AppConstants.SupportedCurrencies.Contains(x.Key, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                CurrencyRates.Add(new CurrencyRateRow
+                {
+                    Currency = rate.Key,
+                    RateText = rate.Value.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture),
+                    IsCustom = true
+                });
+            }
+            OnPropertyChanged(nameof(AvailableCurrencies));
+        }
+
+        [RelayCommand]
+        public void AddCurrencyRate()
+        {
+            CurrencyRateError = string.Empty;
+            var code = Procure.Services.Export.PcrCurrencyConversionOptions.Normalize(NewRateCurrency);
+            if (code.Length != 3 || code.Any(c => c is < 'A' or > 'Z'))
+            {
+                CurrencyRateError = "Enter a three-letter currency code.";
+                return;
+            }
+
+            if (AppConstants.SupportedCurrencies.Contains(code, StringComparer.OrdinalIgnoreCase))
+            {
+                CurrencyRateError = "Use the standard currency rows above for this currency.";
+                return;
+            }
+
+            if (!decimal.TryParse(NewRateText, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture, out var rate) || rate <= 0m)
+            {
+                CurrencyRateError = "Enter a positive conversion rate.";
+                return;
+            }
+
+            var existing = CurrencyRates.FirstOrDefault(x => string.Equals(x.Currency, code, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                CurrencyRates.Add(new CurrencyRateRow { Currency = code, RateText = rate.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture) });
+            else
+                existing.RateText = rate.ToString("0.########", System.Globalization.CultureInfo.InvariantCulture);
+
+            NewRateCurrency = string.Empty;
+            NewRateText = string.Empty;
+            OnPropertyChanged(nameof(AvailableCurrencies));
+        }
+
+        [RelayCommand]
+        public void RemoveCurrencyRate(CurrencyRateRow? row)
+        {
+            if (row is null) return;
+            CurrencyRates.Remove(row);
+            OnPropertyChanged(nameof(AvailableCurrencies));
         }
 
         partial void OnIsSidebarCompactChanged(bool value)
@@ -453,6 +560,26 @@ namespace Procure.PageModels
                 _settingsService.NormalOverdueDays = NormalDays;
                 _settingsService.DatabaseDirectory = DatabaseDirectory;
                 _settingsService.AutoCheckUpdatesOnStartup = AutoCheckUpdates;
+                _settingsService.LocalCurrency = LocalCurrency;
+
+                var rows = CurrencyRates.ToList();
+                var current = _settingsService.CurrencyRates.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in rows)
+                {
+                    if (string.IsNullOrWhiteSpace(row.RateText))
+                    {
+                        current.Remove(row.Currency);
+                        continue;
+                    }
+
+                    if (!decimal.TryParse(row.RateText, System.Globalization.NumberStyles.Number,
+                            System.Globalization.CultureInfo.InvariantCulture, out var rate) || rate <= 0m)
+                        throw new InvalidOperationException($"Invalid rate for {row.Currency}.");
+
+                    _settingsService.SetCurrencyRate(row.Currency, rate);
+                    current.Remove(row.Currency);
+                }
+                foreach (var removed in current) _settingsService.RemoveCurrencyRate(removed);
 
                 SavedMessage = "Settings saved";
                 var gen = ++_savedMessageGeneration;

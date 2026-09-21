@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Procure.Models;
 using Procure.Services;
+using Procure.Services.Export;
 
 namespace Procure.App.Platform;
 
@@ -131,6 +133,58 @@ public sealed class JsonSettingsService : ISettingsService
     {
         get => Get(nameof(DefaultCurrency), "AED");
         set => Set(nameof(DefaultCurrency), value);
+    }
+
+    public string LocalCurrency
+    {
+        get => PcrCurrencyConversionOptions.Normalize(Get(nameof(LocalCurrency), DefaultCurrency));
+        set => Set(nameof(LocalCurrency), PcrCurrencyConversionOptions.Normalize(value));
+    }
+
+    public IReadOnlyDictionary<string, decimal> CurrencyRates
+    {
+        get
+        {
+            var values = new Dictionary<string, decimal>(
+                PcrCurrencyConversionOptions.DefaultRatesFor(LocalCurrency),
+                StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var raw = Get(nameof(CurrencyRates), "{}");
+                var parsed = JsonSerializer.Deserialize<Dictionary<string, decimal>>(raw);
+                if (parsed is not null)
+                {
+                    foreach (var entry in parsed.Where(x => x.Value > 0m))
+                        values[PcrCurrencyConversionOptions.Normalize(entry.Key)] = entry.Value;
+                }
+            }
+            catch
+            {
+                // Keep the editable built-in defaults when an older or malformed setting is found.
+            }
+            return values;
+        }
+    }
+
+    public void SetCurrencyRate(string currency, decimal rate)
+    {
+        if (rate <= 0m) throw new ArgumentOutOfRangeException(nameof(rate));
+        var normalized = PcrCurrencyConversionOptions.Normalize(currency);
+        if (normalized.Length != 3) throw new ArgumentException("Currency code must have three letters.", nameof(currency));
+
+        var values = new Dictionary<string, decimal>(CurrencyRates, StringComparer.OrdinalIgnoreCase)
+        {
+            [normalized] = rate
+        };
+        Set(nameof(CurrencyRates), JsonSerializer.Serialize(values), nameof(CurrencyRates));
+    }
+
+    public void RemoveCurrencyRate(string currency)
+    {
+        var normalized = PcrCurrencyConversionOptions.Normalize(currency);
+        var values = new Dictionary<string, decimal>(CurrencyRates, StringComparer.OrdinalIgnoreCase);
+        if (!values.Remove(normalized)) return;
+        Set(nameof(CurrencyRates), JsonSerializer.Serialize(values), nameof(CurrencyRates));
     }
 
     public bool IsSidebarCompact

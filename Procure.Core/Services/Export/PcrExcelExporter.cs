@@ -17,7 +17,8 @@ namespace Procure.Services.Export
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
-            IReadOnlyList<PrItem>? selectedItems = null)
+            IReadOnlyList<PrItem>? selectedItems = null,
+            PcrCurrencyConversionOptions? conversion = null)
         {
             using var ms = new MemoryStream();
             using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
@@ -36,7 +37,7 @@ namespace Procure.Services.Export
 
                 // 5. xl/worksheets/sheet1.xml - first, because the workbook names its heading rows
                 // as print titles and only the sheet knows which rows those are.
-                var headingRow = AddWorksheet(archive, pr, pcr, selectedRfqs, remarks, selectedItems);
+                var headingRow = AddWorksheet(archive, pr, pcr, selectedRfqs, remarks, selectedItems, conversion);
 
                 // 6. xl/workbook.xml
                 AddWorkbook(archive, selectedRfqs.Count > PcrPdfExporter.FullSizeSupplierLimit ? headingRow : 0);
@@ -152,13 +153,13 @@ namespace Procure.Services.Export
         <!-- 5: Table Text Cell (Regular, Border, Left) -->
         <xf numFmtId=""0"" fontId=""0"" fillId=""0"" borderId=""1"" xfId=""0"" applyBorder=""1""><alignment horizontal=""left"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 6: Table Center Cell (Regular, Border, Center) -->
-        <xf numFmtId=""0"" fontId=""0"" fillId=""0"" borderId=""1"" xfId=""0"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center""/></xf>
+        <xf numFmtId=""0"" fontId=""0"" fillId=""0"" borderId=""1"" xfId=""0"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 7: Table Currency / Number Cell (Regular, Border, Right, #,##0.00) -->
-        <xf numFmtId=""164"" fontId=""0"" fillId=""0"" borderId=""1"" xfId=""0"" applyNumberFormat=""1"" applyBorder=""1""><alignment horizontal=""right"" vertical=""center""/></xf>
+        <xf numFmtId=""164"" fontId=""0"" fillId=""0"" borderId=""1"" xfId=""0"" applyNumberFormat=""1"" applyBorder=""1""><alignment horizontal=""right"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 8: Summary Row Label (Bold 10pt, Border, Left) -->
         <xf numFmtId=""0"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""left"" vertical=""center""/></xf>
         <!-- 9: Summary Row Value (Bold 10pt, Border, Right, #,##0.00) -->
-        <xf numFmtId=""164"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyNumberFormat=""1"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""right"" vertical=""center""/></xf>
+        <xf numFmtId=""164"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyNumberFormat=""1"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""right"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 10: Summary Row Center Value (Bold 10pt, Border, Center) -->
         <xf numFmtId=""0"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center""/></xf>
         <!-- 11: Signature Box Title (Bold 10pt, Fill, Border, Center) -->
@@ -221,8 +222,10 @@ namespace Procure.Services.Export
             PriceComparisonRequest pcr,
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
-            IReadOnlyList<PrItem>? selectedItems)
+            IReadOnlyList<PrItem>? selectedItems,
+            PcrCurrencyConversionOptions? conversion)
         {
+            conversion ??= PcrCurrencyConversionOptions.Disabled;
             var entry = archive.CreateEntry("xl/worksheets/sheet1.xml");
             using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
 
@@ -247,6 +250,25 @@ namespace Procure.Services.Export
             const int vendorQtyColWidth = 10;
             const int vendorPriceColWidth = 18;
             var exportItems = (selectedItems ?? pr.Items)?.ToList() ?? new List<PrItem>();
+            string MoneyText(string? currency, decimal amount)
+            {
+                var source = PcrCurrencyConversionOptions.Normalize(currency);
+                var text = $"{source} {amount:N2}";
+                return conversion.TryConvert(source, amount, out var local)
+                    ? $"{text}\n~ {conversion.LocalCurrency} {local:N2}"
+                    : text;
+            }
+            string MoneyCell(string column, int row, string? currency, decimal amount, bool rowTwoLines, int style = 7)
+            {
+                if (!(conversion.ShowLocalEquivalent && rowTwoLines))
+                    return $@"
+            <c r=""{column}{row}"" s=""{style}""><v>{amount.ToString(CultureInfo.InvariantCulture)}</v></c>";
+
+                return $@"
+            <c r=""{column}{row}"" s=""{style}"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(MoneyText(currency, amount))}</t></is></c>";
+            }
+            bool RowNeedsConversion(IEnumerable<string?> currencies) =>
+                PcrCurrencyConversion.RowNeedsTwoLines(conversion, currencies);
             var widestItemNameLength = exportItems.Count > 0 ? exportItems.Max(i => LongestLineLength(i.ItemName)) : 0;
             int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
 
@@ -405,12 +427,20 @@ namespace Procure.Services.Export
             var prItems = exportItems;
             int itemIndex = 1;
             decimal totalLastPriceSum = 0m;
+            decimal totalLastPriceLocalSum = 0m;
+            bool totalLastPriceLocalComplete = true;
+            bool hasHistoricalConversion = false;
 
             if (prItems.Count == 0)
             {
                 // Fallback for PRs with no item rows
                 var fallbackDescLines = EstimateWrappedLineCount(pr.Description, descColWidth - 2, maxLines: 8);
-                var fallbackRowHeight = Math.Max(22, 20 + fallbackDescLines * 16);
+                var fallbackCurrencies = selectedRfqs
+                    .Where(rf => rf.BaseAmount > 0 || rf.QuoteAmount > 0)
+                    .Select(rf => rf.Currency)
+                    .ToList();
+                var fallbackTwoLines = RowNeedsConversion(fallbackCurrencies);
+                var fallbackRowHeight = Math.Max(22, 20 + fallbackDescLines * 16 + (fallbackTwoLines ? 16 : 0));
                 sb.Append($@"
         <row r=""{r}"" ht=""{fallbackRowHeight}"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>1</t></is></c>
@@ -426,8 +456,8 @@ namespace Procure.Services.Export
                     // No PrItem row exists in this fallback, so there's no matched RfqItem to read a
                     // quantity from - nothing invented here, just "-".
                     sb.Append($@"
-            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>
-            <c r=""{priceColLetter}{r}"" s=""7""><v>{quoteAmt.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>-</t></is></c>");
+                    sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, quoteAmt, fallbackTwoLines));
                 }
 
                 sb.Append($@"
@@ -448,13 +478,31 @@ namespace Procure.Services.Export
                         .ToDictionary(g => g.Key, g => g.First().Key))
                     .ToList();
 
+                bool ItemRowNeedsConversion(PrItem item)
+                {
+                    var currencies = new List<string?>();
+                    for (int i = 0; i < supplierCount; i++)
+                    {
+                        var rfq = selectedRfqs[i];
+                        var rfqItem = quoteByVendorAndLine[i].TryGetValue(item.Id, out var matched) ? matched : null;
+                        if (rfqItem?.QuotedUnitPrice is > 0 || (rfq.BaseAmount > 0 && prItems.Count == 1))
+                            currencies.Add(rfq.Currency);
+                        if (rfqItem?.LastPrice is > 0)
+                            currencies.Add(rfqItem.LastPriceCurrency);
+                    }
+                    if (item.EstimatedUnitPrice is > 0)
+                        currencies.Add(item.EstimatedCurrency);
+                    return RowNeedsConversion(currencies);
+                }
+
                 foreach (var item in prItems)
                 {
                     // Sized per-row from this item's own name only, not uniformly across every
                     // item row - a five-word item three rows down growing its own row shouldn't
                     // change the height of every short one-word row around it.
                     var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 8);
-                    var itemRowHeight = 20 + (descLines * 16);
+                    var itemTwoLines = ItemRowNeedsConversion(item);
+                    var itemRowHeight = 20 + (descLines * 16) + (itemTwoLines ? 16 : 0);
 
                     sb.Append($@"
         <row r=""{r}"" ht=""{itemRowHeight}"">
@@ -479,8 +527,8 @@ namespace Procure.Services.Export
                             // the Total Price Excl. VAT row (which sums discounted line totals).
                             var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
                             sb.Append($@"
-            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(rfqItem.FormattedQuantity)}</t></is></c>
-            <c r=""{priceColLetter}{r}"" s=""7""><v>{netUnitPrice.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(rfqItem.FormattedQuantity)}</t></is></c>");
+                            sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, netUnitPrice, itemTwoLines));
                         }
                         else if (rfq.BaseAmount > 0 && prItems.Count == 1)
                         {
@@ -490,8 +538,8 @@ namespace Procure.Services.Export
                             // own quantity rather than inventing a number.
                             var qtyStr = rfqItem?.FormattedQuantity ?? $"{item.Quantity.ToString("G29", CultureInfo.InvariantCulture)} {item.Unit}";
                             sb.Append($@"
-            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(qtyStr)}</t></is></c>
-            <c r=""{priceColLetter}{r}"" s=""7""><v>{rfq.BaseAmount.ToString(CultureInfo.InvariantCulture)}</v></c>");
+            <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(qtyStr)}</t></is></c>");
+                            sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, rfq.BaseAmount, itemTwoLines));
                         }
                         else
                         {
@@ -514,6 +562,15 @@ namespace Procure.Services.Export
                     }
 
                     totalLastPriceSum += (item.Quantity * rowLastPrice);
+                    var rowCurrency = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? "AED" : rowLastPriceCurrency;
+                    hasHistoricalConversion |= rowLastPrice > 0m && conversion.HasConversion(rowCurrency);
+                    if (conversion.ShowLocalEquivalent && conversion.TryConvert(rowCurrency, rowLastPrice, out var localLastPrice))
+                        totalLastPriceLocalSum += item.Quantity * localLastPrice;
+                    else
+                    {
+                        totalLastPriceLocalSum += item.Quantity * rowLastPrice;
+                        totalLastPriceLocalComplete &= !conversion.HasConversion(rowCurrency);
+                    }
 
                     if (rowLastPrice > 0)
                     {
@@ -522,7 +579,11 @@ namespace Procure.Services.Export
                         // vendor's quote carried the historical figure) may not share this RFQ's
                         // currency at all.
                         var cur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? "AED" : rowLastPriceCurrency;
-                        sb.Append($@"
+                        if (conversion.ShowLocalEquivalent && itemTwoLines)
+                            sb.Append($@"
+            <c r=""{lastPriceColLetter}{r}"" s=""7"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(MoneyText(cur, rowLastPrice))}</t></is></c>");
+                        else
+                            sb.Append($@"
             <c r=""{lastPriceColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{rowLastPrice.ToString("N2", CultureInfo.InvariantCulture)} {EscapeXml(cur)}</t></is></c>");
                     }
                     else
@@ -541,8 +602,12 @@ namespace Procure.Services.Export
             // Helper for summary rows
             void AddSummaryRow(string label, Func<RequestForQuotation, (bool isNum, decimal numVal, string strVal)> valSelector, (bool isNum, decimal numVal, string strVal) lastPriceVal)
             {
+                var summaryTwoLines = RowNeedsConversion(selectedRfqs
+                    .Where(rf => valSelector(rf).isNum)
+                    .Select(rf => rf.Currency))
+                    || (lastPriceVal.isNum && hasHistoricalConversion);
                 sb.Append($@"
-        <row r=""{r}"" ht=""20"">
+        <row r=""{r}"" ht=""{(summaryTwoLines ? 36 : 20)}"">
             <c r=""A{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
             <c r=""B{r}"" s=""8"" t=""inlineStr""><is><t>{EscapeXml(label)}</t></is></c>
             <c r=""C{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
@@ -559,8 +624,8 @@ namespace Procure.Services.Export
                     var val = valSelector(selectedRfqs[i]);
                     if (val.isNum)
                     {
+                        sb.Append(MoneyCell(qtyColLetter, r, selectedRfqs[i].Currency, val.numVal, summaryTwoLines, 9));
                         sb.Append($@"
-            <c r=""{qtyColLetter}{r}"" s=""9""><v>{val.numVal.ToString(CultureInfo.InvariantCulture)}</v></c>
             <c r=""{priceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
                     }
                     else
@@ -594,9 +659,12 @@ namespace Procure.Services.Export
                 (rf.IsQuoteReceived || rf.PricedItemsCount > 0) ? (true, value, "") : (false, 0m, "-");
 
             // Row 1: Total Price Excl. VAT
+            var historicalSummaryTotal = conversion.ShowLocalEquivalent && totalLastPriceLocalComplete
+                ? totalLastPriceLocalSum
+                : totalLastPriceSum;
             AddSummaryRow("Total Price Excl. VAT",
                 rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)),
-                (true, totalLastPriceSum, ""));
+                (true, historicalSummaryTotal, ""));
 
             // Row 2: Discount
             AddSummaryRow("Discount",
@@ -607,7 +675,7 @@ namespace Procure.Services.Export
             // final NetTaxable, and an early clamp made the printed rows fail arithmetic checks)
             AddSummaryRow("Total Price Excl. VAT After Discount",
                 rf => MoneyOrDash(rf, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)),
-                (true, totalLastPriceSum, ""));
+                (true, historicalSummaryTotal, ""));
 
             // Row 4: Freight/Shipping Charges
             AddSummaryRow("Freight/Shipping Charges",
@@ -632,7 +700,7 @@ namespace Procure.Services.Export
                 (false, 0m, historicalVatType));
 
             // Row 7: Total Price Incl. VAT
-            decimal lastPriceInclVat = historicalVatType == "5%" ? totalLastPriceSum * 1.05m : totalLastPriceSum;
+            decimal lastPriceInclVat = historicalVatType == "5%" ? historicalSummaryTotal * 1.05m : historicalSummaryTotal;
             AddSummaryRow("Total Price Incl. VAT",
                 rf => MoneyOrDash(rf, rf.TotalLandedCost),
                 (true, lastPriceInclVat, ""));

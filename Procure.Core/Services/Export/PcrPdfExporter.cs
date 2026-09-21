@@ -162,6 +162,20 @@ namespace Procure.Services.Export
             => MoneyCellPad + MeasureTextWidth(cur, font, size)
                + MeasureTextWidth(amount.ToString("N2", CultureInfo.InvariantCulture), font, size);
 
+        private static double MoneyWidthWithConversion(
+            PcrCurrencyConversionOptions conversion,
+            string sourceCurrency,
+            decimal amount,
+            string font,
+            double size,
+            bool currencyInHeader)
+        {
+            var width = MoneyWidth(currencyInHeader ? string.Empty : sourceCurrency, amount, font, size);
+            if (conversion.TryConvert(sourceCurrency, amount, out var localAmount))
+                width = Math.Max(width, MoneyWidth($"~ {conversion.LocalCurrency}", localAmount, font, size));
+            return width;
+        }
+
         /// <summary>Which RfqItem backs each (item, vendor) cell. Saved link wins, unlinked lines are
         /// handed out one-to-one. Picking the first name match per PR line printed one vendor's single
         /// price against two same-named PR lines and left the second line's real quote off the sheet.</summary>
@@ -180,7 +194,8 @@ namespace Procure.Services.Export
         }
 
         private static ColumnNeeds MeasureColumnNeeds(List<PrItem> prItems, IReadOnlyList<RequestForQuotation> rfqs,
-            RfqItem?[,] matched, string defaultCurrency, bool fitVendors, bool currencyInHeader)
+            RfqItem?[,] matched, string defaultCurrency, bool fitVendors, bool currencyInHeader,
+            PcrCurrencyConversionOptions conversion)
         {
             int n = rfqs.Count;
             var qty = new double[n];
@@ -201,7 +216,20 @@ namespace Procure.Services.Export
                     var ri = matched[p, i];
                     if (ri?.LastPrice > 0) { rowLast = ri.LastPrice.Value; break; }
                 }
-                if (rowLast > 0) histNeed = Math.Max(histNeed, MoneyWidth(Cell(defaultCurrency), rowLast, "F1", 7.5));
+                if (rowLast > 0)
+                {
+                    var rowLastCurrency = string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? defaultCurrency : item.EstimatedCurrency.Trim();
+                    for (int i = 0; i < n; i++)
+                    {
+                        var ri = matched[p, i];
+                        if (ri?.LastPrice > 0)
+                        {
+                            rowLastCurrency = string.IsNullOrWhiteSpace(ri.LastPriceCurrency) ? defaultCurrency : ri.LastPriceCurrency.Trim();
+                            break;
+                        }
+                    }
+                    histNeed = Math.Max(histNeed, MoneyWidthWithConversion(conversion, rowLastCurrency, rowLast, "F1", 7.5, currencyInHeader: false));
+                }
             }
 
             for (int i = 0; i < n; i++)
@@ -223,7 +251,7 @@ namespace Procure.Services.Export
                     }
                     qtyNeed = Math.Max(qtyNeed, CellPad + MeasureTextWidth(ri.FormattedQuantity, "F1", 7));
                     var net = Math.Max(0m, ri.QuotedUnitPrice.Value - (ri.Discount ?? 0m));
-                    priceNeed = Math.Max(priceNeed, MoneyWidth(Cell(cur), net, "F1", 7.5));
+                    priceNeed = Math.Max(priceNeed, MoneyWidthWithConversion(conversion, cur, net, "F1", 7.5, currencyInHeader));
                 }
 
                 // The summary rows draw across the vendor's whole pair, so they constrain the pair
@@ -233,7 +261,7 @@ namespace Procure.Services.Export
                 foreach (var amt in new[] { baseAmt, rf.Discount ?? 0m, baseAmt - (rf.Discount ?? 0m),
                                             rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.TotalLandedCost })
                 {
-                    pairNeed = Math.Max(pairNeed, MoneyWidth(Cell(cur), amt, "F2", 7.5));
+                    pairNeed = Math.Max(pairNeed, MoneyWidthWithConversion(conversion, cur, amt, "F2", 7.5, currencyInHeader));
                 }
                 foreach (var text in new[] {
                     string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType,
@@ -287,14 +315,16 @@ namespace Procure.Services.Export
 
         /// <summary>The scale this PR's sheet prints at with these suppliers and options - 1.0 is full
         /// size. The same calculation <see cref="GeneratePdf"/> lays the sheet out with.</summary>
-        public static double PrintScaleFor(PurchaseRequisition pr, IReadOnlyList<RequestForQuotation> rfqs, PcrPdfOptions options)
+        public static double PrintScaleFor(PurchaseRequisition pr, IReadOnlyList<RequestForQuotation> rfqs, PcrPdfOptions options,
+            PcrCurrencyConversionOptions? conversion = null)
         {
             var (width, _, margin) = PageGeometry(options);
             if (rfqs.Count <= FullSizeSupplierLimit) return HorizontalFitScale(width - 2 * margin, rfqs.Count);
 
             var items = pr.Items?.ToList() ?? new List<PrItem>();
             var needs = MeasureColumnNeeds(items, rfqs, MatchRfqItems(items, rfqs), DefaultCurrencyOf(rfqs),
-                fitVendors: true, currencyInHeader: rfqs.Count > CurrencyInCellsSupplierLimit);
+                fitVendors: true, currencyInHeader: rfqs.Count > CurrencyInCellsSupplierLimit,
+                conversion ?? PcrCurrencyConversionOptions.Disabled);
             return PageScaleFor(width - 2 * margin, rfqs.Count, needs);
         }
 
@@ -308,8 +338,9 @@ namespace Procure.Services.Export
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
             PcrPdfOptions? options = null,
-            IReadOnlyList<PrItem>? selectedItems = null)
-            => GeneratePdfDocument(pr, pcr, selectedRfqs, remarks, options, selectedItems).Bytes;
+            IReadOnlyList<PrItem>? selectedItems = null,
+            PcrCurrencyConversionOptions? conversion = null)
+            => GeneratePdfDocument(pr, pcr, selectedRfqs, remarks, options, selectedItems, conversion).Bytes;
 
         public static PcrPdfDocument GeneratePdfDocument(
             PurchaseRequisition pr,
@@ -317,9 +348,11 @@ namespace Procure.Services.Export
             IReadOnlyList<RequestForQuotation> selectedRfqs,
             string remarks,
             PcrPdfOptions? options = null,
-            IReadOnlyList<PrItem>? selectedItems = null)
+            IReadOnlyList<PrItem>? selectedItems = null,
+            PcrCurrencyConversionOptions? conversion = null)
         {
             options ??= new PcrPdfOptions();
+            conversion ??= PcrCurrencyConversionOptions.Disabled;
             // "Fit sheet to one page" never changes the layout itself - the sheet is always built at
             // one natural, full size (same row heights, gaps and font sizes either way), then - if
             // requested and it doesn't already fit - scaled down as a single whole-page transform at
@@ -344,7 +377,7 @@ namespace Procure.Services.Export
             var prItems = (selectedItems ?? pr.Items)?.ToList() ?? new List<PrItem>();
             var defaultCurrency = DefaultCurrencyOf(selectedRfqs);
             var matchedRfqItems = MatchRfqItems(prItems, selectedRfqs);
-            var needs = MeasureColumnNeeds(prItems, selectedRfqs, matchedRfqItems, defaultCurrency, fitVendors, currencyInHeader);
+            var needs = MeasureColumnNeeds(prItems, selectedRfqs, matchedRfqItems, defaultCurrency, fitVendors, currencyInHeader, conversion);
 
             // Also the "fit every vendor across the page" scale past FullSizeSupplierLimit suppliers.
             double pageScale = PageScaleFor(pageWidth - 2 * margin, supplierCount, needs);
@@ -728,8 +761,22 @@ namespace Procure.Services.Export
                 }
             }
 
-            void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount, bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false)
+            void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount,
+                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false,
+                bool rowTwoLines = false, double rowTop = 0, double rowHeight = 0, string? sourceCurrency = null)
             {
+                var conversionCurrency = sourceCurrency ?? currency;
+                if (rowTwoLines && amount.HasValue && (!showZeroAsDash || amount.Value > 0)
+                    && conversion.TryConvert(conversionCurrency, amount.Value, out var localAmount))
+                {
+                    const double lineHeight = 8.5;
+                    var firstLineY = rowTop - ((rowHeight - (lineHeight * 2)) / 2.0) - (lineHeight * 0.75);
+                    DrawMoneyCell(cellX, cellWidth, firstLineY, currency, amount, isBold, fontSize, showZeroAsDash,
+                        sourceCurrency: conversionCurrency);
+                    DrawMoneyCell(cellX, cellWidth, firstLineY - lineHeight, $"~ {conversion.LocalCurrency}", localAmount, isBold, fontSize, false);
+                    return;
+                }
+
                 if (amount.HasValue && (!showZeroAsDash || amount.Value > 0))
                 {
                     var font = isBold ? "F2" : "F1";
@@ -979,8 +1026,33 @@ namespace Procure.Services.Export
             var itemDescLines = prItems
                 .Select(item => WrapItemName(item.ItemName))
                 .ToList();
+            bool ItemRowNeedsConversion(int itemPos)
+            {
+                var item = prItems[itemPos];
+                var currencies = new List<string?>();
+                for (int i = 0; i < supplierCount; i++)
+                {
+                    var rfq = selectedRfqs[i];
+                    var rfqItem = matchedRfqItems[itemPos, i];
+                    if (rfqItem?.QuotedUnitPrice is > 0 || (rfq.BaseAmount > 0 && prItems.Count == 1))
+                        currencies.Add(CurrencyOf(rfq));
+                    if (rfqItem?.LastPrice is > 0)
+                        currencies.Add(string.IsNullOrWhiteSpace(rfqItem.LastPriceCurrency) ? defaultCur : rfqItem.LastPriceCurrency);
+                }
+
+                if (item.EstimatedUnitPrice is > 0)
+                    currencies.Add(string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? defaultCur : item.EstimatedCurrency);
+
+                return PcrCurrencyConversion.RowNeedsTwoLines(conversion, currencies);
+            }
+
+            var itemRowNeedsConversion = Enumerable.Range(0, prItems.Count)
+                .Select(ItemRowNeedsConversion)
+                .ToList();
+            const double conversionLineHeight = 8.5;
             var itemRowHeights = itemDescLines
-                .Select(lines => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight)
+                .Select((lines, index) => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight
+                    + (itemRowNeedsConversion[index] ? conversionLineHeight : 0))
                 .ToList();
 
             // Remarks are free text and can run long - wrap over the full content width with no
@@ -999,7 +1071,11 @@ namespace Procure.Services.Export
             double remarksBlockH = remarksLines.Count * remarksLineH;
 
             const int summaryRowsCount = 12;
-            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + afterTableGap + remarksBlockH + remarksGap
+            var summaryConversionExtra = conversion.ShowLocalEquivalent
+                && selectedRfqs.Any(rfq => conversion.HasConversion(CurrencyOf(rfq)))
+                ? 7 * conversionLineHeight
+                : 0;
+            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
             // "Fit sheet to one page": work out how much the WHOLE natural-size page needs to shrink to
@@ -1031,7 +1107,11 @@ namespace Procure.Services.Export
             if (prItems.Count == 0)
             {
                 var fallbackDescLines = WrapItemName(pr.Description);
-                double rowH = Math.Max(18, 18 + (fallbackDescLines.Count - 1) * itemDescLineHeight);
+                var fallbackNeedsConversion = PcrCurrencyConversion.RowNeedsTwoLines(
+                    conversion,
+                    selectedRfqs.Select(rf => rf.BaseAmount > 0 || rf.QuoteAmount > 0 ? CurrencyOf(rf) : null));
+                double rowH = Math.Max(18, 18 + (fallbackDescLines.Count - 1) * itemDescLineHeight
+                    + (fallbackNeedsConversion ? conversionLineHeight : 0));
                 DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
                 double fbCenterY = curY - ((rowH - itemDescLineHeight) / 2.0) - (itemDescLineHeight * 0.75);
                 DrawText("1", colX[0], fbCenterY, font: "F1", fontSize: 8, align: "center", width: slNoWidth);
@@ -1046,7 +1126,8 @@ namespace Procure.Services.Export
                     // No PrItem row exists in this fallback, so there's no matched RfqItem to read a
                     // quantity from.
                     DrawText("-", colX[VendorQtyColIdx(i)], fbCenterY, font: "F1", fontSize: 8, align: "center", width: vendorQtyW[i]);
-                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], fbCenterY, CellCur(cur), amt, fontSize: 8);
+                    DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], fbCenterY, CellCur(cur), amt, fontSize: 8,
+                        rowTwoLines: fallbackNeedsConversion, rowTop: curY, rowHeight: rowH, sourceCurrency: cur);
                 }
                 DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, fbCenterY, CellCur(defaultCur), 0.00m, fontSize: 8);
                 curY -= rowH;
@@ -1100,7 +1181,9 @@ namespace Procure.Services.Export
                             // not necessarily the PR Quantity column two cells to the left - in its
                             // own real column now, not stacked into the price cell.
                             DrawFittedText(rfqItem.FormattedQuantity, colX[VendorQtyColIdx(i)] + 3, singleLineCenterY, font: "F1", baseFontSize: 7, align: "center", maxWidth: vendorQtyW[i] - 6, minFontSize: 5.0);
-                            DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], singleLineCenterY, CellCur(cur), netUnitPrice, fontSize: 7.5, showZeroAsDash: true);
+                            DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], singleLineCenterY, CellCur(cur), netUnitPrice,
+                                fontSize: 7.5, showZeroAsDash: true, rowTwoLines: itemRowNeedsConversion[itemPos],
+                                rowTop: curY, rowHeight: rowH, sourceCurrency: cur);
                         }
                         else
                         {
@@ -1135,7 +1218,9 @@ namespace Procure.Services.Export
                         // unlike a vendor's quote, this figure's currency can differ row to row (the
                         // PR's estimate or a past purchase, not this RFQ's own quote currency).
                         var rowCur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? defaultCur : rowLastPriceCurrency;
-                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, rowCur, rowLastPrice, fontSize: 7.5, showZeroAsDash: true);
+                        DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, rowCur, rowLastPrice,
+                            fontSize: 7.5, showZeroAsDash: true, rowTwoLines: itemRowNeedsConversion[itemPos],
+                            rowTop: curY, rowHeight: rowH);
                     }
                     else
                     {
@@ -1169,7 +1254,11 @@ namespace Procure.Services.Export
 
             void DrawSummaryMoneyRow(string label, Func<RequestForQuotation, (decimal? amount, bool showZeroAsDash)> valFunc, bool isBold = false)
             {
-                double rowH = summaryRowH;
+                var values = selectedRfqs.Select(valFunc).ToList();
+                var rowTwoLines = PcrCurrencyConversion.RowNeedsTwoLines(
+                    conversion,
+                    values.Select((value, index) => value.amount.HasValue ? CurrencyOf(selectedRfqs[index]) : null));
+                double rowH = summaryRowH + (rowTwoLines ? conversionLineHeight : 0);
                 DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
                 var textY = SummaryTextY(rowH);
 
@@ -1179,10 +1268,12 @@ namespace Procure.Services.Export
                 {
                     var rfq = selectedRfqs[i];
                     var cur = string.IsNullOrWhiteSpace(rfq.Currency) ? "AED" : rfq.Currency.Trim();
-                    var (amt, showDash) = valFunc(rfq);
+                    var (amt, showDash) = values[i];
                     // Spans the vendor's whole Qty+Price pair - no divider drawn through this band
                     // (see CloseCurrentPageTable), so the total reads as one merged figure.
-                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), textY, CellCur(cur), amt, isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash);
+                    DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), textY, CellCur(cur), amt,
+                        isBold: isBold, fontSize: 7.5, showZeroAsDash: showDash,
+                        rowTwoLines: rowTwoLines, rowTop: curY, rowHeight: rowH, sourceCurrency: cur);
                 }
 
                 curY -= rowH;

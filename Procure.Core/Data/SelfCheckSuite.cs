@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Procure.Data.Repositories;
+using Procure.Services.Export;
 using Procure.Utilities;
 
 namespace Procure.Data
@@ -35,6 +36,7 @@ namespace Procure.Data
             {
                 PrLineMatcherSelfCheck.Run();
                 ClipboardItemParserSelfCheck.Run();
+                PcrCurrencyConversionSelfCheck.Run();
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 

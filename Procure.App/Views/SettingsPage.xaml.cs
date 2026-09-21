@@ -24,6 +24,7 @@ public sealed partial class SettingsPage : Page
         new("Appearance", "Appearance"),
         new("Navigation", "Navigation & Sidebar"),
         new("Procurement", "Procurement Defaults"),
+        new("Currency", "Currency & Rates"),
         new("Columns", "Custom Columns"),
         new("Updates", "Updates"),
         new("Storage", "Storage & Data"),
@@ -140,6 +141,12 @@ public sealed partial class SettingsPage : Page
     {
         if ((sender as FrameworkElement)?.DataContext is CustomColumnDefinition def)
             Vm.ColumnsModel.DeleteColumnCommand.Execute(def);
+    }
+
+    private void DeleteCurrencyRate_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is CurrencyRateRow row)
+            Vm.RemoveCurrencyRateCommand.Execute(row);
     }
 
     // The update is downloaded; the window over the whole app is where it gets installed, because

@@ -357,6 +357,24 @@ namespace Procure.PageModels
         public partial string ExportPcrSubtitle { get; set; } = string.Empty;
 
         [ObservableProperty]
+        public partial bool ExportPcrShowLocalEquivalent { get; set; }
+
+        public string ExportPcrLocalCurrencyLabel => _settingsService.LocalCurrency;
+        public string ExportPcrToggleLabel => $"Show {ExportPcrLocalCurrencyLabel} equivalent";
+
+        public string ExportPcrConversionStatus => ExportPcrShowLocalEquivalent
+            ? $"{ExportPcrLocalCurrencyLabel} equivalents ON"
+            : $"{ExportPcrLocalCurrencyLabel} equivalents OFF";
+
+        private PcrCurrencyConversionOptions BuildPcrCurrencyConversion() =>
+            new(ExportPcrShowLocalEquivalent, _settingsService.LocalCurrency, _settingsService.CurrencyRates);
+
+        partial void OnExportPcrShowLocalEquivalentChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ExportPcrConversionStatus));
+        }
+
+        [ObservableProperty]
         public partial string SelectedRfqCountMessage { get; set; } = string.Empty;
 
         // ================= ITEM SELECTION STEP =================
@@ -377,6 +395,7 @@ namespace Procure.PageModels
             // The comparison prints every quote's lines.
             pr = await EnsureHydratedAsync(pr);
             ExportTargetPr = pr;
+            ExportPcrShowLocalEquivalent = false;
             var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
             ExportPcrSubtitle = $"Requisition {pr.PrNo} — {plant}";
 
@@ -590,7 +609,8 @@ namespace Procure.PageModels
             {
                 var pcr = await GetOrCreateSavedPcrAsync(ExportTargetPr);
 
-                var filePath = await _pcrExportService.ExportPcrToExcelAsync(ExportTargetPr, pcr, selected, ExportPcrRemarks, selectedItems);
+                var filePath = await _pcrExportService.ExportPcrToExcelAsync(
+                    ExportTargetPr, pcr, selected, ExportPcrRemarks, selectedItems, BuildPcrCurrencyConversion());
                 CloseExportPcrModal();
 
                 // The exporter already opened the file; the result is visible, so no blocking dialog.
@@ -825,7 +845,8 @@ namespace Procure.PageModels
         /// would do better when that is too small. Empty at full size. Uses the exporter's own scale
         /// calculation, so it describes exactly the sheet being previewed.</summary>
         private static string PcrFitNote(PurchaseRequisition pr, PriceComparisonRequest pcr, IReadOnlyList<RequestForQuotation> rfqs,
-            string remarks, PcrPdfOptions options, double scale, IReadOnlyList<PrItem>? selectedItems)
+            string remarks, PcrPdfOptions options, double scale, IReadOnlyList<PrItem>? selectedItems,
+            PcrCurrencyConversionOptions? conversion = null)
         {
             const double bodyPt = 7.5;   // the sheet's item and price text
             if (scale >= 1.0) return string.Empty;
@@ -839,7 +860,7 @@ namespace Procure.PageModels
 
             note += " That is hard to read.";
             var a3 = options with { PaperSize = PdfPaperSize.A3, Orientation = PdfOrientation.Landscape };
-            var a3Pt = bodyPt * PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, a3, selectedItems).TextScale;
+            var a3Pt = bodyPt * PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, a3, selectedItems, conversion).TextScale;
             bool alreadyA3OrBigger = options.Orientation == PdfOrientation.Landscape
                 && options.PaperSize is PdfPaperSize.A3 or PdfPaperSize.A2 or PdfPaperSize.A1 or PdfPaperSize.A0 or PdfPaperSize.Tabloid;
             return alreadyA3OrBigger || a3Pt <= printedPt + 0.05
@@ -865,13 +886,14 @@ namespace Procure.PageModels
                 var rfqs = _pcrPreviewRfqs;
                 var items = _pcrPreviewItems;
                 var remarks = _pcrPreviewRemarksSnapshot;
+                var conversion = BuildPcrCurrencyConversion();
 
                 // The PDF itself is cheap; rasterizing it is what takes the time. So build and open it
                 // once, then draw page one and show it before the rest are started - this used to
                 // render every page before displaying any, and again on every option change.
                 var (document, source) = await Task.Run(async () =>
                 {
-                    var doc = PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, options, items);
+                    var doc = PcrPdfExporter.GeneratePdfDocument(pr, pcr, rfqs, remarks, options, items, conversion);
                     return (doc, await PcrPdfPageSource.OpenAsync(doc.Bytes));
                 });
                 var bytes = document.Bytes;
@@ -893,7 +915,7 @@ namespace Procure.PageModels
                 // A sheet too wide for this paper is scaled down to fit rather than overprinting its own
                 // columns - so say so, with the size it will actually print at. Discovering 30%-size text
                 // after it comes out of the printer is the thing to avoid.
-                PcrPreviewPageSummary += PcrFitNote(pr, pcr, rfqs, remarks, options, document.TextScale, items);
+                PcrPreviewPageSummary += PcrFitNote(pr, pcr, rfqs, remarks, options, document.TextScale, items, conversion);
                 IsPcrPagerVisible = source.PageCount > 1;
                 PcrPreviewPageIndex = 0;
                 ShowPcrPreviewPage();
@@ -1046,7 +1068,8 @@ namespace Procure.PageModels
                     var rfqs = _pcrPreviewRfqs;
                     var remarks = _pcrPreviewRemarksSnapshot;
                     var options = BuildPcrPdfOptions() with { PagesToEmit = pageIndices };
-                    pdfBytes = await Task.Run(() => _pcrExportService.GeneratePcrPdfBytes(pr, pcr, rfqs, remarks, options, _pcrPreviewItems));
+                    pdfBytes = await Task.Run(() => _pcrExportService.GeneratePcrPdfBytes(
+                        pr, pcr, rfqs, remarks, options, _pcrPreviewItems, BuildPcrCurrencyConversion()));
                 }
 
                 var copies = ParseCopies(PcrCopiesText);

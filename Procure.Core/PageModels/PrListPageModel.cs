@@ -225,6 +225,12 @@ namespace Procure.PageModels
                 case nameof(ISettingsService.DefaultCurrency):
                     RefreshCardVisuals();
                     break;
+                case nameof(ISettingsService.LocalCurrency):
+                case nameof(ISettingsService.CurrencyRates):
+                    OnPropertyChanged(nameof(ExportPcrLocalCurrencyLabel));
+                    OnPropertyChanged(nameof(ExportPcrToggleLabel));
+                    OnPropertyChanged(nameof(ExportPcrConversionStatus));
+                    break;
             }
         }
 
