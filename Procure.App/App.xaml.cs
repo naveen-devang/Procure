@@ -79,6 +79,19 @@ public partial class App : Application
         (Services.GetRequiredService<IAppHost>() as WinUiAppHost)?
             .ApplyAccentColor(Services.GetRequiredService<ISettingsService>().AccentTheme);
 
+        // A delete that was still in its Undo window when the app last crashed or was killed: it
+        // happens now, before any page reads the database. Off the UI thread's context - blocking it
+        // on work that posts back to it would hang. Only does anything when the journal file exists.
+        try
+        {
+            var undo = Services.GetRequiredService<UndoDeleteService>();
+            System.Threading.Tasks.Task.Run(undo.CommitLeftoversAsync).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Procure.Utilities.CrashLog.Write("Undo: finishing last session's delete failed (kept for next launch)", ex);
+        }
+
         _window = Services.GetRequiredService<MainWindow>();
         _window.Activate();
 
@@ -120,6 +133,7 @@ public partial class App : Application
         s.AddSingleton<IUpdateService, Procure.App.Platform.UpdateService>();
         s.AddSingleton<ICsvExportService, Procure.Services.CsvExportService>();
         s.AddSingleton<IPcrExportService, Procure.App.Platform.PcrExportService>();
+        s.AddSingleton<UndoDeleteService>();
 
         // View models
         s.AddSingleton<DashboardPageModel>();

@@ -188,9 +188,14 @@ namespace Procure.PageModels
         private readonly IDialogService _dialogs;
         private readonly INavigationService _navigation;
 
+        // Null only when a self-check builds the page model by hand: deletes then run at once.
+        private readonly Services.UndoDeleteService? _undo;
+
         public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets,
-            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation)
+            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation,
+            Services.UndoDeleteService? undo = null)
         {
+            _undo = undo;
             _repo = repo;
             _errorHandler = errorHandler;
             _linkTargets = linkTargets;
@@ -778,13 +783,62 @@ namespace Procure.PageModels
         public async Task DeleteSubtaskAsync(TodoTask? sub)
         {
             if (sub is null) return;
+
+            var name = string.IsNullOrWhiteSpace(sub.Title) ? "this sub-task" : $"“{sub.Title}”";
+            var ok = await _dialogs.DisplayAlertAsync("Delete sub-task",
+                $"Are you sure you want to delete {name}?\n\nYou can undo this for 10 seconds.", "Delete", "Cancel");
+            if (!ok) return;
+
+            await DeleteTasksWithUndoAsync(new[] { sub }, "Sub-task deleted");
+        }
+
+        /// <summary>The one task delete path (a task, a sub-task, "Clear finished"): off screen now,
+        /// from the database once Undo runs out. Sub-tasks of a deleted task go with it - the database
+        /// cascade takes them - so they leave the screen with it too.</summary>
+        internal IReadOnlyList<TodoTask> AllTasksForProbe => _all;
+
+        internal async Task DeleteTasksWithUndoAsync(IReadOnlyList<TodoTask> roots, string toast)
+        {
             try
             {
-                await _repo.DeleteAsync(sub.Id);
-                UnhookTask(sub);
-                _all.Remove(sub);
+                var ids = roots.Select(t => t.Id).ToHashSet();
+                var removed = _all.Where(t => ids.Contains(t.Id) || (t.ParentId is { } p && ids.Contains(p))).ToList();
+                var linked = removed.Any(t => t.HasLinks);
+
+                foreach (var t in removed)
+                {
+                    UnhookTask(t);
+                    // A debounced save still waiting would land after the delete and write the task
+                    // back. Cancel it - and, when Undo can bring the task back, save it now instead
+                    // so the last few keystrokes come back with it.
+                    if (_unsaved.Remove(t.Id))
+                    {
+                        _saveGeneration[t.Id] = _saveGeneration.GetValueOrDefault(t.Id) + 1;
+                        if (_undo is not null && !string.IsNullOrWhiteSpace(t.Title)) await _repo.UpsertAsync(t);
+                    }
+                }
+
+                if (_undo is null)
+                {
+                    foreach (var t in roots) await _repo.DeleteAsync(t.Id);
+                }
+                else
+                {
+                    await _undo.StartAsync(toast,
+                        roots.Select(t => new PendingDeleteItem(DeleteKind.Task, t.Id)).ToList(),
+                        onUndo: () =>
+                        {
+                            _ = LoadAsync(force: true);   // reads them back, the rest untouched
+                            if (linked) RaiseChanged();
+                        });
+                }
+
+                foreach (var t in removed) _all.Remove(t);
+                if (SelectedTask is { } selected && removed.Contains(selected)) SelectedTask = null;
+                Rebuild();
                 RefreshSelectedSubtasks();
-                RefreshSubtaskBadges();
+                // The PR panels' task strips re-read, and leave out what is waiting to be deleted.
+                if (linked) RaiseChanged();
             }
             catch (Exception ex)
             {
@@ -812,57 +866,27 @@ namespace Procure.PageModels
             task ??= SelectedTask;
             if (task is null) return;
 
-            if (!string.IsNullOrWhiteSpace(task.Title))
-            {
-                var ok = await _dialogs.DisplayAlertAsync("Delete task",
-                    $"Delete “{task.Title}”?", "Delete", "Cancel");
-                if (!ok) return;
-            }
+            var name = string.IsNullOrWhiteSpace(task.Title) ? "this task" : $"“{task.Title}”";
+            var ok = await _dialogs.DisplayAlertAsync("Delete task",
+                $"Are you sure you want to delete {name}?\n\nYou can undo this for 10 seconds.", "Delete", "Cancel");
+            if (!ok) return;
 
-            try
-            {
-                await _repo.DeleteAsync(task.Id);
-                UnhookTask(task);
-                _all.Remove(task);
-                // FK ON DELETE CASCADE removed the sub-tasks in the DB; drop them from memory too.
-                foreach (var child in _all.Where(t => t.ParentId == task.Id).ToList())
-                {
-                    UnhookTask(child);
-                    _all.Remove(child);
-                }
-                if (SelectedTask == task) SelectedTask = null;
-                Rebuild();
-                if (task.HasLinks) RaiseChanged();
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
+            await DeleteTasksWithUndoAsync(new[] { task }, "Task deleted");
         }
 
         [RelayCommand]
         public async Task ClearFinishedAsync()
         {
-            {
-                var ok = await _dialogs.DisplayAlertAsync("Clear finished",
-                    "Permanently delete every completed task?", "Delete", "Cancel");
-                if (!ok) return;
-            }
+            var finished = _all.Where(t => t.IsDone).ToList();
+            if (finished.Count == 0) return;
 
-            try
-            {
-                await _repo.DeleteCompletedAsync();
-                foreach (var t in _all.Where(t => t.IsDone).ToList())
-                {
-                    UnhookTask(t);
-                    _all.Remove(t);
-                }
-                Rebuild();
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
+            var ok = await _dialogs.DisplayAlertAsync("Clear finished",
+                $"Are you sure you want to delete {(finished.Count == 1 ? "the 1 completed task" : $"all {finished.Count} completed tasks")}?\n\nYou can undo this for 10 seconds.",
+                "Delete", "Cancel");
+            if (!ok) return;
+
+            await DeleteTasksWithUndoAsync(finished,
+                finished.Count == 1 ? "1 finished task deleted" : $"{finished.Count} finished tasks deleted");
         }
 
         [RelayCommand]
@@ -920,12 +944,17 @@ namespace Procure.PageModels
             }
         }
 
+        // Tasks with an edit still waiting for its debounced save - a delete cancels and settles these.
+        private readonly HashSet<Guid> _unsaved = new();
+
         private void ScheduleSave(TodoTask task)
         {
             var generation = _saveGeneration[task.Id] = _saveGeneration.GetValueOrDefault(task.Id) + 1;
+            _unsaved.Add(task.Id);
             _dispatcher.PostDelayed(TimeSpan.FromMilliseconds(400), async () =>
             {
                 if (_saveGeneration.GetValueOrDefault(task.Id) != generation) return;
+                _unsaved.Remove(task.Id);
                 if (string.IsNullOrWhiteSpace(task.Title)) return; // don't persist a blank new task yet
                 try
                 {

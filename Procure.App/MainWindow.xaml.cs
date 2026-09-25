@@ -83,6 +83,7 @@ public sealed partial class MainWindow : Window
 
         InstallShortcuts();
         InitSidebar();
+        InitUndoToast();
         // Opens maximised, as the MAUI app did.
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Maximize();
         NavigateTo(AppRoute.Dashboard, null);   // the page the app opens on, as in the MAUI app

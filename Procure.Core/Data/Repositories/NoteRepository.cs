@@ -42,6 +42,8 @@ namespace Procure.Data.Repositories
                 });
             }
 
+            // Deleted inside the Undo window.
+            if (!PendingDeleteFilter.IsEmpty) list.RemoveAll(n => PendingDeleteFilter.Contains(n.Id));
             return list;
         }
 

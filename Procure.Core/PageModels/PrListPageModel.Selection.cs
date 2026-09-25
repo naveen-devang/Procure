@@ -130,27 +130,15 @@ namespace Procure.PageModels
 
             var confirm = await _dialogs.DisplayAlertAsync(
                 "Delete Requisitions",
-                $"Delete {label} and all associated RFQs, PCRs, and POs? This cannot be undone.",
+                $"Delete {label} and all associated RFQs, PCRs, and POs?\n\nYou can undo this for 10 seconds.",
                 "Delete",
                 "Cancel");
 
             if (!confirm) return;
 
-            try
-            {
-                foreach (var pr in selected)
-                {
-                    await _prRepo.DeleteAsync(pr.Id);
-                    pr.PropertyChanged -= OnPrItemPropertyChanged;
-                    _selectedIds.Remove(pr.Id);
-                }
-                ApplyFilters(resetToTop: true);
-                UpdateSelectionState();
-            }
-            catch (Exception ex)
-            {
-                _errorHandler.HandleError(ex);
-            }
+            await DeletePrsWithUndoAsync(selected, selected.Count == 1
+                ? (string.IsNullOrWhiteSpace(selected[0].PrNo) ? "Requisition deleted" : $"{selected[0].PrNo} deleted")
+                : $"{selected.Count} requisitions deleted");
         }
 
         /// <summary>Records a checkbox change. The id set is the record that outlives the loaded window;

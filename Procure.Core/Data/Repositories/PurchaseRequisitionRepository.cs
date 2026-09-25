@@ -49,11 +49,13 @@ LIMIT @Take OFFSET @Skip;";
                 }
 
                 if (batch.Count == 0) yield break;
+                var fullBatch = batch.Count == batchSize;
+                if (!PendingDeleteFilter.IsEmpty) batch.RemoveAll(p => PendingDeleteFilter.Contains(p.Id));
 
                 await LoadChildrenAsync(connection, batch, scoped: true).ConfigureAwait(false);
                 yield return batch;
 
-                if (batch.Count < batchSize) yield break;
+                if (!fullBatch) yield break;
             }
         }
 
@@ -427,8 +429,10 @@ ORDER BY SortOrder ASC;";
                 if (itemDict.TryGetValue(pr.Id, out var itemList))
                     pr.Items = new ObservableCollection<PrItem>(itemList);
 
+                // Quotes and orders deleted inside the Undo window are left off, whichever read this is.
                 if (rfqDict.TryGetValue(pr.Id, out var rfqList))
-                    pr.Rfqs = new ObservableCollection<RequestForQuotation>(rfqList);
+                    pr.Rfqs = new ObservableCollection<RequestForQuotation>(
+                        PendingDeleteFilter.IsEmpty ? rfqList : rfqList.Where(r => !PendingDeleteFilter.Contains(r.Id)));
 
                 if (pcrDict.TryGetValue(pr.Id, out var pcr))
                 {
@@ -437,7 +441,8 @@ ORDER BY SortOrder ASC;";
                 }
 
                 if (poDict.TryGetValue(pr.Id, out var poList))
-                    pr.Pos = new ObservableCollection<PurchaseOrder>(poList);
+                    pr.Pos = new ObservableCollection<PurchaseOrder>(
+                        PendingDeleteFilter.IsEmpty ? poList : poList.Where(p => !PendingDeleteFilter.Contains(p.Id)));
 
                 if (customDict.TryGetValue(pr.Id, out var customVals))
                     pr.CustomValues = new ObservableCollection<CustomFieldValue>(customVals);
@@ -644,6 +649,10 @@ ORDER BY CreatedAt DESC;";
 
             if (query.UrgentOnly)
                 clauses.Add("Priority = 'Urgent' COLLATE NOCASE");
+
+            // Deleted but still inside the Undo window: gone from the board and its count.
+            if (!PendingDeleteFilter.IsEmpty && PendingDeleteFilter.IdsOf(DeleteKind.Pr) is { Count: > 0 } hidden)
+                clauses.Add("PurchaseRequisition.Id NOT IN (" + BindIdList(cmd, "@Hidden", hidden) + ")");
 
             return clauses.Count == 0 ? string.Empty : "\nWHERE " + string.Join("\n  AND ", clauses);
         }

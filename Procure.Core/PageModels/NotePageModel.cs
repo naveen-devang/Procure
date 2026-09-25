@@ -60,9 +60,14 @@ namespace Procure.PageModels
         private readonly IDialogService _dialogs;
         private readonly INavigationService _navigation;
 
+        // Null only when a self-check builds the page model by hand: deletes then run at once.
+        private readonly Services.UndoDeleteService? _undo;
+
         public NotePageModel(INoteRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets,
-            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation)
+            IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation,
+            Services.UndoDeleteService? undo = null)
         {
+            _undo = undo;
             _repo = repo;
             _errorHandler = errorHandler;
             _linkTargets = linkTargets;
@@ -274,13 +279,31 @@ namespace Procure.PageModels
             if (confirm)
             {
                 var ok = await _dialogs.DisplayAlertAsync("Delete note",
-                    $"Delete “{item.DisplayTitle}”?", "Delete", "Cancel");
+                    $"Are you sure you want to delete “{item.DisplayTitle}”?\n\nYou can undo this for 10 seconds.", "Delete", "Cancel");
                 if (!ok) return;
             }
 
+            // confirm: false is the self-check sweep, which needs the row gone now.
+            await RemoveNoteAsync(item, undoable: confirm);
+        }
+
+        internal IReadOnlyList<NoteListItem> AllNotesForProbe => _all;
+
+        internal async Task RemoveNoteAsync(NoteListItem item, bool undoable)
+        {
             try
             {
-                await _repo.DeleteAsync(item.Id);
+                // Settle a debounced save first: left waiting, it would land after the delete and
+                // write the note back - and Undo should bring back the last few keystrokes.
+                await SaveNoteAsync(item.Id);
+
+                if (_undo is null || !undoable)
+                    await _repo.DeleteAsync(item.Id);
+                else
+                    await _undo.StartAsync("Note deleted",
+                        new[] { new PendingDeleteItem(DeleteKind.Note, item.Id) },
+                        onUndo: () => _ = LoadListAsync(force: true));
+
                 _all.Remove(item);
                 if (SelectedNote?.Id == item.Id)
                 {

@@ -40,6 +40,7 @@ namespace Procure.Data.Repositories
             using (var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false))
                 while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(ReadRow(reader));
 
+            RemoveUndoPending(list);
             await LoadLinksAsync(connection, list).ConfigureAwait(false);
             return list;
         }
@@ -61,7 +62,17 @@ ORDER BY IsDone, CreatedAt DESC;";
             using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false)) list.Add(ReadRow(reader));
 
+            RemoveUndoPending(list);
             return list;
+        }
+
+        // Deleted inside the Undo window: left out, and so are their sub-tasks (the database
+        // cascade takes those with the parent once the delete is final).
+        private static void RemoveUndoPending(List<TodoTask> list)
+        {
+            if (PendingDeleteFilter.IsEmpty) return;
+            list.RemoveAll(t => PendingDeleteFilter.Contains(t.Id)
+                                || (t.ParentId is { } parent && PendingDeleteFilter.Contains(parent)));
         }
 
         // One query for every link row, matched back to the tasks already loaded.

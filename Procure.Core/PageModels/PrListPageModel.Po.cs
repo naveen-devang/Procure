@@ -865,19 +865,15 @@ namespace Procure.PageModels
         public async Task DeletePoAsync(PurchaseOrder po)
         {
 
-            var confirm = await _dialogs.DisplayAlertAsync("Delete PO", $"Delete PO {po.PoNo}?", "Delete", "Cancel");
+            var confirm = await _dialogs.DisplayAlertAsync("Delete PO",
+                $"Are you sure you want to delete PO {po.PoNo}?\n\nYou can undo this for 10 seconds.", "Delete", "Cancel");
             if (!confirm) return;
 
             try
             {
-                await _prRepo.DeletePoAsync(po.Id);
-                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == po.PrId);
-                if (parentPr != null)
-                {
-                    parentPr.Pos.Remove(po);
-                    parentPr.NotifyHierarchyChanged();
-                }
-                Procure.Utilities.DataChangeNotifier.NotifyPoChanged();
+                var message = string.IsNullOrWhiteSpace(po.PoNo) ? "PO deleted" : $"PO {po.PoNo} deleted";
+                await DeleteChildWithUndoAsync(po, p => p.Id, po.PrId, DeleteKind.Po, message, pr => pr.Pos,
+                    Procure.Utilities.DataChangeNotifier.NotifyPoChanged);
             }
             catch (Exception ex)
             {

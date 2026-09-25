@@ -40,6 +40,8 @@ namespace Procure.Data
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 
+            if (On("PROCURE_UNDO_SELFCHECK")) _ = Procure.Services.UndoDeleteServiceSelfCheck.RunAsync();
+
             if (On("PROCURE_UPDATE_SELFCHECK"))
             {
                 UpdateCheckSchedulerSelfCheck.Run();
@@ -48,6 +50,7 @@ namespace Procure.Data
 
             // Drives the live board, so it is never mixed with anything else.
             if (On("PROCURE_BOARD_MEMORY")) return BoardRetentionProbe.RunAsync(services);
+            if (On("PROCURE_UNDO_PROBE")) return UndoMemoryProbe.RunAsync(services);
             if (On("PROCURE_TASK_SCALE")) return TaskScaleProbe.RunAsync(services);
 
             var databaseSuites = RunDatabaseSuitesAsync(services);

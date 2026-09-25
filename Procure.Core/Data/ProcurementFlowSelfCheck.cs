@@ -100,6 +100,7 @@ namespace Procure.Data
                 await Measure("11 deletes and cascade", () => DeleteFlowAsync(db, repo));
                 await Measure("12 PCR export (Excel + PDF)", () => PcrExportFlowAsync(db, repo));
                 await Measure("13 concurrent saves on one material", () => ConcurrentMaterialSavesAsync(db, repo));
+                await Measure("14 undo window hides, undo restores, expiry deletes", () => UndoDeleteFlowAsync(db, repo));
             }
             catch (Exception ex)
             {
@@ -956,6 +957,94 @@ namespace Procure.Data
             await AssertDerivedDataFreshAsync(db, "after deleting a PR");
             var gone = await repo.GetByIdsAsync(new[] { pr.Id });
             Assert(gone.Count == 0, "and so is the requisition");
+        }
+
+        /// <summary>The Undo window against the real repositories: whatever is waiting to be deleted is
+        /// missing from every read a screen uses (board page and count, a reloaded PR's quotes and
+        /// orders, the task list and its sub-tasks, the note list), comes back on Undo, and is really
+        /// gone - cascades included - once the delete is final.</summary>
+        private static async Task UndoDeleteFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var todoRepo = new TodoRepository(db);
+            var noteRepo = new NoteRepository(db);
+            var journalDir = Path.Combine(Path.GetTempPath(), "procure-undo-flow-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(journalDir);
+            var undo = new Services.UndoDeleteService(Services.UndoDeleteService.RepositoryDelete(repo, todoRepo, noteRepo),
+                () => journalDir, new Abstractions.HeadlessUiDispatcher(), null);
+            try
+            {
+                var pr = NewPr("undo", (Brush, 12m));
+                await repo.SaveAsync(pr);
+                var rfq = NewRfq(pr, "undo-vendor");
+                rfq.Items.Add(NewRfqLine(pr.Items[0], price: 15m));
+                await repo.SaveRfqAsync(rfq);
+                var mid = await Reload(repo, pr.Id);
+                var po = NewPo(mid, mid.Rfqs.Single(), "PO-UNDO");
+                po.Items.Add(NewPoLine(mid.Items[0], 12m, 15m));
+                await repo.SavePoAsync(po);
+
+                // RFQ: hidden on reload, back on Undo.
+                await undo.StartAsync("rfq", new[] { new PendingDeleteItem(DeleteKind.Rfq, rfq.Id) }, () => { });
+                Assert((await Reload(repo, pr.Id)).Rfqs.Count == 0, "undo: a waiting RFQ is left off the reloaded PR");
+                undo.Undo();
+                Assert((await Reload(repo, pr.Id)).Rfqs.Any(r => r.Id == rfq.Id), "undo: Undo brings the RFQ back");
+
+                // PO: hidden, then really deleted when the window closes.
+                await undo.StartAsync("po", new[] { new PendingDeleteItem(DeleteKind.Po, po.Id) }, () => { });
+                Assert((await Reload(repo, pr.Id)).Pos.Count == 0, "undo: a waiting PO is left off the reloaded PR");
+                await undo.CommitNowAsync();
+                Assert(PendingDeleteFilter.IsEmpty, "undo: nothing stays hidden once the delete is final");
+                Assert((await Reload(repo, pr.Id)).Pos.Count == 0, "undo: the PO is gone for good");
+                await AssertDerivedDataFreshAsync(db, "after an undo-window PO delete");
+
+                // PR: off the board page and its count, back on Undo, gone with its RFQ once final.
+                var byNo = new PrQuery(pr.PrNo, null, false, false, false, 10, 5, 0, 10);
+                Assert((await repo.GetPageAsync(byNo)).TotalCount == 1, "undo: the PR is on the board to start with");
+                await undo.StartAsync("pr", new[] { new PendingDeleteItem(DeleteKind.Pr, pr.Id) }, () => { });
+                var hidden = await repo.GetPageAsync(byNo);
+                Assert(hidden.TotalCount == 0 && hidden.Rows.Count == 0, "undo: a waiting PR is off the board and its count");
+                undo.Undo();
+                Assert((await repo.GetPageAsync(byNo)).TotalCount == 1, "undo: Undo puts the PR back on the board");
+                await undo.StartAsync("pr", new[] { new PendingDeleteItem(DeleteKind.Pr, pr.Id) }, () => { });
+                await undo.CommitNowAsync();
+                Created.Remove(pr.Id);
+                Assert((await repo.GetByIdsAsync(new[] { pr.Id })).Count == 0, "undo: the PR is deleted once final");
+                await AssertDerivedDataFreshAsync(db, "after an undo-window PR delete");
+
+                // Task with a sub-task: both hidden, both back, both gone (cascade).
+                var now = DateTime.Now;
+                var task = new TodoTask { Title = _marker + "-undo-task", CreatedAt = now, UpdatedAt = now };
+                var sub = new TodoTask { Title = _marker + "-undo-sub", ParentId = task.Id, CreatedAt = now, UpdatedAt = now };
+                await todoRepo.UpsertAsync(task);
+                await todoRepo.UpsertAsync(sub);
+                await undo.StartAsync("task", new[] { new PendingDeleteItem(DeleteKind.Task, task.Id) }, () => { });
+                var tasks = await todoRepo.GetAllAsync();
+                Assert(!tasks.Any(t => t.Id == task.Id || t.Id == sub.Id), "undo: a waiting task and its sub-task are off the list");
+                undo.Undo();
+                tasks = await todoRepo.GetAllAsync();
+                Assert(tasks.Any(t => t.Id == task.Id) && tasks.Any(t => t.Id == sub.Id), "undo: Undo brings back the task and its sub-task");
+                await undo.StartAsync("task", new[] { new PendingDeleteItem(DeleteKind.Task, task.Id) }, () => { });
+                await undo.CommitNowAsync();
+                tasks = await todoRepo.GetAllAsync();
+                Assert(!tasks.Any(t => t.Id == task.Id || t.Id == sub.Id), "undo: the task and its sub-task are deleted once final");
+
+                // Note.
+                var note = new Note { Title = _marker + "-undo-note", CreatedAt = now, UpdatedAt = now };
+                await noteRepo.UpsertAsync(note, "body");
+                await undo.StartAsync("note", new[] { new PendingDeleteItem(DeleteKind.Note, note.Id) }, () => { });
+                Assert(!(await noteRepo.GetListAsync()).Any(n => n.Id == note.Id), "undo: a waiting note is off the list");
+                undo.Undo();
+                Assert((await noteRepo.GetListAsync()).Any(n => n.Id == note.Id), "undo: Undo brings the note back");
+                await undo.StartAsync("note", new[] { new PendingDeleteItem(DeleteKind.Note, note.Id) }, () => { });
+                await undo.CommitNowAsync();
+                Assert(await noteRepo.GetAsync(note.Id) is null, "undo: the note is deleted once final");
+            }
+            finally
+            {
+                await undo.CommitNowAsync();
+                undo.Undo();
+                try { Directory.Delete(journalDir, recursive: true); } catch { }
+            }
         }
 
         /// <summary>Two saves landing on the same Raw Material PR at once.

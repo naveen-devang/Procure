@@ -800,23 +800,19 @@ namespace Procure.PageModels
             var confirm = dependentPos is { Count: > 0 }
                 ? await _dialogs.DisplayAlertAsync(
                     "Delete Quoted RFQ",
-                    $"Purchase order {string.Join(", ", dependentPos)} was raised from this quote.\n\nDeleting it keeps the order and its value, but the order loses the commercial terms it was built on and drops out of the price comparison.",
+                    $"Purchase order {string.Join(", ", dependentPos)} was raised from this quote.\n\nDeleting it keeps the order and its value, but the order loses the commercial terms it was built on and drops out of the price comparison.\n\nYou can undo this for 10 seconds.",
                     "Delete anyway",
                     "Cancel")
-                : await _dialogs.DisplayAlertAsync("Delete RFQ", $"Delete RFQ for {rfq.Vendor}?", "Delete", "Cancel");
+                : await _dialogs.DisplayAlertAsync("Delete RFQ",
+                    $"Are you sure you want to delete the RFQ for {rfq.Vendor}?\n\nYou can undo this for 10 seconds.", "Delete", "Cancel");
 
             if (!confirm) return;
 
             try
             {
-                await _prRepo.DeleteRfqAsync(rfq.Id);
-                var parentPr = _loadedPrs.FirstOrDefault(p => p.Id == rfq.PrId);
-                if (parentPr != null)
-                {
-                    parentPr.Rfqs.Remove(rfq);
-                    parentPr.NotifyHierarchyChanged();
-                }
-                DataChangeNotifier.Notify(ProcurementChange.Rfq);
+                var message = string.IsNullOrWhiteSpace(rfq.Vendor) ? "RFQ deleted" : $"RFQ for {rfq.Vendor} deleted";
+                await DeleteChildWithUndoAsync(rfq, r => r.Id, rfq.PrId, DeleteKind.Rfq, message, pr => pr.Rfqs,
+                    () => DataChangeNotifier.Notify(ProcurementChange.Rfq));
             }
             catch (Exception ex)
             {

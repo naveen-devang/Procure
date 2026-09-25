@@ -379,6 +379,11 @@ namespace Procure.PageModels
         {
             if (SelectedLine is null) return;
 
+            var ok = await _dialogs.DisplayAlertAsync("Delete call-off",
+                $"Are you sure you want to delete the call-off of {entry.Quantity:0.##} on {entry.CallOffDate:dd MMM yyyy}?",
+                "Delete", "Cancel");
+            if (!ok) return;
+
             try
             {
                 await _repo.DeleteCallOffAsync(entry.Id);

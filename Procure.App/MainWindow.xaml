@@ -211,6 +211,145 @@
             </Border>
         </Grid>
 
+        <!-- "Deleted - Undo" toast (MainWindow.UndoToast.cs, UndoDeleteService). Here rather than on a page
+             so it follows you across tabs: a delete made on the Board can still be undone from Tasks.
+             Inverted surface - dark on the light theme, raised grey on the dark one - so it reads as
+             "about the app", not part of the page under it. -->
+        <Grid x:Name="UndoToast" Grid.Row="1" Visibility="Collapsed" Opacity="0"
+              HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,28"
+              MinWidth="380" MaxWidth="560">
+            <Grid.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="UndoToastBackground" Color="#1F1E1C" />
+                            <SolidColorBrush x:Key="UndoToastBorder" Color="#34322E" />
+                            <SolidColorBrush x:Key="UndoToastText" Color="#FFFFFF" />
+                            <SolidColorBrush x:Key="UndoToastSubText" Color="#B8B2A9" />
+                            <SolidColorBrush x:Key="UndoToastIconBg" Color="#40292A" />
+                            <SolidColorBrush x:Key="UndoToastIconFg" Color="#FF9C94" />
+                            <SolidColorBrush x:Key="UndoToastAccent" Color="#8CC8FF" />
+                            <SolidColorBrush x:Key="UndoToastTrack" Color="#26FFFFFF" />
+                            <!-- Lightweight button styling: the toast's buttons sit on a dark card in
+                                 both themes, so the page's light-theme button text must not reach them. -->
+                            <SolidColorBrush x:Key="ButtonForeground" Color="#8CC8FF" />
+                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#B5DCFF" />
+                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#8CC8FF" />
+                            <SolidColorBrush x:Key="ButtonBackground" Color="#1A8CC8FF" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#2E8CC8FF" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#228CC8FF" />
+                            <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="UndoToastBackground" Color="#2C2C32" />
+                            <SolidColorBrush x:Key="UndoToastBorder" Color="#3E3E46" />
+                            <SolidColorBrush x:Key="UndoToastText" Color="#F1EFEC" />
+                            <SolidColorBrush x:Key="UndoToastSubText" Color="#A8A39C" />
+                            <SolidColorBrush x:Key="UndoToastIconBg" Color="#4A2B2F" />
+                            <SolidColorBrush x:Key="UndoToastIconFg" Color="#FF9C94" />
+                            <SolidColorBrush x:Key="UndoToastAccent" Color="#60CDFF" />
+                            <SolidColorBrush x:Key="UndoToastTrack" Color="#1FFFFFFF" />
+                            <SolidColorBrush x:Key="ButtonForeground" Color="#60CDFF" />
+                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#9ADFFF" />
+                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#60CDFF" />
+                            <SolidColorBrush x:Key="ButtonBackground" Color="#1A60CDFF" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#2E60CDFF" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#2260CDFF" />
+                            <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+
+                    <Storyboard x:Key="UndoToastShowAnim">
+                        <DoubleAnimation Storyboard.TargetName="UndoToastShift" Storyboard.TargetProperty="Y"
+                                         From="24" To="0" Duration="0:0:0.28">
+                            <DoubleAnimation.EasingFunction><ExponentialEase EasingMode="EaseOut" Exponent="6" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="UndoToast" Storyboard.TargetProperty="Opacity"
+                                         To="1" Duration="0:0:0.18" />
+                    </Storyboard>
+                    <Storyboard x:Key="UndoToastHideAnim">
+                        <DoubleAnimation Storyboard.TargetName="UndoToastShift" Storyboard.TargetProperty="Y"
+                                         To="14" Duration="0:0:0.16">
+                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseIn" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="UndoToast" Storyboard.TargetProperty="Opacity"
+                                         To="0" Duration="0:0:0.16" />
+                    </Storyboard>
+                    <!-- The bar empties over the whole Undo window. Linear on purpose: it is a clock. -->
+                    <Storyboard x:Key="UndoToastCountdownAnim">
+                        <DoubleAnimation Storyboard.TargetName="UndoToastProgressScale" Storyboard.TargetProperty="ScaleX"
+                                         From="1" To="0" Duration="0:0:10" />
+                    </Storyboard>
+                </ResourceDictionary>
+            </Grid.Resources>
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="UndoToastShift" Y="24" />
+            </Grid.RenderTransform>
+
+            <Border x:Name="UndoToastCard" CornerRadius="12" BorderThickness="1"
+                    Background="{ThemeResource UndoToastBackground}" BorderBrush="{ThemeResource UndoToastBorder}">
+                <Grid Padding="14,12,10,12" RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Width="34" Height="34" CornerRadius="17" VerticalAlignment="Center"
+                                Background="{ThemeResource UndoToastIconBg}">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="15"
+                                      Foreground="{ThemeResource UndoToastIconFg}" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="UndoToastMessage" Text="Deleted" FontSize="13.5" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="False"
+                                       Foreground="{ThemeResource UndoToastText}"
+                                       AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock x:Name="UndoToastCountdown" Text="You can undo this for 10 seconds" FontSize="11.5"
+                                       IsTextSelectionEnabled="False" Foreground="{ThemeResource UndoToastSubText}" />
+                        </StackPanel>
+
+                        <Button x:Name="UndoToastUndoButton" Grid.Column="2" VerticalAlignment="Center"
+                                Height="34" Padding="14,0" CornerRadius="8"
+                                AutomationProperties.Name="Undo delete" Click="UndoToastUndo_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" FontSize="13" />
+                                <TextBlock Text="Undo" FontSize="13" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="3" Width="30" Height="30" Padding="0" CornerRadius="15" VerticalAlignment="Center"
+                                Background="Transparent" Foreground="{ThemeResource UndoToastSubText}"
+                                ToolTipService.ToolTip="Close and delete now" AutomationProperties.Name="Close and delete now"
+                                Click="UndoToastClose_Click">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE711;" FontSize="11" />
+                        </Button>
+                    </Grid>
+
+                    <!-- Countdown: a track, and a fill that shrinks from the right. -->
+                    <Grid Grid.Row="1" Height="3" Margin="0,0,4,0">
+                        <Border CornerRadius="1.5" Background="{ThemeResource UndoToastTrack}" />
+                        <Border CornerRadius="1.5" Background="{ThemeResource UndoToastAccent}" RenderTransformOrigin="0,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="UndoToastProgressScale" ScaleX="1" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!-- Perf HUD - kept in every migration build until cutover (MIGRATION-PLAN.md 5a).
              Development instrument, hidden unless PROCURE_HUD=1 (MainWindow.xaml.cs). -->
         <Border x:Name="Hud" Grid.Row="1" Visibility="Collapsed"

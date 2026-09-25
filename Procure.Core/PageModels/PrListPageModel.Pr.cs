@@ -352,8 +352,8 @@ namespace Procure.PageModels
                 : string.Join(", ", pr.Pos!.Select(p => p.PoNo).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct());
 
             var message = string.IsNullOrEmpty(poNos)
-                ? $"Are you sure you want to delete {pr.PrNo} ({pr.Description}) and all associated RFQs, PCRs, and POs?"
-                : $"{pr.PrNo} has {poCount} purchase order(s) raised against it: {poNos}.\n\nDeleting the requisition deletes those orders and their call-off history too. This cannot be undone.";
+                ? $"Are you sure you want to delete {pr.PrNo} ({pr.Description}) and all associated RFQs, PCRs, and POs?\n\nYou can undo this for 10 seconds."
+                : $"{pr.PrNo} has {poCount} purchase order(s) raised against it: {poNos}.\n\nDeleting the requisition deletes those orders and their call-off history too. You can undo this for 10 seconds.";
 
             var confirm = await _dialogs.DisplayAlertAsync(
                 string.IsNullOrEmpty(poNos) ? "Delete PR" : "Delete PR With Orders",
@@ -363,13 +363,73 @@ namespace Procure.PageModels
 
             if (!confirm) return;
 
+            await DeletePrsWithUndoAsync(new[] { pr },
+                string.IsNullOrWhiteSpace(pr.PrNo) ? "Requisition deleted" : $"{pr.PrNo} deleted");
+        }
+
+        /// <summary>Deletes one RFQ or PO with Undo: off its PR's card now, from the database when Undo
+        /// runs out. Undo puts the same object back where it was, on whichever copy of the PR the board
+        /// holds by then (a reload in between builds new PR objects).</summary>
+        internal async Task DeleteChildWithUndoAsync<T>(T child, Func<T, Guid> idOf, Guid prId, DeleteKind kind,
+            string message, Func<PurchaseRequisition, ObservableCollection<T>> collectionOf, Action notify)
+        {
+            var id = idOf(child);
+            var parent = _loadedPrs.FirstOrDefault(p => p.Id == prId);
+            var index = parent is null ? 0 : Math.Max(0, collectionOf(parent).IndexOf(child));
+
+            if (_undo is null)
+            {
+                await (kind == DeleteKind.Rfq ? _prRepo.DeleteRfqAsync(id) : _prRepo.DeletePoAsync(id));
+            }
+            else
+            {
+                await _undo.StartAsync(message, new[] { new PendingDeleteItem(kind, id) },
+                    onUndo: () =>
+                    {
+                        var current = _loadedPrs.FirstOrDefault(p => p.Id == prId);
+                        if (current is null) return;   // scrolled out of the window: the next load reads it back
+                        var list = collectionOf(current);
+                        if (list.Any(c => idOf(c) == id)) return;
+                        list.Insert(Math.Min(index, list.Count), child);
+                        current.NotifyHierarchyChanged();
+                    },
+                    onCommitted: notify);
+            }
+
+            if (parent is not null)
+            {
+                collectionOf(parent).Remove(child);
+                parent.NotifyHierarchyChanged();
+            }
+            if (_undo is null) notify();
+        }
+
+        /// <summary>The one PR delete path, for a single PR and for a selection: hides them now, and
+        /// UndoDeleteService deletes them - RFQs, PCRs and POs with them - once Undo has run out.</summary>
+        internal async Task DeletePrsWithUndoAsync(IReadOnlyList<PurchaseRequisition> prs, string message)
+        {
             try
             {
-                await _prRepo.DeleteAsync(pr.Id);
-                pr.PropertyChanged -= OnPrItemPropertyChanged;
-                _selectedIds.Remove(pr.Id);
+                if (_undo is null)
+                {
+                    foreach (var pr in prs) await _prRepo.DeleteAsync(pr.Id);
+                }
+                else
+                {
+                    await _undo.StartAsync(message,
+                        prs.Select(p => new PendingDeleteItem(DeleteKind.Pr, p.Id)).ToList(),
+                        onUndo: () => ApplyFilters(resetToTop: true),
+                        onCommitted: () => DataChangeNotifier.Notify(ProcurementChange.All));
+                }
+
+                foreach (var pr in prs)
+                {
+                    pr.PropertyChanged -= OnPrItemPropertyChanged;
+                    _selectedIds.Remove(pr.Id);
+                }
                 ApplyFilters(resetToTop: true);
-                DataChangeNotifier.Notify(ProcurementChange.All);
+                UpdateSelectionState();
+                if (_undo is null) DataChangeNotifier.Notify(ProcurementChange.All);
             }
             catch (Exception ex)
             {

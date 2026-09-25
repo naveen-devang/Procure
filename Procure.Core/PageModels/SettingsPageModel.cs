@@ -169,6 +169,7 @@ namespace Procure.PageModels
         private readonly IUiDispatcher _dispatcher;
         private readonly IDialogService _dialogs;
         private readonly IAppHost _appHost;
+        private readonly UndoDeleteService? _undo;
 
         public SettingsPageModel(
             ISettingsService settingsService,
@@ -178,8 +179,10 @@ namespace Procure.PageModels
             ManageColumnsPageModel columnsModel,
             IUiDispatcher dispatcher,
             IDialogService dialogs,
-            IAppHost appHost)
+            IAppHost appHost,
+            UndoDeleteService? undo = null)
         {
+            _undo = undo;
             _settingsService = settingsService;
             _updateService = updateService;
             _errorHandler = errorHandler;
@@ -652,6 +655,10 @@ namespace Procure.PageModels
                 var confirm = await _dialogs.DisplayAlertAsync(
                     "Change Database Location", message, "Restart & Switch", "Cancel");
                 if (!confirm) return;
+
+                // A delete still in its Undo window belongs to the database being left: finish it
+                // there. Its crash journal sits beside that database, where the relaunch won't look.
+                if (_undo is not null) await _undo.CommitNowAsync();
 
                 _settingsService.DatabaseDirectory = newDir;
                 RestartApplication();
