@@ -89,7 +89,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="SearchBox" PlaceholderText="Search material, vendor, PO, PR, contract" FontSize="12" Height="34"
+                    <TextBox x:Name="SearchBox" PlaceholderText="Search material, vendor, PO, PR, contract" FontSize="12"
                              ToolTipService.ToolTip="Matches material, vendor, PO number, PR number, transport contract or transporter"
                              Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Grid.Column="1" Style="{StaticResource ToolbarIcon}"
@@ -317,11 +317,11 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <CalendarDatePicker Date="{Binding NewCallOffDate, Converter={StaticResource Dto}, Mode=TwoWay}" />
-                    <TextBox Grid.Column="1" PlaceholderText="Qty" Height="34" Text="{Binding NewCallOffQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox Grid.Column="1" PlaceholderText="Qty" Text="{Binding NewCallOffQuantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <TextBlock Grid.Column="2" Text="{Binding SelectedLine.Unit}" VerticalAlignment="Center" FontSize="12"
                                Foreground="{ThemeResource AppTextSecondary}" />
-                    <TextBox Grid.Column="3" PlaceholderText="Note (optional)" Height="34" Text="{Binding NewCallOffNote, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Grid.Column="4" Content="+ Log Delivery" Style="{StaticResource AccentButtonStyle}"
+                    <TextBox Grid.Column="3" PlaceholderText="Note (optional)" Text="{Binding NewCallOffNote, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="4" Height="{StaticResource ControlHeightStd}" Content="+ Log Delivery" Style="{StaticResource AccentButtonStyle}"
                             Command="{Binding LogCallOffCommand}" />
                 </Grid>
             </Border>

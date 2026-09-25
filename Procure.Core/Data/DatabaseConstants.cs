@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 22;
+        public const int SchemaVersion = 23;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -465,6 +465,21 @@ CREATE TABLE IF NOT EXISTS NoteLink (
     PRIMARY KEY (NoteId, EntityId)
 );
 CREATE INDEX IF NOT EXISTS IX_NoteLink_Entity ON NoteLink(EntityId);
+
+-- v23: one row per vendor for the Vendor box's suggestions, kept current by the triggers in
+-- SqlCreateVendorTriggers. The two expression indexes are what those triggers read: a vendor's
+-- most recent RFQ / PO, found without scanning either table.
+CREATE TABLE IF NOT EXISTS VendorAggregate (
+    VendorKey    TEXT PRIMARY KEY,
+    VendorName   TEXT NOT NULL,
+    Currency     TEXT NOT NULL,
+    PaymentTerms TEXT NOT NULL,
+    Incoterms    TEXT NOT NULL,
+    VatType      TEXT NOT NULL,
+    LastUsed     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_RFQ_VendorKey ON RequestForQuotation(lower(trim(Vendor)), COALESCE(SentDate, QuoteReceivedDate, ''));
+CREATE INDEX IF NOT EXISTS IX_PO_VendorKey ON PurchaseOrder(lower(trim(Vendor)), COALESCE(Date, ''));
 ";
 
         // Every linkable entity - the PR / RFQ / PO rows a task or a note can point at - unordered
@@ -694,5 +709,112 @@ SELECT
         EXCEPT
         SELECT K, N, C, O, CO FROM (" + SqlComputeMaterialAggregates + @" GROUP BY K)
     ));";
+
+        // ---- VendorAggregate (v23): one row per vendor, for the Vendor box's suggestions ----------
+        //
+        // Unlike MaterialAggregate this is kept current by triggers, not by the write paths: a vendor
+        // name lives on RequestForQuotation and PurchaseOrder rows, and those are written from a dozen
+        // places (single and batch saves, merge, split, shared RFQs, combined POs, cascading deletes).
+        // A trigger fires on every one of them, including ones added later.
+        //
+        // The key is lower(trim(Vendor)), so "DELL " and "Dell" are one vendor. Each row carries the
+        // spelling and the terms of that vendor's most recent RFQ (currency and VAT fall back to the
+        // most recent PO for a vendor only ever ordered from), and when it was last used.
+
+        private const string VendorKeyOfRfq = "lower(trim(Vendor))";
+        private const string RfqDate = "COALESCE(SentDate, QuoteReceivedDate, '')";
+        private const string PoDate = "COALESCE(Date, '')";
+
+        private const string VendorAggregateColumns =
+            "(VendorKey, VendorName, Currency, PaymentTerms, Incoterms, VatType, LastUsed)";
+
+        /// <summary>The VendorAggregate rows for the keys <paramref name="keysSelect"/> yields (one
+        /// column, VendorKey). The "latest row" lookups read the two expression indexes below.</summary>
+        private static string SqlComputeVendorRows(string keysSelect) => $@"
+SELECT k.VendorKey,
+       CASE WHEN r.rowid IS NULL OR COALESCE(p.Date, '') > COALESCE(r.SentDate, r.QuoteReceivedDate, '')
+            THEN trim(p.Vendor) ELSE trim(r.Vendor) END,
+       COALESCE(NULLIF(r.Currency, ''), NULLIF(p.Currency, ''), 'AED'),
+       COALESCE(r.PaymentTerms, ''),
+       COALESCE(r.Incoterms, ''),
+       COALESCE(NULLIF(r.VatType, ''), NULLIF(p.VatType, ''), '5%'),
+       max(COALESCE(r.SentDate, r.QuoteReceivedDate, ''), COALESCE(p.Date, ''))
+FROM ({keysSelect}) AS k
+LEFT JOIN RequestForQuotation AS r ON r.rowid =
+    (SELECT rowid FROM RequestForQuotation WHERE {VendorKeyOfRfq} = k.VendorKey ORDER BY {RfqDate} DESC, rowid DESC LIMIT 1)
+LEFT JOIN PurchaseOrder AS p ON p.rowid =
+    (SELECT rowid FROM PurchaseOrder WHERE {VendorKeyOfRfq} = k.VendorKey ORDER BY {PoDate} DESC, rowid DESC LIMIT 1)
+WHERE k.VendorKey <> '' AND (r.rowid IS NOT NULL OR p.rowid IS NOT NULL)";
+
+        private const string SqlAllVendorKeys =
+            "SELECT lower(trim(Vendor)) AS VendorKey FROM RequestForQuotation UNION SELECT lower(trim(Vendor)) FROM PurchaseOrder";
+
+        /// <summary>Trigger body: recompute one vendor's row. <paramref name="condition"/> skips it
+        /// (an update that did not change the vendor has no old key to refresh).</summary>
+        private static string SqlRefreshVendor(string keyExpr, string condition = "1") => $@"
+    DELETE FROM VendorAggregate WHERE VendorKey = {keyExpr} AND {condition};
+    INSERT INTO VendorAggregate {VendorAggregateColumns}
+    {SqlComputeVendorRows($"SELECT {keyExpr} AS VendorKey WHERE {condition}")};";
+
+        private const string OldKey = "lower(trim(OLD.Vendor))";
+        private const string NewKey = "lower(trim(NEW.Vendor))";
+        private const string OnlyIfVendorChanged = "lower(trim(OLD.Vendor)) IS NOT lower(trim(NEW.Vendor))";
+
+        /// <summary>Dropped and re-created on every schema upgrade, so a database always carries the
+        /// current definition.</summary>
+        public static readonly string SqlCreateVendorTriggers = $@"
+DROP TRIGGER IF EXISTS TR_Rfq_Vendor_Insert;
+DROP TRIGGER IF EXISTS TR_Rfq_Vendor_Delete;
+DROP TRIGGER IF EXISTS TR_Rfq_Vendor_Update;
+DROP TRIGGER IF EXISTS TR_Po_Vendor_Insert;
+DROP TRIGGER IF EXISTS TR_Po_Vendor_Delete;
+DROP TRIGGER IF EXISTS TR_Po_Vendor_Update;
+
+CREATE TRIGGER TR_Rfq_Vendor_Insert AFTER INSERT ON RequestForQuotation
+BEGIN {SqlRefreshVendor(NewKey)}
+END;
+CREATE TRIGGER TR_Rfq_Vendor_Delete AFTER DELETE ON RequestForQuotation
+BEGIN {SqlRefreshVendor(OldKey)}
+END;
+-- Saves rewrite every column, so only a real change to what the row feeds is worth a refresh.
+CREATE TRIGGER TR_Rfq_Vendor_Update AFTER UPDATE OF Vendor, Currency, PaymentTerms, Incoterms, VatType, SentDate, QuoteReceivedDate ON RequestForQuotation
+WHEN OLD.Vendor IS NOT NEW.Vendor OR OLD.Currency IS NOT NEW.Currency OR OLD.PaymentTerms IS NOT NEW.PaymentTerms
+  OR OLD.Incoterms IS NOT NEW.Incoterms OR OLD.VatType IS NOT NEW.VatType
+  OR OLD.SentDate IS NOT NEW.SentDate OR OLD.QuoteReceivedDate IS NOT NEW.QuoteReceivedDate
+BEGIN {SqlRefreshVendor(OldKey, OnlyIfVendorChanged)} {SqlRefreshVendor(NewKey)}
+END;
+
+CREATE TRIGGER TR_Po_Vendor_Insert AFTER INSERT ON PurchaseOrder
+BEGIN {SqlRefreshVendor(NewKey)}
+END;
+CREATE TRIGGER TR_Po_Vendor_Delete AFTER DELETE ON PurchaseOrder
+BEGIN {SqlRefreshVendor(OldKey)}
+END;
+CREATE TRIGGER TR_Po_Vendor_Update AFTER UPDATE OF Vendor, Currency, VatType, Date ON PurchaseOrder
+WHEN OLD.Vendor IS NOT NEW.Vendor OR OLD.Currency IS NOT NEW.Currency OR OLD.VatType IS NOT NEW.VatType OR OLD.Date IS NOT NEW.Date
+BEGIN {SqlRefreshVendor(OldKey, OnlyIfVendorChanged)} {SqlRefreshVendor(NewKey)}
+END;";
+
+        public static readonly string SqlRebuildAllVendorAggregates = $@"
+DELETE FROM VendorAggregate;
+INSERT INTO VendorAggregate {VendorAggregateColumns}
+{SqlComputeVendorRows(SqlAllVendorKeys)};";
+
+        /// <summary>Rows where VendorAggregate disagrees with a fresh computation, either way. Must
+        /// always be 0 - asserted by DatabaseSelfCheck and after every procurement-flow phase.</summary>
+        public static readonly string SqlStaleVendorAggregateCount = $@"
+SELECT
+    (SELECT COUNT(*) FROM (SELECT * FROM VendorAggregate EXCEPT {SqlComputeVendorRows(SqlAllVendorKeys)}))
+    +
+    (SELECT COUNT(*) FROM ({SqlComputeVendorRows(SqlAllVendorKeys)} EXCEPT SELECT * FROM VendorAggregate));";
+
+        /// <summary>The Vendor box's suggestions: names containing what was typed, names starting with
+        /// it first, then most recently used. '!' escapes LIKE's wildcards in the typed text.</summary>
+        public const string SqlSearchVendors = @"
+SELECT VendorName, Currency, PaymentTerms, Incoterms, VatType, LastUsed
+FROM VendorAggregate
+WHERE VendorName LIKE '%' || @Text || '%' ESCAPE '!'
+ORDER BY (VendorName LIKE @Text || '%' ESCAPE '!') DESC, LastUsed DESC, VendorName
+LIMIT @Limit;";
     }
 }

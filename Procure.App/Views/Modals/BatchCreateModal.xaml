@@ -67,7 +67,7 @@
                         <ComboBox Grid.Column="3" HorizontalAlignment="Stretch" FontSize="11" ItemsSource="{Binding AllPriorities}" SelectedItem="{Binding BatchSharedPriority, Mode=TwoWay}" />
                         <TextBox Grid.Column="4" FontSize="11" PlaceholderText="Default requestor" Text="{Binding BatchSharedRequestor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBox Grid.Column="5" FontSize="11" PlaceholderText="Notes / purpose" Text="{Binding BatchSharedNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Grid.Column="6" Content="Apply to all rows" FontSize="11" Height="32" Padding="12,0"
+                        <Button Grid.Column="6" Content="Apply to all rows" FontSize="11" Height="{StaticResource ControlHeightStd}" Padding="12,0"
                                 Command="{Binding ApplyDefaultsToAllRowsCommand}" />
                     </Grid>
                 </Border>
@@ -212,7 +212,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBox Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110" PlaceholderText="Item name / spec..."
-                                                     FontSize="12" VerticalAlignment="Center" />
+                                                     FontSize="12" VerticalAlignment="Top" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price or 0.00 usd" FontSize="12"

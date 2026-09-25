@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Procure.Models;
@@ -777,6 +778,39 @@ SELECT
             }
 
             return (0, 0m, 0, 0, 0, 0, 0);
+        }
+
+        public async Task<List<VendorSuggestion>> SearchVendorsAsync(string text, int limit = 8)
+        {
+            var list = new List<VendorSuggestion>();
+            text = text.Trim();
+            if (text.Length == 0) return list;
+
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = DatabaseConstants.SqlSearchVendors;
+            // Typed text is literal: "10%" or "A_B" must not act as LIKE wildcards.
+            cmd.Parameters.AddWithValue("@Text", text.Replace("!", "!!").Replace("%", "!%").Replace("_", "!_"));
+            cmd.Parameters.AddWithValue("@Limit", limit);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                list.Add(new VendorSuggestion
+                {
+                    Name = reader.GetString(0),
+                    Currency = reader.GetString(1),
+                    PaymentTerms = reader.GetString(2),
+                    Incoterms = reader.GetString(3),
+                    VatType = reader.GetString(4),
+                    LastUsed = DateTime.TryParse(reader.GetString(5), CultureInfo.InvariantCulture,
+                        DateTimeStyles.RoundtripKind, out var d) ? d : null,
+                });
+            }
+            return list;
         }
 
         public async Task<List<PurchaseRequisition>> GetNeedsAttentionPrsAsync(int normalOverdueDays, int urgentOverdueDays, int limit = 10)

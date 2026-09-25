@@ -86,7 +86,7 @@
                     <Button Grid.Column="1" Content="+ New" FontSize="11.5" Height="30" Padding="12,0" CornerRadius="7"
                             Command="{Binding NewNoteCommand}" />
                 </Grid>
-                <TextBox Grid.Row="1" PlaceholderText="Search notes" FontSize="12.5" Margin="14,0,14,10" Height="34"
+                <TextBox Grid.Row="1" PlaceholderText="Search notes" FontSize="12.5" Margin="14,0,14,10"
                          Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <ListView Grid.Row="2" x:Name="NoteList" ItemsSource="{Binding Notes}" SelectionMode="None"
                           Margin="14,0,14,8" Padding="0" ItemTemplate="{StaticResource NoteRow}">
@@ -189,7 +189,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBox PlaceholderText="Link a PR / RFQ / PO number" FontSize="12" Height="32"
+                    <TextBox PlaceholderText="Link a PR / RFQ / PO number" FontSize="12"
                              Text="{Binding LinkQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Border BorderThickness="1" CornerRadius="7" BorderBrush="{ThemeResource AppHairline}"
                             Background="{ThemeResource AppTertiaryBackground}"

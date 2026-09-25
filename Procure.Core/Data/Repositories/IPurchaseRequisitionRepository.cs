@@ -67,6 +67,10 @@ namespace Procure.Data.Repositories
         Task SplitCombinedPoAsync(Guid poId);
 
         Task<(int TotalPrs, decimal TotalPoValue, int PosRaised, int RfqsAwaitingQuote, int PcrsAwaitingSignature, int UrgentCount, int OverdueCount)> GetDashboardAggregatesAsync(int normalOverdueDays, int urgentOverdueDays);
+        /// <summary>Vendors used before whose name contains <paramref name="text"/>: names starting
+        /// with it first, then most recently used.</summary>
+        Task<List<VendorSuggestion>> SearchVendorsAsync(string text, int limit = 8);
+
         Task<List<PurchaseRequisition>> GetNeedsAttentionPrsAsync(int normalOverdueDays, int urgentOverdueDays, int limit = 10);
     }
 }

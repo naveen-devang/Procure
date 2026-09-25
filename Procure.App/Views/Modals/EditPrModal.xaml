@@ -121,7 +121,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBox Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
-                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
+                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Top" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12"

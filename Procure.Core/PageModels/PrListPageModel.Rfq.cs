@@ -112,8 +112,8 @@ namespace Procure.PageModels
         partial void OnNewRfqFreightChanged(decimal? value) => RecalculateRfqTotals();
         partial void OnNewRfqOtherChargesChanged(decimal? value) => RecalculateRfqTotals();
         partial void OnNewRfqDiscountChanged(decimal? value) => RecalculateRfqTotals();
-        partial void OnNewRfqVatTypeChanged(string value) => RecalculateRfqTotals();
-        partial void OnNewRfqCurrencyChanged(string value) => RecalculateRfqTotals();
+        partial void OnNewRfqVatTypeChanged(string value) { RecalculateRfqTotals(); MarkRfqTermTouched(nameof(NewRfqVatType)); }
+        partial void OnNewRfqCurrencyChanged(string value) { RecalculateRfqTotals(); MarkRfqTermTouched(nameof(NewRfqCurrency)); }
 
         public IReadOnlyList<string> AvailableCurrencies => AppConstants.SupportedCurrencies;
         public List<string> AvailableVatTypes { get; } = new() { "5%", "RC", "V0" };
@@ -428,6 +428,7 @@ namespace Procure.PageModels
             NewRfqDeliveryLeadTime = string.Empty;
             NewRfqWarranty = string.Empty;
             NewRfqTechnicalApproval = TechnicalApprovalNotSet;
+            ResetRfqTermsTouched();   // the defaults above are the form's, not the user's
 
             foreach (var item in EditingRfqItems)
                 item.PropertyChanged -= OnEditingRfqItemPropertyChanged;

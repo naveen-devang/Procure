@@ -59,7 +59,17 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Vendor Name *" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding BatchRfqVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Al-Futtaim Engineering" />
+                                    <AutoSuggestBox x:Name="VendorBox" Text="{Binding BatchRfqVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Al-Futtaim Engineering"
+                                                    AutomationProperties.Name="Vendor name">
+                                        <AutoSuggestBox.ItemTemplate>
+                                            <DataTemplate x:DataType="models:VendorSuggestion">
+                                                <StackPanel Padding="0,5" Spacing="1">
+                                                    <TextBlock Text="{x:Bind Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Detail}" FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </AutoSuggestBox.ItemTemplate>
+                                    </AutoSuggestBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />

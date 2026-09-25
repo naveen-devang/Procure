@@ -150,6 +150,14 @@ namespace Procure.Data
                     $"{staleMaterials} material aggregate row(s) disagree with the live data {step}. " +
                     "A write path changed a PO item, a call-off or a PR's type without going through " +
                     "MaterialAggregateMaintenance, so Raw & Packing will show stale figures.");
+
+            using var vendorCmd = connection.CreateCommand();
+            vendorCmd.CommandText = DatabaseConstants.SqlStaleVendorAggregateCount;
+            var staleVendors = Convert.ToInt32(await vendorCmd.ExecuteScalarAsync());
+            if (staleVendors != 0)
+                throw new InvalidOperationException(
+                    $"{staleVendors} vendor suggestion row(s) disagree with the live RFQs and POs {step}. " +
+                    "The VendorAggregate triggers are missing or out of date.");
         }
 
         /// <summary>Reads the PR back and checks the PO line's transport allocations - count and

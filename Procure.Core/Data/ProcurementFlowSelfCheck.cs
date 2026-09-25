@@ -101,6 +101,7 @@ namespace Procure.Data
                 await Measure("12 PCR export (Excel + PDF)", () => PcrExportFlowAsync(db, repo));
                 await Measure("13 concurrent saves on one material", () => ConcurrentMaterialSavesAsync(db, repo));
                 await Measure("14 undo window hides, undo restores, expiry deletes", () => UndoDeleteFlowAsync(db, repo));
+                await Measure("15 vendor suggestions", () => VendorSuggestionFlowAsync(db, repo));
             }
             catch (Exception ex)
             {
@@ -1047,6 +1048,81 @@ namespace Procure.Data
             }
         }
 
+        /// <summary>The Vendor box: the suggestion list follows every RFQ write (spelling and case
+        /// merged, newest terms win, a delete falls back, a cascade removes), typed wildcards are
+        /// literal, and picking a vendor fills only the terms nobody changed - and none when editing.</summary>
+        private static async Task VendorSuggestionFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var pr = NewPr("vendor", (Brush, 5m));
+            await repo.SaveAsync(pr);
+            var name = $"{_marker} Zeta 100% Supplies";
+
+            var first = NewRfq(pr, "v1");
+            first.Vendor = "  " + name.ToUpperInvariant() + " ";
+            first.Currency = "USD"; first.PaymentTerms = "60 Days"; first.Incoterms = "FOB"; first.VatType = "RC";
+            first.SentDate = DateTime.Today;
+            await repo.SaveRfqAsync(first);
+
+            var found = await repo.SearchVendorsAsync(_marker + " zeta");
+            Assert(found.Count == 1, $"vendor: a vendor used on an RFQ is suggested; got {found.Count}");
+            var v = found.FirstOrDefault() ?? new VendorSuggestion();
+            Assert(v.Currency == "USD" && v.PaymentTerms == "60 Days" && v.Incoterms == "FOB" && v.VatType == "RC",
+                $"vendor: it carries that RFQ's terms; got {v.Currency}/{v.PaymentTerms}/{v.Incoterms}/{v.VatType}");
+            Assert(v.Name == name.ToUpperInvariant(), $"vendor: the name is shown trimmed; got '{v.Name}'");
+            Assert((await repo.SearchVendorsAsync(_marker + " zeta 100%")).Count == 1, "vendor: a typed % matches itself");
+            Assert((await repo.SearchVendorsAsync(_marker + "%supplies")).Count == 0, "vendor: a typed % is not a wildcard");
+
+            var second = NewRfq(pr, "v2");
+            second.Vendor = name;   // same vendor, different case
+            second.Currency = "EUR";
+            second.SentDate = DateTime.Today.AddDays(1);
+            await repo.SaveRfqAsync(second);
+            found = await repo.SearchVendorsAsync(_marker + " zeta");
+            Assert(found.Count == 1, $"vendor: different case and spacing is one vendor; got {found.Count}");
+            Assert(found.FirstOrDefault()?.Currency == "EUR" && found.FirstOrDefault()?.Name == name,
+                "vendor: the newest RFQ's spelling and terms win");
+
+            await repo.DeleteRfqAsync(second.Id);
+            Assert((await repo.SearchVendorsAsync(_marker + " zeta")).FirstOrDefault()?.Currency == "USD",
+                "vendor: deleting the newest RFQ falls back to the one before");
+
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 15 (form part): the PR board page model was not available from the container.");
+            }
+            else
+            {
+                model.IsEditingRfq = false;
+                model.NewRfqCurrency = "AED"; model.NewRfqPaymentTerms = string.Empty; model.NewRfqIncoterms = "DDP"; model.NewRfqVatType = "5%";
+                model.ResetRfqTermsTouched();          // as a freshly opened form
+                model.NewRfqPaymentTerms = "Advance";  // the user types their own terms
+                model.ApplyRfqVendor(v);
+                Assert(model.NewRfqVendor == v.Name, "vendor: picking a suggestion fills the name");
+                Assert(model.NewRfqCurrency == "USD" && model.NewRfqIncoterms == "FOB" && model.NewRfqVatType == "RC",
+                    $"vendor: and the terms left at their defaults; got {model.NewRfqCurrency}/{model.NewRfqIncoterms}/{model.NewRfqVatType}");
+                Assert(model.NewRfqPaymentTerms == "Advance", "vendor: but never terms the user typed");
+
+                model.IsEditingRfq = true;
+                model.NewRfqCurrency = "AED";
+                model.ApplyRfqVendor(v);
+                Assert(model.NewRfqCurrency == "AED", "vendor: editing an existing quote keeps its own terms");
+                model.IsEditingRfq = false;
+
+                var superseded = model.FindVendorsAsync(_marker + " ze");
+                var latest = model.FindVendorsAsync(_marker + " zet");
+                Assert(await superseded is null, "vendor: a keystroke overtaken by the next one returns nothing");
+                Assert((await latest)?.Count == 1, "vendor: the last keystroke's search returns the vendor");
+                Assert((await model.FindVendorsAsync("z"))?.Count == 0, "vendor: one character suggests nothing");
+            }
+
+            await repo.DeleteAsync(pr.Id);
+            Created.Remove(pr.Id);
+            Assert((await repo.SearchVendorsAsync(_marker + " zeta")).Count == 0,
+                "vendor: once no RFQ or PO names a vendor, it stops being suggested");
+            await AssertDerivedDataFreshAsync(db, "after the vendor suggestion checks");
+        }
+
         /// <summary>Two saves landing on the same Raw Material PR at once.
         ///
         /// This is the shape that put "UNIQUE constraint failed: MaterialAggregate.MaterialKey" in
@@ -1540,6 +1616,13 @@ namespace Procure.Data
                 cmd.CommandText = DatabaseConstants.SqlStaleMaterialAggregateCount;
                 var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert(stale == 0, $"material aggregates are current {step} ({stale} disagreeing row(s))");
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = DatabaseConstants.SqlStaleVendorAggregateCount;
+                var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                Assert(stale == 0, $"vendor suggestions are current {step} ({stale} disagreeing row(s))");
             }
 
             // Orphans: a line pointing at a PR line that no longer exists is how the original bug

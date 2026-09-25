@@ -208,10 +208,10 @@
                         <TextBlock Style="{StaticResource AppText}" Text="{x:Bind AllocationStatusText, Mode=OneWay}" FontSize="10.5" TextTrimming="CharacterEllipsis"
                                    Foreground="{x:Bind AllocationStatusText, Converter={StaticResource FulfilColor}, Mode=OneWay}" />
                     </StackPanel>
-                    <TextBox Height="32" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" FontSize="11.5" VerticalAlignment="Center" />
                     <TextBlock Style="{StaticResource AppText}" Grid.Column="3" Text="{x:Bind Unit}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
-                    <TextBox Height="32" Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
-                    <TextBox Height="32" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="4" Text="{x:Bind QuotedUnitPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" FontSize="11.5" VerticalAlignment="Center" />
+                    <TextBox Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}" FontSize="11.5" VerticalAlignment="Center" />
                     <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
                     <Button ToolTipService.ToolTip="Remove this line" Grid.Column="7" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="26" Height="26" Padding="0"
@@ -268,16 +268,16 @@
                                             <ColumnDefinition Width="100" />
                                             <ColumnDefinition Width="28" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBox Height="30" FontSize="11.5" TextAlignment="Right"
+                                        <TextBox FontSize="11.5" TextAlignment="Right"
                                                  Text="{x:Bind Quantity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}"
                                                  TextChanged="TransportEdited" />
-                                        <TextBox Grid.Column="1" Height="30" FontSize="11.5" PlaceholderText="e.g. TC-2026-014"
+                                        <TextBox Grid.Column="1" FontSize="11.5" PlaceholderText="e.g. TC-2026-014"
                                                  Text="{x:Bind ContractNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  TextChanged="TransportEdited" />
-                                        <TextBox Grid.Column="2" Height="30" FontSize="11.5" PlaceholderText="e.g. Gulf Freight LLC"
+                                        <TextBox Grid.Column="2" FontSize="11.5" PlaceholderText="e.g. Gulf Freight LLC"
                                                  Text="{x:Bind TransporterName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  TextChanged="TransportEdited" />
-                                        <TextBox Grid.Column="3" Height="30" FontSize="11.5" TextAlignment="Right" PlaceholderText="0.00"
+                                        <TextBox Grid.Column="3" FontSize="11.5" TextAlignment="Right" PlaceholderText="0.00"
                                                  Text="{x:Bind RatePerUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}"
                                                  TextChanged="TransportEdited" />
                                         <TextBlock Style="{StaticResource AppText}" Grid.Column="4" Text="{x:Bind FormattedTotal, Mode=OneWay}" FontSize="11.5" FontWeight="SemiBold"

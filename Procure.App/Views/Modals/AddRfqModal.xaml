@@ -65,7 +65,17 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
                                     <TextBlock Text="Vendor Name *" Style="{StaticResource Lbl}" />
-                                    <TextBox Text="{Binding NewRfqVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Dell Enterprise Systems" />
+                                    <AutoSuggestBox x:Name="VendorBox" Text="{Binding NewRfqVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Dell Enterprise Systems"
+                                                    AutomationProperties.Name="Vendor name">
+                                        <AutoSuggestBox.ItemTemplate>
+                                            <DataTemplate x:DataType="models:VendorSuggestion">
+                                                <StackPanel Padding="0,5" Spacing="1">
+                                                    <TextBlock Text="{x:Bind Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Detail}" FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </AutoSuggestBox.ItemTemplate>
+                                    </AutoSuggestBox>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
@@ -179,7 +189,7 @@
                                             </Grid.ColumnDefinitions>
                                             <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" />
                                             <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
-                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Center" />
+                                                     PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Top" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"
                                                      TextAlignment="Right" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" />

@@ -105,8 +105,16 @@
          TextBox measures to its text and the nudge has nowhere to go, so placeholders still
          rode high everywhere a Height was not set by hand (40 of 47 boxes in the PR/RFQ/PO
          dialogs). MinHeight, not Height, so multi-line boxes keep their own larger size. -->
-    <Style TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+    <Style x:Key="AppTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
         <Setter Property="MinHeight" Value="34" />
+    </Style>
+    <Style TargetType="TextBox" BasedOn="{StaticResource AppTextBoxStyle}" />
+
+    <!-- The suggestion box's own inner text box uses a different template that measures 4 px shorter
+         than a TextBox with this font, so the Vendor box sat lower than the RFQ Number box beside it.
+         Giving it the app's TextBox style makes every text entry the same height by construction. -->
+    <Style TargetType="AutoSuggestBox" BasedOn="{StaticResource DefaultAutoSuggestBoxStyle}">
+        <Setter Property="TextBoxStyle" Value="{StaticResource AppTextBoxStyle}" />
     </Style>
 
     <!-- Content container: board card, detail columns, modal sections, dashboard tiles, settings panes. -->

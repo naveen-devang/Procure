@@ -4,5 +4,9 @@ namespace Procure.App.Views.Modals;
 
 public sealed partial class BatchPoModal : UserControl
 {
-    public BatchPoModal() => InitializeComponent();
+    public BatchPoModal()
+    {
+        InitializeComponent();
+        Procure.App.Platform.VendorSuggest.Wire(VendorBox, (vm, vendor) => vm.ApplyBatchPoVendor(vendor));
+    }
 }

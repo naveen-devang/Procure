@@ -2,7 +2,8 @@
 <UserControl
     x:Class="Procure.App.Views.Modals.BatchPoModal"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models">
 
     <Grid Background="#B3000000">
         <Grid.ChildrenTransitions>
@@ -22,7 +23,17 @@
                 </StackPanel>
                 <StackPanel Spacing="4">
                     <TextBlock Style="{StaticResource AppText}" Text="Vendor Name *" FontSize="12" Foreground="{ThemeResource AppTextPrimary}" />
-                    <TextBox Text="{Binding BatchPoVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Vendor Name" />
+                    <AutoSuggestBox x:Name="VendorBox" Text="{Binding BatchPoVendor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Vendor Name"
+                                    AutomationProperties.Name="Vendor name">
+                        <AutoSuggestBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:VendorSuggestion">
+                                <StackPanel Padding="0,5" Spacing="1">
+                                    <TextBlock Text="{x:Bind Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind Detail}" FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </AutoSuggestBox.ItemTemplate>
+                    </AutoSuggestBox>
                 </StackPanel>
                 <StackPanel Spacing="4">
                     <TextBlock Style="{StaticResource AppText}" FontSize="12" Foreground="{ThemeResource AppTextPrimary}"

@@ -219,6 +219,20 @@ namespace Procure.Data
                         catch (SqliteException) { /* already gone: a database created at v19 never had it */ }
                     }
 
+                    // v23: the vendor suggestions table. Triggers keep it current from here on, so an
+                    // existing database is filled once. The triggers are re-created on every upgrade.
+                    using (var vendorCmd = connection.CreateCommand())
+                    {
+                        vendorCmd.CommandText = DatabaseConstants.SqlCreateVendorTriggers;
+                        await vendorCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+                    if (storedVersion < 23)
+                    {
+                        using var vendorFill = connection.CreateCommand();
+                        vendorFill.CommandText = DatabaseConstants.SqlRebuildAllVendorAggregates;
+                        await vendorFill.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
                 }
 

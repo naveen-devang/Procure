@@ -4,5 +4,9 @@ namespace Procure.App.Views.Modals;
 
 public sealed partial class BatchRfqModal : UserControl
 {
-    public BatchRfqModal() => InitializeComponent();
+    public BatchRfqModal()
+    {
+        InitializeComponent();
+        Procure.App.Platform.VendorSuggest.Wire(VendorBox, (vm, vendor) => vm.ApplyBatchRfqVendor(vendor));
+    }
 }

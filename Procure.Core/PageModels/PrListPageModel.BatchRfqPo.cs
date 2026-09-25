@@ -102,8 +102,8 @@ namespace Procure.PageModels
         partial void OnBatchRfqFreightChanged(decimal? value) => RecalculateBatchRfqTotals();
         partial void OnBatchRfqOtherChargesChanged(decimal? value) => RecalculateBatchRfqTotals();
         partial void OnBatchRfqDiscountChanged(decimal? value) => RecalculateBatchRfqTotals();
-        partial void OnBatchRfqVatTypeChanged(string value) => RecalculateBatchRfqTotals();
-        partial void OnBatchRfqCurrencyChanged(string value) => RecalculateBatchRfqTotals();
+        partial void OnBatchRfqVatTypeChanged(string value) { RecalculateBatchRfqTotals(); MarkBatchRfqTermTouched(nameof(BatchRfqVatType)); }
+        partial void OnBatchRfqCurrencyChanged(string value) { RecalculateBatchRfqTotals(); MarkBatchRfqTermTouched(nameof(BatchRfqCurrency)); }
 
         // Batch Combined PO modal state
         [ObservableProperty]
@@ -359,6 +359,7 @@ namespace Procure.PageModels
             BatchRfqDeliveryLeadTime = string.Empty;
             BatchRfqWarranty = string.Empty;
             BatchRfqTechnicalApproval = TechnicalApprovalNotSet;
+            ResetBatchRfqTermsTouched();   // the defaults above are the form's, not the user's
 
             foreach (var item in BatchEditingRfqItems)
                 item.PropertyChanged -= OnBatchEditingRfqItemPropertyChanged;

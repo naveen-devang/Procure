@@ -450,8 +450,8 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <CalendarDatePicker Date="{Binding SelectedDueDate, Converter={StaticResource Dto}, Mode=TwoWay}" />
-                        <Button Grid.Column="1" Content="Today" FontSize="11" Height="32" Command="{Binding SetDueTodayCommand}" />
-                        <Button Grid.Column="2" Content="Clear" FontSize="11" Height="32" Background="Transparent" BorderThickness="0"
+                        <Button Grid.Column="1" Content="Today" FontSize="11" Height="{StaticResource ControlHeightStd}" Command="{Binding SetDueTodayCommand}" />
+                        <Button Grid.Column="2" Content="Clear" FontSize="11" Height="{StaticResource ControlHeightStd}" Background="Transparent" BorderThickness="0"
                                 Visibility="{Binding SelectedHasDueDate, Converter={StaticResource BoolVis}}"
                                 Command="{Binding ClearDueDateCommand}" />
                     </Grid>
