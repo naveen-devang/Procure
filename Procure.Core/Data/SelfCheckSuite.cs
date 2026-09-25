@@ -51,6 +51,8 @@ namespace Procure.Data
             // Drives the live board, so it is never mixed with anything else.
             if (On("PROCURE_BOARD_MEMORY")) return BoardRetentionProbe.RunAsync(services);
             if (On("PROCURE_UNDO_PROBE")) return UndoMemoryProbe.RunAsync(services);
+            if (Environment.GetEnvironmentVariable("PROCURE_UNDO_RAM_PROBE") is { Length: > 0 } rows && int.TryParse(rows, out var scrollTo))
+                return UndoMemoryProbe.RamAfterDeleteAsync(services, scrollTo);
             if (On("PROCURE_TASK_SCALE")) return TaskScaleProbe.RunAsync(services);
 
             var databaseSuites = RunDatabaseSuitesAsync(services);

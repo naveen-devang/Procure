@@ -56,11 +56,7 @@ public sealed partial class PrBoardPage : Page
                 // gen2 heap so the pages actually return to the OS; off the UI thread so the tab
                 // switch isn't waiting on it - the MS-sanctioned "free memory after a heavy
                 // sequence" case, and ~50 MB comes back here in practice.
-                _ = System.Threading.Tasks.Task.Run(() =>
-                {
-                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-                    GC.WaitForPendingFinalizers();
-                });
+                Procure.PageModels.PrListPageModel.CompactInBackground();
             }
         };
 

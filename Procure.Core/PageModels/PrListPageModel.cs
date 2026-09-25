@@ -313,15 +313,27 @@ namespace Procure.PageModels
             // refresh looks like it freed nothing. Same deliberate compaction BoardDisappearing
             // already does for the same reason, on the same threshold, off the UI thread so the
             // reload is not waiting on it.
-            if (released > ReleaseThreshold)
-            {
-                _ = Task.Run(() =>
-                {
-                    GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-                    GC.WaitForPendingFinalizers();
-                });
-            }
+            if (released > ReleaseThreshold) CompactInBackground();
         }
+
+        // A forced collection frees the rows but .NET keeps the emptied memory reserved and hands it back
+        // to Windows only gradually - measured, Task Manager sometimes stayed 30 MB high for 20+ seconds
+        // after the heap had dropped from 39 MB to 5. Aggressive is the mode that returns it at once.
+        // Finalizers run in between so the WinRT wrappers the dropped cards held are gone first.
+        internal static void CompactInBackground() => _ = Task.Run(() =>
+        {
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        });
+
+        /// <summary>A reset to the top (a delete, Undo, a new filter) that drops more rows than this
+        /// also compacts. Measured on the 20k database, 1,000 rows scrolled then a delete: the dropped
+        /// rows were all collectable, but with nothing else allocating the collector left 47 MB of them
+        /// in place for over 30 seconds, and Task Manager showed no change. Lower than
+        /// <see cref="ReleaseThreshold"/> because this is a pass the user just asked for - a scrolled
+        /// board already sits at a few hundred rows.</summary>
+        private const int CompactAfterDroppingRows = 200;
 
         /// <summary>Warms the data before the board's XAML has ever been built. The card fill waits for
         /// <see cref="BoardAppearing"/>, unless the user reaches the board first - see LoadCoreAsync.</summary>
@@ -847,8 +859,13 @@ namespace Procure.PageModels
                 // Selection state travels with the ids, so the action bar has to be recomputed once the
                 // page it describes has actually landed.
                 UpdateSelectionState();
+                var dropped = resetToTop ? FilteredPrs.Count - rows.Count : 0;
                 ReplaceRows(rows, resetToTop);
                 UpdateListSummary();
+                // After a beat: the list's containers still hold the dropped rows until the next layout
+                // passes, and a collection straight away found most of them still reachable.
+                if (dropped > CompactAfterDroppingRows)
+                    _dispatcher.PostDelayed(TimeSpan.FromSeconds(2), CompactInBackground);
                 if (showSkeleton)
                 {
                     if (Procure.Utilities.BoardTrace.IsEnabled)

@@ -225,6 +225,73 @@ namespace Procure.Data
             }
         }
 
+        /// <summary>PROCURE_UNDO_RAM_PROBE=1 - what Task Manager sees when a delete sends a deeply
+        /// scrolled board back to the top: working set unforced (what the user watches) and after a
+        /// forced collection, and whether the rows the reset dropped are still reachable.</summary>
+        public static async Task RamAfterDeleteAsync(IServiceProvider services, int scrollTo)
+        {
+            var log = new StringBuilder();
+            var board = services.GetRequiredService<PrListPageModel>();
+            var repo = services.GetRequiredService<IPurchaseRequisitionRepository>();
+            var undo = services.GetRequiredService<UndoDeleteService>();
+            var nav = services.GetRequiredService<Abstractions.INavigationService>();
+            var victim = NewPr("undoram-" + Guid.NewGuid().ToString("N")[..6]);
+            try
+            {
+                await repo.SaveAsync(victim);
+                await nav.GoToAsync(Abstractions.AppRoute.Board);
+                for (var i = 0; i < 100 && board.FilteredPrs.Count == 0; i++) await Task.Delay(100);
+                await Task.Delay(2000);
+                var wsTop = WorkingSet();
+
+                while (board.FilteredPrs.Count < scrollTo)
+                {
+                    var before = board.FilteredPrs.Count;
+                    if (board.LoadMoreCommand.CanExecute(null)) await board.LoadMoreCommand.ExecuteAsync(null);
+                    if (board.FilteredPrs.Count == before) await Task.Delay(300);
+                    if (board.FilteredPrs.Count == before && !board.LoadMoreCommand.CanExecute(null)) break;
+                }
+                await Task.Delay(3000);
+                var rows = board.FilteredPrs.Count;
+                var wsDeep = WorkingSet();
+                var heapDeep = GC.GetTotalMemory(false);
+                var dropped = board.FilteredPrs.Skip(60).Select(p => new WeakReference(p)).ToList();
+
+                var pauseBefore = GC.GetTotalPauseDuration();
+                var target = board.LoadedPrs.FirstOrDefault(p => p.Id == victim.Id) ?? victim;
+                await board.DeletePrsWithUndoAsync(new[] { target }, "ram probe");
+                await Task.Delay(3000);
+                var ws3 = WorkingSet();
+                var pause = (GC.GetTotalPauseDuration() - pauseBefore).TotalMilliseconds;
+                await Task.Delay(9000);   // Undo window over, delete final
+                var ws12 = WorkingSet();
+                await Task.Delay(20000);
+                var ws32 = WorkingSet();
+                var alive = dropped.Count(w => w.IsAlive);
+                var heapUnforced = GC.GetTotalMemory(false);
+                var heapForced = Settle();
+                var wsForced = WorkingSet();
+                var aliveForced = dropped.Count(w => w.IsAlive);
+
+                log.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  RAM after delete (board scrolled to {rows} rows)");
+                log.AppendLine($"working set, board at top            {Mb(wsTop),6:F0} MB");
+                log.AppendLine($"working set, scrolled to {rows,4} rows    {Mb(wsDeep),6:F0} MB   heap {Mb(heapDeep):F1} MB");
+                log.AppendLine($"3 s after delete (board at top)      {Mb(ws3),6:F0} MB   GC pause in those 3 s: {pause:F0} ms");
+                log.AppendLine($"12 s after (delete final)            {Mb(ws12),6:F0} MB");
+                log.AppendLine($"32 s after, nothing forced           {Mb(ws32),6:F0} MB   heap {Mb(heapUnforced):F1} MB   dropped rows alive: {alive} of {dropped.Count}");
+                log.AppendLine($"after a forced, compacting GC        {Mb(wsForced),6:F0} MB   heap {Mb(heapForced):F1} MB   dropped rows alive: {aliveForced} of {dropped.Count}");
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine("PROBE FAILED: " + ex);
+            }
+            finally
+            {
+                try { await undo.CommitNowAsync(); await repo.DeleteAsync(victim.Id); } catch { }
+                File.WriteAllText(Path.Combine(Path.GetTempPath(), "procure-undo-ram.log"), log.ToString());
+            }
+        }
+
         private static PurchaseRequisition NewPr(string no) => new()
         {
             Id = Guid.NewGuid(),
