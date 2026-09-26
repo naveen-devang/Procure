@@ -18,7 +18,7 @@ namespace Procure.Data.Repositories
         private const string DateFmt = "yyyy-MM-dd";
         private const string AllColumns =
             "Id, Title, Notes, Priority, IsDone, DueDate, CompletedAt, SortOrder, CreatedAt, UpdatedAt, " +
-            "ParentId, RecurrenceRule, PlannedForDate";
+            "ParentId, RecurrenceRule, PlannedForDate, ReminderTime";
 
         public TodoRepository(SqliteDatabase db)
         {
@@ -111,6 +111,7 @@ ORDER BY IsDone, CreatedAt DESC;";
             ParentId = reader.IsDBNull(10) ? null : Guid.Parse(reader.GetString(10)),
             RecurrenceRule = reader.IsDBNull(11) ? null : reader.GetString(11),
             PlannedForDate = ParseDate(reader, 12),
+            ReminderTime = reader.IsDBNull(13) ? null : reader.GetString(13),
         };
 
         public Task UpsertAsync(TodoTask task) => Task.Run(() => UpsertCoreAsync(task));
@@ -125,10 +126,14 @@ ORDER BY IsDone, CreatedAt DESC;";
             {
                 cmd.CommandText = @"
 INSERT INTO TodoTask (Id, Title, Notes, Priority, IsDone, DueDate, CompletedAt, SortOrder, CreatedAt, UpdatedAt,
-                      ParentId, RecurrenceRule, PlannedForDate)
+                      ParentId, RecurrenceRule, PlannedForDate, ReminderTime)
 VALUES (@Id, @Title, @Notes, @Priority, @IsDone, @DueDate, @CompletedAt, @SortOrder, @CreatedAt, @UpdatedAt,
-        @ParentId, @RecurrenceRule, @PlannedForDate)
+        @ParentId, @RecurrenceRule, @PlannedForDate, @ReminderTime)
 ON CONFLICT(Id) DO UPDATE SET
+    -- A new due date or reminder time ends any snooze. Evaluated against the row as it was.
+    SnoozedUntil = CASE WHEN TodoTask.DueDate IS NOT excluded.DueDate OR TodoTask.ReminderTime IS NOT excluded.ReminderTime
+                        THEN NULL ELSE TodoTask.SnoozedUntil END,
+    ReminderTime = excluded.ReminderTime,
     Title = excluded.Title,
     Notes = excluded.Notes,
     Priority = excluded.Priority,
@@ -154,9 +159,11 @@ ON CONFLICT(Id) DO UPDATE SET
                 cmd.Parameters.AddWithValue("@ParentId", (object?)task.ParentId?.ToString() ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@RecurrenceRule", (object?)task.RecurrenceRule ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PlannedForDate", DateOrNull(task.PlannedForDate));
+                cmd.Parameters.AddWithValue("@ReminderTime", (object?)task.ReminderTime ?? DBNull.Value);
 
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
+            Utilities.TodoChangeNotifier.NotifyWritten();
 
             // Task row exists now; (re)write its link set (FK TaskId -> TodoTask). Snapshot the
             // collection - it lives on the UI thread.
@@ -219,6 +226,7 @@ ON CONFLICT(Id) DO UPDATE SET
             cmd.Parameters.AddWithValue("@Id", id.ToString());
 
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            Utilities.TodoChangeNotifier.NotifyWritten();
         }
 
         public Task DeleteAsync(Guid id) => Task.Run(() => DeleteCoreAsync(id));
@@ -233,6 +241,7 @@ ON CONFLICT(Id) DO UPDATE SET
             cmd.CommandText = "DELETE FROM TodoTask WHERE Id = @Id;";
             cmd.Parameters.AddWithValue("@Id", id.ToString());
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            Utilities.TodoChangeNotifier.NotifyWritten();
         }
 
         public Task DeleteCompletedAsync() => Task.Run(DeleteCompletedCoreAsync);
@@ -246,7 +255,61 @@ ON CONFLICT(Id) DO UPDATE SET
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "DELETE FROM TodoTask WHERE IsDone = 1;";
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            Utilities.TodoChangeNotifier.NotifyWritten();
         }
+
+        // ---- reminders -----------------------------------------------------------------------
+
+        public Task<List<Utilities.ReminderRow>> GetRemindersAsync() => Task.Run(async () =>
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+
+            // Open tasks with a due date and reminders not turned off; the index on (IsDone,
+            // DueDate) keeps this to the open tasks however many finished ones pile up.
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+SELECT t.Id, t.Title, t.DueDate, t.ReminderTime, t.SnoozedUntil, t.ReminderAck, t.ParentId,
+       COALESCE((SELECT EntityLabel FROM TodoTaskLink WHERE TaskId = t.Id LIMIT 1), '')
+FROM TodoTask AS t
+WHERE t.IsDone = 0 AND t.DueDate IS NOT NULL AND COALESCE(t.ReminderTime, '') <> @Off;";
+            cmd.Parameters.AddWithValue("@Off", Utilities.TaskReminders.Off);
+
+            var rows = new List<Utilities.ReminderRow>();
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var id = Guid.Parse(reader.GetString(0));
+                var parent = reader.IsDBNull(6) ? (Guid?)null : Guid.Parse(reader.GetString(6));
+                if (!Utilities.PendingDeleteFilter.IsEmpty
+                    && (Utilities.PendingDeleteFilter.Contains(id) || parent is { } p && Utilities.PendingDeleteFilter.Contains(p))) continue;
+                if (ParseDate(reader, 2) is not { } due) continue;
+                rows.Add(new Utilities.ReminderRow(id, reader.GetString(1), due,
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    ParseDateTime(reader, 4), ParseDateTime(reader, 5), reader.GetString(7)));
+            }
+            return rows;
+        });
+
+        public Task SnoozeReminderAsync(Guid id, DateTime until) => SetReminderStateAsync(
+            "UPDATE TodoTask SET SnoozedUntil = @At, ReminderAck = NULL WHERE Id = @Id;", id, until);
+
+        public Task AcknowledgeReminderAsync(Guid id, DateTime firedAt) => SetReminderStateAsync(
+            "UPDATE TodoTask SET ReminderAck = @At WHERE Id = @Id;", id, firedAt);
+
+        private Task SetReminderStateAsync(string sql, Guid id, DateTime at) => Task.Run(async () =>
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Parameters.AddWithValue("@At", at.ToString("o", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@Id", id.ToString());
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            Utilities.TodoChangeNotifier.NotifyWritten();
+        });
 
         public Task ReorderAsync(IReadOnlyList<(Guid Id, int SortOrder)> rows) =>
             Task.Run(() => ReorderCoreAsync(rows));

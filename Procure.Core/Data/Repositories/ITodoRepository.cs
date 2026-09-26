@@ -34,5 +34,11 @@ namespace Procure.Data.Repositories
 
         // Tasks linked to one PR / RFQ / PO, for the reverse strip on the PR detail panel.
         Task<List<TodoTask>> GetLinkedAsync(Guid entityId);
+
+        // Reminders: every open task with a due date and reminders on, and the two writes only the
+        // reminder service makes (the Tasks page never overwrites them).
+        Task<List<Utilities.ReminderRow>> GetRemindersAsync();
+        Task SnoozeReminderAsync(Guid id, DateTime until);
+        Task AcknowledgeReminderAsync(Guid id, DateTime firedAt);
     }
 }

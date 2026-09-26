@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 26;
+        public const int SchemaVersion = 27;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 

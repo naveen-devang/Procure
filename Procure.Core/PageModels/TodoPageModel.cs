@@ -106,6 +106,7 @@ namespace Procure.PageModels
         [NotifyPropertyChangedFor(nameof(SelectedHasDueDate))]
         [NotifyPropertyChangedFor(nameof(SelectedDueDate))]
         [NotifyPropertyChangedFor(nameof(SelectedRecurrence))]
+        [NotifyPropertyChangedFor(nameof(SelectedReminderMode), nameof(SelectedReminderTime), nameof(SelectedHasReminderTime), nameof(ReminderHint))]
         public partial TodoTask? SelectedTask { get; set; }
 
         // ---- link typeahead (detail panel) ----
@@ -160,6 +161,60 @@ namespace Procure.PageModels
             }
         }
 
+        // ---- reminder (detail panel) ----
+        public string[] ReminderOptions { get; } = { ReminderUsual, ReminderSet, ReminderOff };
+        private const string ReminderUsual = "At the usual time";
+        private const string ReminderSet = "At a set time";
+        private const string ReminderOff = "No reminder";
+
+        private TimeSpan UsualReminderTime =>
+            Utilities.TaskReminders.ParseTime(_settings?.DefaultReminderTime) ?? Utilities.TaskReminders.DefaultTime;
+
+        public string SelectedReminderMode
+        {
+            get => SelectedTask?.ReminderTime switch
+            {
+                null => ReminderUsual,
+                Utilities.TaskReminders.Off => ReminderOff,
+                _ => ReminderSet,
+            };
+            set
+            {
+                if (SelectedTask is null || value == SelectedReminderMode) return;
+                SelectedTask.ReminderTime = value switch
+                {
+                    ReminderOff => Utilities.TaskReminders.Off,
+                    ReminderSet => Utilities.TaskReminders.FormatTime(UsualReminderTime),
+                    _ => null,
+                };
+                OnPropertyChanged(nameof(SelectedHasReminderTime));
+                OnPropertyChanged(nameof(SelectedReminderTime));
+                OnPropertyChanged(nameof(ReminderHint));
+            }
+        }
+
+        public bool SelectedHasReminderTime => SelectedReminderMode == ReminderSet;
+
+        public TimeSpan SelectedReminderTime
+        {
+            get => Utilities.TaskReminders.ParseTime(SelectedTask?.ReminderTime) ?? UsualReminderTime;
+            set
+            {
+                if (SelectedTask is null || !SelectedHasReminderTime) return;
+                var text = Utilities.TaskReminders.FormatTime(new TimeSpan(value.Hours, value.Minutes, 0));
+                if (SelectedTask.ReminderTime == text) return;
+                SelectedTask.ReminderTime = text;
+                OnPropertyChanged(nameof(ReminderHint));
+            }
+        }
+
+        /// <summary>"Reminds you at 09:00 on the due day", or why it won't.</summary>
+        public string ReminderHint =>
+            SelectedTask is null ? string.Empty
+            : SelectedReminderMode == ReminderOff ? "No reminder for this task."
+            : SelectedTask.DueDate is null ? "Set a due date to be reminded."
+            : $"Reminds you at {Utilities.TaskReminders.FormatTime(Utilities.TaskReminders.ParseTime(SelectedTask.ReminderTime) ?? UsualReminderTime)} on the due day, while Procure is open.";
+
         public bool HasSelection => SelectedTask is not null;
         public bool SelectedHasDueDate => SelectedTask?.DueDate is not null;
 
@@ -173,6 +228,7 @@ namespace Procure.PageModels
                 if (SelectedTask is null || SelectedTask.DueDate == value.Date) return;
                 SelectedTask.DueDate = value.Date;
                 OnPropertyChanged(nameof(SelectedHasDueDate));
+                OnPropertyChanged(nameof(ReminderHint));
             }
         }
 
@@ -190,12 +246,15 @@ namespace Procure.PageModels
 
         // Null only when a self-check builds the page model by hand: deletes then run at once.
         private readonly Services.UndoDeleteService? _undo;
+        // Null in the same self-checks: the usual reminder time is then 09:00.
+        private readonly Services.ISettingsService? _settings;
 
         public TodoPageModel(ITodoRepository repo, IErrorHandler errorHandler, ILinkTargetService linkTargets,
             IUiDispatcher dispatcher, IDialogService dialogs, INavigationService navigation,
-            Services.UndoDeleteService? undo = null)
+            Services.UndoDeleteService? undo = null, Services.ISettingsService? settings = null)
         {
             _undo = undo;
+            _settings = settings;
             _repo = repo;
             _errorHandler = errorHandler;
             _linkTargets = linkTargets;
@@ -572,6 +631,7 @@ namespace Procure.PageModels
                 Priority = done.Priority,
                 DueDate = next.Value.Date,
                 RecurrenceRule = done.RecurrenceRule,
+                ReminderTime = done.ReminderTime,   // same time of day on the next one
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 SortOrder = done.SortOrder,
@@ -889,12 +949,34 @@ namespace Procure.PageModels
                 finished.Count == 1 ? "1 finished task deleted" : $"{finished.Count} finished tasks deleted");
         }
 
+        // ---- reached from a reminder card ----
+
+        /// <summary>Shows the task in the list, selected, whatever view or filter was on.</summary>
+        public async Task SelectByIdAsync(Guid id)
+        {
+            await LoadAsync();
+            if (_all.FirstOrDefault(t => t.Id == id) is not { } task) return;
+            if (task.ParentId is { } parent && _all.FirstOrDefault(t => t.Id == parent) is { } top) task = top;
+            FilterText = string.Empty;
+            CurrentView = task.IsDone ? "Finished" : "List";
+            Rebuild();
+            Select(task);
+        }
+
+        /// <summary>Ticks the task off exactly as its checkbox would (so a repeating task spawns its next one).</summary>
+        public async Task CompleteByIdAsync(Guid id)
+        {
+            await LoadAsync();
+            if (_all.FirstOrDefault(t => t.Id == id) is { IsDone: false } task) await ToggleDoneAsync(task);
+        }
+
         [RelayCommand]
         public void ClearDueDate()
         {
             if (SelectedTask is null) return;
             SelectedTask.DueDate = null;
             OnPropertyChanged(nameof(SelectedHasDueDate));
+            OnPropertyChanged(nameof(ReminderHint));
         }
 
         [RelayCommand]
@@ -904,6 +986,7 @@ namespace Procure.PageModels
             SelectedTask.DueDate = DateTime.Today;
             OnPropertyChanged(nameof(SelectedHasDueDate));
             OnPropertyChanged(nameof(SelectedDueDate));
+            OnPropertyChanged(nameof(ReminderHint));
         }
 
         [RelayCommand]
@@ -939,6 +1022,7 @@ namespace Procure.PageModels
                 case nameof(TodoTask.Title):
                 case nameof(TodoTask.Notes):
                 case nameof(TodoTask.RecurrenceRule):
+                case nameof(TodoTask.ReminderTime):
                     ScheduleSave(task);
                     break;
             }

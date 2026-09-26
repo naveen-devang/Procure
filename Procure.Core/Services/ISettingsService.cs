@@ -25,6 +25,8 @@ namespace Procure.Services
         bool AutoCollapseSidebarOnNarrow { get; set; }
         bool IsRawPackingTabEnabled { get; set; }
         bool AutoCheckUpdatesOnStartup { get; set; }
+        /// <summary>"HH:mm" - when a task's reminder goes off on its due day unless the task sets its own time.</summary>
+        string DefaultReminderTime { get; set; }
         IReadOnlyList<PastelThemeOption> AvailableAccentThemes { get; }
         List<string> GetDefaultApprovalRoles();
         void SetDefaultApprovalRoles(IEnumerable<string> roles);

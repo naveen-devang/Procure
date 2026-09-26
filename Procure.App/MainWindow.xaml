@@ -215,6 +215,10 @@
             </Border>
         </Grid>
 
+        <!-- Task reminder cards (MainWindow.Reminders.cs, TaskReminderService): bottom-right, on every page. -->
+        <StackPanel x:Name="ReminderStack" Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,24,24" Spacing="10" Width="380" />
+
         <!-- "Deleted - Undo" toast (MainWindow.UndoToast.cs, UndoDeleteService). Here rather than on a page
              so it follows you across tabs: a delete made on the Board can still be undone from Tasks.
              Inverted surface - dark on the light theme, raised grey on the dark one - so it reads as

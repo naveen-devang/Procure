@@ -60,6 +60,11 @@ namespace Procure.Models
         // chips and re-resolved on load (TodoPageModel.ResolveLinkLabel).
         public ObservableCollection<TaskLink> Links { get; } = new();
 
+        /// <summary>Null = the default time from Settings on the due day; "off"; or "HH:mm".
+        /// See <see cref="Utilities.TaskReminders"/>.</summary>
+        [ObservableProperty]
+        public partial string? ReminderTime { get; set; }
+
         public TodoTask()
         {
             Links.CollectionChanged += (_, _) =>

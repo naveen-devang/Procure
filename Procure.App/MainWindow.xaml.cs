@@ -84,6 +84,7 @@ public sealed partial class MainWindow : Window
         InstallShortcuts();
         InitSidebar();
         InitUndoToast();
+        InitReminders();
         // Opens maximised, as the MAUI app did.
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Maximize();
         NavigateTo(AppRoute.Dashboard, null);   // the page the app opens on, as in the MAUI app
@@ -101,6 +102,7 @@ public sealed partial class MainWindow : Window
         Procure.App.Platform.PopupCursorFix.Install(DispatcherQueue);   // no busy cursor over dropdowns
         EnsureKeyboardFocus();
         StartUpdateWork();
+        StartReminders();
         // Load the PR Board's rows and the task list while the user is still on the Dashboard (data only,
         // no visual tree), so opening either tab doesn't pay for the whole load on the click.
         _ = App.Services.GetService(typeof(PrListPageModel)) is PrListPageModel board ? board.PreloadDataAsync() : null;

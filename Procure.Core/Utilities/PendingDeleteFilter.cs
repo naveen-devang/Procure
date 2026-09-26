@@ -37,7 +37,10 @@ namespace Procure.Utilities
 
         internal static void Add(IEnumerable<PendingDeleteItem> items)
         {
-            lock (Gate) foreach (var i in items) _ids[i.Id] = i.Kind;
+            var list = items.ToList();
+            lock (Gate) foreach (var i in list) _ids[i.Id] = i.Kind;
+            // A task hidden for Undo loses its reminder card at once, not when the delete is final.
+            if (list.Any(i => i.Kind == DeleteKind.Task)) TodoChangeNotifier.NotifyWritten();
         }
 
         internal static void Remove(IEnumerable<PendingDeleteItem> items)

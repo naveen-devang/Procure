@@ -141,6 +141,7 @@ public partial class App : Application
         s.AddSingleton<PrListPageModel>();
         s.AddSingleton<CallOffPageModel>();
         s.AddSingleton<TodoPageModel>();
+        s.AddSingleton<TaskReminderService>();
         s.AddSingleton<NotePageModel>();
         s.AddSingleton<SuppliersPageModel>();
         s.AddSingleton<ManageColumnsPageModel>();

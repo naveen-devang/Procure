@@ -114,6 +114,10 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool AutoCheckUpdates { get; set; } = true;
 
+        /// <summary>When task reminders go off on the due day, unless a task sets its own time.</summary>
+        [ObservableProperty]
+        public partial TimeSpan DefaultReminderTime { get; set; } = Utilities.TaskReminders.DefaultTime;
+
         [ObservableProperty]
         public partial string CurrentVersion { get; set; } = "v1.0.0";
 
@@ -203,6 +207,7 @@ namespace Procure.PageModels
             DatabaseDirectory = _settingsService.DatabaseDirectory;
             DatabasePath = DatabaseConstants.DatabaseFilePath;
             AutoCheckUpdates = _settingsService.AutoCheckUpdatesOnStartup;
+            DefaultReminderTime = Utilities.TaskReminders.ParseTime(_settingsService.DefaultReminderTime) ?? Utilities.TaskReminders.DefaultTime;
 
             // Mirror the shared download state so a background auto-download that's already
             // running (or finished) shows the moment the Settings page opens.
@@ -563,6 +568,7 @@ namespace Procure.PageModels
                 _settingsService.NormalOverdueDays = NormalDays;
                 _settingsService.DatabaseDirectory = DatabaseDirectory;
                 _settingsService.AutoCheckUpdatesOnStartup = AutoCheckUpdates;
+                _settingsService.DefaultReminderTime = Utilities.TaskReminders.FormatTime(new TimeSpan(DefaultReminderTime.Hours, DefaultReminderTime.Minutes, 0));
                 _settingsService.LocalCurrency = LocalCurrency;
 
                 var rows = CurrencyRates.ToList();

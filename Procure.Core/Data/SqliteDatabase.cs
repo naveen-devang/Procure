@@ -347,6 +347,11 @@ namespace Procure.Data
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases
             // have the table already, so the CREATE script skips it; add the column explicitly.
             await EnsureColumnExistsAsync(connection, "TodoTask", "LinkedEntityLabel", "TEXT").ConfigureAwait(false);
+            // v27: task reminders (TaskReminders). ReminderTime null = the Settings default on the due
+            // day; SnoozedUntil and ReminderAck are written only by the reminder service.
+            await EnsureColumnExistsAsync(connection, "TodoTask", "ReminderTime", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "TodoTask", "SnoozedUntil", "TEXT").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "TodoTask", "ReminderAck", "TEXT").ConfigureAwait(false);
 
             // v9: the single LinkedEntity* columns became the TodoTaskLink table (many links per task).
             // Backfill once, from the pre-v9 single link. INSERT OR IGNORE keeps a re-run harmless.

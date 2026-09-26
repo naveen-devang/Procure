@@ -239,6 +239,20 @@
                                     <TextBlock Style="{StaticResource RowHint}" Text="Standard PR overdue warning threshold" />
                                 </StackPanel>
                             </Grid>
+                            <Border Height="1" Background="{ThemeResource AppHairline}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Task reminders" Style="{StaticResource RowTitle}" />
+                                    <TextBlock Style="{StaticResource RowHint}" TextWrapping="Wrap"
+                                               Text="When a task's reminder goes off on its due day, unless the task sets its own time." />
+                                </StackPanel>
+                                <TimePicker Grid.Column="1" ClockIdentifier="24HourClock" VerticalAlignment="Center"
+                                            Time="{Binding DefaultReminderTime, Mode=TwoWay}" AutomationProperties.Name="Usual reminder time" />
+                            </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
                                 <TextBlock Text="{Binding SavedMessage}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
                                            Foreground="{ThemeResource FluentSuccess}"

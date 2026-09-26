@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Procure.Data.Repositories;
 using Procure.Models;
+using Procure.Utilities;
 
 namespace Procure.Data
 {
@@ -83,6 +84,30 @@ namespace Procure.Data
 
                 var linked = await repo.GetLinkedAsync(linkA);
                 Assert(linked.Any(t => t.Id == id) && linked.All(t => t.ParentId is null), "GetLinkedAsync returns the parent, not sub-tasks");
+
+                // Reminders: the open task is listed with its link; a snooze sticks through an edit that
+                // leaves the due date alone, and a new due date ends it; acknowledging is kept; "off"
+                // takes the task out of the list.
+                async Task<ReminderRow> Reminder() => (await repo.GetRemindersAsync()).First(r => r.Id == id);
+                back = (await repo.GetAllAsync()).First(t => t.Id == id);
+                var r0 = await Reminder();
+                Assert(r0.ReminderTime is null && r0.LinkLabel == "PR-0001" && r0.DueDate == DateTime.Today.AddDays(2), "reminder row round trip");
+                var snooze = DateTime.Now.AddMinutes(10);
+                await repo.SnoozeReminderAsync(id, snooze);
+                Assert((await Reminder()).SnoozedUntil == snooze, "snooze round trip");
+                back.Notes = "edited";
+                await repo.UpsertAsync(back);
+                Assert((await Reminder()).SnoozedUntil == snooze, "an edit that keeps the due date keeps the snooze");
+                back.ReminderTime = "14:30";
+                await repo.UpsertAsync(back);
+                Assert((await Reminder()).SnoozedUntil is null && (await Reminder()).ReminderTime == "14:30", "a new reminder time ends the snooze");
+                var fired = DateTime.Today.AddDays(2).AddHours(14.5);
+                await repo.AcknowledgeReminderAsync(id, fired);
+                Assert((await Reminder()).Acknowledged == fired, "acknowledged round trip");
+                back.ReminderTime = TaskReminders.Off;
+                await repo.UpsertAsync(back);
+                Assert((await repo.GetRemindersAsync()).All(r => r.Id != id), "reminders off leaves the list");
+                Assert((await repo.GetRemindersAsync()).All(r => r.Id != childId), "a task with no due date is never reminded");
 
                 await repo.DeleteAsync(id);
                 var after = await repo.GetAllAsync();

@@ -211,6 +211,12 @@ public sealed class JsonSettingsService : ISettingsService
         set => Set(nameof(AutoCheckUpdatesOnStartup), value ? "true" : "false");
     }
 
+    public string DefaultReminderTime
+    {
+        get => Get(nameof(DefaultReminderTime), "09:00");
+        set => Set(nameof(DefaultReminderTime), value);
+    }
+
     public IReadOnlyList<PastelThemeOption> AvailableAccentThemes => AccentPalettes.All;
 
     public List<string> GetDefaultApprovalRoles()

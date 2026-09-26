@@ -456,6 +456,16 @@
                                 Command="{Binding ClearDueDateCommand}" />
                     </Grid>
 
+                    <TextBlock Text="Reminder" Style="{StaticResource FieldLabel}" />
+                    <ComboBox ItemsSource="{Binding ReminderOptions}" HorizontalAlignment="Stretch"
+                              SelectedItem="{Binding SelectedReminderMode, Mode=TwoWay}" AutomationProperties.Name="Reminder" />
+                    <TimePicker ClockIdentifier="24HourClock" HorizontalAlignment="Stretch" MinWidth="0"
+                                Time="{Binding SelectedReminderTime, Mode=TwoWay}"
+                                Visibility="{Binding SelectedHasReminderTime, Converter={StaticResource BoolVis}}"
+                                AutomationProperties.Name="Reminder time" />
+                    <TextBlock Text="{Binding ReminderHint}" FontSize="11.5" TextWrapping="Wrap" Margin="0,-4,0,0"
+                               Foreground="{ThemeResource AppTextTertiary}" />
+
                     <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" />
                     <TextBox Text="{Binding SelectedTask.Notes, Mode=TwoWay}" TextWrapping="Wrap" AcceptsReturn="True"
                              MinHeight="90" FontSize="12.5" PlaceholderText="Optional notes" />

@@ -10,5 +10,12 @@ namespace Procure.Utilities
         public static event Action? Changed;
 
         public static void NotifyChanged() => Changed?.Invoke();
+
+        /// <summary>Any task write at all - including the Tasks page's own autosaves, which do not
+        /// raise <see cref="Changed"/>. The reminder service re-reads its next reminder on this.
+        /// Raised on whatever thread wrote.</summary>
+        public static event Action? Written;
+
+        public static void NotifyWritten() => Written?.Invoke();
     }
 }
