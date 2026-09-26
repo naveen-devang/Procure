@@ -71,6 +71,10 @@ namespace Procure.Data.Repositories
         /// with it first, then most recently used.</summary>
         Task<List<VendorSuggestion>> SearchVendorsAsync(string text, int limit = 8);
 
+        /// <summary>The last price paid for each item name (capitals and outer spaces ignored), leaving
+        /// out POs raised on <paramref name="excludePrIds"/>. Names never bought are absent.</summary>
+        Task<Dictionary<string, LastPaidPrice>> GetLastPaidPricesAsync(IReadOnlyCollection<string> itemNames, IReadOnlyCollection<Guid> excludePrIds);
+
         Task<List<PurchaseRequisition>> GetNeedsAttentionPrsAsync(int normalOverdueDays, int urgentOverdueDays, int limit = 10);
     }
 }

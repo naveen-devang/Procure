@@ -192,9 +192,15 @@
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center" />
                                             <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
-                                            <TextBox Grid.Column="7" Text="{x:Bind LastPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00 or 0.00 usd" FontSize="12" TextAlignment="Right"
-                                                     IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" VerticalAlignment="Center"
-                                                     ToolTipService.ToolTip="A currency typed with the number - e.g. 86.75 usd - is kept; otherwise the row keeps its last currency" />
+                                            <StackPanel Grid.Column="7" VerticalAlignment="Center">
+                                                <TextBox Text="{x:Bind LastPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00 or 0.00 usd" FontSize="12" TextAlignment="Right"
+                                                         IsEnabled="{x:Bind IsQuoted, Mode=OneWay}"
+                                                         ToolTipService.ToolTip="A currency typed with the number - e.g. 86.75 usd - is kept; otherwise the row keeps its last currency" />
+                                                <!-- Filled from a past PO: which one, in grey under the box; the whole line on hover. -->
+                                                <TextBlock Text="{x:Bind LastPriceSourceShort, Mode=OneWay}" Visibility="{x:Bind HasLastPriceSource, Mode=OneWay}"
+                                                           FontSize="10.5" Foreground="{ThemeResource AppTextSecondary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"
+                                                           Margin="0,2,2,0" ToolTipService.ToolTip="{x:Bind LastPriceSource, Mode=OneWay}" IsTextSelectionEnabled="False" />
+                                            </StackPanel>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

@@ -130,6 +130,7 @@ namespace Procure.PageModels
                 {
                     EditingPrItems.Add(item);
                 }
+                _ = FillPrItemPricesAsync(parsedItems, CurrentEditingPr?.Id);
 
                 if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(EditingPrDescription) && EditingPrItems.Count > 0)
                 {
@@ -239,6 +240,7 @@ namespace Procure.PageModels
             }
 
             IsEditModalVisible = true;
+            _ = FillPrItemPricesAsync(EditingPrItems.ToList(), pr.Id);   // an older PR's empty prices
         }
 
         private static string StripControlChars(string? value) =>

@@ -158,6 +158,14 @@ namespace Procure.Data
                 throw new InvalidOperationException(
                     $"{staleVendors} vendor suggestion row(s) disagree with the live RFQs and POs {step}. " +
                     "The VendorAggregate triggers are missing or out of date.");
+
+            using var poDateCmd = connection.CreateCommand();
+            poDateCmd.CommandText = DatabaseConstants.SqlStalePoDateCount;
+            var stalePoDates = Convert.ToInt32(await poDateCmd.ExecuteScalarAsync());
+            if (stalePoDates != 0)
+                throw new InvalidOperationException(
+                    $"{stalePoDates} PO line(s) carry a PoDate that disagrees with their PO {step}. " +
+                    "The PoDate triggers are missing or out of date, so Last price can pick the wrong PO.");
         }
 
         /// <summary>Reads the PR back and checks the PO line's transport allocations - count and

@@ -134,8 +134,71 @@ namespace Procure.Models
 
         private bool _suppressEstimatedPriceTextEcho;
 
-        partial void OnEstimatedUnitPriceChanged(decimal? value) => RaiseEstimatedPriceTextChanged();
-        partial void OnEstimatedCurrencyChanged(string? value) => RaiseEstimatedPriceTextChanged();
+        partial void OnEstimatedUnitPriceChanged(decimal? value) { RaiseEstimatedPriceTextChanged(); ForgetPriceSource(); }
+        partial void OnEstimatedCurrencyChanged(string? value) { RaiseEstimatedPriceTextChanged(); ForgetPriceSource(); }
+
+        // ---- filled from a past PO (see PrListPageModel.FillPrItemPricesAsync) --------------------
+
+        /// <summary>Set when the price was filled in from a past PO: "PO-2914-1 · Dell · 12 Aug 2026".
+        /// Shown under the box for as long as the form is open, never saved. Any change to the price
+        /// or its currency clears it - the figure is then the user's, not that PO's.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasEstimatedPriceSource))]
+        [NotifyPropertyChangedFor(nameof(EstimatedPriceSourceShort))]
+        public partial string EstimatedPriceSource { get; set; } = string.Empty;
+
+        public bool HasEstimatedPriceSource => EstimatedPriceSource.Length > 0;
+
+        /// <summary>The part that fits under a 95 px box: "PO-2914-1".</summary>
+        public string EstimatedPriceSourceShort
+        {
+            get
+            {
+                var cut = EstimatedPriceSource.IndexOf("  ·  ", StringComparison.Ordinal);
+                return cut < 0 ? EstimatedPriceSource : EstimatedPriceSource[..cut];
+            }
+        }
+
+        /// <summary>The item name the filled price was looked up for, so a rename can tell that the
+        /// price belongs to the old name.</summary>
+        public string? PriceFilledForName { get; private set; }
+
+        private bool _fillingPrice;
+
+        private void ForgetPriceSource()
+        {
+            if (_fillingPrice) return;
+            EstimatedPriceSource = string.Empty;
+            PriceFilledForName = null;
+        }
+
+        public void FillEstimatedPrice(LastPaidPrice paid, string forName)
+        {
+            _fillingPrice = true;
+            try
+            {
+                EstimatedUnitPrice = paid.Price;
+                EstimatedCurrency = paid.Currency;
+            }
+            finally { _fillingPrice = false; }
+            EstimatedPriceSource = paid.Source;
+            PriceFilledForName = forName;
+        }
+
+        /// <summary>A filled price whose item was renamed to something never bought: it described the
+        /// old item, so it goes.</summary>
+        public void ClearFilledEstimate()
+        {
+            _fillingPrice = true;
+            try
+            {
+                EstimatedUnitPrice = null;
+                EstimatedCurrency = null;
+            }
+            finally { _fillingPrice = false; }
+            EstimatedPriceSource = string.Empty;
+            PriceFilledForName = null;
+        }
 
         private void RaiseEstimatedPriceTextChanged()
         {

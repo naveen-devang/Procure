@@ -233,6 +233,20 @@ namespace Procure.Data
                         await vendorFill.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
 
+                    // v24: last price paid. The index and triggers need PoDate, which MigrateSchemaAsync
+                    // has just added; existing lines get their PO's date once.
+                    using (var poDateCmd = connection.CreateCommand())
+                    {
+                        poDateCmd.CommandText = DatabaseConstants.SqlCreatePoDateSync;
+                        await poDateCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+                    if (storedVersion < 24)
+                    {
+                        using var poDateFill = connection.CreateCommand();
+                        poDateFill.CommandText = DatabaseConstants.SqlBackfillPoDate;
+                        await poDateFill.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
                 }
 
@@ -300,6 +314,9 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportRatePerUnit", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportTotal", "REAL").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "SortOrder", "INTEGER").ConfigureAwait(false);
+            // v24: the PO's date on each line, for the last-price lookup. Filled by the v24 step in
+            // InitializeAsync, then kept by triggers.
+            await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "PoDate", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "MaterialAggregate", "LastActivity", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportMode", "TEXT").ConfigureAwait(false);
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases

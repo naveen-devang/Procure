@@ -18,4 +18,12 @@ public sealed partial class EditPrModal : UserControl
         if ((sender as FrameworkElement)?.DataContext is PrItem item && DataContext is PrListPageModel vm)
             vm.RemoveEditingPrItemCommand.Execute(item);
     }
+
+    // Leaving an item name fills its estimated price from the last PO for that item (never over a
+    // typed price). Its own POs don't count: they are this PR's, not a past purchase.
+    private void ItemName_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is PrItem item && DataContext is PrListPageModel vm)
+            _ = vm.FillPrItemPricesAsync(new[] { item }, vm.CurrentEditingPr?.Id);
+    }
 }

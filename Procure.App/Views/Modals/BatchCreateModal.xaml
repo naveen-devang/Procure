@@ -212,11 +212,17 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBox Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110" PlaceholderText="Item name / spec..."
-                                                     FontSize="12" VerticalAlignment="Top" />
+                                                     FontSize="12" VerticalAlignment="Top" LostFocus="ItemName_LostFocus" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" TextAlignment="Center" />
-                                            <TextBox Height="36" VerticalAlignment="Top" Grid.Column="3" Text="{x:Bind EstimatedPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price or 0.00 usd" FontSize="12"
-                                                     ToolTipService.ToolTip="A currency typed with the number - e.g. 86.75 usd - is kept; otherwise the row keeps its last currency" />
+                                            <StackPanel Grid.Column="3" VerticalAlignment="Top">
+                                                <TextBox Height="36" Text="{x:Bind EstimatedPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Price or 0.00 usd" FontSize="12"
+                                                         ToolTipService.ToolTip="A currency typed with the number - e.g. 86.75 usd - is kept; otherwise the row keeps its last currency" />
+                                                <!-- Filled from a past PO: which one, in grey under the box; the whole line on hover. -->
+                                                <TextBlock Text="{x:Bind EstimatedPriceSourceShort, Mode=OneWay}" Visibility="{x:Bind HasEstimatedPriceSource, Mode=OneWay}"
+                                                           FontSize="10.5" Foreground="{ThemeResource AppTextSecondary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"
+                                                           Margin="0,2,2,0" ToolTipService.ToolTip="{x:Bind EstimatedPriceSource, Mode=OneWay}" IsTextSelectionEnabled="False" />
+                                            </StackPanel>
                                             <Button ToolTipService.ToolTip="Remove Item" Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="11" Width="28" Height="28" Padding="0"
                                                     Background="Transparent" BorderThickness="0" Foreground="{ThemeResource FluentCritical}" VerticalAlignment="Top" Margin="0,4,0,0"
                                                     Click="RemoveItem_Click" />

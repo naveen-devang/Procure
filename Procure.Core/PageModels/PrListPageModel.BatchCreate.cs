@@ -455,6 +455,7 @@ namespace Procure.PageModels
                 if (firstAdded != null) SelectedBatchEntry = firstAdded;
 
                 UpdateBatchEntriesSummary();
+                _ = FillPrItemPricesAsync(parsedEntries.SelectMany(e => e.Items).ToList(), null);
             }
             catch (Exception ex)
             {
@@ -496,6 +497,7 @@ namespace Procure.PageModels
                     entry.Items.Add(item);
                 }
                 entry.NotifyItemsChanged();
+                _ = FillPrItemPricesAsync(parsed, null);
 
                 if (CurrentEditingPr != null && string.IsNullOrWhiteSpace(CurrentEditingPr.Description) && entry.Items.Count > 0)
                     CurrentEditingPr.Description = entry.Items[0].ItemName;

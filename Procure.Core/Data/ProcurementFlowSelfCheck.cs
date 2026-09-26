@@ -102,6 +102,7 @@ namespace Procure.Data
                 await Measure("13 concurrent saves on one material", () => ConcurrentMaterialSavesAsync(db, repo));
                 await Measure("14 undo window hides, undo restores, expiry deletes", () => UndoDeleteFlowAsync(db, repo));
                 await Measure("15 vendor suggestions", () => VendorSuggestionFlowAsync(db, repo));
+                await Measure("16 last price paid", () => LastPaidPriceFlowAsync(db, repo));
             }
             catch (Exception ex)
             {
@@ -1123,6 +1124,104 @@ namespace Procure.Data
             await AssertDerivedDataFreshAsync(db, "after the vendor suggestion checks");
         }
 
+        /// <summary>Last price: the newest priced PO line for an item, by PO date, net of its discount,
+        /// matched ignoring case and outer spaces, never from the quote's own PR - and a PO whose date
+        /// is changed moves with it. The form fills only empty lines and says where the price came from.</summary>
+        private static async Task LastPaidPriceFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var item = $"{_marker} Widget Z";
+            var bought = NewPr("lastprice-a", (item, 10m));
+            await repo.SaveAsync(bought);
+            var quote = NewRfq(bought, "lp");
+            quote.Items.Add(NewRfqLine(bought.Items[0], price: 10m));
+            await repo.SaveRfqAsync(quote);
+            var withQuote = await Reload(repo, bought.Id);
+
+            var older = NewPo(withQuote, withQuote.Rfqs.Single(), "PO-LP-OLD");
+            older.Date = DateTime.Today.AddDays(-30);
+            older.Items.Add(NewPoLine(withQuote.Items[0], 4m, 10m));
+            older.Items[0].Discount = 1m;   // paid 9 a unit
+            await repo.SavePoAsync(older);
+
+            var newer = NewPo(withQuote, withQuote.Rfqs.Single(), "PO-LP-NEW");
+            newer.Date = DateTime.Today.AddDays(-2);
+            newer.Currency = "USD";
+            newer.Items.Add(NewPoLine(withQuote.Items[0], 6m, 20m));
+            await repo.SavePoAsync(newer);
+
+            var unpriced = NewPo(withQuote, withQuote.Rfqs.Single(), "PO-LP-ZERO");
+            unpriced.Date = DateTime.Today;   // newest of all, but no price: never a "last price"
+            unpriced.Items.Add(NewPoLine(withQuote.Items[0], 1m, 0m));
+            await repo.SavePoAsync(unpriced);
+
+            var other = NewPr("lastprice-b", (item, 3m));
+            await repo.SaveAsync(other);
+
+            var found = await repo.GetLastPaidPricesAsync(new[] { "  " + item.ToUpperInvariant() + " " }, new[] { other.Id });
+            var paid = found.Values.FirstOrDefault();
+            Assert(paid is not null, "last price: an item bought before is found, whatever its case and spacing");
+            Assert(paid?.Price == 20m && paid.Currency == "USD" && paid.PoNo == newer.PoNo,
+                $"last price: the newest priced PO wins; got {paid?.Price} {paid?.Currency} {paid?.PoNo}");
+            Assert(paid?.Source.StartsWith("PO " + newer.PoNo) == true, $"last price: it names its PO; got '{paid?.Source}'");
+
+            Assert((await repo.GetLastPaidPricesAsync(new[] { item }, new[] { bought.Id })).Count == 0,
+                "last price: a quote's own PR never supplies its last price");
+
+            // Moving the older PO's date past the newer one makes it the last purchase.
+            older.Date = DateTime.Today.AddDays(-1);
+            await repo.SavePoAsync(older);
+            paid = (await repo.GetLastPaidPricesAsync(new[] { item }, new[] { other.Id })).Values.FirstOrDefault();
+            Assert(paid?.Price == 9m && paid.PoNo == older.PoNo,
+                $"last price: follows a PO date change, net of the line discount; got {paid?.Price} {paid?.PoNo}");
+            await AssertDerivedDataFreshAsync(db, "after the last price checks");
+
+            var model = HostServices?.GetService<PrListPageModel>();
+            if (model == null)
+            {
+                Failures.Add("SKIPPED 16 (form part): the PR board page model was not available from the container.");
+            }
+            else
+            {
+                var empty = new RfqItem { ItemName = item };
+                var estimated = new RfqItem { ItemName = item, LastPrice = 5m, LastPriceCurrency = "AED" };
+                var neverBought = new RfqItem { ItemName = _marker + " never bought" };
+                await model.FillLastPricesAsync(new[] { empty, estimated, neverBought }, new[] { other.Id });
+                Assert(empty.LastPrice == 9m && empty.LastPriceCurrency == "AED" && empty.HasLastPriceSource,
+                    $"last price: an empty line is filled, with its source; got {empty.LastPrice} {empty.LastPriceCurrency} '{empty.LastPriceSource}'");
+                Assert(estimated.LastPrice == 5m && !estimated.HasLastPriceSource, "last price: a PR estimate is never replaced");
+                Assert(neverBought.LastPrice is null, "last price: an item never bought stays empty");
+                empty.LastPriceText = "12";
+                Assert(!empty.HasLastPriceSource, "last price: typing a price removes the PO note");
+
+                // The PR side - where the price lives and flows on to every RFQ and the PCR.
+                var line = new PrItem { ItemName = item };
+                var typed = new PrItem { ItemName = item };
+                typed.EstimatedPriceText = "7 usd";
+                await model.FillPrItemPricesAsync(new[] { line, typed }, other.Id);
+                Assert(line.EstimatedUnitPrice == 9m && line.EstimatedCurrency == "AED" && line.HasEstimatedPriceSource,
+                    $"last price: a PR line's empty estimate is filled from the last PO; got {line.EstimatedUnitPrice} '{line.EstimatedPriceSource}'");
+                Assert(typed.EstimatedUnitPrice == 7m && typed.EstimatedCurrency == "USD", "last price: a typed PR estimate is never replaced");
+
+                var own = new PrItem { ItemName = item };
+                await model.FillPrItemPricesAsync(new[] { own }, bought.Id);
+                Assert(own.EstimatedUnitPrice is null, "last price: a PR's own POs are not its last price");
+
+                line.ItemName = _marker + " never bought";
+                await model.FillPrItemPricesAsync(new[] { line }, other.Id);
+                Assert(line.EstimatedUnitPrice is null && !line.HasEstimatedPriceSource,
+                    "last price: renaming a filled line to an item never bought clears the filled price");
+                line.ItemName = item;
+                await model.FillPrItemPricesAsync(new[] { line }, other.Id);
+                Assert(line.EstimatedUnitPrice == 9m, "last price: renaming it back fills it again");
+            }
+
+            await repo.DeleteAsync(bought.Id);
+            await repo.DeleteAsync(other.Id);
+            Created.Remove(bought.Id);
+            Created.Remove(other.Id);
+            await AssertDerivedDataFreshAsync(db, "after removing the last price PRs");
+        }
+
         /// <summary>Two saves landing on the same Raw Material PR at once.
         ///
         /// This is the shape that put "UNIQUE constraint failed: MaterialAggregate.MaterialKey" in
@@ -1623,6 +1722,13 @@ namespace Procure.Data
                 cmd.CommandText = DatabaseConstants.SqlStaleVendorAggregateCount;
                 var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert(stale == 0, $"vendor suggestions are current {step} ({stale} disagreeing row(s))");
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = DatabaseConstants.SqlStalePoDateCount;
+                var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                Assert(stale == 0, $"PO lines carry their PO's date {step} ({stale} disagreeing line(s))");
             }
 
             // Orphans: a line pointing at a PR line that no longer exists is how the original bug

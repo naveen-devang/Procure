@@ -813,6 +813,41 @@ SELECT
             return list;
         }
 
+        public async Task<Dictionary<string, LastPaidPrice>> GetLastPaidPricesAsync(
+            IReadOnlyCollection<string> itemNames, IReadOnlyCollection<Guid> excludePrIds)
+        {
+            var result = new Dictionary<string, LastPaidPrice>(StringComparer.OrdinalIgnoreCase);
+            var names = itemNames.Select(n => n?.Trim() ?? string.Empty).Where(n => n.Length > 0)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (names.Count == 0) return result;
+
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+
+            // One prepared statement, run once per distinct name: each run is an index seek
+            // (IX_PoItem_LastPrice), so a 50-line quote costs 50 seeks, whatever the table size.
+            using var cmd = connection.CreateCommand();
+            var excluded = excludePrIds.Count == 0 ? "''" : BindIdList(cmd, "@Ex", excludePrIds);
+            cmd.CommandText = string.Format(DatabaseConstants.SqlLastPaidPriceTemplate, excluded);
+            var nameParam = cmd.Parameters.Add("@Name", SqliteType.Text);
+
+            foreach (var name in names)
+            {
+                nameParam.Value = name;
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                if (!await reader.ReadAsync().ConfigureAwait(false)) continue;
+                result[name] = new LastPaidPrice(
+                    Price: (decimal)reader.GetDouble(0),
+                    Currency: reader.IsDBNull(1) || reader.GetString(1).Length == 0 ? "AED" : reader.GetString(1),
+                    PoDate: !reader.IsDBNull(2) && DateTime.TryParse(reader.GetString(2), CultureInfo.InvariantCulture,
+                        DateTimeStyles.RoundtripKind, out var d) ? d : null,
+                    PoNo: reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim(),
+                    Vendor: reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim());
+            }
+            return result;
+        }
+
         public async Task<List<PurchaseRequisition>> GetNeedsAttentionPrsAsync(int normalOverdueDays, int urgentOverdueDays, int limit = 10)
         {
             await _db.InitializeAsync().ConfigureAwait(false);

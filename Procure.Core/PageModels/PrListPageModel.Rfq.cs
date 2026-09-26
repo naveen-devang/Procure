@@ -463,6 +463,8 @@ namespace Procure.PageModels
 
             RecalculateRfqTotals();
             IsAddRfqModalVisible = true;
+            // Editing (below) keeps the quote's saved prices; only a new quote's empty lines are filled.
+            _ = FillLastPricesAsync(EditingRfqItems.ToList(), new[] { pr.Id });
         }
 
         [RelayCommand]

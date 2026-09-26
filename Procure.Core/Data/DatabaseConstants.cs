@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 23;
+        public const int SchemaVersion = 24;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -339,7 +339,10 @@ CREATE TABLE IF NOT EXISTS PurchaseOrderItem (
     UnitPrice REAL DEFAULT 0,
     Discount REAL DEFAULT 0,
     LineTotal REAL DEFAULT 0,
-    SortOrder INTEGER DEFAULT 0
+    SortOrder INTEGER DEFAULT 0,
+    -- v24: a copy of the PO's Date, kept by triggers (SqlCreatePoDateSync), so the newest line for
+    -- an item is one index step away. See SqlLastPaidPrice.
+    PoDate TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS IX_PoItem_PoId ON PurchaseOrderItem(PoId);
 -- v12: Raw & Packing groups by material name and fetches one material's lines on expand; both
@@ -816,5 +819,54 @@ FROM VendorAggregate
 WHERE VendorName LIKE '%' || @Text || '%' ESCAPE '!'
 ORDER BY (VendorName LIKE @Text || '%' ESCAPE '!') DESC, LastUsed DESC, VendorName
 LIMIT @Limit;";
+
+        // ---- Last price paid (v24): the newest PO line for an item ------------------------------
+        //
+        // "Newest" is by the PO's date, which lives on PurchaseOrder - so ordering an item's lines by
+        // it meant reading and sorting every line of that item: 10 ms a line at 20,000 PRs for a
+        // common item, half a second at a million. PurchaseOrderItem.PoDate carries the PO's date,
+        // kept in step by the triggers below, and the index on (item, PoDate) makes the newest line
+        // the first one read.
+
+        /// <summary>Run after MigrateSchemaAsync has added PoDate: the index needs the column.
+        /// Triggers dropped and re-created on every upgrade, as the vendor ones are.</summary>
+        public const string SqlCreatePoDateSync = @"
+CREATE INDEX IF NOT EXISTS IX_PoItem_LastPrice ON PurchaseOrderItem(lower(trim(ItemName)), PoDate);
+
+DROP TRIGGER IF EXISTS TR_PoItem_PoDate_Insert;
+DROP TRIGGER IF EXISTS TR_PoItem_PoDate_Move;
+DROP TRIGGER IF EXISTS TR_Po_Date_ToItems;
+
+CREATE TRIGGER TR_PoItem_PoDate_Insert AFTER INSERT ON PurchaseOrderItem
+BEGIN
+    UPDATE PurchaseOrderItem SET PoDate = COALESCE((SELECT Date FROM PurchaseOrder WHERE Id = NEW.PoId), '') WHERE rowid = NEW.rowid;
+END;
+CREATE TRIGGER TR_PoItem_PoDate_Move AFTER UPDATE OF PoId ON PurchaseOrderItem WHEN OLD.PoId IS NOT NEW.PoId
+BEGIN
+    UPDATE PurchaseOrderItem SET PoDate = COALESCE((SELECT Date FROM PurchaseOrder WHERE Id = NEW.PoId), '') WHERE rowid = NEW.rowid;
+END;
+CREATE TRIGGER TR_Po_Date_ToItems AFTER UPDATE OF Date ON PurchaseOrder WHEN OLD.Date IS NOT NEW.Date
+BEGIN
+    UPDATE PurchaseOrderItem SET PoDate = COALESCE(NEW.Date, '') WHERE PoId = NEW.Id;
+END;";
+
+        public const string SqlBackfillPoDate =
+            "UPDATE PurchaseOrderItem SET PoDate = COALESCE((SELECT Date FROM PurchaseOrder WHERE Id = PoId), '');";
+
+        /// <summary>PO lines whose PoDate disagrees with their PO. Must always be 0.</summary>
+        public const string SqlStalePoDateCount = @"
+SELECT COUNT(*) FROM PurchaseOrderItem AS i
+WHERE i.PoDate IS NOT COALESCE((SELECT Date FROM PurchaseOrder WHERE Id = i.PoId), '');";
+
+        /// <summary>The newest priced PO line for one item name (capitals and outer spaces ignored),
+        /// leaving out the requisitions in {0} - a quote's own PR must not supply its own "last price".
+        /// Net of the line's per-unit discount: what was actually paid.</summary>
+        public const string SqlLastPaidPriceTemplate = @"
+SELECT max(0, i.UnitPrice - COALESCE(i.Discount, 0)), po.Currency, po.Date, po.PoNo, po.Vendor
+FROM PurchaseOrderItem AS i
+JOIN PurchaseOrder AS po ON po.Id = i.PoId
+WHERE lower(trim(i.ItemName)) = lower(trim(@Name)) AND i.UnitPrice > 0 AND po.PrId NOT IN ({0})
+ORDER BY i.PoDate DESC, i.rowid DESC
+LIMIT 1;";
     }
 }

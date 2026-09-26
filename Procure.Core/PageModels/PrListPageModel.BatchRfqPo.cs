@@ -385,6 +385,7 @@ namespace Procure.PageModels
                             QuotedUnitPrice = null,
                             Discount = null,
                             LastPrice = prItem.EstimatedUnitPrice,
+                            LastPriceCurrency = prItem.EstimatedCurrency,
                             Notes = pr.PrNo, // stores PR number for row badge and PR-item binding
                             SortOrder = sort++
                         };
@@ -396,6 +397,7 @@ namespace Procure.PageModels
 
             RecalculateBatchRfqTotals();
             IsBatchRfqModalVisible = true;
+            _ = FillLastPricesAsync(BatchEditingRfqItems.ToList(), selected.Select(p => p.Id).ToList());
         }
 
         [RelayCommand]

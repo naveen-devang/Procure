@@ -18,4 +18,12 @@ public sealed partial class BatchCreateModal : UserControl
         if ((sender as FrameworkElement)?.DataContext is PrItem item && DataContext is PrListPageModel vm)
             vm.RemoveBatchItemFromPrCommand.Execute(item);
     }
+
+    // Leaving an item name fills its estimated price from the last PO for that item (never over a
+    // typed price). These PRs are new, so there are no POs of their own to leave out.
+    private void ItemName_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is PrItem item && DataContext is PrListPageModel vm)
+            _ = vm.FillPrItemPricesAsync(new[] { item }, null);
+    }
 }

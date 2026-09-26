@@ -58,6 +58,26 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedLastPrice))]
         public partial string? LastPriceCurrency { get; set; }
 
+        /// <summary>Set when Last price was filled in from a past PO: "PO 4500123 · Dell · 12 Aug 2026".
+        /// Shown under the box, never saved; any change to the price or its currency clears it, since
+        /// the figure is then no longer that PO's.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasLastPriceSource))]
+        [NotifyPropertyChangedFor(nameof(LastPriceSourceShort))]
+        public partial string LastPriceSource { get; set; } = string.Empty;
+
+        public bool HasLastPriceSource => LastPriceSource.Length > 0;
+
+        /// <summary>The part that fits under a 90 px box: "PO 4500123".</summary>
+        public string LastPriceSourceShort
+        {
+            get
+            {
+                var cut = LastPriceSource.IndexOf("  ·  ", StringComparison.Ordinal);
+                return cut < 0 ? LastPriceSource : LastPriceSource[..cut];
+            }
+        }
+
         /// <summary>What the vendor said instead of a price - "Regret", "No bid", "Item discontinued".
         /// Deliberately not a number and never part of any total: it prints where the dash would
         /// otherwise print, so a blank cell in the comparison says why it is blank.</summary>
@@ -205,8 +225,17 @@ namespace Procure.Models
 
         private bool _suppressLastPriceTextEcho;
 
-        partial void OnLastPriceChanged(decimal? value) => RaiseLastPriceTextChanged();
-        partial void OnLastPriceCurrencyChanged(string? value) => RaiseLastPriceTextChanged();
+        partial void OnLastPriceChanged(decimal? value) { RaiseLastPriceTextChanged(); LastPriceSource = string.Empty; }
+        partial void OnLastPriceCurrencyChanged(string? value) { RaiseLastPriceTextChanged(); LastPriceSource = string.Empty; }
+
+        /// <summary>Fills Last price from a past PO. The source is set last: setting the price and
+        /// currency clears it.</summary>
+        public void FillLastPrice(LastPaidPrice paid)
+        {
+            LastPrice = paid.Price;
+            LastPriceCurrency = paid.Currency;
+            LastPriceSource = paid.Source;
+        }
 
         private void RaiseLastPriceTextChanged()
         {
