@@ -76,6 +76,10 @@
                 <muxc:NavigationViewItem x:Name="RawPackingNavItem" Content="Raw &amp; Packing" Tag="CallOff">
                     <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xE218;" /></muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
+                <!-- Segoe Fluent Icons "People": the MAUI icon font the others use has no supplier glyph. -->
+                <muxc:NavigationViewItem Content="Suppliers" Tag="Suppliers">
+                    <muxc:NavigationViewItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE716;" /></muxc:NavigationViewItem.Icon>
+                </muxc:NavigationViewItem>
                 <muxc:NavigationViewItemHeader Content="Planning" />
                 <muxc:NavigationViewItem Content="Tasks" Tag="Tasks">
                     <muxc:NavigationViewItem.Icon><FontIcon FontFamily="{StaticResource NavIconFont}" Glyph="&#xEC93;" /></muxc:NavigationViewItem.Icon>

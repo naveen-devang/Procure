@@ -166,6 +166,14 @@ namespace Procure.Data
                 throw new InvalidOperationException(
                     $"{stalePoDates} PO line(s) carry a PoDate that disagrees with their PO {step}. " +
                     "The PoDate triggers are missing or out of date, so Last price can pick the wrong PO.");
+
+            using var priceCmd = connection.CreateCommand();
+            priceCmd.CommandText = DatabaseConstants.SqlStaleItemPriceCount;
+            var stalePrices = Convert.ToInt32(await priceCmd.ExecuteScalarAsync());
+            if (stalePrices != 0)
+                throw new InvalidOperationException(
+                    $"{stalePrices} quote date(s) or item count(s) disagree with the live RFQs and POs {step}. " +
+                    "The price-history triggers are missing or out of date.");
         }
 
         /// <summary>Reads the PR back and checks the PO line's transport allocations - count and

@@ -37,6 +37,7 @@ namespace Procure.Data
                 PrLineMatcherSelfCheck.Run();
                 ClipboardItemParserSelfCheck.Run();
                 PcrCurrencyConversionSelfCheck.Run();
+                PriceAnalysis.SelfCheck();
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 

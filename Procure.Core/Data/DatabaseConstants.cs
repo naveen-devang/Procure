@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 24;
+        public const int SchemaVersion = 26;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -483,6 +483,49 @@ CREATE TABLE IF NOT EXISTS VendorAggregate (
 );
 CREATE INDEX IF NOT EXISTS IX_RFQ_VendorKey ON RequestForQuotation(lower(trim(Vendor)), COALESCE(SentDate, QuoteReceivedDate, ''));
 CREATE INDEX IF NOT EXISTS IX_PO_VendorKey ON PurchaseOrder(lower(trim(Vendor)), COALESCE(Date, ''));
+
+-- v25: the Suppliers page. What was spent with each vendor, per currency, kept by the same vendor
+-- triggers and read from the covering index below without touching the table. Contact details are
+-- typed by the user, so they live apart from the trigger-built rows that are rebuilt on every write.
+CREATE TABLE IF NOT EXISTS VendorSpend (
+    VendorKey TEXT NOT NULL,
+    Currency  TEXT NOT NULL,
+    Total     REAL NOT NULL,
+    PRIMARY KEY (VendorKey, Currency)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS VendorContact (
+    VendorKey TEXT PRIMARY KEY,
+    Email     TEXT NOT NULL DEFAULT '',
+    Notes     TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS IX_PO_VendorSpend ON PurchaseOrder(lower(trim(Vendor)), Currency, Value);
+
+-- v26: the Items side of the Suppliers page. One row per item name ever quoted or ordered, kept by
+-- the triggers in SqlCreateItemPriceSync. LooseKey drops spaces and punctuation, so ""Gasket 4-core""
+-- and ""GASKET 4 CORE"" find each other as likely duplicates.
+CREATE TABLE IF NOT EXISTS ItemAggregate (
+    ItemKey   TEXT PRIMARY KEY,
+    ItemName  TEXT NOT NULL,
+    LooseKey  TEXT NOT NULL,
+    LineCount INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_ItemAggregate_Loose ON ItemAggregate(LooseKey);
+-- ""Treat as one item"": AliasKey's lines count as CanonicalKey's everywhere on the page.
+CREATE TABLE IF NOT EXISTS ItemAlias (
+    AliasKey     TEXT PRIMARY KEY,
+    CanonicalKey TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_ItemAlias_Canonical ON ItemAlias(CanonicalKey);
+-- A note on a stretch of months for one item (""Red Sea freight""), shown on its price chart.
+CREATE TABLE IF NOT EXISTS ItemNote (
+    Id        TEXT PRIMARY KEY,
+    ItemKey   TEXT NOT NULL,
+    FromMonth TEXT NOT NULL,
+    ToMonth   TEXT NOT NULL,
+    Text      TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_ItemNote_Item ON ItemNote(ItemKey);
 ";
 
         // Every linkable entity - the PR / RFQ / PO rows a task or a note can point at - unordered
@@ -757,7 +800,18 @@ WHERE k.VendorKey <> '' AND (r.rowid IS NOT NULL OR p.rowid IS NOT NULL)";
         private static string SqlRefreshVendor(string keyExpr, string condition = "1") => $@"
     DELETE FROM VendorAggregate WHERE VendorKey = {keyExpr} AND {condition};
     INSERT INTO VendorAggregate {VendorAggregateColumns}
-    {SqlComputeVendorRows($"SELECT {keyExpr} AS VendorKey WHERE {condition}")};";
+    {SqlComputeVendorRows($"SELECT {keyExpr} AS VendorKey WHERE {condition}")};
+    DELETE FROM VendorSpend WHERE VendorKey = {keyExpr} AND {condition};
+    INSERT INTO VendorSpend (VendorKey, Currency, Total)
+    SELECT {keyExpr}, {SpendCurrency}, SUM(COALESCE(Value, 0)) FROM PurchaseOrder
+    WHERE lower(trim(Vendor)) = {keyExpr} AND {keyExpr} <> '' AND {condition} GROUP BY 2;";
+
+        private const string SpendCurrency = "COALESCE(NULLIF(Currency, ''), 'AED')";
+
+        /// <summary>Every vendor's spend per currency, from the covering index.</summary>
+        private const string SqlComputeAllVendorSpend =
+            "SELECT lower(trim(Vendor)) AS k, " + SpendCurrency + " AS c, SUM(COALESCE(Value, 0)) AS t FROM PurchaseOrder " +
+            "WHERE lower(trim(Vendor)) <> '' GROUP BY 1, 2";
 
         private const string OldKey = "lower(trim(OLD.Vendor))";
         private const string NewKey = "lower(trim(NEW.Vendor))";
@@ -793,15 +847,18 @@ END;
 CREATE TRIGGER TR_Po_Vendor_Delete AFTER DELETE ON PurchaseOrder
 BEGIN {SqlRefreshVendor(OldKey)}
 END;
-CREATE TRIGGER TR_Po_Vendor_Update AFTER UPDATE OF Vendor, Currency, VatType, Date ON PurchaseOrder
+CREATE TRIGGER TR_Po_Vendor_Update AFTER UPDATE OF Vendor, Currency, VatType, Date, Value ON PurchaseOrder
 WHEN OLD.Vendor IS NOT NEW.Vendor OR OLD.Currency IS NOT NEW.Currency OR OLD.VatType IS NOT NEW.VatType OR OLD.Date IS NOT NEW.Date
+  OR OLD.Value IS NOT NEW.Value
 BEGIN {SqlRefreshVendor(OldKey, OnlyIfVendorChanged)} {SqlRefreshVendor(NewKey)}
 END;";
 
         public static readonly string SqlRebuildAllVendorAggregates = $@"
 DELETE FROM VendorAggregate;
 INSERT INTO VendorAggregate {VendorAggregateColumns}
-{SqlComputeVendorRows(SqlAllVendorKeys)};";
+{SqlComputeVendorRows(SqlAllVendorKeys)};
+DELETE FROM VendorSpend;
+INSERT INTO VendorSpend (VendorKey, Currency, Total) {SqlComputeAllVendorSpend};";
 
         /// <summary>Rows where VendorAggregate disagrees with a fresh computation, either way. Must
         /// always be 0 - asserted by DatabaseSelfCheck and after every procurement-flow phase.</summary>
@@ -809,7 +866,13 @@ INSERT INTO VendorAggregate {VendorAggregateColumns}
 SELECT
     (SELECT COUNT(*) FROM (SELECT * FROM VendorAggregate EXCEPT {SqlComputeVendorRows(SqlAllVendorKeys)}))
     +
-    (SELECT COUNT(*) FROM ({SqlComputeVendorRows(SqlAllVendorKeys)} EXCEPT SELECT * FROM VendorAggregate));";
+    (SELECT COUNT(*) FROM ({SqlComputeVendorRows(SqlAllVendorKeys)} EXCEPT SELECT * FROM VendorAggregate))
+    +
+    (SELECT COUNT(*) FROM (SELECT VendorKey, Currency, round(Total, 4) FROM VendorSpend
+                           EXCEPT SELECT k, c, round(t, 4) FROM ({SqlComputeAllVendorSpend})))
+    +
+    (SELECT COUNT(*) FROM (SELECT k, c, round(t, 4) FROM ({SqlComputeAllVendorSpend})
+                           EXCEPT SELECT VendorKey, Currency, round(Total, 4) FROM VendorSpend));";
 
         /// <summary>The Vendor box's suggestions: names containing what was typed, names starting with
         /// it first, then most recently used. '!' escapes LIKE's wildcards in the typed text.</summary>
@@ -857,6 +920,102 @@ END;";
         public const string SqlStalePoDateCount = @"
 SELECT COUNT(*) FROM PurchaseOrderItem AS i
 WHERE i.PoDate IS NOT COALESCE((SELECT Date FROM PurchaseOrder WHERE Id = i.PoId), '');";
+
+        // ---- Price history (v26): the Suppliers & Items page ------------------------------------
+        //
+        // A quote line's date and currency live on its RFQ, so "one item's quotes" had to read every
+        // line of the item and look each one's RFQ up: 1.3 s for 25 items at 20,000 PRs. RfqItem
+        // carries QuoteDate and QuoteCurrency, kept by triggers the way PoDate is, and IX_RfqItem_Cover
+        // holds everything a market price needs, so it is read from the index alone (0.1 s).
+
+        private const string RfqDateOf = "COALESCE((SELECT COALESCE(QuoteReceivedDate, SentDate) FROM RequestForQuotation WHERE Id = {0}), '')";
+        /// <summary>The RFQ's currency, 'AED' when blank - the same default the rest of the app uses.</summary>
+        private const string RfqCurrencyOf = "COALESCE((SELECT COALESCE(NULLIF(trim(Currency), ''), 'AED') FROM RequestForQuotation WHERE Id = {0}), 'AED')";
+        private const string LooseKeyOf =
+            "replace(replace(replace(replace(replace(replace(replace(replace(lower(trim({0})),' ',''),'-',''),'_',''),'.',''),'/',''),',',''),'(',''),')','')";
+
+        /// <summary>Trigger body: one more (or one fewer) line naming <paramref name="name"/>.</summary>
+        private static string BumpItem(string name, bool add) => add
+            ? $@"
+    INSERT INTO ItemAggregate (ItemKey, ItemName, LooseKey, LineCount)
+    SELECT lower(trim({name})), trim({name}), {string.Format(LooseKeyOf, name)}, 1 WHERE lower(trim({name})) <> ''
+    ON CONFLICT(ItemKey) DO UPDATE SET LineCount = LineCount + 1;"
+            : $@"
+    UPDATE ItemAggregate SET LineCount = LineCount - 1 WHERE ItemKey = lower(trim({name}));
+    DELETE FROM ItemAggregate WHERE ItemKey = lower(trim({name})) AND LineCount <= 0;";
+
+        private const string AllItemLines = "SELECT ItemName FROM RfqItem UNION ALL SELECT ItemName FROM PurchaseOrderItem";
+
+        /// <summary>Run after MigrateSchemaAsync has added QuoteDate. Triggers dropped and re-created
+        /// on every upgrade.</summary>
+        public static readonly string SqlCreateItemPriceSync = $@"
+DROP INDEX IF EXISTS IX_RfqItem_Price;
+CREATE INDEX IF NOT EXISTS IX_RfqItem_Cover ON RfqItem(lower(trim(ItemName)), QuoteDate, QuoteCurrency, IsQuoted, QuotedUnitPrice, Discount);
+
+DROP TRIGGER IF EXISTS TR_RfqItem_Date_Insert;
+DROP TRIGGER IF EXISTS TR_RfqItem_Date_Move;
+DROP TRIGGER IF EXISTS TR_Rfq_Date_ToItems;
+DROP TRIGGER IF EXISTS TR_RfqItem_Agg_Insert;
+DROP TRIGGER IF EXISTS TR_RfqItem_Agg_Delete;
+DROP TRIGGER IF EXISTS TR_RfqItem_Agg_Rename;
+DROP TRIGGER IF EXISTS TR_PoItem_Agg_Insert;
+DROP TRIGGER IF EXISTS TR_PoItem_Agg_Delete;
+DROP TRIGGER IF EXISTS TR_PoItem_Agg_Rename;
+
+CREATE TRIGGER TR_RfqItem_Date_Insert AFTER INSERT ON RfqItem
+BEGIN
+    UPDATE RfqItem SET QuoteDate = {string.Format(RfqDateOf, "NEW.RfqId")}, QuoteCurrency = {string.Format(RfqCurrencyOf, "NEW.RfqId")} WHERE rowid = NEW.rowid;
+END;
+CREATE TRIGGER TR_RfqItem_Date_Move AFTER UPDATE OF RfqId ON RfqItem WHEN OLD.RfqId IS NOT NEW.RfqId
+BEGIN
+    UPDATE RfqItem SET QuoteDate = {string.Format(RfqDateOf, "NEW.RfqId")}, QuoteCurrency = {string.Format(RfqCurrencyOf, "NEW.RfqId")} WHERE rowid = NEW.rowid;
+END;
+CREATE TRIGGER TR_Rfq_Date_ToItems AFTER UPDATE OF SentDate, QuoteReceivedDate, Currency ON RequestForQuotation
+WHEN COALESCE(OLD.QuoteReceivedDate, OLD.SentDate, '') IS NOT COALESCE(NEW.QuoteReceivedDate, NEW.SentDate, '')
+  OR OLD.Currency IS NOT NEW.Currency
+BEGIN
+    UPDATE RfqItem SET QuoteDate = COALESCE(NEW.QuoteReceivedDate, NEW.SentDate, ''),
+                       QuoteCurrency = COALESCE(NULLIF(trim(NEW.Currency), ''), 'AED') WHERE RfqId = NEW.Id;
+END;
+
+CREATE TRIGGER TR_RfqItem_Agg_Insert AFTER INSERT ON RfqItem
+BEGIN {BumpItem("NEW.ItemName", true)}
+END;
+CREATE TRIGGER TR_RfqItem_Agg_Delete AFTER DELETE ON RfqItem
+BEGIN {BumpItem("OLD.ItemName", false)}
+END;
+CREATE TRIGGER TR_RfqItem_Agg_Rename AFTER UPDATE OF ItemName ON RfqItem WHEN OLD.ItemName IS NOT NEW.ItemName
+BEGIN {BumpItem("OLD.ItemName", false)} {BumpItem("NEW.ItemName", true)}
+END;
+CREATE TRIGGER TR_PoItem_Agg_Insert AFTER INSERT ON PurchaseOrderItem
+BEGIN {BumpItem("NEW.ItemName", true)}
+END;
+CREATE TRIGGER TR_PoItem_Agg_Delete AFTER DELETE ON PurchaseOrderItem
+BEGIN {BumpItem("OLD.ItemName", false)}
+END;
+CREATE TRIGGER TR_PoItem_Agg_Rename AFTER UPDATE OF ItemName ON PurchaseOrderItem WHEN OLD.ItemName IS NOT NEW.ItemName
+BEGIN {BumpItem("OLD.ItemName", false)} {BumpItem("NEW.ItemName", true)}
+END;";
+
+        public static readonly string SqlBackfillItemPrices = $@"
+UPDATE RfqItem SET QuoteDate = {string.Format(RfqDateOf, "RfqId")}, QuoteCurrency = {string.Format(RfqCurrencyOf, "RfqId")};
+DELETE FROM ItemAggregate;
+INSERT INTO ItemAggregate (ItemKey, ItemName, LooseKey, LineCount)
+SELECT lower(trim(ItemName)), max(trim(ItemName)), {string.Format(LooseKeyOf, "max(ItemName)")}, COUNT(*)
+FROM ({AllItemLines}) WHERE lower(trim(ItemName)) <> '' GROUP BY 1;";
+
+        /// <summary>Quote lines whose QuoteDate or QuoteCurrency disagrees with their RFQ, plus items whose line count
+        /// disagrees with a fresh count (either way). Must always be 0.</summary>
+        public static readonly string SqlStaleItemPriceCount = $@"
+SELECT
+    (SELECT COUNT(*) FROM RfqItem AS i WHERE i.QuoteDate IS NOT {string.Format(RfqDateOf, "i.RfqId")}
+                                            OR i.QuoteCurrency IS NOT {string.Format(RfqCurrencyOf, "i.RfqId")})
+    +
+    (SELECT COUNT(*) FROM (SELECT ItemKey, LineCount FROM ItemAggregate
+        EXCEPT SELECT lower(trim(ItemName)), COUNT(*) FROM ({AllItemLines}) WHERE lower(trim(ItemName)) <> '' GROUP BY 1))
+    +
+    (SELECT COUNT(*) FROM (SELECT lower(trim(ItemName)), COUNT(*) FROM ({AllItemLines}) WHERE lower(trim(ItemName)) <> '' GROUP BY 1
+        EXCEPT SELECT ItemKey, LineCount FROM ItemAggregate));";
 
         /// <summary>The newest priced PO line for one item name (capitals and outer spaces ignored),
         /// leaving out the requisitions in {0} - a quote's own PR must not supply its own "last price".

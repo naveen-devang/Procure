@@ -69,6 +69,7 @@ public sealed partial class MainWindow
             Is(KeyboardShortcutIds.GoMaterials) && _settings.IsRawPackingTabEnabled ? AppRoute.CallOff :
             Is(KeyboardShortcutIds.GoTasks) ? AppRoute.Tasks :
             Is(KeyboardShortcutIds.GoNotes) ? AppRoute.Notes :
+            Is(KeyboardShortcutIds.GoSuppliers) ? AppRoute.Suppliers :
             Is(KeyboardShortcutIds.GoSettings) ? AppRoute.Settings : null;
         if (route is { } r)
         {

@@ -9,6 +9,7 @@ public enum AppRoute
     Tasks,
     Notes,
     CallOff,
+    Suppliers,
     Settings,
 }
 

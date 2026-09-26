@@ -226,7 +226,8 @@ namespace Procure.Data
                         vendorCmd.CommandText = DatabaseConstants.SqlCreateVendorTriggers;
                         await vendorCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
-                    if (storedVersion < 23)
+                    // v25 added VendorSpend beside it: one rebuild fills both.
+                    if (storedVersion < 25)
                     {
                         using var vendorFill = connection.CreateCommand();
                         vendorFill.CommandText = DatabaseConstants.SqlRebuildAllVendorAggregates;
@@ -245,6 +246,20 @@ namespace Procure.Data
                         using var poDateFill = connection.CreateCommand();
                         poDateFill.CommandText = DatabaseConstants.SqlBackfillPoDate;
                         await poDateFill.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+
+                    // v26: price history. QuoteDate was just added by MigrateSchemaAsync; the index and
+                    // triggers need it, and existing lines get their RFQ's date once.
+                    using (var priceCmd = connection.CreateCommand())
+                    {
+                        priceCmd.CommandText = DatabaseConstants.SqlCreateItemPriceSync;
+                        await priceCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
+                    if (storedVersion < 26)
+                    {
+                        using var priceFill = connection.CreateCommand();
+                        priceFill.CommandText = DatabaseConstants.SqlBackfillItemPrices;
+                        await priceFill.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
 
                     await WriteSchemaVersionAsync(connection).ConfigureAwait(false);
@@ -317,6 +332,16 @@ namespace Procure.Data
             // v24: the PO's date on each line, for the last-price lookup. Filled by the v24 step in
             // InitializeAsync, then kept by triggers.
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "PoDate", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            // v26: the quote's date and currency on each quote line, for price history; filled and kept like PoDate.
+            await EnsureColumnExistsAsync(connection, "RfqItem", "QuoteDate", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "RfqItem", "QuoteCurrency", "TEXT NOT NULL DEFAULT 'AED'").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "VendorContact", "Person", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            await EnsureColumnExistsAsync(connection, "VendorContact", "Phone", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            // "Preferred", "Avoid" or empty.
+            await EnsureColumnExistsAsync(connection, "VendorContact", "Tag", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            // What the supplier sells, one per line, as the user set it. NULL means "not set": the page
+            // guesses from the item names instead. An empty string means the user removed them all.
+            await EnsureColumnExistsAsync(connection, "VendorContact", "Categories", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "MaterialAggregate", "LastActivity", "TEXT").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "PurchaseOrder", "TransportMode", "TEXT").ConfigureAwait(false);
             // TodoTask.LinkedEntityLabel was added after v7 shipped the table - existing v7 databases

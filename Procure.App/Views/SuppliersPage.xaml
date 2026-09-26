@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Procure.App.Views.SuppliersPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Procure.Models"
+    xmlns:views="using:Procure.App.Views">
+
+    <!-- Built to the approved design (Suppliers and items, screens 7 and 8): its sizes, radii and
+         colours, from the app palette so both themes follow. Chips and the Suppliers / Items switch are
+         painted from code (SupplierLook), never by a toggle template's own checked colours. -->
+    <Page.Resources>
+        <Style x:Key="Pane" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppHairline}" />
+            <Setter Property="Background" Value="{ThemeResource AppTertiaryBackground}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="13,11" />
+        </Style>
+        <Style x:Key="TileLabel" TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="H1" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="H2" TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="Sub" TargetType="TextBlock" BasedOn="{StaticResource AppText}">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+        </Style>
+        <Style x:Key="ColHead" TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CharacterSpacing" Value="40" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextTertiary}" />
+        </Style>
+        <Style x:Key="Cell" TargetType="TextBlock" BasedOn="{StaticResource NonSelectableText}">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Pill" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="9,2,9,3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The design's button: 6 px corners, a hairline border, semibold 12.5. -->
+        <Style x:Key="PlainButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppControlBorder}" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="PlainDropDown" TargetType="DropDownButton">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{ThemeResource AppSecondaryBackground}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppControlBorder}" />
+            <Setter Property="Foreground" Value="{ThemeResource AppTextPrimary}" />
+        </Style>
+        <!-- A text-only action in the accent colour ("Treat as one item", "+ Note on a period"). -->
+        <Style x:Key="LinkButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0,2" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
+                                          Content="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Chips and the Suppliers / Items switch: a bare template; SupplierLook paints both states. -->
+        <Style x:Key="Flat" TargetType="Button">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                                          Padding="{TemplateBinding Padding}" Content="{TemplateBinding Content}"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="FlatList" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+
+        <DataTemplate x:Key="SupplierRow" x:DataType="models:SupplierListItem">
+            <Border x:DefaultBindMode="OneWay" Tapped="Supplier_Tapped" CornerRadius="8" Margin="0,0,0,6" BorderThickness="1" Padding="11,9"
+                    Background="{x:Bind views:SupplierLook.RowBg(IsSelected)}" BorderBrush="{x:Bind views:SupplierLook.RowBorder(IsSelected)}">
+                <StackPanel Spacing="2">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource Cell}" Text="{x:Bind Name, Mode=OneTime}" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AppTextPrimary}" />
+                        <TextBlock Grid.Column="1" Style="{StaticResource NonSelectableText}" Text="{x:Bind Tag, Mode=OneTime}" FontSize="10.5"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{x:Bind views:SupplierLook.TagInk(Tag), Mode=OneTime}" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="{x:Bind SubLine, Mode=OneTime}" FontSize="11.5"
+                               TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextSecondary}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ItemRow" x:DataType="models:ItemListItem">
+            <Grid x:DefaultBindMode="OneWay" Margin="0,0,0,6">
+                <!-- A likely duplicate gets the design's dashed outline. -->
+                <Rectangle RadiusX="8" RadiusY="8" StrokeThickness="1" StrokeDashArray="4,3" Stroke="{ThemeResource AppControlBorder}"
+                           Visibility="{x:Bind HasTwin, Mode=OneTime}" />
+                <Border CornerRadius="8" BorderThickness="{x:Bind views:SupplierLook.SolidEdge(HasTwin), Mode=OneTime}" Padding="11,10"
+                        Background="{x:Bind views:SupplierLook.RowBg(IsSelected)}" BorderBrush="{x:Bind views:SupplierLook.RowBorder(IsSelected)}"
+                        Tapped="Item_Tapped">
+                    <StackPanel Spacing="2">
+                        <!-- Long names wrap to a second line, then end in "..."; the whole name shows on hover. -->
+                        <TextBlock Style="{StaticResource NonSelectableText}" Text="{x:Bind Name, Mode=OneTime}" FontSize="13" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AppTextPrimary}"
+                                   ToolTipService.ToolTip="{x:Bind Name, Mode=OneTime}" />
+                        <TextBlock Style="{StaticResource NonSelectableText}" Text="{x:Bind TwinText, Mode=OneTime}" FontSize="11.5" TextWrapping="Wrap"
+                                   Foreground="{ThemeResource FluentCaution}" Visibility="{x:Bind HasTwin, Mode=OneTime}" />
+                        <Button Style="{StaticResource LinkButton}" FontSize="11.5" Content="Treat as one item" Click="TreatAsOne_Click"
+                                Visibility="{x:Bind HasTwin, Mode=OneTime}"
+                                ToolTipService.ToolTip="Count this spelling's quotes and orders as the other item's. You can separate them again from the item's page." />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="OtherQuoteRow" x:DataType="models:OtherQuote">
+            <Grid ColumnSpacing="8" Padding="0,6" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource AppHairline}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource Cell}" FontSize="12.5" Text="{x:Bind Vendor}" Foreground="{x:Bind views:SupplierLook.Ink(IsOld)}" />
+                <TextBlock Grid.Column="1" Style="{StaticResource Cell}" FontSize="12.5" Text="{x:Bind PriceText}"
+                           Foreground="{x:Bind views:SupplierLook.BestInk(IsBest, IsOld)}" FontWeight="{x:Bind views:SupplierLook.Weight(IsBest)}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="VendorItemTemplate" x:DataType="models:VendorItemRow">
+            <Border x:DefaultBindMode="OneWay" Margin="{x:Bind views:SupplierLook.OpenGap(IsExpanded)}"
+                    BorderThickness="{x:Bind views:SupplierLook.OpenEdge(IsExpanded)}" CornerRadius="{x:Bind views:SupplierLook.OpenCorners(IsExpanded)}"
+                    BorderBrush="{x:Bind views:SupplierLook.OpenBorder(IsExpanded)}">
+                <StackPanel>
+                    <Grid Padding="8,10" Tapped="VendorItem_Tapped" Background="{x:Bind views:SupplierLook.OpenHeader(IsExpanded)}">
+                        <TextBlock Style="{StaticResource Cell}" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}">
+                            <Run Text="{x:Bind Chevron}" /><Run Text=" " /><Run Text="{x:Bind Name, Mode=OneTime}" />
+                        </TextBlock>
+                    </Grid>
+                    <!-- Built only while the row is open; the chart's elements go when it closes. -->
+                    <Grid x:Name="Expanded" x:Load="{x:Bind IsExpanded}" Padding="16,14" ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="300" />
+                        </Grid.ColumnDefinitions>
+                        <views:PriceChart Height="212" Data="{x:Bind Chart}" />
+                        <StackPanel Grid.Column="1" Spacing="0">
+                            <TextBlock Style="{StaticResource NonSelectableText}" Text="Others for this item, recent quotes" FontSize="12"
+                                       FontWeight="SemiBold" Margin="0,0,0,4" Foreground="{ThemeResource AppTextPrimary}" />
+                            <ItemsControl ItemsSource="{x:Bind Others}" ItemTemplate="{StaticResource OtherQuoteRow}" />
+                            <Button Style="{StaticResource LinkButton}" Content="Open the item page ›" Margin="0,10,0,0" Click="OpenItem_Click" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="RankRow" x:DataType="models:ItemSupplierRank">
+            <Grid Padding="8,10" ColumnSpacing="12" BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppHairline}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.3*" />
+                    <ColumnDefinition Width="1.8*" />
+                    <ColumnDefinition Width="1.6*" />
+                    <ColumnDefinition Width="1.1*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource Cell}" Text="{x:Bind RankText}" FontWeight="{x:Bind views:SupplierLook.Weight(IsTop)}"
+                           Foreground="{x:Bind views:SupplierLook.RankInk(IsTop, IsFaded)}" />
+                <TextBlock Grid.Column="1" Style="{StaticResource Cell}" Foreground="{x:Bind views:SupplierLook.Ink(IsFaded)}">
+                    <Run Text="{x:Bind Name}" FontWeight="{x:Bind views:SupplierLook.Weight(IsTop)}" /><Run Text=" " /><Run Text="{x:Bind Tag}" FontSize="10.5" Foreground="{x:Bind views:SupplierLook.TagInk(Tag)}" />
+                </TextBlock>
+                <TextBlock Grid.Column="2" Style="{StaticResource Cell}" Text="{x:Bind LatestText}" Foreground="{x:Bind views:SupplierLook.Ink(IsFaded)}" />
+                <TextBlock Grid.Column="3" Style="{StaticResource Cell}" Text="{x:Bind VsText}"
+                           Foreground="{x:Bind views:SupplierLook.ToneInk(VsTone, IsFaded)}" FontWeight="{x:Bind views:SupplierLook.ToneWeight(VsTone, IsFaded)}" />
+                <TextBlock Grid.Column="4" Style="{StaticResource Cell}" Text="{x:Bind RepliesText}" Foreground="{x:Bind views:SupplierLook.Ink(IsFaded)}" />
+                <TextBlock Grid.Column="5" Style="{StaticResource Cell}" Text="{x:Bind SaidNoText}" Foreground="{x:Bind views:SupplierLook.Ink(IsFaded)}" />
+                <TextBlock Grid.Column="6" Style="{StaticResource Cell}" Text="{x:Bind BoughtText}" Foreground="{x:Bind views:SupplierLook.QuietInk(IsFaded)}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="NoteRow" x:DataType="models:ItemNoteRow">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Style="{StaticResource NonSelectableText}" FontSize="11.5" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}">
+                    <Run Text="{x:Bind Period}" FontWeight="SemiBold" /><Run Text=": " /><Run Text="{x:Bind Text}" />
+                </TextBlock>
+                <Button Style="{StaticResource LinkButton}" FontSize="11.5" Content="Remove" Tag="{x:Bind Id}" Click="DeleteNote_Click" />
+            </StackPanel>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="20" ColumnSpacing="16" Background="{ThemeResource AppBackground}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT: one list, two ways in -->
+        <Border Style="{StaticResource Pane}" Padding="14">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Background="{ThemeResource AppSubtleFill}" CornerRadius="7" Padding="3" ColumnSpacing="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="SuppliersTab" Style="{StaticResource Flat}" HorizontalAlignment="Stretch" BorderThickness="0" CornerRadius="5"
+                            Padding="10,7" FontSize="12.5" Tag="suppliers" Click="Mode_Click" AutomationProperties.Name="Browse suppliers">
+                        <TextBlock Text="{x:Bind Vm.SuppliersTabText, Mode=OneWay}" />
+                    </Button>
+                    <Button x:Name="ItemsTab" Grid.Column="1" Style="{StaticResource Flat}" HorizontalAlignment="Stretch" BorderThickness="0" CornerRadius="5"
+                            Padding="10,7" FontSize="12.5" Tag="items" Click="Mode_Click" AutomationProperties.Name="Browse items">
+                        <TextBlock Text="{x:Bind Vm.ItemsTabText, Mode=OneWay}" />
+                    </Button>
+                </Grid>
+                <TextBox Grid.Row="1" PlaceholderText="{x:Bind Vm.SearchPlaceholder, Mode=OneWay}" FontSize="13" CornerRadius="6"
+                         Text="{x:Bind Vm.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Search" />
+                <StackPanel x:Name="TagChips" Grid.Row="2" Orientation="Horizontal" Spacing="6"
+                            Visibility="{x:Bind Vm.IsSuppliersMode, Mode=OneWay}" />
+                <ListView Grid.Row="3" x:Name="SupplierList" ItemsSource="{x:Bind Vm.Suppliers}" SelectionMode="None" Padding="0"
+                          ItemTemplate="{StaticResource SupplierRow}" ItemContainerStyle="{StaticResource FlatList}"
+                          Visibility="{x:Bind Vm.IsSuppliersMode, Mode=OneWay}" />
+                <ListView Grid.Row="2" Grid.RowSpan="2" x:Name="ItemList" ItemsSource="{x:Bind Vm.Items}" SelectionMode="None" Padding="0"
+                          ItemTemplate="{StaticResource ItemRow}" ItemContainerStyle="{StaticResource FlatList}"
+                          Visibility="{x:Bind Vm.IsItemsMode, Mode=OneWay}" />
+                <StackPanel Grid.Row="3" Visibility="{x:Bind Vm.IsListEmpty, Mode=OneWay}" Spacing="4"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0,12,40">
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="Nothing found" FontSize="13" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+                    <TextBlock Style="{StaticResource NonSelectableText}" Text="Suppliers and items appear here once they are on an RFQ or a PO"
+                               FontSize="11.5" TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- RIGHT (a): one supplier -->
+        <Border Grid.Column="1" Style="{StaticResource Pane}" Padding="24,22,24,10" Visibility="{x:Bind Vm.HasSupplier, Mode=OneWay}">
+            <Grid RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Style="{StaticResource H1}" Text="{x:Bind Vm.Selected.Name, Mode=OneWay, FallbackValue=''}" />
+                            <Border Style="{StaticResource Pill}" Padding="9,3" Background="{ThemeResource FluentSuccessBg}"
+                                    Visibility="{x:Bind Vm.Selected.IsPreferred, Mode=OneWay, FallbackValue=Collapsed}">
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="Preferred" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource FluentSuccess}" />
+                            </Border>
+                            <Border Style="{StaticResource Pill}" Padding="9,3" Background="{ThemeResource FluentCriticalBg}"
+                                    Visibility="{x:Bind Vm.Selected.IsAvoid, Mode=OneWay, FallbackValue=Collapsed}">
+                                <TextBlock Style="{StaticResource NonSelectableText}" Text="Avoid" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource FluentCritical}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Sub}" Text="{x:Bind Vm.Selected.ContactLine, Mode=OneWay, FallbackValue=''}" />
+                        <ItemsControl ItemsSource="{x:Bind Vm.Selected.Categories, Mode=OneWay}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Border Style="{StaticResource Pill}" Background="{ThemeResource AppSubtleFill}">
+                                        <TextBlock Style="{StaticResource NonSelectableText}" Text="{x:Bind}" FontSize="11.5" Foreground="{ThemeResource AppTextSecondary}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                        <DropDownButton Style="{StaticResource PlainDropDown}" Content="Tag" AutomationProperties.Name="Tag this supplier">
+                            <DropDownButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem Text="Preferred" Tag="Preferred" Click="SetTag_Click" />
+                                    <MenuFlyoutItem Text="Avoid" Tag="Avoid" Click="SetTag_Click" />
+                                    <MenuFlyoutItem Text="No tag" Tag="" Click="SetTag_Click" />
+                                </MenuFlyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <Button Style="{StaticResource PlainButton}" Content="Edit contact">
+                            <Button.Flyout>
+                                <Flyout x:Name="ContactFlyout" Placement="BottomEdgeAlignedRight">
+                                    <StackPanel Width="320" Spacing="10">
+                                        <TextBox Header="Email" PlaceholderText="sales@vendor.com" CornerRadius="6" Text="{x:Bind Vm.EditEmail, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Header="Contact person" PlaceholderText="Rashid (sales)" CornerRadius="6" Text="{x:Bind Vm.EditPerson, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Header="Phone" PlaceholderText="+971 4 000 0000" CornerRadius="6" Text="{x:Bind Vm.EditPhone, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Header="Notes" PlaceholderText="Anything worth remembering" CornerRadius="6" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="96"
+                                                 Text="{x:Bind Vm.EditNotes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="What they sell" />
+                                            <ItemsControl ItemsSource="{x:Bind Vm.EditCategories}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Grid ColumnSpacing="8" Padding="0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{x:Bind}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                            <Button Grid.Column="1" Content="Remove" Tag="{x:Bind}" Click="RemoveCategory_Click"
+                                                                    AutomationProperties.Name="Remove category" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="NewCategory" PlaceholderText="Add a category" KeyDown="NewCategory_KeyDown"
+                                                         AutomationProperties.Name="New category" />
+                                                <Button Grid.Column="1" Content="Add" Click="AddCategory_Click" />
+                                            </Grid>
+                                        </StackPanel>
+                                        <Button Style="{StaticResource PrimaryButton}" Content="Save" HorizontalAlignment="Right" Click="SaveContact_Click" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="1" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource Tile}" ToolTipService.ToolTip="Rounds are the same PR and the same item, where at least one other supplier also gave a price.">
+                        <StackPanel Spacing="3">
+                            <TextBlock Style="{StaticResource TileLabel}" Text="Head-to-head, same round" />
+                            <TextBlock Style="{StaticResource TileValue}" Text="{x:Bind Vm.Selected.HeadToHeadText, Mode=OneWay, FallbackValue=''}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Tile}">
+                        <StackPanel Spacing="3">
+                            <TextBlock Style="{StaticResource TileLabel}" Text="{x:Bind BoughtLabel(Vm.Period), Mode=OneWay}" />
+                            <TextBlock Style="{StaticResource TileValue}" Text="{x:Bind Vm.Selected.BoughtLine, Mode=OneWay, FallbackValue=''}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource H2}" Text="What they sell" />
+                    <StackPanel x:Name="SupplierPeriodChips" Grid.Column="1" Orientation="Horizontal" Spacing="6" />
+                </Grid>
+
+                <Grid Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource ColHead}" Text="ITEM" Padding="8,0,8,8" />
+                    <ListView Grid.Row="1" x:Name="VendorItemList" ItemsSource="{x:Bind Vm.VendorItems}" SelectionMode="None" Padding="0"
+                              ItemTemplate="{StaticResource VendorItemTemplate}" ItemContainerStyle="{StaticResource FlatList}" />
+                    <TextBlock Grid.Row="1" Style="{StaticResource NonSelectableText}" Text="Nothing quoted or bought in this period. Try All."
+                               FontSize="12.5" Margin="8,10,0,0" Foreground="{ThemeResource AppTextTertiary}" Visibility="{x:Bind Vm.VendorItemsEmpty, Mode=OneWay}" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- RIGHT (b): one item -->
+        <Border Grid.Column="1" Style="{StaticResource Pane}" Padding="24,22,24,14" Visibility="{x:Bind Vm.HasItem, Mode=OneWay}">
+            <Grid RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource H1}" TextWrapping="Wrap" TextTrimming="None"
+                                   Text="{x:Bind Vm.SelectedItem.Name, Mode=OneWay, FallbackValue=''}" />
+                        <TextBlock Style="{StaticResource Sub}" Text="{x:Bind Vm.SelectedItem.HeaderText, Mode=OneWay, FallbackValue=''}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind Vm.SelectedItem.HasAliases, Mode=OneWay, FallbackValue=Collapsed}">
+                            <TextBlock Style="{StaticResource NonSelectableText}" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}"
+                                       Text="{x:Bind Vm.SelectedItem.AliasText, Mode=OneWay, FallbackValue=''}" />
+                            <Button Style="{StaticResource LinkButton}" Content="Separate again" Click="Separate_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="ItemPeriodChips" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom" />
+                </Grid>
+
+                <Border Grid.Row="1" BorderThickness="1" BorderBrush="{ThemeResource AppHairline}" CornerRadius="8" Padding="16,14,16,10">
+                    <StackPanel Spacing="6">
+                        <views:PriceChart Height="248" Data="{x:Bind Vm.SelectedItem.Chart, Mode=OneWay, FallbackValue={x:Null}}" />
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource AppText}" FontSize="11.5" TextWrapping="Wrap" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AppTextSecondary}" Text="{x:Bind Vm.SelectedItem.SpikeCostText, Mode=OneWay, FallbackValue=''}" />
+                            <Button Grid.Column="1" Style="{StaticResource LinkButton}" Content="+ Note on a period">
+                                <Button.Flyout>
+                                    <Flyout x:Name="NoteFlyout" Placement="BottomEdgeAlignedRight" Opening="NoteFlyout_Opening">
+                                        <StackPanel Width="320" Spacing="10">
+                                            <TextBlock Style="{StaticResource NonSelectableText}" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}"
+                                                       Text="Say why prices moved, so it is remembered next time. It shows on the chart." />
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="NoteFrom" Header="From" CornerRadius="6" HorizontalAlignment="Stretch" />
+                                                <ComboBox x:Name="NoteTo" Grid.Column="1" Header="To" CornerRadius="6" HorizontalAlignment="Stretch" />
+                                            </Grid>
+                                            <TextBox x:Name="NoteText" Header="Note" CornerRadius="6" PlaceholderText="Red Sea shipping disruption, freight up" />
+                                            <Button Style="{StaticResource PrimaryButton}" Content="Add note" HorizontalAlignment="Right" Click="AddNote_Click" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                        </Grid>
+                        <ItemsControl ItemsSource="{x:Bind Vm.SelectedItem.Notes, Mode=OneWay}" ItemTemplate="{StaticResource NoteRow}" />
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="8,0,8,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource H2}" Text="Who to ask next time" />
+                        <Button x:Name="CopyTopButton" Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Copy top 3 (names + emails)"
+                                Click="CopyTop_Click" ToolTipService.ToolTip="Copies the first three (leaving out any marked Avoid) for an email's To box" />
+                    </Grid>
+                    <Grid Grid.Row="1" Padding="8,0,8,8" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="0.3*" />
+                            <ColumnDefinition Width="1.8*" />
+                            <ColumnDefinition Width="1.6*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource ColHead}" Text="#" />
+                        <TextBlock Grid.Column="1" Style="{StaticResource ColHead}" Text="SUPPLIER" />
+                        <TextBlock Grid.Column="2" Style="{StaticResource ColHead}" Text="LATEST PRICE" />
+                        <TextBlock Grid.Column="3" Style="{StaticResource ColHead}" Text="VS MARKET THEN" ToolTipService.ToolTip="{x:Bind Vm.CurrencyHint}" />
+                        <TextBlock Grid.Column="4" Style="{StaticResource ColHead}" Text="REPLIES IN" />
+                        <TextBlock Grid.Column="5" Style="{StaticResource ColHead}" Text="SAID NO" />
+                        <TextBlock Grid.Column="6" Style="{StaticResource ColHead}" Text="BOUGHT" />
+                    </Grid>
+                    <ListView Grid.Row="2" x:Name="RankList" ItemsSource="{x:Bind Vm.SelectedItem.Suppliers, Mode=OneWay, FallbackValue={x:Null}}"
+                              SelectionMode="None" Padding="0" ItemTemplate="{StaticResource RankRow}" ItemContainerStyle="{StaticResource FlatList}" />
+                    <TextBlock Grid.Row="3" Style="{StaticResource Sub}" FontSize="12" Padding="8,10,8,0"
+                               Text="Ranked by price against the market at the time, then reply speed, then how often they say no. Old prices come after recent ones; suppliers you marked Avoid go last." />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Nothing picked yet -->
+        <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{x:Bind Vm.HasNothing, Mode=OneWay}">
+            <TextBlock Style="{StaticResource NonSelectableText}" Text="Pick a supplier or an item" FontSize="15" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
+            <TextBlock Style="{StaticResource NonSelectableText}" Text="to see their prices against the market at the time" FontSize="12.5"
+                       HorizontalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
+        </StackPanel>
+
+        <ProgressBar Grid.Column="1" VerticalAlignment="Top" IsIndeterminate="True" Margin="10,1,10,0"
+                     Visibility="{x:Bind Vm.IsDetailLoading, Mode=OneWay}" />
+    </Grid>
+</Page>

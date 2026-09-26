@@ -103,6 +103,7 @@ namespace Procure.Data
                 await Measure("14 undo window hides, undo restores, expiry deletes", () => UndoDeleteFlowAsync(db, repo));
                 await Measure("15 vendor suggestions", () => VendorSuggestionFlowAsync(db, repo));
                 await Measure("16 last price paid", () => LastPaidPriceFlowAsync(db, repo));
+                await Measure("17 suppliers page", () => SuppliersFlowAsync(db, repo));
             }
             catch (Exception ex)
             {
@@ -1222,6 +1223,153 @@ namespace Procure.Data
             await AssertDerivedDataFreshAsync(db, "after removing the last price PRs");
         }
 
+        /// <summary>The Suppliers &amp; Items page. Same-round head-to-head and the average against the
+        /// others in those rounds; "said no"; spend per currency; the items table against the market
+        /// at the time; a look-alike item offered as a duplicate, folded in and separated again; notes
+        /// on a period; Avoid ranking last; contact details surviving the vendor rows being rebuilt.</summary>
+        private static async Task SuppliersFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            var suppliers = new SupplierRepository(db);
+            var vendor = $"{_marker} Omega Supplies";
+            var key = vendor.ToLowerInvariant();
+            var item = $"{_marker} Gasket 4-core";
+            var itemKey = item.ToLowerInvariant();
+            var twin = $"{_marker.ToUpperInvariant()} GASKET 4 CORE";
+            var now = MonthIndex.Of(DateTime.Today);
+            var aedOnly = new Dictionary<string, decimal> { ["AED"] = 1m };
+            var ctx = new PriceContext(now - 11, now, "AED", aedOnly);
+            var monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+            async Task<PurchaseRequisition> Round(string tag, string itemName, DateTime date, params (string Vendor, decimal? Price)[] quotes)
+            {
+                var pr = NewPr(tag, (itemName, 10m));
+                await repo.SaveAsync(pr);
+                foreach (var (who, price) in quotes)
+                {
+                    var rfq = NewRfq(pr, tag + who.Length);
+                    rfq.Vendor = who;
+                    rfq.QuoteReceivedDate = date;
+                    var line = NewRfqLine(pr.Items[0], price ?? 0m);
+                    if (price is null) { line.IsQuoted = false; line.PriceNote = "Regret"; }
+                    rfq.Items.Add(line);
+                    await repo.SaveRfqAsync(rfq);
+                }
+                return pr;
+            }
+
+            var rival1 = $"{_marker} Rival One";
+            var rival2 = $"{_marker} Rival Two";
+            // Round 1: Omega 100 against 90 and 110 - not cheapest, level with the others' average.
+            var pr1 = await Round("sup1", item, monthStart, (vendor, 100m), (rival1, 90m), (rival2, 110m));
+            // Round 2: Omega 80 against 95 - cheapest, 16% below.
+            var pr2 = await Round("sup2", item, DateTime.Today, (vendor, 80m), (rival1, 95m));
+            // Round 3: Omega said no.
+            var pr3 = await Round("sup3", item, DateTime.Today, (vendor, null));
+
+            var live2 = await Reload(repo, pr2.Id);
+            var aed = NewPo(live2, live2.Rfqs.First(r => r.Vendor == vendor), "PO-S-AED");
+            aed.Value = 400m;
+            aed.Items.Add(NewPoLine(live2.Items[0], 5m, 80m));
+            await repo.SavePoAsync(aed);
+            var usd = NewPo(live2, live2.Rfqs.First(r => r.Vendor == vendor), "PO-S-USD");
+            usd.Value = 100m; usd.Currency = "USD";
+            await repo.SavePoAsync(usd);
+            await AssertDerivedDataFreshAsync(db, "after the suppliers rounds");
+
+            var summary = await suppliers.GetSummaryAsync(key, ctx);
+            Assert(summary is not null, "suppliers: a vendor on an RFQ and a PO has a page");
+            Assert(summary?.Rounds == 2 && summary.RoundsWon == 1, $"suppliers: cheapest in 1 of 2 same-PR rounds; got {summary?.HeadToHeadText}");
+            Assert(summary?.PoCount == 2 && summary.BoughtText.Contains("AED 400") && summary.BoughtText.Contains("USD 100"),
+                $"suppliers: bought is converted where there is a rate and shown apart where not; got {summary?.BoughtText} / {summary?.PoCountText}");
+            Assert(summary?.Categories.Contains("Seals & gaskets") == true, "suppliers: categories come from the item names");
+
+            var keys = await suppliers.GetVendorItemKeysAsync(key, ctx);
+            Assert(keys.SequenceEqual(new[] { itemKey }), $"suppliers: one item quoted; got {string.Join(",", keys)}");
+            var row = (await suppliers.GetVendorItemRowsAsync(keys)).Single();
+            Assert(row.Name == item, $"suppliers: the items list shows the item's name; got {row.Name}");
+            var (chart, others) = await suppliers.GetVendorItemDetailAsync(key, itemKey, ctx);
+            Assert(chart.Dots.Count(d => !d.IsPo) == 2 && chart.Dots.Count(d => d.IsPo) == 1 && chart.Dots.All(d => d.Vendor == vendor),
+                "suppliers: the row chart shows only this vendor's own quotes and orders");
+            Assert(chart.Market.Count == 1 && Math.Abs(chart.Market[0].Value - 95) < 1e-9, "suppliers: the market line is this month's middle quote");
+            Assert(others.Count == 2 && others.All(o => o.Vendor != vendor), "suppliers: the others' latest, one each, never the vendor itself");
+
+            // A look-alike spelling is offered as a duplicate of the busier item, folded in, and separated again.
+            var pr4 = await Round("sup4", twin, DateTime.Today, (rival1, 97m));
+            var (items, _) = await suppliers.GetItemPageAsync(_marker + " gasket", 0, 10);
+            Assert(items.Count == 2 && items.Single(i => i.Key == twin.ToLowerInvariant()).TwinKey == itemKey && !items.Single(i => i.Key == itemKey).HasTwin,
+                $"items: the look-alike offers the busier item, not the other way round; got {string.Join(" | ", items.Select(i => i.Key + " -> " + i.TwinKey))}");
+            await suppliers.TreatAsOneAsync(twin.ToLowerInvariant(), itemKey);
+            (items, _) = await suppliers.GetItemPageAsync(_marker + " gasket", 0, 10);
+            Assert(items.Count == 1 && items[0].Key == itemKey, "items: once treated as one, only the kept item is listed");
+            var detail = await suppliers.GetItemDetailAsync(itemKey, ctx);
+            Assert(detail?.Aliases.Count == 1 && detail.HeaderText.Contains("AED 96.00"),
+                $"items: the folded-in quote counts towards the market (middle of 100, 90, 110, 80, 95, 97 = 96); got {detail?.HeaderText}");
+            Assert(detail?.Suppliers.FirstOrDefault()?.Key == key, "items: the cheapest against the market ranks first");
+            await suppliers.SeparateAsync(twin.ToLowerInvariant());
+            Assert((await suppliers.GetItemDetailAsync(itemKey, ctx))?.Aliases.Count == 0, "items: separated again");
+
+            // A note on a period shows on the chart and can be taken off again.
+            await suppliers.AddItemNoteAsync(itemKey, now, now, "freight");
+            detail = await suppliers.GetItemDetailAsync(itemKey, ctx);
+            Assert(detail?.Notes.Count == 1 && detail.Chart.Bands.Any(b => b.Note == "freight"), "items: a note is kept and drawn");
+            await suppliers.DeleteItemNoteAsync(detail!.Notes[0].Id);
+            Assert((await suppliers.GetItemDetailAsync(itemKey, ctx))?.Notes.Count == 0, "items: a note can be removed");
+
+            // Contact details and the tag are the user's, kept apart from the rows the triggers rebuild;
+            // a supplier marked Avoid goes to the bottom however cheap.
+            await suppliers.SaveContactAsync(key, "  sales@omega.test ", "Priya", "+971 4", "Ask for Priya", SupplierTag.Avoid, null);
+            Assert((await suppliers.GetSummaryAsync(key, ctx))?.Categories.Contains("Seals & gaskets") == true,
+                "suppliers: saving contact details without touching categories keeps the guess");
+            await suppliers.SaveContactAsync(key, "sales@omega.test", "Priya", "+971 4", "Ask for Priya", SupplierTag.Avoid, new[] { "Valves", " Hoses " });
+            Assert((await suppliers.GetSummaryAsync(key, ctx))?.Categories.SequenceEqual(new[] { "Valves", "Hoses" }) == true,
+                "suppliers: categories the user set replace the guess");
+            await suppliers.SaveContactAsync(key, "sales@omega.test", "Priya", "+971 4", "Ask for Priya", SupplierTag.Avoid, null);
+            Assert((await suppliers.GetSummaryAsync(key, ctx))?.Categories.SequenceEqual(new[] { "Valves", "Hoses" }) == true,
+                "suppliers: a later contact save keeps the user's categories");
+            await suppliers.SaveContactAsync(key, "sales@omega.test", "Priya", "+971 4", "Ask for Priya", SupplierTag.Avoid, System.Array.Empty<string>());
+            Assert((await suppliers.GetSummaryAsync(key, ctx))?.Categories.Count == 0, "suppliers: removing every category leaves none, not the guess");
+            var lost = (await Reload(repo, pr1.Id)).Rfqs.First(r => r.Vendor == vendor);
+            lost.PaymentTerms = "90 Days";   // any write rebuilds this vendor's derived rows
+            await repo.SaveRfqAsync(lost);
+            summary = await suppliers.GetSummaryAsync(key, ctx);
+            Assert(summary?.Email == "sales@omega.test" && summary.Person == "Priya" && summary.IsAvoid,
+                "suppliers: contact details and tag survive the vendor list being rebuilt");
+            Assert((await suppliers.GetItemDetailAsync(itemKey, ctx))?.Suppliers.LastOrDefault()?.Key == key, "items: Avoid ranks last");
+            var (tagged, taggedTotal) = await suppliers.GetPageAsync(_marker, SupplierSort.Recent, SupplierTag.Avoid, aedOnly, 0, 10);
+            Assert(taggedTotal == 1 && tagged.Single().Key == key && tagged[0].IsAvoid, "suppliers: the Avoid filter");
+
+            // Sort by spend: with USD at 3.6725, 100 USD (367.25) + 400 AED puts it above a 700 AED vendor;
+            // without a USD rate it falls below.
+            var rival = NewPr("suppliers-rival", (Brush, 1m));
+            await repo.SaveAsync(rival);
+            var rivalPo = NewPo(rival, NewRfq(rival, "sr"), "PO-S-RIVAL");
+            rivalPo.LinkedRfqId = null; rivalPo.Vendor = $"{_marker} Omega Rival"; rivalPo.Value = 700m; rivalPo.Currency = "AED";
+            await repo.SavePoAsync(rivalPo);
+            var withRate = (await suppliers.GetPageAsync(_marker + " omega", SupplierSort.Spend, "",
+                new Dictionary<string, decimal> { ["AED"] = 1m, ["USD"] = 3.6725m }, 0, 10)).Rows;
+            var withoutRate = (await suppliers.GetPageAsync(_marker + " omega", SupplierSort.Spend, "", aedOnly, 0, 10)).Rows;
+            Assert(withRate.FirstOrDefault()?.Key == key, "suppliers: spend sorts in the local currency at the Settings rates");
+            Assert(withoutRate.FirstOrDefault()?.Key != key, "suppliers: a currency without a rate does not count towards the order");
+
+            await AssertDerivedDataFreshAsync(db, "after the suppliers checks");
+            foreach (var pr in new[] { pr1, pr2, pr3, pr4, rival })
+            {
+                await repo.DeleteAsync(pr.Id);
+                Created.Remove(pr.Id);
+            }
+            Assert(await suppliers.GetSummaryAsync(key, ctx) is null, "suppliers: a vendor no RFQ or PO names any more has no page");
+            Assert(await suppliers.GetItemDetailAsync(itemKey, ctx) is null, "items: an item no line names any more has no page");
+            await AssertDerivedDataFreshAsync(db, "after removing the suppliers PRs");
+
+            using var connection = db.CreateConnection();
+            await connection.OpenAsync();
+            using var cleanup = connection.CreateCommand();
+            cleanup.CommandText = "DELETE FROM VendorContact WHERE VendorKey = @K; DELETE FROM ItemAlias WHERE CanonicalKey = @I; DELETE FROM ItemNote WHERE ItemKey = @I;";
+            cleanup.Parameters.AddWithValue("@K", key);
+            cleanup.Parameters.AddWithValue("@I", itemKey);
+            await cleanup.ExecuteNonQueryAsync();
+        }
+
         /// <summary>Two saves landing on the same Raw Material PR at once.
         ///
         /// This is the shape that put "UNIQUE constraint failed: MaterialAggregate.MaterialKey" in
@@ -1729,6 +1877,13 @@ namespace Procure.Data
                 cmd.CommandText = DatabaseConstants.SqlStalePoDateCount;
                 var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
                 Assert(stale == 0, $"PO lines carry their PO's date {step} ({stale} disagreeing line(s))");
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = DatabaseConstants.SqlStaleItemPriceCount;
+                var stale = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                Assert(stale == 0, $"quote dates and the items list are current {step} ({stale} disagreeing row(s))");
             }
 
             // Orphans: a line pointing at a PR line that no longer exists is how the original bug

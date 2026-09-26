@@ -122,6 +122,7 @@ public partial class App : Application
         s.AddSingleton<ICallOffRepository, CallOffRepository>();
         s.AddSingleton<ITodoRepository, TodoRepository>();
         s.AddSingleton<INoteRepository, NoteRepository>();
+        s.AddSingleton<ISupplierRepository, SupplierRepository>();
         s.AddSingleton<ILinkTargetService, LinkTargetService>();
         s.AddSingleton<IPurchaseRequisitionRepository, PurchaseRequisitionRepository>();
 
@@ -141,6 +142,7 @@ public partial class App : Application
         s.AddSingleton<CallOffPageModel>();
         s.AddSingleton<TodoPageModel>();
         s.AddSingleton<NotePageModel>();
+        s.AddSingleton<SuppliersPageModel>();
         s.AddSingleton<ManageColumnsPageModel>();
         s.AddSingleton<SettingsPageModel>();
 
@@ -155,6 +157,7 @@ public partial class App : Application
         s.AddSingleton<TasksPage>();
         s.AddSingleton<NotesPage>();
         s.AddSingleton<CallOffPage>();
+        s.AddSingleton<SuppliersPage>();
         s.AddSingleton<SettingsPage>();
 
         return s.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });

@@ -14,6 +14,7 @@ namespace Procure.Utilities
         public const string GoMaterials = "Global.GoMaterials";
         public const string GoTasks = "Global.GoTasks";
         public const string GoNotes = "Global.GoNotes";
+        public const string GoSuppliers = "Global.GoSuppliers";
         public const string GoSettings = "Global.GoSettings";
         public const string ToggleSidebar = "Global.ToggleSidebar";
 
@@ -51,6 +52,8 @@ namespace Procure.Utilities
             new(KeyboardShortcutIds.GoMaterials, "Go to Raw & Packing", "Global", "Ctrl+Number3"),
             new(KeyboardShortcutIds.GoTasks, "Go to Tasks", "Global", "Ctrl+Number4"),
             new(KeyboardShortcutIds.GoNotes, "Go to Notes", "Global", "Ctrl+Number5"),
+            // Ctrl+6, not slotted in after Raw & Packing: the existing numbers are already in people's hands.
+            new(KeyboardShortcutIds.GoSuppliers, "Go to Suppliers", "Global", "Ctrl+Number6"),
             new(KeyboardShortcutIds.GoSettings, "Go to Settings", "Global", "Ctrl+Comma"),
             new(KeyboardShortcutIds.ToggleSidebar, "Toggle Sidebar", "Global", "Ctrl+B"),
 
