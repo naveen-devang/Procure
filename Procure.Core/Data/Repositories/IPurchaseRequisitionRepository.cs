@@ -64,6 +64,12 @@ namespace Procure.Data.Repositories
         Task SplitMergedPrAsync(Guid masterPrId);
         Task PartialSplitMergedPrAsync(Guid masterPrId, List<PurchaseRequisition> splitPrs, List<PurchaseRequisition> keptPrs);
         Task SplitSharedRfqAsync(Guid rfqId);
+
+        /// <summary>Saves a PR's RFQ order (drag to reorder), <paramref name="orderedIds"/> top to
+        /// bottom. A shared RFQ keeps one order everywhere: on every other PR holding copies of this
+        /// PR's shared RFQs, those copies are rearranged to match, in the places they already take -
+        /// that PR's own RFQs do not move. Returns the new order of each other PR it changed.</summary>
+        Task<Dictionary<Guid, List<Guid>>> ReorderRfqsAsync(Guid prId, IReadOnlyList<Guid> orderedIds);
         Task SplitCombinedPoAsync(Guid poId);
 
         Task<(int TotalPrs, decimal TotalPoValue, int PosRaised, int RfqsAwaitingQuote, int PcrsAwaitingSignature, int UrgentCount, int OverdueCount)> GetDashboardAggregatesAsync(int normalOverdueDays, int urgentOverdueDays);

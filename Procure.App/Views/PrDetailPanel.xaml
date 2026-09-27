@@ -129,10 +129,30 @@
                                     Background="{ThemeResource FluentTealBg}" Foreground="{ThemeResource FluentTeal}"
                                     BorderBrush="{ThemeResource BadgeSharedRfqBorder}" BorderThickness="0" />
                         </Grid>
-                        <ItemsControl ItemsSource="{x:Bind Pr.Rfqs, Mode=OneWay}">
-                            <ItemsControl.ItemTemplate>
+                        <!-- Drag a card up or down to reorder (stock ListView reordering). The order is saved on
+                             drop and is the one the PCR export, preview and PO wizard use. No selection, no
+                             hover fill, no inner scrolling: it looks and scrolls exactly like the plain list. -->
+                        <ListView x:Name="RfqList" ItemsSource="{x:Bind Pr.Rfqs, Mode=OneWay}" SelectionMode="None"
+                                  CanDragItems="True" CanReorderItems="True" AllowDrop="True" Padding="0"
+                                  DragItemsCompleted="RfqList_DragItemsCompleted"
+                                  ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                  AutomationProperties.Name="RFQs, drag to reorder">
+                            <ListView.Resources>
+                                <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="Transparent" />
+                            </ListView.Resources>
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:RequestForQuotation">
-                                    <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="14,12">
+                                    <Border x:DefaultBindMode="OneWay" Style="{StaticResource ItemCard}" Padding="14,12"
+                                            AutomationProperties.Name="{x:Bind Vendor}">
                                         <StackPanel Spacing="10">
                                             <!-- Vendor, its quote status, and the row actions on one line:
                                                  the status belongs next to the vendor it describes. -->
@@ -229,8 +249,8 @@
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                            </ListView.ItemTemplate>
+                        </ListView>
                         <TextBlock Style="{StaticResource AppText}" Text="No RFQs invited yet. Click '+ Add RFQ' to record vendor inquiries."
                                    FontSize="11" Foreground="{ThemeResource AppTextTertiary}" Padding="6,12" TextWrapping="Wrap"
                                    Visibility="{x:Bind Pr.RfqCount, Mode=OneWay, Converter={StaticResource ZeroVis}}" />

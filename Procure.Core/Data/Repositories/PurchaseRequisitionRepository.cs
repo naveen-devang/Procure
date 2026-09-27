@@ -88,7 +88,7 @@ LIMIT @Take OFFSET @Skip;";
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Incoterms, DeliveryLeadTime, Currency, SharedPrs, Warranty, TechnicalApproval, Discount
+SELECT Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Incoterms, DeliveryLeadTime, Currency, SharedPrs, Warranty, TechnicalApproval, Discount, SortOrder
 FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
 
                 using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -121,7 +121,8 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                         SharedPrs = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
                         Warranty = reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
                         TechnicalApproval = reader.IsDBNull(17) ? string.Empty : reader.GetString(17),
-                        Discount = reader.IsDBNull(18) ? null : reader.GetDecimal(18)
+                        Discount = reader.IsDBNull(18) ? null : reader.GetDecimal(18),
+                        SortOrder = reader.GetInt32(19),
                     };
 
                     rfq.ItemsLoaded = includeLineItems;
@@ -129,6 +130,16 @@ FROM RequestForQuotation" + Scope(cmd, "PrId", "@Pr", prIds) + ";";
                     rfqById[rfq.Id] = rfq;
                 }
             }
+
+            // The user's order (drag to reorder). OrderBy is stable, so RFQs sharing a position keep
+            // the order they were written in.
+            foreach (var list in rfqDict.Values)
+                if (list.Count > 1)
+                {
+                    var ordered = list.OrderBy(r => r.SortOrder).ToList();
+                    list.Clear();
+                    list.AddRange(ordered);
+                }
 
             if (includeLineItems)
             {

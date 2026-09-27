@@ -135,8 +135,8 @@ VALUES (@Id, @PrId, @ItemName, @Quantity, @Unit, @EstimatedUnitPrice, @Notes, @S
                         using var rfqCmd = connection.CreateCommand();
                         rfqCmd.Transaction = tx;
                         rfqCmd.CommandText = @"
-INSERT INTO RequestForQuotation (Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Discount, Incoterms, DeliveryLeadTime, Currency, Warranty, TechnicalApproval)
-VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @QuoteAmount, @PaymentTerms, @VatType, @Freight, @OtherCharges, @Discount, @Incoterms, @DeliveryLeadTime, @Currency, @Warranty, @TechnicalApproval);";
+INSERT INTO RequestForQuotation (Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Discount, Incoterms, DeliveryLeadTime, Currency, Warranty, TechnicalApproval, SortOrder)
+VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @QuoteAmount, @PaymentTerms, @VatType, @Freight, @OtherCharges, @Discount, @Incoterms, @DeliveryLeadTime, @Currency, @Warranty, @TechnicalApproval, " + DatabaseConstants.SqlNextRfqSortOrder + @");";
 
                         rfqCmd.Parameters.AddWithValue("@Id", newRfq.Id.ToString());
                         rfqCmd.Parameters.AddWithValue("@PrId", masterPr.Id.ToString());
@@ -571,8 +571,8 @@ VALUES (@Id, @PoId, @PrItemId, @RfqItemId, @ItemName, @Quantity, @Unit, @UnitPri
                 using var cmd = connection.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO RequestForQuotation (Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Discount, Incoterms, DeliveryLeadTime, Currency, SharedPrs, Warranty, TechnicalApproval)
-VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @QuoteAmount, @PaymentTerms, @VatType, @Freight, @OtherCharges, @Discount, @Incoterms, @DeliveryLeadTime, @Currency, @SharedPrs, @Warranty, @TechnicalApproval);
+INSERT INTO RequestForQuotation (Id, PrId, RfqNo, Vendor, Status, SentDate, QuoteReceivedDate, QuoteAmount, PaymentTerms, VatType, Freight, OtherCharges, Discount, Incoterms, DeliveryLeadTime, Currency, SharedPrs, Warranty, TechnicalApproval, SortOrder)
+VALUES (@Id, @PrId, @RfqNo, @Vendor, @Status, @SentDate, @QuoteReceivedDate, @QuoteAmount, @PaymentTerms, @VatType, @Freight, @OtherCharges, @Discount, @Incoterms, @DeliveryLeadTime, @Currency, @SharedPrs, @Warranty, @TechnicalApproval, " + DatabaseConstants.SqlNextRfqSortOrder + @");
 
 UPDATE PurchaseRequisition SET Status = @PrStatus, UpdatedAt = @UpdatedAt WHERE Id = @PrId;";
 
@@ -1076,6 +1076,92 @@ WHERE Id IN ({string.Join(", ", rfqParams)});";
         }
 
         public Task SplitSharedRfqAsync(Guid rfqId) => Task.Run(() => SplitSharedRfqCoreAsync(rfqId));
+
+        public Task<Dictionary<Guid, List<Guid>>> ReorderRfqsAsync(Guid prId, IReadOnlyList<Guid> orderedIds) =>
+            Task.Run(() => ReorderRfqsCoreAsync(prId, orderedIds));
+
+        // A shared RFQ is one RFQ sent against several PRs, stored once per PR and recognised by its
+        // RFQ number (as SplitSharedRfqAsync recognises it).
+        private const string IsShared = "COALESCE(SharedPrs, '') <> '' AND trim(COALESCE(RfqNo, '')) <> ''";
+
+        private async Task<Dictionary<Guid, List<Guid>>> ReorderRfqsCoreAsync(Guid prId, IReadOnlyList<Guid> orderedIds)
+        {
+            await _db.InitializeAsync().ConfigureAwait(false);
+            using var connection = _db.CreateConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+            using var tx = connection.BeginTransaction();
+
+            async Task WriteOrderAsync(Guid pr, IReadOnlyList<Guid> ids)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = "UPDATE RequestForQuotation SET SortOrder = @O WHERE Id = @Id AND PrId = @Pr;";
+                var pO = cmd.Parameters.Add("@O", SqliteType.Integer);
+                var pId = cmd.Parameters.Add("@Id", SqliteType.Text);
+                cmd.Parameters.AddWithValue("@Pr", pr.ToString());
+                for (var i = 0; i < ids.Count; i++)
+                {
+                    pO.Value = i;
+                    pId.Value = ids[i].ToString();
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                }
+            }
+
+            await WriteOrderAsync(prId, orderedIds);
+
+            // This PR's shared RFQs, by number, in their new order.
+            var sharedNo = new Dictionary<Guid, string>();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = $"SELECT Id, RfqNo FROM RequestForQuotation WHERE PrId = @Pr AND {IsShared};";
+                cmd.Parameters.AddWithValue("@Pr", prId.ToString());
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                    sharedNo[Guid.Parse(reader.GetString(0))] = reader.GetString(1);
+            }
+            var rank = new Dictionary<string, int>();
+            foreach (var id in orderedIds)
+                if (sharedNo.TryGetValue(id, out var no) && !rank.ContainsKey(no)) rank[no] = rank.Count;
+
+            var changed = new Dictionary<Guid, List<Guid>>();
+            if (rank.Count > 1)   // one shared RFQ alone has nothing to line up with
+            {
+                var others = new List<Guid>();
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    var names = rank.Keys.Select((no, i) => { cmd.Parameters.AddWithValue("@N" + i, no); return "@N" + i; });
+                    cmd.CommandText = $"SELECT DISTINCT PrId FROM RequestForQuotation WHERE PrId <> @Pr AND {IsShared} AND RfqNo IN ({string.Join(",", names)});";
+                    cmd.Parameters.AddWithValue("@Pr", prId.ToString());
+                    using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                    while (await reader.ReadAsync().ConfigureAwait(false)) others.Add(Guid.Parse(reader.GetString(0)));
+                }
+
+                foreach (var other in others)
+                {
+                    var rows = new List<(Guid Id, string? No)>();
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.CommandText = $@"SELECT Id, CASE WHEN {IsShared} THEN RfqNo END FROM RequestForQuotation
+WHERE PrId = @Pr ORDER BY SortOrder, rowid;";
+                        cmd.Parameters.AddWithValue("@Pr", other.ToString());
+                        using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                        while (await reader.ReadAsync().ConfigureAwait(false))
+                            rows.Add((Guid.Parse(reader.GetString(0)), reader.IsDBNull(1) ? null : reader.GetString(1)));
+                    }
+
+                    var result = RfqOrder.AlignShared(rows, rank);
+                    if (result.SequenceEqual(rows.Select(r => r.Id))) continue;
+                    await WriteOrderAsync(other, result);
+                    changed[other] = result;
+                }
+            }
+
+            tx.Commit();
+            return changed;
+        }
 
         private async Task SplitSharedRfqCoreAsync(Guid rfqId)
         {

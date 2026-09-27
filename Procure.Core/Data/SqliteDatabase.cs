@@ -255,6 +255,13 @@ namespace Procure.Data
                         priceCmd.CommandText = DatabaseConstants.SqlCreateItemPriceSync;
                         await priceCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
+                    // v28: RFQ order. Existing RFQs keep the order they were shown in until now.
+                    if (storedVersion < 28)
+                    {
+                        using var rfqOrder = connection.CreateCommand();
+                        rfqOrder.CommandText = DatabaseConstants.SqlBackfillRfqSortOrder;
+                        await rfqOrder.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
                     if (storedVersion < 26)
                     {
                         using var priceFill = connection.CreateCommand();
@@ -334,6 +341,8 @@ namespace Procure.Data
             await EnsureColumnExistsAsync(connection, "PurchaseOrderItem", "PoDate", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
             // v26: the quote's date and currency on each quote line, for price history; filled and kept like PoDate.
             await EnsureColumnExistsAsync(connection, "RfqItem", "QuoteDate", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            // v28: where an RFQ sits in its PR's list; filled by the v28 step in InitializeAsync.
+            await EnsureColumnExistsAsync(connection, "RequestForQuotation", "SortOrder", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "RfqItem", "QuoteCurrency", "TEXT NOT NULL DEFAULT 'AED'").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "VendorContact", "Person", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
             await EnsureColumnExistsAsync(connection, "VendorContact", "Phone", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);

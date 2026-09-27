@@ -11,6 +11,10 @@ namespace Procure.Models
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid PrId { get; set; }
 
+        /// <summary>Position in the PR's RFQ list (dragged by the user). Every list, the PCR export and
+        /// the PO wizard show RFQs in this order. Saved only by ReorderRfqsAsync; a new RFQ goes last.</summary>
+        public int SortOrder { get; set; }
+
         [ObservableProperty]
         public partial string RfqNo { get; set; } = string.Empty;
 

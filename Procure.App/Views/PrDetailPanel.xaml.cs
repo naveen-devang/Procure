@@ -86,6 +86,13 @@ public sealed partial class PrDetailPanel : UserControl
 
     // ---- RFQ ----
     private void AddRfq_Click(object s, RoutedEventArgs e) { if (Pr is { } pr) Pm?.OpenAddRfqModalCommand.Execute(pr); }
+
+    /// <summary>An RFQ card was dropped in a new place: save the order.</summary>
+    private void RfqList_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs e)
+    {
+        if (e.DropResult == Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move && Pr is { } pr && Pm is { } pm)
+            _ = pm.ReorderRfqsAsync(pr);
+    }
     private void EditRfq_Click(object s, RoutedEventArgs e) { if (Ctx<RequestForQuotation>(s) is { } r) Pm?.OpenEditRfqModalCommand.Execute(r); }
     private void DeleteRfq_Click(object s, RoutedEventArgs e) { if (Ctx<RequestForQuotation>(s) is { } r) Pm?.DeleteRfqCommand.Execute(r); }
     private void SplitRfq_Click(object s, RoutedEventArgs e) { if (Ctx<RequestForQuotation>(s) is { } r) Pm?.SplitSharedRfqCommand.Execute(r); }

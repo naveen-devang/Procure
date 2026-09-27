@@ -823,5 +823,41 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>After an RFQ card is dragged to a new place: saves the order of this PR's RFQs, and
+        /// lines up the shared ones on any other PR on the board (see ReorderRfqsAsync). The detail
+        /// panel's list has already moved the card; the PCR export, preview and PO wizard read this
+        /// same list, so they follow.</summary>
+        public async Task ReorderRfqsAsync(PurchaseRequisition pr)
+        {
+            var ids = pr.Rfqs.Select(r => r.Id).ToList();
+            for (var i = 0; i < pr.Rfqs.Count; i++) pr.Rfqs[i].SortOrder = i;
+            try
+            {
+                var others = await _prRepo.ReorderRfqsAsync(pr.Id, ids);
+                foreach (var (otherId, order) in others)
+                {
+                    if (_loadedPrs.FirstOrDefault(p => p.Id == otherId) is not { } other) continue;
+                    for (var i = 0; i < order.Count; i++)
+                    {
+                        var at = IndexOfRfq(other, order[i]);
+                        if (at < 0) continue;   // hidden for Undo, or not loaded
+                        other.Rfqs[at].SortOrder = i;
+                        if (at != i && i < other.Rfqs.Count) other.Rfqs.Move(at, i);
+                    }
+                }
+                pr.NotifyHierarchyChanged();
+            }
+            catch (Exception ex)
+            {
+                _errorHandler.HandleError(ex);
+            }
+        }
+
+        private static int IndexOfRfq(PurchaseRequisition pr, Guid id)
+        {
+            for (var i = 0; i < pr.Rfqs.Count; i++)
+                if (pr.Rfqs[i].Id == id) return i;
+            return -1;
+        }
     }
 }

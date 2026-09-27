@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 27;
+        public const int SchemaVersion = 28;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -996,6 +996,17 @@ END;
 CREATE TRIGGER TR_PoItem_Agg_Rename AFTER UPDATE OF ItemName ON PurchaseOrderItem WHEN OLD.ItemName IS NOT NEW.ItemName
 BEGIN {BumpItem("OLD.ItemName", false)} {BumpItem("NEW.ItemName", true)}
 END;";
+
+        /// <summary>v28: RFQ order within a PR (drag to reorder). Numbers the existing RFQs in the order
+        /// they have always been shown - the order they were written - so nothing moves on upgrade.</summary>
+        public const string SqlBackfillRfqSortOrder = @"
+UPDATE RequestForQuotation SET SortOrder = (
+    SELECT COUNT(*) FROM RequestForQuotation AS r2
+    WHERE r2.PrId = RequestForQuotation.PrId AND r2.rowid < RequestForQuotation.rowid);";
+
+        /// <summary>The next position at the bottom of a PR's RFQs - a new RFQ always goes last.</summary>
+        public const string SqlNextRfqSortOrder =
+            "COALESCE((SELECT MAX(SortOrder) + 1 FROM RequestForQuotation WHERE PrId = @PrId), 0)";
 
         public static readonly string SqlBackfillItemPrices = $@"
 UPDATE RfqItem SET QuoteDate = {string.Format(RfqDateOf, "RfqId")}, QuoteCurrency = {string.Format(RfqCurrencyOf, "RfqId")};

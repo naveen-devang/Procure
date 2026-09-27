@@ -45,7 +45,10 @@ namespace Procure.Data
     {
         private const string Brush = "CARBON BRUSH,25X50X50MM F/FRAME:M15E";
         private const string Gasket = "GASKET,SPIRAL WOUND,DN50,CL150";
-        private const string Gypsum = "GYPSUM";
+        // Marked like every other test record: a plain "GYPSUM" collided with real GYPSUM PO lines
+        // when the check ran against a copy of a real database, and the material totals it asserts
+        // then counted the real lines too.
+        private static string Gypsum => _marker + " GYPSUM";
 
         /// <summary>The host's container. Set by whichever head is running the check - this used to
         /// read MAUI's IPlatformApplication.Current directly, which is why the whole suite could only
@@ -104,6 +107,7 @@ namespace Procure.Data
                 await Measure("15 vendor suggestions", () => VendorSuggestionFlowAsync(db, repo));
                 await Measure("16 last price paid", () => LastPaidPriceFlowAsync(db, repo));
                 await Measure("17 suppliers page", () => SuppliersFlowAsync(db, repo));
+                await Measure("18 RFQ order", () => RfqOrderFlowAsync(db, repo));
             }
             catch (Exception ex)
             {
@@ -1093,8 +1097,10 @@ namespace Procure.Data
             {
                 Failures.Add("SKIPPED 15 (form part): the PR board page model was not available from the container.");
             }
-            else
+            else await OnUiAsync(async () =>
             {
+                // The Add RFQ window binds these fields, so they are set on the UI thread as the
+                // window itself would set them; from a pool thread Windows refuses (RPC_E_WRONG_THREAD).
                 model.IsEditingRfq = false;
                 model.NewRfqCurrency = "AED"; model.NewRfqPaymentTerms = string.Empty; model.NewRfqIncoterms = "DDP"; model.NewRfqVatType = "5%";
                 model.ResetRfqTermsTouched();          // as a freshly opened form
@@ -1116,7 +1122,7 @@ namespace Procure.Data
                 Assert(await superseded is null, "vendor: a keystroke overtaken by the next one returns nothing");
                 Assert((await latest)?.Count == 1, "vendor: the last keystroke's search returns the vendor");
                 Assert((await model.FindVendorsAsync("z"))?.Count == 0, "vendor: one character suggests nothing");
-            }
+            });
 
             await repo.DeleteAsync(pr.Id);
             Created.Remove(pr.Id);
@@ -1368,6 +1374,99 @@ namespace Procure.Data
             cleanup.Parameters.AddWithValue("@K", key);
             cleanup.Parameters.AddWithValue("@I", itemKey);
             await cleanup.ExecuteNonQueryAsync();
+        }
+
+        /// <summary>Runs <paramref name="work"/> on the UI thread and waits for it - for checks that set
+        /// fields an open window is bound to.</summary>
+        private static Task OnUiAsync(Func<Task> work)
+        {
+            var ui = HostServices?.GetService<Abstractions.IUiDispatcher>();
+            if (ui is null || ui.IsMainThread) return work();
+            var done = new TaskCompletionSource();
+            ui.Post(async () =>
+            {
+                try { await work(); done.SetResult(); }
+                catch (Exception ex) { done.SetException(ex); }
+            });
+            return done.Task;
+        }
+
+        /// <summary>RFQ order (drag to reorder): a new RFQ goes last, a saved order survives reloads,
+        /// edits and deletes, a shared RFQ keeps one order on every PR it is on (the other PR's own
+        /// RFQs staying put), and merging carries each PR's order across, the merged-in ones below.</summary>
+        private static async Task RfqOrderFlowAsync(SqliteDatabase db, IPurchaseRequisitionRepository repo)
+        {
+            async Task<List<string>> OrderOf(Guid prId) => (await Reload(repo, prId)).Rfqs.Select(r => r.Vendor).ToList();
+            string Show(List<string> v) => string.Join(", ", v.Select(x => x.Replace(_marker + "-", "")));
+            async Task<RequestForQuotation> Add(PurchaseRequisition pr, string vendor, string? rfqNo = null, string shared = "")
+            {
+                var rfq = NewRfq(pr, vendor);
+                if (rfqNo is not null) rfq.RfqNo = rfqNo;
+                rfq.SharedPrs = shared;
+                await repo.SaveRfqAsync(rfq);
+                return rfq;
+            }
+            string V(string name) => $"{_marker}-{name}";
+
+            var pr = NewPr("order", (Brush, 5m));
+            await repo.SaveAsync(pr);
+            var a = await Add(pr, "a");
+            var b = await Add(pr, "b");
+            var c = await Add(pr, "c");
+            Assert((await OrderOf(pr.Id)).SequenceEqual(new[] { V("a"), V("b"), V("c") }), "new RFQs go at the bottom, in the order added");
+
+            await repo.ReorderRfqsAsync(pr.Id, new[] { c.Id, a.Id, b.Id });
+            Assert((await OrderOf(pr.Id)).SequenceEqual(new[] { V("c"), V("a"), V("b") }), $"a dragged order survives a reload; got {Show(await OrderOf(pr.Id))}");
+
+            var liveA = (await Reload(repo, pr.Id)).Rfqs.Single(r => r.Id == a.Id);
+            liveA.PaymentTerms = "60 Days";
+            await repo.SaveRfqAsync(liveA);
+            Assert((await OrderOf(pr.Id)).SequenceEqual(new[] { V("c"), V("a"), V("b") }), "editing an RFQ never moves it");
+
+            await Add(pr, "d");
+            Assert((await OrderOf(pr.Id)).Last() == V("d"), "an RFQ added after a reorder still goes last");
+
+            await repo.DeleteRfqAsync(a.Id);
+            Assert((await OrderOf(pr.Id)).SequenceEqual(new[] { V("c"), V("b"), V("d") }), $"deleting one keeps the rest in order; got {Show(await OrderOf(pr.Id))}");
+
+            // Shared RFQs X and Y on two PRs; PR B also has its own RFQ Z between them.
+            var prA = NewPr("order-sa", (Brush, 5m));
+            var prB = NewPr("order-sb", (Brush, 5m));
+            await repo.SaveAsync(prA);
+            await repo.SaveAsync(prB);
+            var shared = $"{prA.PrNo}, {prB.PrNo}";
+            var xA = await Add(prA, "x", _marker + "-RFQ-X", shared);
+            var yA = await Add(prA, "y", _marker + "-RFQ-Y", shared);
+            await Add(prB, "x", _marker + "-RFQ-X", shared);
+            await Add(prB, "z");
+            await Add(prB, "y", _marker + "-RFQ-Y", shared);
+
+            var changed = await repo.ReorderRfqsAsync(prA.Id, new[] { yA.Id, xA.Id });
+            Assert((await OrderOf(prA.Id)).SequenceEqual(new[] { V("y"), V("x") }), "the dragged PR takes the new order");
+            Assert((await OrderOf(prB.Id)).SequenceEqual(new[] { V("y"), V("z"), V("x") }),
+                $"the other PR's shared RFQs follow, its own stays in place; got {Show(await OrderOf(prB.Id))}");
+            Assert(changed.Count == 1 && changed.ContainsKey(prB.Id), "the other PR is reported so the board can move its cards");
+            Assert((await repo.ReorderRfqsAsync(prA.Id, new[] { yA.Id, xA.Id })).Count == 0, "reordering to the same order changes nothing elsewhere");
+
+            // Merge: each PR's RFQs come across in their own order, the later PR's below.
+            var m1 = NewPr("order-m1", (Brush, 5m));
+            var m2 = NewPr("order-m2", (Brush, 5m));
+            await repo.SaveAsync(m1);
+            await repo.SaveAsync(m2);
+            var p = await Add(m1, "p");
+            var q = await Add(m1, "q");
+            await Add(m2, "r");
+            await repo.ReorderRfqsAsync(m1.Id, new[] { q.Id, p.Id });
+            var master = new PurchaseRequisition
+            {
+                Id = Guid.NewGuid(), PrNo = _marker + "-order-master", Description = "merged", Requestor = "flow check",
+            };
+            Created.Add(master.Id);
+            await repo.MergePrsAsync(new List<PurchaseRequisition> { await Reload(repo, m1.Id), await Reload(repo, m2.Id) }, master, copyRfqs: true);
+            Assert((await OrderOf(master.Id)).SequenceEqual(new[] { V("q"), V("p"), V("r") }),
+                $"merging keeps each PR's order, the merged-in ones below; got {Show(await OrderOf(master.Id))}");
+
+            await AssertDerivedDataFreshAsync(db, "after reordering RFQs");
         }
 
         /// <summary>Two saves landing on the same Raw Material PR at once.

@@ -39,6 +39,7 @@ namespace Procure.Data
                 PcrCurrencyConversionSelfCheck.Run();
                 PriceAnalysis.SelfCheck();
                 TaskReminders.SelfCheck();
+                RfqOrder.SelfCheck();
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 
