@@ -24,9 +24,13 @@ namespace Procure.Data.Repositories
 
         // ---- SQL pieces -----------------------------------------------------------------------
 
-        private const string Priced = "ri.IsQuoted = 1 AND ri.QuotedUnitPrice > 0";
-        private const string NetQuote = "max(0, ri.QuotedUnitPrice - COALESCE(ri.Discount, 0))";
-        private const string NetPoLine = "max(0, pi.UnitPrice - COALESCE(pi.Discount, 0))";
+        // A quote answered in words ("Regret") is stored as quoted with NO price, and in SQL
+        // "quoted AND NULL > 0" is NULL rather than false - read as a number, that threw "The data is
+        // NULL" and the item page would not open (v2.2.0). An empty price is "not priced", and an
+        // unpriced PO line counts as bought at an unknown price (0: no chart dot).
+        private const string Priced = "ri.IsQuoted = 1 AND COALESCE(ri.QuotedUnitPrice, 0) > 0";
+        private const string NetQuote = "max(0, COALESCE(ri.QuotedUnitPrice, 0) - COALESCE(ri.Discount, 0))";
+        private const string NetPoLine = "max(0, COALESCE(pi.UnitPrice, 0) - COALESCE(pi.Discount, 0))";
         private const string RfqCurrency = "COALESCE(NULLIF(trim(r.Currency), ''), 'AED')";
         private const string PoCurrency = "COALESCE(NULLIF(trim(p.Currency), ''), 'AED')";
 

@@ -1256,7 +1256,9 @@ namespace Procure.Data
                     rfq.Vendor = who;
                     rfq.QuoteReceivedDate = date;
                     var line = NewRfqLine(pr.Items[0], price ?? 0m);
-                    if (price is null) { line.IsQuoted = false; line.PriceNote = "Regret"; }
+                    // Exactly as the RFQ window stores words typed in the price box: still quoted,
+                    // no price, the words as a note. (Saving it as "not quoted" hid the v2.2.0 bug.)
+                    if (price is null) line.QuotedUnitPriceText = "Regret";
                     rfq.Items.Add(line);
                     await repo.SaveRfqAsync(rfq);
                 }
@@ -1279,6 +1281,9 @@ namespace Procure.Data
             await repo.SavePoAsync(aed);
             var usd = NewPo(live2, live2.Rfqs.First(r => r.Vendor == vendor), "PO-S-USD");
             usd.Value = 100m; usd.Currency = "USD";
+            var unpriced = NewPoLine(live2.Items[0], 2m, 0m);
+            unpriced.UnitPrice = null;   // a PO line with no unit price
+            usd.Items.Add(unpriced);
             await repo.SavePoAsync(usd);
             await AssertDerivedDataFreshAsync(db, "after the suppliers rounds");
 
@@ -1308,6 +1313,9 @@ namespace Procure.Data
             (items, _) = await suppliers.GetItemPageAsync(_marker + " gasket", 0, 10);
             Assert(items.Count == 1 && items[0].Key == itemKey, "items: once treated as one, only the kept item is listed");
             var detail = await suppliers.GetItemDetailAsync(itemKey, ctx);
+            var omega = detail?.Suppliers.FirstOrDefault(s => s.Key == key);
+            Assert(omega?.SaidNoText == "1 of 3" && omega.BoughtText == "2×",
+                $"items: a Regret line counts as said no and an unpriced PO line as bought, without breaking the page; got {omega?.SaidNoText} / {omega?.BoughtText}");
             Assert(detail?.Aliases.Count == 1 && detail.HeaderText.Contains("AED 96.00"),
                 $"items: the folded-in quote counts towards the market (middle of 100, 90, 110, 80, 95, 97 = 96); got {detail?.HeaderText}");
             Assert(detail?.Suppliers.FirstOrDefault()?.Key == key, "items: the cheapest against the market ranks first");
