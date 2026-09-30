@@ -40,6 +40,7 @@ namespace Procure.Data
                 PriceAnalysis.SelfCheck();
                 TaskReminders.SelfCheck();
                 RfqOrder.SelfCheck();
+                ReleaseNotesFormat.SelfCheck();
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 

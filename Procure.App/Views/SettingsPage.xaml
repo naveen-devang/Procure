@@ -514,7 +514,7 @@
                                 Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolVis}}">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="{Binding UpdateInfo.Title}" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AppTextPrimary}" />
-                                <TextBlock Text="{Binding UpdateInfo.ReleaseNotes}" FontSize="12" MaxLines="6" TextTrimming="CharacterEllipsis"
+                                <TextBlock Text="{Binding UpdateInfo.ReleaseNotesPlain}" FontSize="12" MaxLines="6" TextTrimming="CharacterEllipsis"
                                            TextWrapping="Wrap" Foreground="{ThemeResource AppTextSecondary}" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <!-- Once the download is done, the update window is where the

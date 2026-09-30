@@ -8,6 +8,9 @@ namespace Procure.Models
         public Version? Version { get; set; }
         public string Title { get; set; } = string.Empty;
         public string ReleaseNotes { get; set; } = string.Empty;
+
+        /// <summary>The notes without their Markdown marks ("##", "**"), for the short preview in Settings.</summary>
+        public string ReleaseNotesPlain => Utilities.ReleaseNotesFormat.Plain(ReleaseNotes);
         public string ReleaseUrl { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
         public string AssetName { get; set; } = string.Empty;

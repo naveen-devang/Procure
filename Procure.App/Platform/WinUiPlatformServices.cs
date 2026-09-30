@@ -142,6 +142,60 @@ public sealed class WinUiDialogService : IDialogService
         return await dialog.ShowAsync();
     }
 
+    /// <summary>Release notes in a dialog: headings, bullets and bold drawn for real, and the body in
+    /// its own scroll area. A plain alert puts text straight into ContentDialog, whose body does not
+    /// scroll - long notes were cut off with no way to read the rest.</summary>
+    public async Task ShowReleaseNotesAsync(string title, string markdown, string close)
+    {
+        if (_shell.XamlRoot is null) return;
+        var text = new RichTextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+        var previous = Procure.Utilities.NotesBlockKind.Heading;
+        foreach (var block in Procure.Utilities.ReleaseNotesFormat.Parse(markdown))
+        {
+            var p = new Microsoft.UI.Xaml.Documents.Paragraph();
+            switch (block.Kind)
+            {
+                case Procure.Utilities.NotesBlockKind.Heading:
+                    p.FontSize = 16;
+                    p.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                    p.Margin = new Thickness(0, text.Blocks.Count == 0 ? 0 : 14, 0, 6);
+                    break;
+                case Procure.Utilities.NotesBlockKind.Bullet:
+                    p.Margin = new Thickness(18, 0, 0, 6);
+                    p.TextIndent = -12;
+                    p.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = "•  " });
+                    break;
+                default:
+                    // A little air after a list, which otherwise runs straight into the next paragraph.
+                    p.Margin = new Thickness(0, previous == Procure.Utilities.NotesBlockKind.Bullet ? 8 : 0, 0, 10);
+                    break;
+            }
+            foreach (var (span, bold) in block.Spans)
+            {
+                var run = new Microsoft.UI.Xaml.Documents.Run { Text = span };
+                if (bold)
+                {
+                    var b = new Microsoft.UI.Xaml.Documents.Bold();
+                    b.Inlines.Add(run);
+                    p.Inlines.Add(b);
+                }
+                else p.Inlines.Add(run);
+            }
+            text.Blocks.Add(p);
+            previous = block.Kind;
+        }
+        var scroll = new ScrollViewer
+        {
+            Content = text,
+            MaxHeight = 460,
+            Padding = new Thickness(0, 0, 14, 0),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(scroll, "Release notes");
+        await ShowAsync(title, scroll, null, null, close);
+    }
+
     public async Task DisplayAlertAsync(string title, string message, string cancel)
     {
         if (_shell.XamlRoot is null) return;

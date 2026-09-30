@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Procure.Abstractions;
+using Procure.App.Platform;
 using Procure.Services;
 using Procure.Utilities;
 
@@ -82,9 +83,10 @@ public sealed partial class MainWindow
             var notes = await updates.GetReleaseNotesForVersionAsync(AppConstants.GitHubRepository, current);
 
             await Task.Delay(1500);   // the dialog needs the window's content to be up
-            var message = string.IsNullOrWhiteSpace(notes) ? "Procure has been updated. Check Settings for release details." : notes;
-            DispatcherQueue.TryEnqueue(() => _ = App.Services.GetRequiredService<IDialogService>()
-                .DisplayAlertAsync($"What's New in v{current}", message, "OK"));
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            DispatcherQueue.TryEnqueue(() => _ = string.IsNullOrWhiteSpace(notes) || dialogs is not WinUiDialogService winUi
+                ? dialogs.DisplayAlertAsync($"What's New in v{current}", "Procure has been updated. Check Settings for release details.", "OK")
+                : winUi.ShowReleaseNotesAsync($"What's New in v{current}", notes, "OK"));
         }
         catch
         {
