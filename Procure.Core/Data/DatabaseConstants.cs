@@ -14,7 +14,7 @@ namespace Procure.Data
         /// re-checked and the new column will be missing at runtime. Editing the script without
         /// changing its shape - as removing the per-connection PRAGMAs did - needs no bump.
         /// </summary>
-        public const int SchemaVersion = 28;
+        public const int SchemaVersion = 29;
 
         public static string DefaultDatabaseDirectory => AppPaths.AppData;
 
@@ -443,6 +443,36 @@ CREATE TABLE IF NOT EXISTS TodoTaskLink (
     PRIMARY KEY (TaskId, EntityId)
 );
 CREATE INDEX IF NOT EXISTS IX_TodoTaskLink_Entity ON TodoTaskLink(EntityId);
+
+-- v29: the Service Entry register (ServiceEntryRepository). Stands alone: PO numbers and vendors
+-- are typed in and never looked up in the PR tables. Dates are 'yyyy-MM-dd' text, NULL until done.
+-- Stage is derived from which handover dates are set, so it can never disagree with them.
+CREATE TABLE IF NOT EXISTS ServiceEntry (
+    Id                  TEXT PRIMARY KEY,
+    SrNo                INTEGER NOT NULL UNIQUE,
+    PoNo                TEXT NOT NULL DEFAULT '',
+    PoAmount            REAL,
+    Vendor              TEXT NOT NULL DEFAULT '',
+    Description         TEXT NOT NULL DEFAULT '',
+    InvoiceDate         TEXT NOT NULL,
+    InvoiceNo           TEXT NOT NULL DEFAULT '',
+    InvoiceAmount       REAL NOT NULL DEFAULT 0,
+    TechHandoverDate    TEXT,
+    SapSeDate           TEXT,
+    ServiceEntryNo      TEXT,
+    AccountHandoverDate TEXT,
+    CreatedAt           TEXT NOT NULL,
+    UpdatedAt           TEXT NOT NULL,
+    Stage INTEGER GENERATED ALWAYS AS (CASE
+        WHEN AccountHandoverDate IS NOT NULL THEN 3
+        WHEN SapSeDate IS NOT NULL THEN 2
+        WHEN TechHandoverDate IS NOT NULL THEN 1
+        ELSE 0 END) VIRTUAL,
+    StageDate TEXT GENERATED ALWAYS AS (COALESCE(AccountHandoverDate, SapSeDate, TechHandoverDate, InvoiceDate)) VIRTUAL
+);
+CREATE INDEX IF NOT EXISTS IX_ServiceEntry_Stage ON ServiceEntry(Stage, SrNo);
+CREATE INDEX IF NOT EXISTS IX_ServiceEntry_Po ON ServiceEntry(PoNo COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS IX_ServiceEntry_Vendor ON ServiceEntry(Vendor COLLATE NOCASE);
 
 -- v10: freeform notes. Body is RTF (see NoteEditorHandler); Snippet is the first plain-text chars,
 -- kept for the list so bodies never load until a note is opened. New table only - no migration.

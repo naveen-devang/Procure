@@ -120,6 +120,7 @@ public partial class App : Application
         s.AddSingleton<SqliteDatabase>();
         s.AddSingleton<ICustomColumnRepository, CustomColumnRepository>();
         s.AddSingleton<ICallOffRepository, CallOffRepository>();
+        s.AddSingleton<ServiceEntryRepository>();
         s.AddSingleton<ITodoRepository, TodoRepository>();
         s.AddSingleton<INoteRepository, NoteRepository>();
         s.AddSingleton<ISupplierRepository, SupplierRepository>();
@@ -140,6 +141,7 @@ public partial class App : Application
         s.AddSingleton<DashboardPageModel>();
         s.AddSingleton<PrListPageModel>();
         s.AddSingleton<CallOffPageModel>();
+        s.AddSingleton<ServiceEntryPageModel>();
         s.AddSingleton<TodoPageModel>();
         s.AddSingleton<TaskReminderService>();
         s.AddSingleton<NotePageModel>();
@@ -158,6 +160,7 @@ public partial class App : Application
         s.AddSingleton<TasksPage>();
         s.AddSingleton<NotesPage>();
         s.AddSingleton<CallOffPage>();
+        s.AddSingleton<ServiceEntriesPage>();
         s.AddSingleton<SuppliersPage>();
         s.AddSingleton<SettingsPage>();
 

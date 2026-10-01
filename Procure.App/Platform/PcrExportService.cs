@@ -228,7 +228,7 @@ public sealed class PcrExportService : IPcrExportService
         => printerName.Contains("PDF", StringComparison.OrdinalIgnoreCase)
            || printerName.Contains("XPS", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<string> SaveAndOpenFileAsync(byte[] bytes, string filename)
+    public async Task<string> SaveAndOpenFileAsync(byte[] bytes, string filename)
     {
         var targetDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))

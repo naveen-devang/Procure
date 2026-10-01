@@ -93,6 +93,7 @@ public sealed partial class MainWindow
             TasksPage p => p.HandleShortcut(key, s),
             NotesPage p => p.HandleShortcut(key, s),
             CallOffPage p => p.HandleShortcut(key, s),
+            ServiceEntriesPage p => p.HandleShortcut(key, s),
             _ => false,
         };
     }

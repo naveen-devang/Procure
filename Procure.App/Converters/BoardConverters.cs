@@ -107,6 +107,36 @@ sealed class StatusColorConverter : BrushConverter
     };
 }
 
+// Service Entries: the four steps, as the design's pills (caution, purple, info, success).
+sealed class ServiceStageColorConverter : BrushConverter
+{
+    protected override SolidColorBrush Map(object? v, object? p) => v switch
+    {
+        1 => BoardTheme.Pick("#C4A6FE", "#4B2BA8"),
+        2 => BoardTheme.Pick("#60CDFF", "#004E8C"),
+        3 => BoardTheme.Pick("#6CCB5F", "#107C41"),
+        _ => BoardTheme.Pick("#FCE100", "#7A4B04"),
+    };
+}
+
+sealed class ServiceStageBgConverter : BrushConverter
+{
+    protected override SolidColorBrush Map(object? v, object? p) => v switch
+    {
+        1 => BoardTheme.Pick("#281A4C", "#F0EBF9"),
+        2 => BoardTheme.Pick("#142F4C", "#EBF3FC"),
+        3 => BoardTheme.Pick("#143823", "#E7F3ED"),
+        _ => BoardTheme.Pick("#3B2E08", "#FFF4CE"),
+    };
+}
+
+// Days-in-step text: red once it passes the Settings threshold.
+sealed class LateTextConverter : BrushConverter
+{
+    protected override SolidColorBrush Map(object? v, object? p) =>
+        v is true ? BoardTheme.Pick("#FF99A4", "#A80000") : BoardTheme.Pick("#6F6A62", "#A39C92");
+}
+
 sealed class StatusBadgeBgConverter : BrushConverter
 {
     protected override SolidColorBrush Map(object? v, object? p) => (v as string) switch

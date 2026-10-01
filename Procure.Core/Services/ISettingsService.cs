@@ -24,6 +24,11 @@ namespace Procure.Services
         bool IsSidebarCompact { get; set; }
         bool AutoCollapseSidebarOnNarrow { get; set; }
         bool IsRawPackingTabEnabled { get; set; }
+        bool IsServiceEntryTabEnabled { get; set; }
+        /// <summary>Service Entries table: the fixed columns' widths, "48,104,...", empty for defaults.</summary>
+        string ServiceEntryColumnWidths { get; set; }
+        /// <summary>Service Entries: an invoice is flagged after this many days in one step.</summary>
+        int ServiceEntryFlagDays { get; set; }
         bool AutoCheckUpdatesOnStartup { get; set; }
         /// <summary>"HH:mm" - when a task's reminder goes off on its due day unless the task sets its own time.</summary>
         string DefaultReminderTime { get; set; }

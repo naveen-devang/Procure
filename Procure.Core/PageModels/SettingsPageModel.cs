@@ -85,6 +85,12 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial bool IsRawPackingTabEnabled { get; set; }
 
+        [ObservableProperty]
+        public partial bool IsServiceEntryTabEnabled { get; set; }
+
+        [ObservableProperty]
+        public partial double ServiceEntryFlagDays { get; set; } = 10;
+
         // Default Currency
         [ObservableProperty]
         public partial string DefaultCurrency { get; set; } = "AED";
@@ -217,6 +223,8 @@ namespace Procure.PageModels
             IsSidebarCompact = _settingsService.IsSidebarCompact;
             AutoCollapseSidebarOnNarrow = _settingsService.AutoCollapseSidebarOnNarrow;
             IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
+            IsServiceEntryTabEnabled = _settingsService.IsServiceEntryTabEnabled;
+            ServiceEntryFlagDays = _settingsService.ServiceEntryFlagDays;
             DefaultCurrency = _settingsService.DefaultCurrency;
             LocalCurrency = _settingsService.LocalCurrency;
             LoadCurrencyRates();
@@ -247,6 +255,12 @@ namespace Procure.PageModels
                         break;
                     case nameof(ISettingsService.IsRawPackingTabEnabled):
                         IsRawPackingTabEnabled = _settingsService.IsRawPackingTabEnabled;
+                        break;
+                    case nameof(ISettingsService.IsServiceEntryTabEnabled):
+                        IsServiceEntryTabEnabled = _settingsService.IsServiceEntryTabEnabled;
+                        break;
+                    case nameof(ISettingsService.ServiceEntryFlagDays):
+                        ServiceEntryFlagDays = _settingsService.ServiceEntryFlagDays;
                         break;
                     case nameof(ISettingsService.DefaultCurrency):
                         DefaultCurrency = _settingsService.DefaultCurrency;
@@ -388,6 +402,20 @@ namespace Procure.PageModels
             {
                 _settingsService.IsRawPackingTabEnabled = value;
             }
+        }
+
+        partial void OnIsServiceEntryTabEnabledChanged(bool value)
+        {
+            if (_settingsService.IsServiceEntryTabEnabled != value)
+                _settingsService.IsServiceEntryTabEnabled = value;
+        }
+
+        // NumberBox: NaN when cleared. Saved as it changes, like the tab switch beside it.
+        partial void OnServiceEntryFlagDaysChanged(double value)
+        {
+            if (double.IsNaN(value) || value < 1) return;
+            var days = (int)Math.Round(value);
+            if (_settingsService.ServiceEntryFlagDays != days) _settingsService.ServiceEntryFlagDays = days;
         }
 
         [RelayCommand]

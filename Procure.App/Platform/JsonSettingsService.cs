@@ -205,6 +205,24 @@ public sealed class JsonSettingsService : ISettingsService
         set => Set(nameof(IsRawPackingTabEnabled), value ? "true" : "false");
     }
 
+    public bool IsServiceEntryTabEnabled
+    {
+        get => Get(nameof(IsServiceEntryTabEnabled), "false") == "true";
+        set => Set(nameof(IsServiceEntryTabEnabled), value ? "true" : "false");
+    }
+
+    public string ServiceEntryColumnWidths
+    {
+        get => Get(nameof(ServiceEntryColumnWidths), "");
+        set => Set(nameof(ServiceEntryColumnWidths), value);
+    }
+
+    public int ServiceEntryFlagDays
+    {
+        get => int.TryParse(Get(nameof(ServiceEntryFlagDays), "10"), out var n) && n > 0 ? n : 10;
+        set => Set(nameof(ServiceEntryFlagDays), Math.Max(1, value).ToString());
+    }
+
     public bool AutoCheckUpdatesOnStartup
     {
         get => Get(nameof(AutoCheckUpdatesOnStartup), "true") == "true";

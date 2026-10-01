@@ -199,6 +199,30 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" IsOn="{Binding IsRawPackingTabEnabled, Mode=TwoWay}" />
                         </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Service Entry Tab" Style="{StaticResource RowTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="Show the service invoice register in the sidebar. Turning it off hides the tab; your entries are kept." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsOn="{Binding IsServiceEntryTabEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <Grid Visibility="{Binding IsServiceEntryTabEnabled, Converter={StaticResource BoolVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Flag Service Entries After" Style="{StaticResource RowTitle}" />
+                                <TextBlock Style="{StaticResource RowHint}" Text="An invoice turns red when it has sat in one step (for example, with technical) for more than this many days." />
+                            </StackPanel>
+                            <NumberBox Grid.Column="1" Width="120" VerticalAlignment="Center" Minimum="1" Maximum="365"
+                                       SpinButtonPlacementMode="Inline" Header="{x:Null}" PlaceholderText="days"
+                                       Value="{Binding ServiceEntryFlagDays, Mode=TwoWay}" />
+                        </Grid>
                     </StackPanel>
                   </ScrollViewer>
                 </Border>

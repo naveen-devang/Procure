@@ -6,6 +6,10 @@ namespace Procure.Services.Export
 {
     public interface IPcrExportService
     {
+        /// <summary>Writes a finished file to the Desktop (Documents if there is none) and opens it.
+        /// Returns the path.</summary>
+        Task<string> SaveAndOpenFileAsync(byte[] bytes, string fileName);
+
         Task<string> ExportPcrToExcelAsync(
             PurchaseRequisition pr,
             PriceComparisonRequest pcr,

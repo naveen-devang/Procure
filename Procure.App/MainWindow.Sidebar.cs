@@ -11,6 +11,7 @@ namespace Procure.App;
 //   Auto-collapse       - below 1024 wide the sidebar goes compact, above it expands, until the user
 //                         toggles it by hand this session.
 //   Raw & Packing tab   - shows or hides that sidebar entry.
+//   Service Entry tab   - the same, for the Service Entries register.
 public sealed partial class MainWindow
 {
     private bool _sidebarToggledByHand;
@@ -19,6 +20,7 @@ public sealed partial class MainWindow
     {
         ApplySidebarCompact();
         ApplyRawPackingTab();
+        ApplyServiceEntryTab();
         SizeChanged += (_, e) => AutoCollapseSidebar(e.Size.Width);
         _settings.SettingsChanged += (_, e) => DispatcherQueue.TryEnqueue(() =>
         {
@@ -26,6 +28,7 @@ public sealed partial class MainWindow
             {
                 case nameof(ISettingsService.IsSidebarCompact): ApplySidebarCompact(); break;
                 case nameof(ISettingsService.IsRawPackingTabEnabled): ApplyRawPackingTab(); break;
+                case nameof(ISettingsService.IsServiceEntryTabEnabled): ApplyServiceEntryTab(); break;
             }
         });
     }
@@ -75,5 +78,12 @@ public sealed partial class MainWindow
         RawPackingNavItem.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
         // Turned off while it is the page on screen: don't strand the user on a tab that just vanished.
         if (!enabled && _current == AppRoute.CallOff) NavigateTo(AppRoute.Dashboard, null);
+    }
+
+    private void ApplyServiceEntryTab()
+    {
+        var enabled = _settings.IsServiceEntryTabEnabled;
+        ServiceEntriesNavItem.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        if (!enabled && _current == AppRoute.ServiceEntries) NavigateTo(AppRoute.Dashboard, null);
     }
 }

@@ -19,6 +19,9 @@
     <conv:PriorityColorConverter x:Key="PriorityColor" />
     <conv:StatusColorConverter x:Key="StatusColor" />
     <conv:StatusBadgeBgConverter x:Key="StatusBg" />
+    <conv:ServiceStageColorConverter x:Key="StageColor" />
+    <conv:ServiceStageBgConverter x:Key="StageBg" />
+    <conv:LateTextConverter x:Key="LateText" />
     <conv:SelectAllToggleConverter x:Key="SelAll" />
     <conv:BoolToFilterChipBgConverter x:Key="ChipBg" />
     <conv:BoolToFilterChipStrokeConverter x:Key="ChipStroke" />

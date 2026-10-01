@@ -44,6 +44,8 @@ namespace Procure.Data
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }
 
+            if (On("PROCURE_SERVICE_SELFCHECK")) _ = ServiceEntrySelfCheck.RunAsync(services);
+
             if (On("PROCURE_UNDO_SELFCHECK")) _ = Procure.Services.UndoDeleteServiceSelfCheck.RunAsync();
 
             if (On("PROCURE_UPDATE_SELFCHECK"))
