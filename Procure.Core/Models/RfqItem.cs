@@ -98,6 +98,19 @@ namespace Procure.Models
             ? Quantity * Math.Max(0m, QuotedUnitPrice.Value - (Discount ?? 0m)) 
             : 0m;
 
+        /// <summary>True when the printed unit price differs from the quoted one: a discount was
+        /// taken off a real, still-positive price. A discount that wipes the price out prints the
+        /// dash the sheet already uses for a zero, so there is nothing to strike.</summary>
+        public bool HasLineDiscount => IsQuoted && QuotedUnitPrice is > 0
+            && Discount is > 0 && QuotedUnitPrice.Value - Discount.Value > 0;
+
+        /// <summary>What the per-unit discount took off this line in total, for the PCR's
+        /// "Item Discounts" row. Mirrors <see cref="LineTotal"/>: a discount larger than the price
+        /// only ever removes the price.</summary>
+        public decimal DiscountTotal => (IsQuoted && QuotedUnitPrice is > 0 && Discount is > 0)
+            ? Quantity * (QuotedUnitPrice.Value - Math.Max(0m, QuotedUnitPrice.Value - Discount.Value))
+            : 0m;
+
         public string FormattedQuantity
         {
             get

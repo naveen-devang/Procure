@@ -258,8 +258,21 @@ namespace Procure.Services.Export
                     ? $"{text}\n~ {conversion.LocalCurrency} {local:N2}"
                     : text;
             }
-            string MoneyCell(string column, int row, string? currency, decimal amount, bool rowTwoLines, int style = 7)
+            string MoneyCell(string column, int row, string? currency, decimal amount, bool rowTwoLines, int style = 7,
+                decimal? listAmount = null)
             {
+                // A discounted price: the list price struck through on the first line, the price
+                // paid under it, then the local equivalent of the price paid (MoneyText).
+                if (listAmount.HasValue && listAmount.Value > amount)
+                {
+                    var listLine = $"{PcrCurrencyConversionOptions.Normalize(currency)} {listAmount.Value:N2}";
+                    var paidLines = conversion.ShowLocalEquivalent && rowTwoLines
+                        ? MoneyText(currency, amount)
+                        : $"{PcrCurrencyConversionOptions.Normalize(currency)} {amount:N2}";
+                    return $@"
+            <c r=""{column}{row}"" s=""{style}"" t=""inlineStr""><is><r><rPr><strike/><sz val=""10""/><color rgb=""FF7A7A7A""/><rFont val=""Calibri""/></rPr><t xml:space=""preserve"">{EscapeXml(listLine)}</t></r><r><t xml:space=""preserve"">{EscapeXml("\n" + paidLines)}</t></r></is></c>";
+                }
+
                 if (!(conversion.ShowLocalEquivalent && rowTwoLines))
                     return $@"
             <c r=""{column}{row}"" s=""{style}""><v>{amount.ToString(CultureInfo.InvariantCulture)}</v></c>";
@@ -502,7 +515,9 @@ namespace Procure.Services.Export
                     // change the height of every short one-word row around it.
                     var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 8);
                     var itemTwoLines = ItemRowNeedsConversion(item);
-                    var itemRowHeight = 20 + (descLines * 16) + (itemTwoLines ? 16 : 0);
+                    var itemHasDiscount = Enumerable.Range(0, supplierCount).Any(i =>
+                        quoteByVendorAndLine[i].TryGetValue(item.Id, out var q) && q.HasLineDiscount);
+                    var itemRowHeight = 20 + (descLines * 16) + (itemTwoLines ? 16 : 0) + (itemHasDiscount ? 16 : 0);
 
                     sb.Append($@"
         <row r=""{r}"" ht=""{itemRowHeight}"">
@@ -528,7 +543,8 @@ namespace Procure.Services.Export
                             var netUnitPrice = Math.Max(0m, rfqItem.QuotedUnitPrice.Value - (rfqItem.Discount ?? 0m));
                             sb.Append($@"
             <c r=""{qtyColLetter}{r}"" s=""6"" t=""inlineStr""><is><t>{EscapeXml(rfqItem.FormattedQuantity)}</t></is></c>");
-                            sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, netUnitPrice, itemTwoLines));
+                            sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, netUnitPrice, itemTwoLines,
+                                listAmount: rfqItem.HasLineDiscount ? rfqItem.QuotedUnitPrice : null));
                         }
                         else if (rfq.BaseAmount > 0 && prItems.Count == 1)
                         {
@@ -665,6 +681,14 @@ namespace Procure.Services.Export
             AddSummaryRow("Total Price Excl. VAT",
                 rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)),
                 (true, historicalSummaryTotal, ""));
+
+            // What the per-line discounts took off - already out of the total above, so it explains
+            // it rather than being subtracted again. Only when a vendor has any.
+            if (selectedRfqs.Any(rf => rf.ItemDiscountTotal > 0))
+                AddSummaryRow("Item Discounts (included above)",
+                    rf => (rf.IsQuoteReceived || rf.PricedItemsCount > 0) && rf.ItemDiscountTotal > 0
+                        ? (true, rf.ItemDiscountTotal, "") : (false, 0m, "-"),
+                    (false, 0m, "-"));
 
             // Row 2: Discount
             AddSummaryRow("Discount",

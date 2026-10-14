@@ -223,6 +223,10 @@ namespace Procure.Models
             }
         }
 
+        /// <summary>What the per-line discounts took off, already out of <see cref="BaseAmount"/>.
+        /// Zero when the vendor quoted a lump sum with no lines.</summary>
+        public decimal ItemDiscountTotal => HasLineItems ? Items.Where(i => i.IsQuoted).Sum(i => i.DiscountTotal) : 0m;
+
         public decimal FreightAmount => Freight ?? 0m;
 
         public decimal OtherChargesAmount => OtherCharges ?? 0m;

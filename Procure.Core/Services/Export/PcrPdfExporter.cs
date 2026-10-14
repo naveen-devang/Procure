@@ -37,6 +37,9 @@ namespace Procure.Services.Export
         // to agree or a column sized to the exact figure still triggers a shrink.
         private const double MoneyCellPad = 13;
 
+        // The list price a discount was taken off: grey, with a line through it.
+        private const string StruckInkHex = "6B6B6B";
+
         // A multi-line item name grows its row downward; past this many lines it truncates with an
         // ellipsis rather than letting one row swallow a page.
         private const int MaxItemNameLines = 8;
@@ -252,6 +255,9 @@ namespace Procure.Services.Export
                     qtyNeed = Math.Max(qtyNeed, CellPad + MeasureTextWidth(ri.FormattedQuantity, "F1", 7));
                     var net = Math.Max(0m, ri.QuotedUnitPrice.Value - (ri.Discount ?? 0m));
                     priceNeed = Math.Max(priceNeed, MoneyWidthWithConversion(conversion, cur, net, "F1", 7.5, currencyInHeader));
+                    // The struck list price prints above it and is the wider of the two.
+                    if (ri.HasLineDiscount)
+                        priceNeed = Math.Max(priceNeed, MoneyWidth(currencyInHeader ? string.Empty : cur, ri.QuotedUnitPrice.Value, "F1", 7.5));
                 }
 
                 // The summary rows draw across the vendor's whole pair, so they constrain the pair
@@ -761,25 +767,15 @@ namespace Procure.Services.Export
                 }
             }
 
-            void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount,
-                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false,
-                bool rowTwoLines = false, double rowTop = 0, double rowHeight = 0, string? sourceCurrency = null)
+            // One line of currency + figure. `strike` greys it and draws a line through it: the list
+            // price a discount was taken off.
+            void DrawMoneyLine(double cellX, double cellWidth, double textY, string currency, decimal? amount,
+                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false, bool strike = false)
             {
-                var conversionCurrency = sourceCurrency ?? currency;
-                if (rowTwoLines && amount.HasValue && (!showZeroAsDash || amount.Value > 0)
-                    && conversion.TryConvert(conversionCurrency, amount.Value, out var localAmount))
-                {
-                    const double lineHeight = 8.5;
-                    var firstLineY = rowTop - ((rowHeight - (lineHeight * 2)) / 2.0) - (lineHeight * 0.75);
-                    DrawMoneyCell(cellX, cellWidth, firstLineY, currency, amount, isBold, fontSize, showZeroAsDash,
-                        sourceCurrency: conversionCurrency);
-                    DrawMoneyCell(cellX, cellWidth, firstLineY - lineHeight, $"~ {conversion.LocalCurrency}", localAmount, isBold, fontSize, false);
-                    return;
-                }
-
                 if (amount.HasValue && (!showZeroAsDash || amount.Value > 0))
                 {
                     var font = isBold ? "F2" : "F1";
+                    var ink = strike ? StruckInkHex : "000000";
                     var amtStr = amount.Value.ToString("N2", CultureInfo.InvariantCulture);
 
                     // Currency is pinned left and the amount right, so a pair too wide for the cell
@@ -806,17 +802,72 @@ namespace Procure.Services.Export
                         }
                     }
 
-                    if (showCurrency) DrawText(currency, cellX + 3, textY, font: font, fontSize: fontSize, align: "left");
+                    if (showCurrency) DrawText(currency, cellX + 3, textY, font: font, fontSize: fontSize, align: "left", colorHex: ink);
                     // No currency in the cell (it is in the column heading past CurrencyInCellsSupplierLimit
                     // suppliers): nothing sits on the left to balance a right-aligned figure, so a short
                     // amount is centred instead of leaving the left of the cell empty.
                     DrawFittedText(amtStr, cellX, textY, font: font, baseFontSize: fontSize,
-                        align: currency.Length == 0 ? "center" : "right", maxWidth: cellWidth, minFontSize: 5.0);
+                        align: currency.Length == 0 ? "center" : "right", maxWidth: cellWidth, colorHex: ink, minFontSize: 5.0);
+
+                    if (strike)
+                    {
+                        // Where DrawFittedText put the figure: shrunk to the cell if too wide, then
+                        // centred or pushed right with its 4 pt inset. The line runs from the currency
+                        // (or the figure, when there is none) to the end of the figure.
+                        var amtSize = fontSize;
+                        var amtW = MeasureTextWidth(amtStr, font, amtSize);
+                        if (cellWidth > 0 && amtW > cellWidth)
+                        {
+                            amtSize = Math.Max(5.0, fontSize * (cellWidth / amtW));
+                            amtW = MeasureTextWidth(amtStr, font, amtSize);
+                        }
+                        var amtX = currency.Length == 0
+                            ? cellX + Math.Max(0, (cellWidth - amtW) / 2.0)
+                            : cellX + Math.Max(0, cellWidth - amtW - 4);
+                        var fromX = showCurrency && currency.Length > 0 ? cellX + 3 : amtX;
+                        var lineY = textY + (amtSize * 0.3);
+                        DrawLine(fromX, lineY, amtX + amtW, lineY, width: 0.5, strokeHex: ink);
+                    }
                 }
                 else
                 {
                     DrawText("-", cellX, textY, font: isBold ? "F2" : "F1", fontSize: fontSize, align: "center", width: cellWidth);
                 }
+            }
+
+            // A money cell is one to three stacked lines: the struck list price (only where a
+            // discount was taken off), the price, and its local-currency equivalent (only for a
+            // foreign currency with the switch on). The equivalent is always worked out from the
+            // price actually paid, never the list price. Each cell centres its own lines in the
+            // row, so a neighbour with fewer lines still sits in the middle of a taller row.
+            void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount,
+                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false,
+                bool rowTwoLines = false, double rowTop = 0, double rowHeight = 0, string? sourceCurrency = null,
+                decimal? listAmount = null)
+            {
+                var conversionCurrency = sourceCurrency ?? currency;
+                var shown = amount.HasValue && (!showZeroAsDash || amount.Value > 0);
+                var localAmount = 0m;
+                var hasLocal = rowTwoLines && shown && conversion.TryConvert(conversionCurrency, amount!.Value, out localAmount);
+                var hasList = shown && listAmount.HasValue && listAmount.Value > amount!.Value;
+
+                var lineCount = 1 + (hasLocal ? 1 : 0) + (hasList ? 1 : 0);
+                if (lineCount == 1)
+                {
+                    DrawMoneyLine(cellX, cellWidth, textY, currency, amount, isBold, fontSize, showZeroAsDash);
+                    return;
+                }
+
+                const double lineHeight = 8.5;
+                var y = rowTop - ((rowHeight - (lineHeight * lineCount)) / 2.0) - (lineHeight * 0.75);
+                if (hasList)
+                {
+                    DrawMoneyLine(cellX, cellWidth, y, currency, listAmount, false, fontSize, false, strike: true);
+                    y -= lineHeight;
+                }
+                DrawMoneyLine(cellX, cellWidth, y, currency, amount, isBold, fontSize, showZeroAsDash);
+                if (hasLocal)
+                    DrawMoneyLine(cellX, cellWidth, y - lineHeight, $"~ {conversion.LocalCurrency}", localAmount, isBold, fontSize, false);
             }
 
             void CloseCurrentPageTable()
@@ -1050,9 +1101,14 @@ namespace Procure.Services.Export
                 .Select(ItemRowNeedsConversion)
                 .ToList();
             const double conversionLineHeight = 8.5;
+            // A row grows by one line when any vendor's price on it has a discount struck above it.
+            var itemRowHasDiscount = Enumerable.Range(0, prItems.Count)
+                .Select(p => Enumerable.Range(0, supplierCount).Any(i => matchedRfqItems[p, i]?.HasLineDiscount == true))
+                .ToList();
             var itemRowHeights = itemDescLines
                 .Select((lines, index) => itemRowH + Math.Max(0, lines.Count - 1) * itemDescLineHeight
-                    + (itemRowNeedsConversion[index] ? conversionLineHeight : 0))
+                    + (itemRowNeedsConversion[index] ? conversionLineHeight : 0)
+                    + (itemRowHasDiscount[index] ? conversionLineHeight : 0))
                 .ToList();
 
             // Remarks are free text and can run long - wrap over the full content width with no
@@ -1071,11 +1127,14 @@ namespace Procure.Services.Export
             double remarksBlockH = remarksLines.Count * remarksLineH;
 
             const int summaryRowsCount = 12;
+            // One more summary row, only when a vendor's lines carry discounts; sheets without any
+            // are laid out exactly as before.
+            var showItemDiscountsRow = selectedRfqs.Any(rfq => rfq.ItemDiscountTotal > 0);
             var summaryConversionExtra = conversion.ShowLocalEquivalent
                 && selectedRfqs.Any(rfq => conversion.HasConversion(CurrencyOf(rfq)))
-                ? 7 * conversionLineHeight
+                ? (7 + (showItemDiscountsRow ? 1 : 0)) * conversionLineHeight
                 : 0;
-            double footerBlockNeeded = (summaryRowsCount * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
+            double footerBlockNeeded = ((summaryRowsCount + (showItemDiscountsRow ? 1 : 0)) * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
             // "Fit sheet to one page": work out how much the WHOLE natural-size page needs to shrink to
@@ -1183,7 +1242,8 @@ namespace Procure.Services.Export
                             DrawFittedText(rfqItem.FormattedQuantity, colX[VendorQtyColIdx(i)] + 3, singleLineCenterY, font: "F1", baseFontSize: 7, align: "center", maxWidth: vendorQtyW[i] - 6, minFontSize: 5.0);
                             DrawMoneyCell(colX[VendorPriceColIdx(i)], vendorPriceW[i], singleLineCenterY, CellCur(cur), netUnitPrice,
                                 fontSize: 7.5, showZeroAsDash: true, rowTwoLines: itemRowNeedsConversion[itemPos],
-                                rowTop: curY, rowHeight: rowH, sourceCurrency: cur);
+                                rowTop: curY, rowHeight: rowH, sourceCurrency: cur,
+                                listAmount: rfqItem.HasLineDiscount ? rfqItem.QuotedUnitPrice : null);
                         }
                         else
                         {
@@ -1304,6 +1364,12 @@ namespace Procure.Services.Export
             DrawSummaryMoneyRow("Total Price Excl. VAT",
                 rf => (HasQuote(rf) ? (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) : (decimal?)null, false),
                 isBold: true);
+
+            // What the per-line discounts took off. Already out of the total above, so this row
+            // explains it rather than being subtracted again.
+            if (showItemDiscountsRow)
+                DrawSummaryMoneyRow("Item Discounts (included above)",
+                    rf => (HasQuote(rf) ? rf.ItemDiscountTotal : (decimal?)null, true));
 
             DrawSummaryMoneyRow("Discount",
                 rf => (rf.Discount, true));
