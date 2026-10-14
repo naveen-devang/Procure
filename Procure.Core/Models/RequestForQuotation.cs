@@ -223,10 +223,6 @@ namespace Procure.Models
             }
         }
 
-        /// <summary>What the per-line discounts took off, already out of <see cref="BaseAmount"/>.
-        /// Zero when the vendor quoted a lump sum with no lines.</summary>
-        public decimal ItemDiscountTotal => HasLineItems ? Items.Where(i => i.IsQuoted).Sum(i => i.DiscountTotal) : 0m;
-
         public decimal FreightAmount => Freight ?? 0m;
 
         public decimal OtherChargesAmount => OtherCharges ?? 0m;
@@ -236,6 +232,11 @@ namespace Procure.Models
         public decimal NetTaxableAmount => Math.Max(0m, (BaseAmount + FreightAmount + OtherChargesAmount) - DiscountAmount);
 
         public decimal EffectiveVatAmount => (VatType == "5%") ? NetTaxableAmount * 0.05m : 0m;
+
+        /// <summary>Reverse charge: the buyer works out 5% VAT on the taxable amount and reports it,
+        /// but pays the supplier only the taxable amount. Shown on the PCR sheet, never part of
+        /// <see cref="EffectiveVatAmount"/> or any total.</summary>
+        public decimal ReverseChargeVatAmount => VatType == "RC" ? NetTaxableAmount * 0.05m : 0m;
 
         public decimal DisplayTotalAmount => NetTaxableAmount + EffectiveVatAmount;
 

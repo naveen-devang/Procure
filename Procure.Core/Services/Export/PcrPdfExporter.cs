@@ -265,7 +265,8 @@ namespace Procure.Services.Export
                 var baseAmt = rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m);
                 double pairNeed = 0;
                 foreach (var amt in new[] { baseAmt, rf.Discount ?? 0m, baseAmt - (rf.Discount ?? 0m),
-                                            rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.TotalLandedCost })
+                                            rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.NetTaxableAmount,
+                                            rf.EffectiveVatAmount, rf.ReverseChargeVatAmount, rf.TotalLandedCost })
                 {
                     pairNeed = Math.Max(pairNeed, MoneyWidthWithConversion(conversion, cur, amt, "F2", 7.5, currencyInHeader));
                 }
@@ -770,13 +771,15 @@ namespace Procure.Services.Export
             // One line of currency + figure. `strike` greys it and draws a line through it: the list
             // price a discount was taken off.
             void DrawMoneyLine(double cellX, double cellWidth, double textY, string currency, decimal? amount,
-                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false, bool strike = false)
+                bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false, bool strike = false, bool parens = false)
             {
                 if (amount.HasValue && (!showZeroAsDash || amount.Value > 0))
                 {
                     var font = isBold ? "F2" : "F1";
                     var ink = strike ? StruckInkHex : "000000";
                     var amtStr = amount.Value.ToString("N2", CultureInfo.InvariantCulture);
+                    // Reverse-charge VAT: reported, not paid - the brackets say so.
+                    if (parens) amtStr = "(" + amtStr + ")";
 
                     // Currency is pinned left and the amount right, so a pair too wide for the cell
                     // used to collide in the middle. The borrow pass above already widened this
@@ -843,7 +846,7 @@ namespace Procure.Services.Export
             void DrawMoneyCell(double cellX, double cellWidth, double textY, string currency, decimal? amount,
                 bool isBold = false, double fontSize = 7.5, bool showZeroAsDash = false,
                 bool rowTwoLines = false, double rowTop = 0, double rowHeight = 0, string? sourceCurrency = null,
-                decimal? listAmount = null)
+                decimal? listAmount = null, bool parens = false)
             {
                 var conversionCurrency = sourceCurrency ?? currency;
                 var shown = amount.HasValue && (!showZeroAsDash || amount.Value > 0);
@@ -854,7 +857,7 @@ namespace Procure.Services.Export
                 var lineCount = 1 + (hasLocal ? 1 : 0) + (hasList ? 1 : 0);
                 if (lineCount == 1)
                 {
-                    DrawMoneyLine(cellX, cellWidth, textY, currency, amount, isBold, fontSize, showZeroAsDash);
+                    DrawMoneyLine(cellX, cellWidth, textY, currency, amount, isBold, fontSize, showZeroAsDash, parens: parens);
                     return;
                 }
 
@@ -865,9 +868,9 @@ namespace Procure.Services.Export
                     DrawMoneyLine(cellX, cellWidth, y, currency, listAmount, false, fontSize, false, strike: true);
                     y -= lineHeight;
                 }
-                DrawMoneyLine(cellX, cellWidth, y, currency, amount, isBold, fontSize, showZeroAsDash);
+                DrawMoneyLine(cellX, cellWidth, y, currency, amount, isBold, fontSize, showZeroAsDash, parens: parens);
                 if (hasLocal)
-                    DrawMoneyLine(cellX, cellWidth, y - lineHeight, $"~ {conversion.LocalCurrency}", localAmount, isBold, fontSize, false);
+                    DrawMoneyLine(cellX, cellWidth, y - lineHeight, $"~ {conversion.LocalCurrency}", localAmount, isBold, fontSize, false, parens: parens);
             }
 
             void CloseCurrentPageTable()
@@ -1127,14 +1130,17 @@ namespace Procure.Services.Export
             double remarksBlockH = remarksLines.Count * remarksLineH;
 
             const int summaryRowsCount = 12;
-            // One more summary row, only when a vendor's lines carry discounts; sheets without any
-            // are laid out exactly as before.
-            var showItemDiscountsRow = selectedRfqs.Any(rfq => rfq.ItemDiscountTotal > 0);
+            // "Taxable Amount" - what VAT is charged on - only earns a row when freight or other
+            // charges make it differ from the discounted total above it; otherwise the sheet is
+            // exactly as long as it always was.
+            var showTaxableRow = selectedRfqs.Any(rfq => rfq.HasFreight || rfq.HasOtherCharges);
+            // Money rows that can carry a local-currency line: the original 6, the VAT row (now an
+            // amount too), and the taxable row when present. The original budget was 7.
             var summaryConversionExtra = conversion.ShowLocalEquivalent
                 && selectedRfqs.Any(rfq => conversion.HasConversion(CurrencyOf(rfq)))
-                ? (7 + (showItemDiscountsRow ? 1 : 0)) * conversionLineHeight
+                ? (8 + (showTaxableRow ? 1 : 0)) * conversionLineHeight
                 : 0;
-            double footerBlockNeeded = ((summaryRowsCount + (showItemDiscountsRow ? 1 : 0)) * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
+            double footerBlockNeeded = ((summaryRowsCount + (showTaxableRow ? 1 : 0)) * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
             // "Fit sheet to one page": work out how much the WHOLE natural-size page needs to shrink to
@@ -1356,20 +1362,58 @@ namespace Procure.Services.Export
                 curY -= rowH;
             }
 
+            // VAT: a vendor charging VAT shows the rate on the left and the amount on the right, in
+            // one cell and one row. Anything else ("RC", "V0", no VAT, no quote yet) keeps the
+            // plain text it always printed.
+            void DrawVatRow()
+            {
+                // 5%: the VAT charged. RC: the VAT reported, in brackets (see ReverseChargeVatAmount).
+                static decimal VatShown(RequestForQuotation rf) =>
+                    rf.EffectiveVatAmount > 0 ? rf.EffectiveVatAmount : rf.ReverseChargeVatAmount;
+                static bool ShowsAmount(RequestForQuotation rf) =>
+                    (rf.IsQuoteReceived || rf.PricedItemsCount > 0) && VatShown(rf) > 0;
+
+                var rowTwoLines = PcrCurrencyConversion.RowNeedsTwoLines(
+                    conversion, selectedRfqs.Select(rf => ShowsAmount(rf) ? CurrencyOf(rf) : null));
+                double rowH = summaryRowH + (rowTwoLines ? conversionLineHeight : 0);
+                DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
+                var textY = SummaryTextY(rowH);
+
+                DrawText("VAT", colX[1] + 4, textY, font: "F1", fontSize: 7.5);
+
+                for (int i = 0; i < supplierCount; i++)
+                {
+                    var rf = selectedRfqs[i];
+                    if (ShowsAmount(rf))
+                    {
+                        DrawMoneyCell(colX[VendorQtyColIdx(i)], VendorPairW(i), textY, rf.VatType.Trim(), VatShown(rf),
+                            fontSize: 7.5, rowTwoLines: rowTwoLines, rowTop: curY, rowHeight: rowH, sourceCurrency: CurrencyOf(rf),
+                            parens: rf.EffectiveVatAmount <= 0);
+                    }
+                    else if (string.IsNullOrWhiteSpace(rf.VatType))
+                    {
+                        DrawFittedText("-", colX[VendorQtyColIdx(i)] + 3, textY, font: "F1", baseFontSize: 7.5, align: "center", maxWidth: VendorPairW(i) - 6, minFontSize: 5.0);
+                    }
+                    else
+                    {
+                        // The type on the left and a dash where the amount would be, so the column of
+                        // rates stays straight down the sheet whether or not a vendor has an amount.
+                        DrawText(rf.VatType.Trim(), colX[VendorQtyColIdx(i)] + 3, textY, font: "F1", fontSize: 7.5, align: "left");
+                        DrawText("-", colX[VendorQtyColIdx(i)], textY, font: "F1", fontSize: 7.5, align: "right", width: VendorPairW(i));
+                    }
+                }
+
+                curY -= rowH;
+            }
+
             // Unquoted vendors print "-" instead of a 0.00 that reads as a zero quote. Gated on
             // quote PRESENCE (null for no quote) with showZeroAsDash off, so a genuine zero or
             // negative figure from a quoted vendor still prints — matching the Excel exporter.
             static bool HasQuote(RequestForQuotation rf) => rf.IsQuoteReceived || rf.PricedItemsCount > 0;
 
+            // Plain, not bold: it is only the items total, and the bold rows below are the ones that matter.
             DrawSummaryMoneyRow("Total Price Excl. VAT",
-                rf => (HasQuote(rf) ? (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) : (decimal?)null, false),
-                isBold: true);
-
-            // What the per-line discounts took off. Already out of the total above, so this row
-            // explains it rather than being subtracted again.
-            if (showItemDiscountsRow)
-                DrawSummaryMoneyRow("Item Discounts (included above)",
-                    rf => (HasQuote(rf) ? rf.ItemDiscountTotal : (decimal?)null, true));
+                rf => (HasQuote(rf) ? (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) : (decimal?)null, false));
 
             DrawSummaryMoneyRow("Discount",
                 rf => (rf.Discount, true));
@@ -1388,8 +1432,13 @@ namespace Procure.Services.Export
             DrawSummaryMoneyRow("Other Charges",
                 rf => (rf.OtherCharges, true));
 
-            DrawSummaryTextRow("VAT",
-                rf => (string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType));
+            // Discounted total + freight + other charges: the figure VAT is worked out on.
+            if (showTaxableRow)
+                DrawSummaryMoneyRow("Taxable Amount",
+                    rf => (HasQuote(rf) ? rf.NetTaxableAmount : (decimal?)null, false),
+                    isBold: true);
+
+            DrawVatRow();
 
             DrawSummaryMoneyRow("Total Price Incl. VAT",
                 rf => (HasQuote(rf) ? rf.TotalLandedCost : (decimal?)null, false),

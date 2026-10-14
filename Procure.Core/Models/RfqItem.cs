@@ -18,6 +18,7 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedQuantity))]
         [NotifyPropertyChangedFor(nameof(LineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
+        [NotifyPropertyChangedFor(nameof(FormattedListLineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial decimal Quantity { get; set; } = 1;
 
@@ -29,6 +30,8 @@ namespace Procure.Models
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(LineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
+        [NotifyPropertyChangedFor(nameof(HasLineDiscount))]
+        [NotifyPropertyChangedFor(nameof(FormattedListLineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial bool IsQuoted { get; set; } = true;
 
@@ -36,6 +39,8 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(LineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedQuotedUnitPrice))]
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
+        [NotifyPropertyChangedFor(nameof(HasLineDiscount))]
+        [NotifyPropertyChangedFor(nameof(FormattedListLineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial decimal? QuotedUnitPrice { get; set; }
 
@@ -43,6 +48,8 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(LineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedDiscount))]
         [NotifyPropertyChangedFor(nameof(FormattedLineTotal))]
+        [NotifyPropertyChangedFor(nameof(HasLineDiscount))]
+        [NotifyPropertyChangedFor(nameof(FormattedListLineTotal))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial decimal? Discount { get; set; }
 
@@ -103,13 +110,6 @@ namespace Procure.Models
         /// dash the sheet already uses for a zero, so there is nothing to strike.</summary>
         public bool HasLineDiscount => IsQuoted && QuotedUnitPrice is > 0
             && Discount is > 0 && QuotedUnitPrice.Value - Discount.Value > 0;
-
-        /// <summary>What the per-unit discount took off this line in total, for the PCR's
-        /// "Item Discounts" row. Mirrors <see cref="LineTotal"/>: a discount larger than the price
-        /// only ever removes the price.</summary>
-        public decimal DiscountTotal => (IsQuoted && QuotedUnitPrice is > 0 && Discount is > 0)
-            ? Quantity * (QuotedUnitPrice.Value - Math.Max(0m, QuotedUnitPrice.Value - Discount.Value))
-            : 0m;
 
         public string FormattedQuantity
         {
@@ -267,6 +267,11 @@ namespace Procure.Models
                 return "-";
             }
         }
+
+        /// <summary>The line total before the per-unit discount, shown struck through above
+        /// <see cref="FormattedLineTotal"/> when <see cref="HasLineDiscount"/>.</summary>
+        public string FormattedListLineTotal =>
+            HasLineDiscount ? (Quantity * QuotedUnitPrice!.Value).ToString("N2", CultureInfo.InvariantCulture) : string.Empty;
 
         public string FormattedDisplay
         {

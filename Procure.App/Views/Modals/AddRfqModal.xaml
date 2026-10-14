@@ -158,7 +158,7 @@
                                     <ColumnDefinition Width="72" />
                                     <ColumnDefinition Width="64" />
                                     <ColumnDefinition Width="82" />
-                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="96" />
                                     <ColumnDefinition Width="95" />
                                     <ColumnDefinition Width="90" />
                                     <ColumnDefinition Width="34" />
@@ -167,7 +167,7 @@
                                 <TextBlock Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
                                 <TextBlock Grid.Column="3" Text="UNIT" />
                                 <TextBlock Grid.Column="4" Text="UNIT RATE" HorizontalAlignment="Right" />
-                                <TextBlock Grid.Column="5" Text="DISCOUNT" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="DISCOUNT / UNIT" HorizontalAlignment="Right" />
                                 <TextBlock Grid.Column="6" Text="LINE TOTAL" HorizontalAlignment="Right" />
                                 <TextBlock Grid.Column="7" Text="LAST PRICE" HorizontalAlignment="Right" />
                             </Grid>
@@ -182,7 +182,7 @@
                                                 <ColumnDefinition Width="72" />
                                                 <ColumnDefinition Width="64" />
                                                 <ColumnDefinition Width="82" />
-                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="96" />
                                                 <ColumnDefinition Width="95" />
                                                 <ColumnDefinition Width="90" />
                                                 <ColumnDefinition Width="34" />
@@ -201,8 +201,17 @@
                                                      ToolTipService.ToolTip="A price, or what the vendor said instead - e.g. Regret" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="5" Text="{x:Bind Discount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}}" PlaceholderText="0.00" platform:MoneyBox.PercentOf="{x:Bind QuotedUnitPrice, Mode=OneWay}"
                                                      FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}" />
-                                            <TextBlock Style="{StaticResource AppText}" Grid.Column="6" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,0,0" Foreground="{ThemeResource AppTextPrimary}" />
+                                            <!-- Centred in the same 36 px as the boxes beside it, so one figure sits
+                                                 where it always did and a discounted line fits its struck
+                                                 list total above the price paid, the way the PCR sheet does. -->
+                                            <Grid Grid.Column="6" Height="36" VerticalAlignment="Top" HorizontalAlignment="Right">
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedListLineTotal, Mode=OneWay}" Visibility="{x:Bind HasLineDiscount, Mode=OneWay}"
+                                                               FontSize="10.5" TextDecorations="Strikethrough" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
+                                                    <TextBlock Style="{StaticResource AppText}" Text="{x:Bind FormattedLineTotal, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"
+                                                               HorizontalAlignment="Right" Foreground="{ThemeResource AppTextPrimary}" />
+                                                </StackPanel>
+                                            </Grid>
                                             <StackPanel Grid.Column="7" VerticalAlignment="Top">
                                                 <TextBox Height="36" Text="{x:Bind LastPriceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="0.00 or 0.00 usd"
                                                          FontSize="12" TextAlignment="Right" IsEnabled="{x:Bind IsQuoted, Mode=OneWay}"
@@ -238,20 +247,21 @@
                                     <TextBox Text="{Binding NewRfqQuoteAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}, ConverterParameter=decimal?}" PlaceholderText="0.00"
                                              FontSize="13" FontWeight="SemiBold" />
                                 </StackPanel>
+                                <!-- Same order as the PCR sheet: base, overall discount, freight, other charges. -->
                                 <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
+                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Overall Discount ({0})'}" />
+                                    <TextBox Text="{Binding NewRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}, ConverterParameter=decimal?}" platform:MoneyBox.PercentOf="{Binding CalculatedRfqBaseTotal}" PlaceholderText="0.00" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
                                                Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Freight ({0})'}" />
                                     <TextBox Text="{Binding NewRfqFreight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}, ConverterParameter=decimal?}" PlaceholderText="0.00" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="2" Spacing="4">
+                                <StackPanel Grid.Column="3" Spacing="4">
                                     <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
                                                Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Other Charges ({0})'}" />
                                     <TextBox Text="{Binding NewRfqOtherCharges, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}, ConverterParameter=decimal?}" PlaceholderText="0.00" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="3" Spacing="4">
-                                    <TextBlock Style="{StaticResource AppText}" FontSize="11" Foreground="{ThemeResource AppTextSecondary}"
-                                               Text="{Binding NewRfqCurrency, Converter={StaticResource Fmt}, ConverterParameter='Total Discount ({0})'}" />
-                                    <TextBox Text="{Binding NewRfqDiscount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource Num}, ConverterParameter=decimal?}" platform:MoneyBox.PercentOf="{Binding CalculatedRfqBaseTotal}" PlaceholderText="0.00" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="4" Spacing="4">
                                     <TextBlock Style="{StaticResource AppText}" Text="VAT Applicable" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
@@ -261,17 +271,53 @@
                             </Grid>
                             <Border Padding="12,10" CornerRadius="6" BorderThickness="1"
                                     BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
-                                <Grid>
+                                <!-- The working, in the PCR sheet's order, then the total. -->
+                                <Grid ColumnSpacing="24">
+                                    <!-- Ledger packed on the left, total on the right as before; the empty
+                                         middle column takes the slack instead of the ledger doing so. -->
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost (Base + Freight + Other - Discount + VAT)" FontSize="11" Foreground="{ThemeResource AppTextSecondary}" />
-                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding FormattedCalculatedRfqGrandTotal}" FontSize="22" FontWeight="SemiBold" Foreground="{ThemeResource PrimaryTextBrush}" />
+                                    <Grid ColumnSpacing="20" RowSpacing="2" VerticalAlignment="Center">
+                                        <Grid.Resources>
+                                            <Style BasedOn="{StaticResource AppText}" TargetType="TextBlock">
+                                                <Setter Property="FontSize" Value="12" />
+                                                <Setter Property="Foreground" Value="{ThemeResource AppTextSecondary}" />
+                                            </Style>
+                                        </Grid.Resources>
+                                        <!-- Labels in a fixed-width column and figures in one right-aligned column
+                                             beside it, so every figure sits straight under the one above. -->
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="Auto" MinWidth="110" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Base Quote Sum" />
+                                        <TextBlock Grid.Column="1" Text="{Binding RfqLedgerBase}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Row="1" Text="Overall Discount" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RfqLedgerDiscount}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Row="2" Text="Freight" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding RfqLedgerFreight}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Row="3" Text="Other Charges" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding RfqLedgerOther}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Row="4" Text="Taxable Amount" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding RfqLedgerTaxable}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimary}" />
+                                        <TextBlock Grid.Row="5" Text="{Binding RfqLedgerVatLabel}" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding RfqLedgerVat}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource AppText}" Text="Total Landed Cost" FontSize="11" HorizontalAlignment="Right" Foreground="{ThemeResource AppTextSecondary}" />
+                                        <TextBlock Style="{StaticResource AppText}" Text="{Binding FormattedCalculatedRfqGrandTotal}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource PrimaryTextBrush}" />
                                     </StackPanel>
-                                    <TextBlock Style="{StaticResource AppText}" Grid.Column="1" Text="{Binding CalculatedRfqVatAmount, Converter={StaticResource Fmt}, ConverterParameter='VAT: {0:N2}'}"
-                                               FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource AppTextSecondary}" />
                                 </Grid>
                             </Border>
                         </StackPanel>

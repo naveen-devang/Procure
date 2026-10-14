@@ -259,8 +259,19 @@ namespace Procure.Services.Export
                     : text;
             }
             string MoneyCell(string column, int row, string? currency, decimal amount, bool rowTwoLines, int style = 7,
-                decimal? listAmount = null)
+                decimal? listAmount = null, bool bracket = false)
             {
+                // Reverse-charge VAT: reported, not paid - the brackets say so, which makes it text.
+                if (bracket)
+                {
+                    var text = $"({amount:N2})";
+                    if (conversion.ShowLocalEquivalent && rowTwoLines
+                        && conversion.TryConvert(PcrCurrencyConversionOptions.Normalize(currency), amount, out var localVat))
+                        text += $"\n~ {conversion.LocalCurrency} ({localVat:N2})";
+                    return $@"
+            <c r=""{column}{row}"" s=""{style}"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(text)}</t></is></c>";
+                }
+
                 // A discounted price: the list price struck through on the first line, the price
                 // paid under it, then the local equivalent of the price paid (MoneyText).
                 if (listAmount.HasValue && listAmount.Value > amount)
@@ -682,14 +693,6 @@ namespace Procure.Services.Export
                 rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)),
                 (true, historicalSummaryTotal, ""));
 
-            // What the per-line discounts took off - already out of the total above, so it explains
-            // it rather than being subtracted again. Only when a vendor has any.
-            if (selectedRfqs.Any(rf => rf.ItemDiscountTotal > 0))
-                AddSummaryRow("Item Discounts (included above)",
-                    rf => (rf.IsQuoteReceived || rf.PricedItemsCount > 0) && rf.ItemDiscountTotal > 0
-                        ? (true, rf.ItemDiscountTotal, "") : (false, 0m, "-"),
-                    (false, 0m, "-"));
-
             // Row 2: Discount
             AddSummaryRow("Discount",
                 rf => (rf.Discount.HasValue && rf.Discount.Value > 0) ? (true, rf.Discount.Value, "") : (false, 0m, "-"),
@@ -711,6 +714,13 @@ namespace Procure.Services.Export
                 rf => (rf.OtherCharges.HasValue && rf.OtherCharges.Value > 0) ? (true, rf.OtherCharges.Value, "") : (false, 0m, "-"),
                 (false, 0m, "-"));
 
+            // Discounted total + freight + other charges: the figure VAT is worked out on. Only when
+            // some vendor has freight or other charges; otherwise it would repeat the row above.
+            if (selectedRfqs.Any(rf => rf.HasFreight || rf.HasOtherCharges))
+                AddSummaryRow("Taxable Amount",
+                    rf => MoneyOrDash(rf, rf.NetTaxableAmount),
+                    (true, historicalSummaryTotal, ""));
+
             // The historical column's VAT treatment follows the compared quotes' predominant
             // VatType instead of a hardcoded 5% (which inflated it against RC/V0 quotes).
             var historicalVatType = selectedRfqs.Count > 0
@@ -718,10 +728,58 @@ namespace Procure.Services.Export
                     .OrderByDescending(g => g.Count()).Select(g => g.Key).First()
                 : "5%";
 
-            // Row 6: VAT
-            AddSummaryRow("VAT",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.VatType) ? "-" : rf.VatType),
-                (false, 0m, historicalVatType));
+            // Row 6: VAT. A vendor charging VAT shows the rate in the Qty column and the amount in
+            // the price column (so the money stays a number); anything else ("RC", "V0", no quote
+            // yet) keeps the merged text it always printed.
+            {
+                // 5%: the VAT charged. RC: the VAT reported, in brackets (see ReverseChargeVatAmount).
+                static decimal VatShown(RequestForQuotation rf) =>
+                    rf.EffectiveVatAmount > 0 ? rf.EffectiveVatAmount : rf.ReverseChargeVatAmount;
+                static bool ShowsVatAmount(RequestForQuotation rf) =>
+                    (rf.IsQuoteReceived || rf.PricedItemsCount > 0) && VatShown(rf) > 0;
+
+                var vatTwoLines = RowNeedsConversion(selectedRfqs.Where(ShowsVatAmount).Select(rf => rf.Currency));
+                sb.Append($@"
+        <row r=""{r}"" ht=""{(vatTwoLines ? 36 : 20)}"">
+            <c r=""A{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
+            <c r=""B{r}"" s=""8"" t=""inlineStr""><is><t>VAT</t></is></c>
+            <c r=""C{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
+                merges.Add($"B{r}:C{r}");
+
+                for (int i = 0; i < supplierCount; i++)
+                {
+                    string qtyColLetter = GetColumnLetter(VendorQtyCol(i));
+                    string priceColLetter = GetColumnLetter(VendorPriceCol(i));
+                    var rfq = selectedRfqs[i];
+                    if (ShowsVatAmount(rfq))
+                    {
+                        sb.Append($@"
+            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(rfq.VatType.Trim())}</t></is></c>");
+                        sb.Append(MoneyCell(priceColLetter, r, rfq.Currency, VatShown(rfq), vatTwoLines, 9,
+                            bracket: rfq.EffectiveVatAmount <= 0));
+                    }
+                    else if (string.IsNullOrWhiteSpace(rfq.VatType))
+                    {
+                        merges.Add($"{qtyColLetter}{r}:{priceColLetter}{r}");
+                        sb.Append($@"
+            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>-</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
+                    }
+                    else
+                    {
+                        // The type in the Qty column and a dash where the amount would be, so the
+                        // rates stay in one column whether or not a vendor has an amount.
+                        sb.Append($@"
+            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(rfq.VatType.Trim())}</t></is></c>
+            <c r=""{priceColLetter}{r}"" s=""9"" t=""inlineStr""><is><t>-</t></is></c>");
+                    }
+                }
+
+                sb.Append($@"
+            <c r=""{lastPriceColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(historicalVatType)}</t></is></c>
+        </row>");
+                r++;
+            }
 
             // Row 7: Total Price Incl. VAT
             decimal lastPriceInclVat = historicalVatType == "5%" ? historicalSummaryTotal * 1.05m : historicalSummaryTotal;

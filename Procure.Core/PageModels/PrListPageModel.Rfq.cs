@@ -93,6 +93,33 @@ namespace Procure.PageModels
         [ObservableProperty]
         public partial string FormattedCalculatedRfqGrandTotal { get; set; } = string.Empty;
 
+        // The working shown under the totals boxes, in the order the PCR sheet prints it: base,
+        // overall discount, freight + other charges, the taxable amount VAT is charged on, VAT.
+        // Signed ("- 10,000.00", "+ 7,500.00") so a negative entry still reads as what it does.
+        [ObservableProperty]
+        public partial string RfqLedgerBase { get; set; } = "0.00";
+
+        [ObservableProperty]
+        public partial string RfqLedgerDiscount { get; set; } = "0.00";
+
+        [ObservableProperty]
+        public partial string RfqLedgerFreight { get; set; } = "0.00";
+
+        [ObservableProperty]
+        public partial string RfqLedgerOther { get; set; } = "0.00";
+
+        [ObservableProperty]
+        public partial string RfqLedgerTaxable { get; set; } = "0.00";
+
+        [ObservableProperty]
+        public partial string RfqLedgerVatLabel { get; set; } = "VAT 5%";
+
+        [ObservableProperty]
+        public partial string RfqLedgerVat { get; set; } = "0.00";
+
+        private static string SignedAmount(decimal value) =>
+            value < 0 ? $"- {Math.Abs(value):N2}" : value > 0 ? $"+ {value:N2}" : "0.00";
+
         // Distinguishes the recalc's own item-sum sync from a user-typed lump sum: after the sync
         // has driven NewRfqQuoteAmount, clearing every price must zero the total instead of
         // falling back to the stale synced figure (which then saved as a phantom quote).
@@ -174,6 +201,17 @@ namespace Procure.PageModels
 
             var cur = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency;
             FormattedCalculatedRfqGrandTotal = $"{cur} {CalculatedRfqGrandTotal:N2}";
+
+            RfqLedgerBase = $"{CalculatedRfqBaseTotal:N2}";
+            RfqLedgerDiscount = SignedAmount(-discount);
+            RfqLedgerFreight = SignedAmount(freight);
+            RfqLedgerOther = SignedAmount(otherCharges);
+            RfqLedgerTaxable = $"{netTaxable:N2}";
+            // The title follows the type: "VAT 5%", "VAT RC", "VAT V0". Under reverse charge the
+            // buyer works out the 5% and reports it but pays the supplier only the taxable amount,
+            // so the amount is shown in brackets and never added to the total.
+            RfqLedgerVatLabel = $"VAT {vatType}";
+            RfqLedgerVat = vatType == "RC" ? $"({netTaxable * 0.05m:N2})" : $"{CalculatedRfqVatAmount:N2}";
             HasEditingRfqItems = EditingRfqItems != null && EditingRfqItems.Count > 0;
             OnPropertyChanged(nameof(AllRfqItemsSelected));
         }

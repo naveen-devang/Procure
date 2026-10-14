@@ -1117,6 +1117,46 @@ namespace Procure.Data
                 Assert(model.NewRfqCurrency == "AED", "vendor: editing an existing quote keeps its own terms");
                 model.IsEditingRfq = false;
 
+                // The working under the totals boxes: base, overall discount, freight + other,
+                // taxable amount, VAT, in the order the PCR sheet prints it - and the same figure
+                // for the total as ever.
+                var savedVat = model.NewRfqVatType;
+                model.EditingRfqItems.Clear();
+                model.NewRfqCurrency = "AED"; model.NewRfqVatType = "5%";
+                model.NewRfqQuoteAmount = 1200m; model.NewRfqDiscount = 100m; model.NewRfqFreight = 50m; model.NewRfqOtherCharges = 30m;
+                model.RecalculateRfqTotals();
+                Assert(model.RfqLedgerBase == "1,200.00" && model.RfqLedgerDiscount == "- 100.00"
+                       && model.RfqLedgerFreight == "+ 50.00" && model.RfqLedgerOther == "+ 30.00",
+                    $"ledger: base, discount, and freight and other charges on their own rows; got {model.RfqLedgerBase} / {model.RfqLedgerDiscount} / {model.RfqLedgerFreight} / {model.RfqLedgerOther}");
+                Assert(model.RfqLedgerTaxable == "1,180.00" && model.RfqLedgerVatLabel == "VAT 5%" && model.RfqLedgerVat == "59.00",
+                    $"ledger: taxable amount and VAT; got {model.RfqLedgerTaxable} / {model.RfqLedgerVatLabel} / {model.RfqLedgerVat}");
+                Assert(model.FormattedCalculatedRfqGrandTotal == "AED 1,239.00", $"ledger: the total is unchanged; got {model.FormattedCalculatedRfqGrandTotal}");
+
+                model.NewRfqVatType = "RC";
+                Assert(model.RfqLedgerVatLabel == "VAT RC" && model.RfqLedgerVat == "(59.00)" && model.RfqLedgerTaxable == "1,180.00"
+                       && model.FormattedCalculatedRfqGrandTotal == "AED 1,180.00",
+                    $"ledger: reverse charge shows its VAT in brackets and does not add it; got {model.RfqLedgerVatLabel} / {model.RfqLedgerVat} / {model.FormattedCalculatedRfqGrandTotal}");
+
+                model.NewRfqVatType = "V0";
+                Assert(model.RfqLedgerVatLabel == "VAT V0" && model.RfqLedgerVat == "0.00" && model.FormattedCalculatedRfqGrandTotal == "AED 1,180.00",
+                    $"ledger: zero-rated has no VAT; got {model.RfqLedgerVatLabel} / {model.RfqLedgerVat} / {model.FormattedCalculatedRfqGrandTotal}");
+
+                model.NewRfqVatType = "5%";
+                model.NewRfqDiscount = null; model.NewRfqFreight = null; model.NewRfqOtherCharges = null;
+                Assert(model.RfqLedgerDiscount == "0.00" && model.RfqLedgerFreight == "0.00" && model.RfqLedgerOther == "0.00" && model.RfqLedgerTaxable == "1,200.00",
+                    $"ledger: nothing typed reads as zero; got {model.RfqLedgerDiscount} / {model.RfqLedgerFreight} / {model.RfqLedgerOther} / {model.RfqLedgerTaxable}");
+
+                model.NewRfqDiscount = -20m;
+                Assert(model.RfqLedgerDiscount == "+ 20.00" && model.RfqLedgerTaxable == "1,220.00",
+                    $"ledger: a negative discount adds, and reads as adding; got {model.RfqLedgerDiscount} / {model.RfqLedgerTaxable}");
+
+                model.NewRfqDiscount = 5000m;
+                Assert(model.RfqLedgerTaxable == "0.00" && model.RfqLedgerVat == "0.00" && model.FormattedCalculatedRfqGrandTotal == "AED 0.00",
+                    $"ledger: a discount larger than the quote bottoms out at zero; got {model.RfqLedgerTaxable} / {model.RfqLedgerVat} / {model.FormattedCalculatedRfqGrandTotal}");
+
+                model.NewRfqQuoteAmount = null; model.NewRfqDiscount = null;
+                model.NewRfqVatType = savedVat;
+
                 var superseded = model.FindVendorsAsync(_marker + " ze");
                 var latest = model.FindVendorsAsync(_marker + " zet");
                 Assert(await superseded is null, "vendor: a keystroke overtaken by the next one returns nothing");
