@@ -20,7 +20,10 @@ namespace Procure.Data.Repositories
         /// <summary>Search words are ANDed by default, so adding a word narrows. The one caller that
         /// means "any of these" - looking up the several PR, RFQ and PO numbers a task links to -
         /// sets this.</summary>
-        bool MatchAnyOf = false);
+        bool MatchAnyOf = false,
+        /// <summary>Which board tab to read, or null for every status (a search across all tabs). When
+        /// set it replaces the "hide Merged unless searching" default, since the tab decides.</summary>
+        BoardTab? Tab = null);
 
     /// <summary><paramref name="TotalCount"/> is the unpaged match count, for the board's footer and
     /// for knowing when the infinite scroll has reached the end.</summary>

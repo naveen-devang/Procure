@@ -639,12 +639,15 @@ ORDER BY CreatedAt DESC;";
                 cmd.Parameters.AddWithValue("@Match", BuildFtsMatch(query.Search!, query.MatchAnyOf));
             }
 
+            if (query.Tab is { } tab)
+                clauses.Add(TabClause(cmd, tab));
+
             if (hasStatus)
             {
                 clauses.Add("Status = @Status COLLATE NOCASE");
                 cmd.Parameters.AddWithValue("@Status", query.Status);
             }
-            else if (!hasSearch)
+            else if (!hasSearch && query.Tab is null)
             {
                 clauses.Add("Status <> @Merged");
                 cmd.Parameters.AddWithValue("@Merged", ProcurementStatus.Merged);
@@ -667,6 +670,30 @@ ORDER BY CreatedAt DESC;";
                 clauses.Add("PurchaseRequisition.Id NOT IN (" + BindIdList(cmd, "@Hidden", hidden) + ")");
 
             return clauses.Count == 0 ? string.Empty : "\nWHERE " + string.Join("\n  AND ", clauses);
+        }
+
+        /// <summary>A tab as a status test, mirroring <see cref="BoardTabs.Of"/>: Completed and On hold
+        /// are lists, Active is everything not in either (and a missing status), so no row falls between tabs.</summary>
+        private static string TabClause(SqliteCommand cmd, BoardTab tab)
+        {
+            static string Bind(SqliteCommand c, string prefix, string[] statuses)
+            {
+                var names = new List<string>(statuses.Length);
+                for (var i = 0; i < statuses.Length; i++)
+                {
+                    var name = prefix + i;
+                    names.Add(name);
+                    c.Parameters.AddWithValue(name, statuses[i]);
+                }
+                return string.Join(", ", names);
+            }
+
+            return tab switch
+            {
+                BoardTab.Completed => $"Status COLLATE NOCASE IN ({Bind(cmd, "@Done", BoardTabs.CompletedStatuses)})",
+                BoardTab.OnHold => $"Status COLLATE NOCASE IN ({Bind(cmd, "@Hold", BoardTabs.OnHoldStatuses)})",
+                _ => $"(Status IS NULL OR Status COLLATE NOCASE NOT IN ({Bind(cmd, "@Done", BoardTabs.CompletedStatuses)}, {Bind(cmd, "@Hold", BoardTabs.OnHoldStatuses)}))",
+            };
         }
 
         /// <summary>Turns what someone typed into an FTS5 MATCH expression.

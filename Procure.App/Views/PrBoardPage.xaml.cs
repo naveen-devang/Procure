@@ -35,6 +35,12 @@ public sealed partial class PrBoardPage : Page
         Vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(PrListPageModel.IsDetailPanelOpen) && Vm.IsDetailPanelOpen) ShowDetailPanel();
+            else if (e.PropertyName == nameof(PrListPageModel.StatusFilterOptions)) RefreshStatusFilterBox();
+            else if (e.PropertyName is nameof(PrListPageModel.SelectedTab) or nameof(PrListPageModel.SearchAllTabs)
+                     or nameof(PrListPageModel.TotalFilteredCount) or nameof(PrListPageModel.IsSearchPending))
+                SyncTabBar();
+            if (e.PropertyName is nameof(PrListPageModel.SelectedTab) or nameof(PrListPageModel.SearchAllTabs)
+                or nameof(PrListPageModel.CanSearchAllTabs)) UpdateEmptyState();
         };
         _searchDebounce.Tick += (_, _) =>
         {
@@ -135,8 +141,8 @@ public sealed partial class PrBoardPage : Page
         // Re-set every time Loaded fires (not just the first time) - this page is a DI singleton,
         // so Loaded refires on every nav back to the board, and the ComboBox's displayed content
         // goes blank on that revisit if it isn't nudged again.
-        StatusFilterBox.ItemsSource = Vm.StatusFilterOptions;
-        StatusFilterBox.SelectedItem = Vm.SelectedStatusFilter;
+        RefreshStatusFilterBox();
+        SyncTabBar();
 
         if (!_loaded)
         {
@@ -162,9 +168,58 @@ public sealed partial class PrBoardPage : Page
     {
         var empty = Vm.FilteredPrs.Count == 0 && !Vm.IsBusy;
         EmptyPanel.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        // Empty with no filter at all is a statement about the tab, not the database: a database whose
+        // every PR is finished has an empty Active tab and plenty of PRs.
         EmptyText.Text = Vm.IsGenuinelyEmpty
-            ? "No PR entries yet. Create your first purchase requisition to get started."
-            : "No purchase requisitions match your criteria.";
+            ? Vm.SelectedTab switch
+            {
+                Procure.Models.BoardTab.Completed => "Nothing has been completed yet.",
+                Procure.Models.BoardTab.OnHold => "Nothing is on hold or cancelled.",
+                _ => "No active requisitions. Add one with + Add PR, or look in the Completed tab.",
+            }
+            : Vm.CanSearchAllTabs
+                ? $"Nothing in {Procure.Models.BoardTabs.Title(Vm.SelectedTab)} matches your search."
+                : "No purchase requisitions match your criteria.";
+    }
+
+    // ----- tabs -----
+
+    private bool _syncingTabs;
+
+    private void TabBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        if (_syncingTabs) return;
+        if (sender.SelectedItem?.Tag is string tag && Enum.TryParse<Procure.Models.BoardTab>(tag, out var tab))
+            Vm.SelectTab(tab);
+    }
+
+    /// <summary>Puts the tab strip in step with the view model: the open tab selected (none while
+    /// searching across all tabs) and its match count beside its name.</summary>
+    private void SyncTabBar()
+    {
+        _syncingTabs = true;
+        try
+        {
+            var items = new[] { (TabActive, Procure.Models.BoardTab.Active), (TabCompleted, Procure.Models.BoardTab.Completed), (TabOnHold, Procure.Models.BoardTab.OnHold) };
+            foreach (var (item, tab) in items)
+            {
+                var open = !Vm.SearchAllTabs && Vm.SelectedTab == tab;
+                item.Text = open && !Vm.IsSearchPending
+                    ? $"{Procure.Models.BoardTabs.Title(tab)}  {Vm.TotalFilteredCount:N0}"
+                    : Procure.Models.BoardTabs.Title(tab);
+                if (open && TabBar.SelectedItem != item) TabBar.SelectedItem = item;
+            }
+            if (Vm.SearchAllTabs && TabBar.SelectedItem is not null) TabBar.SelectedItem = null;
+        }
+        finally { _syncingTabs = false; }
+    }
+
+    /// <summary>The dropdown only offers the open tab's statuses, so it is rebuilt whenever the tab or
+    /// the search scope changes.</summary>
+    private void RefreshStatusFilterBox()
+    {
+        StatusFilterBox.ItemsSource = Vm.StatusFilterOptions;
+        StatusFilterBox.SelectedItem = Vm.SelectedStatusFilter;
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)

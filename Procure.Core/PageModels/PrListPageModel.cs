@@ -119,23 +119,6 @@ namespace Procure.PageModels
         public partial bool IsGenuinelyEmpty { get; set; }
 
 
-        public List<string> StatusFilterOptions { get; } = new()
-        {
-            "All",
-            ProcurementStatus.PrRaised,
-            ProcurementStatus.RfqSent,
-            ProcurementStatus.QuotesReceived,
-            ProcurementStatus.PcrSubmitted,
-            ProcurementStatus.PcrApproved,
-            ProcurementStatus.PoRaised,
-            ProcurementStatus.PartiallyDelivered,
-            ProcurementStatus.Delivered,
-            ProcurementStatus.Closed,
-            ProcurementStatus.Merged,
-            ProcurementStatus.OnHold,
-            ProcurementStatus.Cancelled
-        };
-
         public string[] SelectableStatuses => ProcurementStatus.SelectableStatuses;
         public string[] AllPriorities => ProcurementPriority.AllPriorities;
         public string[] AllPlants => ProcurementPlant.AllPlants;
@@ -521,15 +504,37 @@ namespace Procure.PageModels
         /// record numbers to the board; typing in the box always means all of the words.</summary>
         public void SearchAnyOf(string terms)
         {
+            // The linked PR may be finished or parked, so look in every tab.
+            var unchanged = SearchText == terms;
+            _suppressScopeReload = true;
+            try { SearchAllTabs = true; }
+            finally { _suppressScopeReload = false; }
+            OnPropertyChanged(nameof(StatusFilterOptions));
+
             _settingSearchAnyOf = true;
             try { SearchText = terms; }
             finally { _settingSearchAnyOf = false; }
+            if (unchanged) ApplyFilters(true);   // same words, wider scope: no text change will reload
+        }
+
+        /// <summary>Back to the open tab's own scope (search cleared, filters reset). The status filter
+        /// goes back to All too - a status picked while searching everywhere may not exist in this tab.</summary>
+        private void LeaveSearchAllTabs()
+        {
+            if (!SearchAllTabs) return;
+            _suppressScopeReload = true;
+            try { SearchAllTabs = false; }
+            finally { _suppressScopeReload = false; }
+            OnPropertyChanged(nameof(StatusFilterOptions));
+            if (SelectedStatusFilter != "All") SelectedStatusFilter = "All";
         }
 
         partial void OnSearchTextChanged(string value)
         {
             // Whoever set the text decides how the words combine, and typing always resets it.
             _searchAnyOf = _settingSearchAnyOf;
+            OnPropertyChanged(nameof(CanSearchAllTabs));
+            if (string.IsNullOrWhiteSpace(value)) LeaveSearchAllTabs();
 
             // Set before the debounce, not after: the whole point is to mark the rows stale the
             // moment the term stops matching them.
@@ -570,6 +575,7 @@ namespace Procure.PageModels
         public void ResetFilters()
         {
             SearchText = string.Empty;
+            LeaveSearchAllTabs();
             SelectedStatusFilter = "All";
             FilterOverdueOnly = false;
             FilterPcrPendingOnly = false;
@@ -743,7 +749,8 @@ namespace Procure.PageModels
             UrgentOverdueDays: _settingsService.UrgentOverdueDays,
             Skip: skip,
             Take: take,
-            MatchAnyOf: _searchAnyOf);
+            MatchAnyOf: _searchAnyOf,
+            Tab: QueryTab);
 
         private void UpdateListSummary()
         {
@@ -841,7 +848,12 @@ namespace Procure.PageModels
                 // Anything the user had scrolled past the re-read window keeps its place. Re-reading all
                 // of it would cost seconds at 12,000 rows, and dropping it - which is what the clamp used
                 // to do - yanks the board back to the end of the window mid-edit.
-                var tail = resetToTop
+                // A query that comes back short of what it was asked for has reached the end of the
+                // matches, so nothing past it can still match. Without this a list shorter than the
+                // window kept every row below the query's last one - including the rows an edit had just
+                // moved to another tab - on the board until the next reset.
+                var endReached = page.Rows.Count < take;
+                var tail = resetToTop || endReached
                     ? new List<PurchaseRequisition>()
                     : FilteredPrs.Skip(page.Rows.Count).ToList();
 
@@ -966,7 +978,8 @@ namespace Procure.PageModels
                 pr.Status = newStatus;
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyStatusChanged();
-                if (RowFilterActive) ApplyFilters();
+                // A status edit can also move the row to another tab, which no filter check sees.
+                if (RowFilterActive || !InCurrentScope(pr.Status)) ApplyFilters();
             }
             catch (Exception ex)
             {
@@ -999,7 +1012,7 @@ namespace Procure.PageModels
                     parentPr.NotifyHierarchyChanged();
                 }
 
-                if (RowFilterActive) ApplyFilters();
+                if (RowFilterActive || (parentPr != null && !InCurrentScope(parentPr.Status))) ApplyFilters();
             }
             catch (Exception ex)
             {
@@ -1032,7 +1045,7 @@ namespace Procure.PageModels
                     parentPr.NotifyHierarchyChanged();
                 }
 
-                if (RowFilterActive) ApplyFilters();
+                if (RowFilterActive || (parentPr != null && !InCurrentScope(parentPr.Status))) ApplyFilters();
             }
             catch (Exception ex)
             {

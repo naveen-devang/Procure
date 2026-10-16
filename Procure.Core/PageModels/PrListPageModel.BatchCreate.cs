@@ -378,7 +378,10 @@ namespace Procure.PageModels
                 IsBatchCreateModalVisible = false;
                 BatchPrEntries.Clear();
                 SelectedBatchEntry = null;
-                ApplyFilters(resetToTop: true);
+                // New requisitions start as PR Raised, so they belong on Active: a board looking at
+                // Completed or searching every tab would otherwise show no sign of them.
+                if (SelectedTab != BoardTab.Active || SearchAllTabs) SelectTab(BoardTab.Active);
+                else ApplyFilters(resetToTop: true);
                 DataChangeNotifier.Notify(ProcurementChange.Pr);
 
                 ShowToast($"Created {validEntries.Count} purchase requisitions");

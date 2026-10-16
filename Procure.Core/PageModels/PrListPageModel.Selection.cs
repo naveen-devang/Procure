@@ -214,6 +214,8 @@ namespace Procure.PageModels
                 CombinedPoButtonToolTip = "Create a combined purchase order across all selected requisitions";
                 IsCombinedPoActionEnabled = selected.Count >= 1;
             }
+
+            UpdateTabActions(selected);
         }
 
         private void OnPrItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -221,6 +223,11 @@ namespace Procure.PageModels
             if (e.PropertyName == nameof(PurchaseRequisition.IsSelected))
             {
                 UpdateSelectionState();
+            }
+            else if (e.PropertyName == nameof(PurchaseRequisition.Status)
+                     && sender is PurchaseRequisition pr && !InCurrentScope(pr.Status))
+            {
+                QueueScopeReconcile();
             }
         }
 

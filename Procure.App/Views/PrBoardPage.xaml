@@ -47,6 +47,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -123,8 +124,16 @@
             </Button>
         </Grid>
 
+        <!-- Tabs. A tab is a status group fed to the same paged query, so only the open tab ever
+             reads rows. Nothing selected while searching across all tabs. -->
+        <SelectorBar x:Name="TabBar" Grid.Row="2" Margin="0,-12,0,-16" SelectionChanged="TabBar_SelectionChanged">
+            <SelectorBarItem x:Name="TabActive" Text="Active" Tag="Active" IsSelected="True" />
+            <SelectorBarItem x:Name="TabCompleted" Text="Completed" Tag="Completed" />
+            <SelectorBarItem x:Name="TabOnHold" Text="On hold &amp; cancelled" Tag="OnHold" />
+        </SelectorBar>
+
         <!-- Batch action bar -->
-        <Border Grid.Row="2" Padding="16,10" CornerRadius="8" BorderThickness="1,1,1,1"
+        <Border Grid.Row="3" Padding="16,10" CornerRadius="8" BorderThickness="1,1,1,1"
                 BorderBrush="{ThemeResource AppControlBorder}"
                 Background="{ThemeResource AppTertiaryBackground}"
                 Visibility="{Binding IsBatchSelectionActive, Converter={StaticResource BoolVis}}">
@@ -135,8 +144,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Border Background="{ThemeResource AccentFillBrush}" CornerRadius="10" Padding="6,2">
-                        <TextBlock Text="{Binding SelectedPrsCount}" FontSize="12" FontWeight="SemiBold" Foreground="#1A1A1A" />
+                    <!-- Fixed height with half-height corners is a true circle for one digit; MinWidth lets 2-3 digits stretch into a pill. -->
+                    <Border Background="{ThemeResource AccentFillBrush}" CornerRadius="11" MinWidth="22" Height="22" Padding="6,0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SelectedPrsCount}" FontSize="12" FontWeight="SemiBold" Foreground="#1A1A1A"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
                     </Border>
                     <TextBlock Text="{Binding SelectedPrsSummary}" FontWeight="SemiBold" FontSize="13"
                                VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" />
@@ -151,6 +163,22 @@
                     <Button Content="{Binding CombinedPoButtonText}" Command="{Binding CreateOrSplitCombinedPoCommand}"
                             IsEnabled="{Binding IsCombinedPoActionEnabled}" Height="34" FontSize="12"
                             ToolTipService.ToolTip="{Binding CombinedPoButtonToolTip}" />
+                    <Button Content="Mark completed" Command="{Binding MarkSelectedCompletedCommand}" Height="34" FontSize="12"
+                            Visibility="{Binding CanMarkCompleted, Converter={StaticResource BoolVis}}"
+                            ToolTipService.ToolTip="Move the selected requisitions to the Completed tab (status Closed)" />
+                    <Button Content="Hold / cancel" Height="34" FontSize="12"
+                            Visibility="{Binding CanHoldCancel, Converter={StaticResource BoolVis}}"
+                            ToolTipService.ToolTip="Move the selected requisitions to the On hold &amp; cancelled tab">
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem Text="Put on hold" Command="{Binding HoldSelectedCommand}" />
+                                <MenuFlyoutItem Text="Cancel requisitions" Command="{Binding CancelSelectedCommand}" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Content="{Binding ReopenButtonText}" Command="{Binding ReopenSelectedCommand}" Height="34" FontSize="12"
+                            Visibility="{Binding CanReopen, Converter={StaticResource BoolVis}}"
+                            ToolTipService.ToolTip="Send the selected requisitions back to the Active tab" />
                     <Button Content="Clear" Command="{Binding ClearSelectionCommand}" Height="34" FontSize="12" />
                     <Button Content="Delete" Command="{Binding DeleteSelectedPrsCommand}" Height="34" FontSize="12"
                             ToolTipService.ToolTip="Permanently delete the selected requisitions and all their RFQs, PCRs and POs" />
@@ -159,7 +187,7 @@
         </Border>
 
         <!-- PR cards -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <ProgressRing IsActive="{Binding IsBusy}" Width="36" Height="36"
                           VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,40,0,0" />
 
@@ -304,6 +332,8 @@
                         Padding="60,40" Visibility="Collapsed">
                 <TextBlock x:Name="EmptyText" Text="No purchase requisitions match your criteria." FontSize="15"
                            FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{ThemeResource AppTextTertiary}" />
+                <Button Content="Search all tabs" Command="{Binding SearchEveryTabCommand}" HorizontalAlignment="Center"
+                        Visibility="{Binding CanSearchAllTabs, Converter={StaticResource BoolVis}}" />
                 <Button Content="Reset Filters" Command="{Binding ResetFiltersCommand}" HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
