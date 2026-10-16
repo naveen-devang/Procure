@@ -707,12 +707,21 @@ namespace Procure.PageModels
             {
                 _loadingMore = true;
                 var generation = _pageGeneration;
-                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(FilteredPrs.Count, PageSize)))
+                // The total was counted when this list was set up (or re-read after a change) and
+                // does not change by scrolling, so this page does not count again: at a million rows
+                // that count, not the 50 rows, was the cost of every scroll.
+                var skip = FilteredPrs.Count;
+                var page = await Task.Run(() => _prRepo.GetPageAsync(BuildQuery(skip, PageSize, skipCount: true)))
                                      .ConfigureAwait(true);
                 if (generation != _pageGeneration) return;   // a filter change superseded this
 
                 foreach (var pr in MergeAppend(page.Rows)) FilteredPrs.Add(pr);
-                TotalFilteredCount = page.TotalCount;
+
+                // A short page is the end of the matches, so the true total is known exactly. That also
+                // repairs a stale total (rows removed elsewhere since the count) instead of leaving
+                // "Showing 60 of 70". Any change that adds or removes rows already re-reads and recounts.
+                if (page.Rows.Count < PageSize) TotalFilteredCount = skip + page.Rows.Count;
+                else if (FilteredPrs.Count > TotalFilteredCount) TotalFilteredCount = FilteredPrs.Count;
                 UpdateListSummary();
                 if (Procure.Utilities.BoardTrace.IsEnabled)
                     Procure.Utilities.BoardTrace.Mark($"more-loaded total={FilteredPrs.Count}");
@@ -739,7 +748,7 @@ namespace Procure.PageModels
             }
         }
 
-        private PrQuery BuildQuery(int skip, int take) => new(
+        private PrQuery BuildQuery(int skip, int take, bool skipCount = false) => new(
             Search: SearchText,
             Status: SelectedStatusFilter,
             OverdueOnly: FilterOverdueOnly,
@@ -750,7 +759,8 @@ namespace Procure.PageModels
             Skip: skip,
             Take: take,
             MatchAnyOf: _searchAnyOf,
-            Tab: QueryTab);
+            Tab: QueryTab,
+            SkipCount: skipCount);
 
         private void UpdateListSummary()
         {

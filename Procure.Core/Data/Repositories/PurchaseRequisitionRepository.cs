@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Procure.Models;
@@ -472,17 +473,26 @@ ORDER BY SortOrder ASC;";
         /// 20,000 PRs, so the simpler form wins; switch to a keyset cursor on (CreatedAt, Id) if the
         /// table ever grows far past that.
         /// </summary>
+        private static int _countQueriesForTest;
+
+        /// <summary>Test seam for BoardTabsProbe: how many board count queries have run in this process.</summary>
+        internal static int CountQueriesForTest => Volatile.Read(ref _countQueriesForTest);
+
         public async Task<PrPage> GetPageAsync(PrQuery query)
         {
             await _db.InitializeAsync().ConfigureAwait(false);
             using var connection = _db.CreateConnection();
             await connection.OpenAsync().ConfigureAwait(false);
 
-            int total;
-            using (var countCmd = connection.CreateCommand())
+            // The count is the part of a page that grows with the whole table, not with the page, so a
+            // caller that already has the total (scrolling on) asks to leave it out.
+            var total = -1;
+            if (!query.SkipCount)
             {
+                using var countCmd = connection.CreateCommand();
                 countCmd.CommandText = MatchesCte(query) + "SELECT COUNT(*) FROM PurchaseRequisition" + BuildWhere(countCmd, query) + ";";
                 total = Convert.ToInt32(await countCmd.ExecuteScalarAsync().ConfigureAwait(false));
+                Interlocked.Increment(ref _countQueriesForTest);
             }
 
             var prs = new List<PurchaseRequisition>();

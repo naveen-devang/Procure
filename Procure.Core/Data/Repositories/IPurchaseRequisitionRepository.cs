@@ -23,10 +23,14 @@ namespace Procure.Data.Repositories
         bool MatchAnyOf = false,
         /// <summary>Which board tab to read, or null for every status (a search across all tabs). When
         /// set it replaces the "hide Merged unless searching" default, since the tab decides.</summary>
-        BoardTab? Tab = null);
+        BoardTab? Tab = null,
+        /// <summary>Skip the match count: the caller already knows the total (scrolling to the next page
+        /// of a list it counted when the filter was set). <see cref="PrPage.TotalCount"/> is then -1.</summary>
+        bool SkipCount = false);
 
     /// <summary><paramref name="TotalCount"/> is the unpaged match count, for the board's footer and
-    /// for knowing when the infinite scroll has reached the end.</summary>
+    /// for knowing when the infinite scroll has reached the end. -1 when the query asked to
+    /// skip the count.</summary>
     public sealed record PrPage(List<PurchaseRequisition> Rows, int TotalCount);
 
     public interface IPurchaseRequisitionRepository

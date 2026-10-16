@@ -58,6 +58,19 @@ namespace Procure.Data
             return sw.ElapsedMilliseconds;
         }
 
+        /// <summary>Pages the open list to its end, as scrolling would. A search for a number can match
+        /// several numbers that start with it, and the one being looked for may not be in the first page.</summary>
+        private static async Task Fill(PrListPageModel vm)
+        {
+            var guard = 0;
+            while (vm.LoadMoreCommand.CanExecute(null) && guard++ < 30)
+            {
+                var before = vm.FilteredPrs.Count;
+                await vm.LoadMoreCommand.ExecuteAsync(null).ConfigureAwait(true);
+                if (vm.FilteredPrs.Count == before) break;
+            }
+        }
+
         private static long HeapSettled()
         {
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
@@ -262,13 +275,13 @@ namespace Procure.Data
                 vm.SelectTab(BoardTab.Completed); await Settled(vm);
                 foreach (var no in pickNos)
                 {
-                    vm.SearchText = no; await Settled(vm);
+                    vm.SearchText = no; await Settled(vm); await Fill(vm);
                     Check(vm.FilteredPrs.Count(p => p.PrNo == no) == 1, $"{no} is in Completed exactly once (search inside the tab)");
                 }
                 vm.SearchText = string.Empty; await Settled(vm);
 
                 // reopen from Completed
-                vm.SearchText = pickNos[0]; await Settled(vm);
+                vm.SearchText = pickNos[0]; await Settled(vm); await Fill(vm);
                 var row = vm.FilteredPrs.First(p => p.PrNo == pickNos[0]);
                 vm.SetSelected(row, true);
                 Check(vm.CanReopen && vm.ReopenButtonText == "Reopen" && !vm.CanMarkCompleted, "a Completed row offers Reopen, not Mark completed");
@@ -279,7 +292,7 @@ namespace Procure.Data
                 var reopened = (await repo.GetByIdsAsync(new[] { pickIds[0] })).Single();
                 Check(BoardTabs.Of(reopened.Status) == BoardTab.Active, $"and is active again as '{reopened.Status}'");
                 vm.SelectTab(BoardTab.Active); await Settled(vm);
-                vm.SearchText = pickNos[0]; await Settled(vm);
+                vm.SearchText = pickNos[0]; await Settled(vm); await Fill(vm);
                 Check(vm.FilteredPrs.Count(p => p.PrNo == pickNos[0]) == 1, "it is in Active exactly once (no duplicate after the round trip)");
                 vm.SearchText = string.Empty; await Settled(vm);
 
@@ -294,7 +307,7 @@ namespace Procure.Data
                 Check(!vm.FilteredPrs.Any(p => holdIds.Contains(p.Id)), "two put on hold left Active");
                 Check((await repo.GetPageAsync(Q(BoardTab.OnHold))).TotalCount == holdBefore + 2, "On hold gained exactly 2");
                 vm.SelectTab(BoardTab.OnHold); await Settled(vm);
-                vm.SearchText = holdRows[0].PrNo; await Settled(vm);
+                vm.SearchText = holdRows[0].PrNo; await Settled(vm); await Fill(vm);
                 var heldRow = vm.FilteredPrs.FirstOrDefault(p => p.PrNo == holdRows[0].PrNo);
                 Check(heldRow != null && heldRow.Status == ProcurementStatus.OnHold, "it shows in On hold with status On Hold");
                 if (heldRow != null) vm.SetSelected(heldRow, true);
@@ -306,7 +319,7 @@ namespace Procure.Data
 
                 // merged source is never moved
                 vm.SelectTab(BoardTab.OnHold); await Settled(vm);
-                vm.SearchText = mergedProbe.PrNo; await Settled(vm);
+                vm.SearchText = mergedProbe.PrNo; await Settled(vm); await Fill(vm);
                 var mergedRow = vm.FilteredPrs.FirstOrDefault(p => p.Id == mergedProbe.Id);
                 Check(mergedRow != null, "the Merged test row shows in On hold");
                 if (mergedRow != null)
@@ -408,6 +421,80 @@ namespace Procure.Data
                 Check(vm.FilteredPrs.Count == 0 && vm.TotalFilteredCount == 0 && vm.CanSearchAllTabs, "a search with no match empties the tab and offers 'Search all tabs'");
                 vm.SearchText = string.Empty; await Settled(vm);
                 vm.SelectTab(BoardTab.Active); await Settled(vm);
+
+                // ---------------------------------------------------------------- 11 counting
+                Section("11. The total is counted when the list is set up, not on every scroll");
+                {
+                    var c0 = PurchaseRequisitionRepository.CountQueriesForTest;
+                    vm.SelectTab(BoardTab.Completed); await Settled(vm);
+                    var afterSwitch = PurchaseRequisitionRepository.CountQueriesForTest - c0;
+                    Check(afterSwitch == 1, $"switching tab counts once ({afterSwitch} count queries)");
+
+                    var totalBefore = vm.TotalFilteredCount;
+                    var c1 = PurchaseRequisitionRepository.CountQueriesForTest;
+                    var pages = 0;
+                    while (vm.FilteredPrs.Count < 400 && vm.LoadMoreCommand.CanExecute(null) && pages++ < 40)
+                    {
+                        var before = vm.FilteredPrs.Count;
+                        await vm.LoadMoreCommand.ExecuteAsync(null).ConfigureAwait(true);
+                        if (vm.FilteredPrs.Count == before) break;
+                    }
+                    var duringScroll = PurchaseRequisitionRepository.CountQueriesForTest - c1;
+                    Check(vm.FilteredPrs.Count >= 400 && duringScroll == 0, $"scrolling to {vm.FilteredPrs.Count} rows ran {duringScroll} count queries");
+                    Check(vm.TotalFilteredCount == totalBefore, $"and the total is unchanged ({vm.TotalFilteredCount:N0})");
+
+                    // what one scroll page costs with and without the count (Active, rows 50-100)
+                    var withCount = new List<long>(); var noCount = new List<long>();
+                    for (var i = 0; i < 12; i++)
+                    {
+                        var tc = Stopwatch.StartNew();
+                        await repo.GetPageAsync(new PrQuery(null, null, false, false, false, 7, 3, 50, 50, false, BoardTab.Active, false));
+                        withCount.Add(tc.ElapsedMilliseconds);
+                        var tn = Stopwatch.StartNew();
+                        await repo.GetPageAsync(new PrQuery(null, null, false, false, false, 7, 3, 50, 50, false, BoardTab.Active, true));
+                        noCount.Add(tn.ElapsedMilliseconds);
+                    }
+                    static long Med(List<long> v) => v.OrderBy(x => x).ElementAt(v.Count / 2);
+                    Note($"one scroll page of 50 on Active: with the count {Med(withCount)} ms, without {Med(noCount)} ms (medians of 12)");
+
+                    // a search is counted once and then pages without counting
+                    vm.SearchText = "a"; await Settled(vm);
+                    var c2 = PurchaseRequisitionRepository.CountQueriesForTest;
+                    var more = 0;
+                    while (vm.LoadMoreCommand.CanExecute(null) && more++ < 4)
+                        await vm.LoadMoreCommand.ExecuteAsync(null).ConfigureAwait(true);
+                    Check(PurchaseRequisitionRepository.CountQueriesForTest == c2, "paging a search runs no count either");
+                    vm.SearchText = string.Empty; await Settled(vm);
+
+                    // the end of the list repairs a stale total
+                    vm.SelectTab(BoardTab.Active); await Settled(vm);
+                    var token = "TC" + Guid.NewGuid().ToString("N")[..5].ToUpperInvariant();
+                    var made = new List<Guid>();
+                    for (var i = 0; i < 70; i++)
+                    {
+                        var pr = new PurchaseRequisition
+                        {
+                            Id = Guid.NewGuid(), PrNo = token + i.ToString("D3"), Description = "count probe " + token, Requestor = "probe",
+                            Plant = ProcurementPlant.RW01, PrType = ProcurementPrType.StoresAndSpares, Status = ProcurementStatus.PrRaised,
+                            CreatedAt = DateTime.Now.AddMinutes(-i), UpdatedAt = DateTime.Now,
+                        };
+                        made.Add(pr.Id); created.Add(pr.Id);
+                        await repo.SaveAsync(pr).ConfigureAwait(true);
+                    }
+                    vm.SearchText = token; await Settled(vm);
+                    Check(vm.TotalFilteredCount == 70, $"70 matching requisitions are counted as {vm.TotalFilteredCount}");
+                    Check(vm.FilteredPrs.Count < 70, $"and {vm.FilteredPrs.Count} are on screen so far");
+                    // the oldest few, not yet loaded, vanish behind the board's back
+                    var unloaded = made.Where(id => vm.FilteredPrs.All(p => p.Id != id)).ToList();
+                    foreach (var id in unloaded) await repo.DeleteAsync(id).ConfigureAwait(true);
+                    var loadedNow = vm.FilteredPrs.Count;
+                    var guard3 = 0;
+                    while (vm.LoadMoreCommand.CanExecute(null) && guard3++ < 5)
+                        await vm.LoadMoreCommand.ExecuteAsync(null).ConfigureAwait(true);
+                    Check(vm.TotalFilteredCount == loadedNow && vm.FilteredPrs.Count == loadedNow,
+                          $"after {unloaded.Count} vanished, reaching the end corrects the total to {vm.TotalFilteredCount} (not 70)");
+                    vm.SearchText = string.Empty; await Settled(vm);
+                }
             }
             catch (Exception ex)
             {
