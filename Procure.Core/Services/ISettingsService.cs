@@ -32,6 +32,9 @@ namespace Procure.Services
         bool AutoCheckUpdatesOnStartup { get; set; }
         /// <summary>"HH:mm" - when a task's reminder goes off on its due day unless the task sets its own time.</summary>
         string DefaultReminderTime { get; set; }
+        /// <summary>Why the last attempt to write the settings file failed, or null when the settings on
+        /// disk are up to date. A page that says "saved" has to check this first.</summary>
+        string? LastSaveError { get; }
         IReadOnlyList<PastelThemeOption> AvailableAccentThemes { get; }
         List<string> GetDefaultApprovalRoles();
         void SetDefaultApprovalRoles(IEnumerable<string> roles);

@@ -998,14 +998,12 @@ namespace Procure.PageModels
                 var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == po.PrId);
                 if (parentPr != null)
                 {
-                    if (parentPr.Pos.All(p => p.Status == PoStatus.Delivered))
+                    // Both ways: delivering moves the requisition on, setting an order back to Raised
+                    // pulls it back. A person's decision (Closed, On Hold, Cancelled) is never touched.
+                    var delivered = parentPr.Pos.Count(p => p.Status == PoStatus.Delivered);
+                    if (StatusFlow.AfterPoChange(parentPr.Status, parentPr.Pos.Count, delivered) is { } afterPo)
                     {
-                        parentPr.Status = ProcurementStatus.Delivered;
-                        await _prRepo.SavePrFieldsAsync(parentPr);
-                    }
-                    else if (parentPr.Pos.Any(p => p.Status == PoStatus.Delivered))
-                    {
-                        parentPr.Status = ProcurementStatus.PartiallyDelivered;
+                        parentPr.Status = afterPo;
                         await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 
@@ -1030,15 +1028,22 @@ namespace Procure.PageModels
                 {
                     rfq.QuoteReceivedDate = DateTime.Now;
                 }
+                else if (newStatus == RfqStatus.Sent && rfq.QuoteReceivedDate.HasValue)
+                {
+                    // Back to "not received": a leftover received date would keep reading as received
+                    // (RequestForQuotation.IsQuoteReceived), and the requisition would stay at Quotes Received.
+                    rfq.QuoteReceivedDate = null;
+                    rfq.NotifyCalculationsChanged();
+                }
 
                 await _prRepo.SaveRfqAsync(rfq);
 
                 var parentPr = FilteredPrs.FirstOrDefault(p => p.Id == rfq.PrId);
                 if (parentPr != null)
                 {
-                    if (parentPr.Rfqs.All(r => r.IsQuoteReceived) && parentPr.Status == ProcurementStatus.RfqSent)
+                    if (StatusFlow.AfterRfqChange(parentPr.Status, parentPr.Rfqs.Count, parentPr.Rfqs.All(r => r.IsQuoteReceived)) is { } afterRfq)
                     {
-                        parentPr.Status = ProcurementStatus.QuotesReceived;
+                        parentPr.Status = afterRfq;
                         await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 

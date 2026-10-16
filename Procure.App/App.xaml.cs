@@ -100,6 +100,8 @@ public partial class App : Application
         // (PROCURE_SELFCHECK, PROCURE_FLOW_SELFCHECK, ...). After Activate so a check that takes
         // half a minute is not sitting between launch and the first window.
         _ = Procure.Data.SelfCheckSuite.RunAsync(Services);
+        if (Environment.GetEnvironmentVariable("PROCURE_SETTINGS_SELFCHECK") == "1")
+            _ = System.Threading.Tasks.Task.Run(Procure.App.Platform.JsonSettingsServiceSelfCheck.Run);
 #endif
     }
 

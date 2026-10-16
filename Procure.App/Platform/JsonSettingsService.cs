@@ -16,24 +16,109 @@ namespace Procure.App.Platform;
 /// </summary>
 public sealed class JsonSettingsService : ISettingsService
 {
-    private readonly string _path = Path.Combine(AppPaths.AppData, "settings.json");
-    private readonly Dictionary<string, string> _values = new();
+    private readonly string _path;
+    private Dictionary<string, string> _values = new();
 
-    public JsonSettingsService()
+    // Held for every read and write of _values: the database layer asks for the saved folder from
+    // background threads while the UI thread is saving a setting.
+    private readonly object _gate = new();
+
+    public string? LastSaveError { get; private set; }
+
+    public JsonSettingsService() : this(Path.Combine(AppPaths.AppData, "settings.json"), wireDatabaseFolder: true) { }
+
+    /// <summary>A service over any file. Only the real one wires the database-folder hooks - a test copy
+    /// must not take them over.</summary>
+    internal JsonSettingsService(string path, bool wireDatabaseFolder)
     {
-        try
-        {
-            if (File.Exists(_path))
-                _values = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_path)) ?? new();
-            else
-                MigrateFromMauiPreferences();   // one-time, only before settings.json first exists
-        }
-        catch { /* corrupt file -> defaults */ }
+        _path = path;
+        Load();
+
+        if (!wireDatabaseFolder) return;
 
         // The custom database directory was a MAUI Preference; back it with settings.json now.
         Procure.Data.DatabaseConstants.SavedDirectoryReader = () =>
-            _values.TryGetValue(nameof(DatabaseDirectory), out var d) && !string.IsNullOrWhiteSpace(d) ? d : null;
+        {
+            lock (_gate)
+                return _values.TryGetValue(nameof(DatabaseDirectory), out var d) && !string.IsNullOrWhiteSpace(d) ? d : null;
+        };
         Procure.Data.DatabaseConstants.SavedDirectoryWriter = v => Set(nameof(DatabaseDirectory), v);
+    }
+
+    private string BackupPath => _path + ".bak";
+
+    private static Dictionary<string, string>? TryRead(string file)
+    {
+        try
+        {
+            return File.Exists(file)
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file))
+                : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>The file, else its last good copy, else a first run. A file that cannot be read is moved
+    /// aside rather than overwritten by the next save: it holds the saved database folder, and losing that
+    /// silently opens a new empty database.</summary>
+    private void Load()
+    {
+        lock (_gate)
+        {
+            if (File.Exists(_path))
+            {
+                var read = TryRead(_path);
+                if (read is not null) { _values = read; return; }
+
+                var kept = TryQuarantine();
+                _values = TryRead(BackupPath) ?? new();
+                Procure.Utilities.CrashLog.Write(_values.Count > 0
+                    ? $"settings.json could not be read; restored the last good copy (damaged file kept as {kept})"
+                    : $"settings.json could not be read and there is no good copy; settings are back to defaults (damaged file kept as {kept})");
+                return;
+            }
+
+            if (TryRead(BackupPath) is { } fromBackup) { _values = fromBackup; return; }
+
+            try { MigrateFromMauiPreferences(); }   // one-time, only before settings.json first exists
+            catch { /* nothing to carry forward */ }
+        }
+    }
+
+    private string? TryQuarantine()
+    {
+        try
+        {
+            var aside = Path.Combine(Path.GetDirectoryName(_path)!, $"settings.damaged-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+            File.Move(_path, aside);
+            return Path.GetFileName(aside);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Writes the whole file: to a temp file first, then swapped in, with the previous file kept as
+    /// .bak. A crash or a full disk mid-write can no longer leave half a file behind. Failure is recorded
+    /// in <see cref="LastSaveError"/> and logged, never thrown into the setter that triggered it.</summary>
+    private bool Persist()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                var tmp = _path + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(_values));
+                if (File.Exists(_path)) File.Copy(_path, BackupPath, overwrite: true);
+                File.Move(tmp, _path, overwrite: true);
+                LastSaveError = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LastSaveError = ex.Message;
+                Procure.Utilities.CrashLog.Write("settings.json could not be saved", ex);
+                return false;
+            }
+        }
     }
 
     // MAUI stored settings via Preferences, which on unpackaged Windows is this JSON file:
@@ -78,7 +163,7 @@ public sealed class JsonSettingsService : ISettingsService
         Copy("CustomDatabaseDirectory", nameof(DatabaseDirectory));
 
         if (_values.Count == 0) return;
-        try { File.WriteAllText(_path, JsonSerializer.Serialize(_values)); } catch { }
+        Persist();
 
         // Keyboard shortcut overrides lived under the same Preferences store.
         if (V("Procure_KeyboardShortcutOverrides") is { } ko && ko.Trim() is not ("" or "{}"))
@@ -89,13 +174,19 @@ public sealed class JsonSettingsService : ISettingsService
 
     public event EventHandler<SettingsChangedEventArgs>? SettingsChanged;
 
-    private string Get(string key, string fallback) => _values.TryGetValue(key, out var v) ? v : fallback;
+    private string Get(string key, string fallback)
+    {
+        lock (_gate) return _values.TryGetValue(key, out var v) ? v : fallback;
+    }
 
     private void Set(string key, string value, [System.Runtime.CompilerServices.CallerMemberName] string prop = "")
     {
-        if (_values.TryGetValue(key, out var cur) && cur == value) return;
-        _values[key] = value;
-        try { File.WriteAllText(_path, JsonSerializer.Serialize(_values)); } catch { }
+        lock (_gate)
+        {
+            if (_values.TryGetValue(key, out var cur) && cur == value) return;
+            _values[key] = value;
+            Persist();
+        }
         SettingsChanged?.Invoke(this, new SettingsChangedEventArgs(prop));
     }
 

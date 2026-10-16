@@ -594,7 +594,9 @@ namespace Procure.PageModels
             {
                 _settingsService.UrgentOverdueDays = UrgentDays;
                 _settingsService.NormalOverdueDays = NormalDays;
-                _settingsService.DatabaseDirectory = DatabaseDirectory;
+                // The database folder is deliberately not written here. DatabaseDirectory is the folder in
+                // use right now, which includes a PROCURE_DB_DIR test override; saving it made a test
+                // database the permanent one. It changes only through ChangeDatabaseLocationAsync.
                 _settingsService.AutoCheckUpdatesOnStartup = AutoCheckUpdates;
                 _settingsService.DefaultReminderTime = Utilities.TaskReminders.FormatTime(new TimeSpan(DefaultReminderTime.Hours, DefaultReminderTime.Minutes, 0));
                 _settingsService.LocalCurrency = LocalCurrency;
@@ -617,6 +619,14 @@ namespace Procure.PageModels
                     current.Remove(row.Currency);
                 }
                 foreach (var removed in current) _settingsService.RemoveCurrencyRate(removed);
+
+                if (_settingsService.LastSaveError is { } saveError)
+                {
+                    SavedMessage = string.Empty;
+                    await _dialogs.DisplayAlertAsync("Settings Not Saved",
+                        $"Procure could not write your settings to disk ({saveError}). They apply until you close Procure, then are lost.", "OK");
+                    return;
+                }
 
                 SavedMessage = "Settings saved";
                 var gen = ++_savedMessageGeneration;

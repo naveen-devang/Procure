@@ -36,15 +36,39 @@ namespace Procure.Data
         private static string? _cachedDirectory;
         private static string? _cachedConnectionString;
 
+        /// <summary>Which folder holds the database: the test override, else the saved one, else the
+        /// default. A blank value is "not set", not a folder. An empty PROCURE_DB_DIR (clearing a variable
+        /// with "" instead of removing it) used to win over everything and point the app at the working
+        /// directory or fail outright, which looked like every requisition having vanished.</summary>
+        internal static string ResolveDirectory(string? envOverride, string? saved, string defaultDirectory) =>
+            !string.IsNullOrWhiteSpace(envOverride) ? envOverride.Trim()
+            : !string.IsNullOrWhiteSpace(saved) ? saved
+            : defaultDirectory;
+
+        internal static void SelfCheck()
+        {
+            static void Check(bool ok, string what)
+            {
+                if (!ok) throw new InvalidOperationException("DatabaseConstants: " + what);
+            }
+            Check(ResolveDirectory("/test", "/saved", "/default") == "/test", "the override wins");
+            Check(ResolveDirectory(null, "/saved", "/default") == "/saved", "then the saved folder");
+            Check(ResolveDirectory(null, null, "/default") == "/default", "then the default");
+            Check(ResolveDirectory("", "/saved", "/default") == "/saved", "an empty override is not a folder");
+            Check(ResolveDirectory("   ", null, "/default") == "/default", "nor is a blank one");
+            Check(ResolveDirectory(null, "", "/default") == "/default", "nor an empty saved folder");
+        }
+
         public static string DatabaseDirectory
         {
             get
             {
                 if (_cachedDirectory is null)
                 {
-                    _cachedDirectory = Environment.GetEnvironmentVariable("PROCURE_DB_DIR")
-                                       ?? SavedDirectoryReader?.Invoke()
-                                       ?? DefaultDatabaseDirectory;
+                    _cachedDirectory = ResolveDirectory(
+                        Environment.GetEnvironmentVariable("PROCURE_DB_DIR"),
+                        SavedDirectoryReader?.Invoke(),
+                        DefaultDatabaseDirectory);
                     Directory.CreateDirectory(_cachedDirectory); // no-op when it already exists
                 }
                 return _cachedDirectory;

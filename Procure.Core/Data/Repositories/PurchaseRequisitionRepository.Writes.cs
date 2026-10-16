@@ -449,6 +449,63 @@ ON CONFLICT(Id) DO UPDATE SET
             await tx.CommitAsync().ConfigureAwait(false);
         }
 
+        /// <summary>After an order or quote is deleted, lets the requisition's status fall back to what it
+        /// still has, so "PO Raised" never outlives its last order. Here rather than in the page so it also
+        /// runs when the delete is carried out by the Undo timer, the app closing, or the next launch.
+        /// Same transaction as the delete. The rules, and which statuses are never touched, are StatusFlow.</summary>
+        private static async Task ReconcileStatusAfterDeleteAsync(SqliteConnection connection, SqliteTransaction tx, Guid prId, bool orderDeleted)
+        {
+            string? current;
+            using (var read = connection.CreateCommand())
+            {
+                read.Transaction = tx;
+                read.CommandText = "SELECT Status FROM PurchaseRequisition WHERE Id = @Id;";
+                read.Parameters.AddWithValue("@Id", prId.ToString());
+                current = (await read.ExecuteScalarAsync().ConfigureAwait(false)) as string;
+            }
+            if (current is null) return;
+
+            int rfqCount, rfqOutstanding, poCount, poDelivered, pcrCount, pcrApproved;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                // A quote counts as received the way RequestForQuotation.IsQuoteReceived counts it from its own
+                // columns; the PCR as approved the way the board's "PCR awaiting sign" filter does.
+                cmd.CommandText = $@"
+SELECT
+  (SELECT COUNT(*) FROM RequestForQuotation WHERE PrId = @Id),
+  (SELECT COUNT(*) FROM RequestForQuotation WHERE PrId = @Id
+     AND NOT (Status = @Received OR QuoteReceivedDate IS NOT NULL OR COALESCE(QuoteAmount, 0) > 0)),
+  (SELECT COUNT(*) FROM PurchaseOrder WHERE PrId = @Id),
+  (SELECT COUNT(*) FROM PurchaseOrder WHERE PrId = @Id AND Status = @Delivered),
+  (SELECT COUNT(*) FROM PriceComparisonRequest WHERE PrId = @Id),
+  (SELECT COUNT(*) FROM PriceComparisonRequest p WHERE p.PrId = @Id AND NOT ({SqlPcrPending}));";
+                cmd.Parameters.AddWithValue("@Id", prId.ToString());
+                cmd.Parameters.AddWithValue("@Received", RfqStatus.QuoteReceived);
+                cmd.Parameters.AddWithValue("@Delivered", PoStatus.Delivered);
+                using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                await reader.ReadAsync().ConfigureAwait(false);
+                rfqCount = reader.GetInt32(0);
+                rfqOutstanding = reader.GetInt32(1);
+                poCount = reader.GetInt32(2);
+                poDelivered = reader.GetInt32(3);
+                pcrCount = reader.GetInt32(4);
+                pcrApproved = reader.GetInt32(5);
+            }
+
+            var next = StatusFlow.AfterDelete(current, orderDeleted, rfqCount, rfqOutstanding == 0,
+                pcrCount > 0, pcrApproved > 0, poCount, poDelivered);
+            if (next is null) return;
+
+            using var update = connection.CreateCommand();
+            update.Transaction = tx;
+            update.CommandText = "UPDATE PurchaseRequisition SET Status = @Status, UpdatedAt = @Now WHERE Id = @Id;";
+            update.Parameters.AddWithValue("@Status", next);
+            update.Parameters.AddWithValue("@Now", DateTime.Now.ToString("o"));
+            update.Parameters.AddWithValue("@Id", prId.ToString());
+            await update.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
+
         public Task DeleteRfqAsync(Guid rfqId) => Task.Run(() => DeleteRfqCoreAsync(rfqId));
 
         private async Task DeleteRfqCoreAsync(Guid rfqId)
@@ -477,6 +534,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
+            await ReconcileStatusAfterDeleteAsync(connection, tx, prId, orderDeleted: false).ConfigureAwait(false);
             await RefreshSearchIndexAsync(connection, tx, prId).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);
         }
@@ -832,6 +890,7 @@ ON CONFLICT(Id) DO UPDATE SET
                 await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
+            await ReconcileStatusAfterDeleteAsync(connection, tx, prId, orderDeleted: true).ConfigureAwait(false);
             await RefreshSearchIndexAsync(connection, tx, prId).ConfigureAwait(false);
             await MaterialAggregateMaintenance.RefreshKeysAsync(connection, tx, materialKeysBefore).ConfigureAwait(false);
             await tx.CommitAsync().ConfigureAwait(false);

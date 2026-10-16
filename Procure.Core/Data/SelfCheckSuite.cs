@@ -35,6 +35,8 @@ namespace Procure.Data
             if (On("PROCURE_SELFCHECK"))
             {
                 PrLineMatcherSelfCheck.Run();
+                Procure.Models.StatusFlow.SelfCheck();
+                DatabaseConstants.SelfCheck();
                 ClipboardItemParserSelfCheck.Run();
                 PcrCurrencyConversionSelfCheck.Run();
                 PcrDiscountSelfCheck.Run();
@@ -58,6 +60,7 @@ namespace Procure.Data
             // Drives the live board, so it is never mixed with anything else.
             if (On("PROCURE_BOARD_MEMORY")) return BoardRetentionProbe.RunAsync(services);
             if (On("PROCURE_BOARDTABS_PROBE")) return BoardTabsProbe.RunAsync(services);
+            if (On("PROCURE_STATUS_PROBE")) return StatusIntegrityProbe.RunAsync(services);
             if (On("PROCURE_UNDO_PROBE")) return UndoMemoryProbe.RunAsync(services);
             if (Environment.GetEnvironmentVariable("PROCURE_UNDO_RAM_PROBE") is { Length: > 0 } rows && int.TryParse(rows, out var scrollTo))
                 return UndoMemoryProbe.RamAfterDeleteAsync(services, scrollTo);

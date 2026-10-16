@@ -55,7 +55,9 @@ namespace Procure.PageModels
 
                 await _prRepo.SavePcrAsync(pcr);
                 pr.Pcr = pcr;
-                pr.Status = ProcurementStatus.PcrSubmitted;
+                // Only a requisition that has not been ordered yet takes its status from the comparison;
+                // one already on order, delivered, closed or on hold keeps it (see StatusFlow).
+                if (StatusFlow.AfterPcrChange(pr.Status, pcr.IsFullyApproved) is { } afterCreate) pr.Status = afterCreate;
                 await _prRepo.SavePrFieldsAsync(pr);
                 pr.NotifyHierarchyChanged();
                 DataChangeNotifier.Notify(ProcurementChange.Pr);
@@ -244,14 +246,9 @@ namespace Procure.PageModels
 
                 await _prRepo.SavePcrAsync(pcr);
 
-                if (pcr.IsFullyApproved)
+                if (StatusFlow.AfterPcrChange(ConfiguringPr.Status, pcr.IsFullyApproved) is { } afterStages)
                 {
-                    ConfiguringPr.Status = ProcurementStatus.PcrApproved;
-                    await _prRepo.SavePrFieldsAsync(ConfiguringPr);
-                }
-                else if (ConfiguringPr.Status == ProcurementStatus.PcrApproved)
-                {
-                    ConfiguringPr.Status = ProcurementStatus.PcrSubmitted;
+                    ConfiguringPr.Status = afterStages;
                     await _prRepo.SavePrFieldsAsync(ConfiguringPr);
                 }
 
@@ -272,14 +269,9 @@ namespace Procure.PageModels
                                ?? FilteredPrs.FirstOrDefault(p => p.Pcr != null && p.Pcr.Approvals.Any(a => a.Id == approval.Id));
                 if (parentPr?.Pcr != null)
                 {
-                    if (parentPr.Pcr.IsFullyApproved)
+                    if (StatusFlow.AfterPcrChange(parentPr.Status, parentPr.Pcr.IsFullyApproved) is { } next)
                     {
-                        parentPr.Status = ProcurementStatus.PcrApproved;
-                        await _prRepo.SavePrFieldsAsync(parentPr);
-                    }
-                    else if (parentPr.Status == ProcurementStatus.PcrApproved)
-                    {
-                        parentPr.Status = ProcurementStatus.PcrSubmitted;
+                        parentPr.Status = next;
                         await _prRepo.SavePrFieldsAsync(parentPr);
                     }
 

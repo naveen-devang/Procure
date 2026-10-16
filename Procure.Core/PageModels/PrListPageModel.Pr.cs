@@ -395,7 +395,9 @@ namespace Procure.PageModels
                         list.Insert(Math.Min(index, list.Count), child);
                         current.NotifyHierarchyChanged();
                     },
-                    onCommitted: notify);
+                    // The database delete also lets the requisition's status fall back (see
+                    // PurchaseRequisitionRepository.ReconcileStatusAfterDeleteAsync), so the card re-reads it.
+                    onCommitted: () => { notify(); ApplyFilters(); });
             }
 
             if (parent is not null)
@@ -403,7 +405,7 @@ namespace Procure.PageModels
                 collectionOf(parent).Remove(child);
                 parent.NotifyHierarchyChanged();
             }
-            if (_undo is null) notify();
+            if (_undo is null) { notify(); ApplyFilters(); }
         }
 
         /// <summary>The one PR delete path, for a single PR and for a selection: hides them now, and
