@@ -121,7 +121,14 @@ namespace Procure.Models
                 _suppressEstimatedPriceTextEcho = true;
                 try
                 {
-                    var (amount, currency) = SmartPriceParser.Parse(value, EstimatedCurrency ?? "AED");
+                    // Text that is not one price is not guessed at: the price and currency stay as they were
+                    // and the box says so (HasInvalidPriceText). Saving is refused until it is fixed.
+                    if (!SmartPriceParser.TryParse(value, EstimatedCurrency ?? "AED", out var amount, out var currency))
+                    {
+                        HasInvalidPriceText = true;
+                        return;
+                    }
+                    HasInvalidPriceText = false;
                     EstimatedUnitPrice = amount;
                     EstimatedCurrency = currency;
                 }
@@ -133,6 +140,10 @@ namespace Procure.Models
         }
 
         private bool _suppressEstimatedPriceTextEcho;
+
+        /// <summary>The price box holds text that is not a single price (a range, a sum, plain words).</summary>
+        [ObservableProperty]
+        public partial bool HasInvalidPriceText { get; set; }
 
         partial void OnEstimatedUnitPriceChanged(decimal? value) { RaiseEstimatedPriceTextChanged(); ForgetPriceSource(); }
         partial void OnEstimatedCurrencyChanged(string? value) { RaiseEstimatedPriceTextChanged(); ForgetPriceSource(); }
@@ -203,6 +214,7 @@ namespace Procure.Models
         private void RaiseEstimatedPriceTextChanged()
         {
             if (_suppressEstimatedPriceTextEcho) return;
+            HasInvalidPriceText = false;   // the price was set from elsewhere, and the box now shows it
             OnPropertyChanged(nameof(EstimatedPriceText));
         }
 

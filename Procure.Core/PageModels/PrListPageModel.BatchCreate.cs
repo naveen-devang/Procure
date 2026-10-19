@@ -322,6 +322,13 @@ namespace Procure.PageModels
                 // Filter valid line items
                 var validItems = entry.Items.Where(i => !string.IsNullOrWhiteSpace(i.ItemName)).ToList();
 
+                if (validItems.FirstOrDefault(i => i.HasInvalidPriceText) is { } badPrice)
+                {
+                    errors.Add($"Row {index}: the price on \"{badPrice.ItemName.Trim()}\" is not a number. Fix or clear it.");
+                    index++;
+                    continue;
+                }
+
                 // Description is optional. When it's blank but the row has line items, fill it from
                 // them so the board card still has a readable title; a row with neither is allowed
                 // (a placeholder PR held by its number).

@@ -39,6 +39,7 @@ internal static class PcrDiscountSelfCheck
             PdfSurvivesEveryLayout();
             TotalsRows();
             TotalsRowsSurviveEveryLayout();
+            HistoricalPriceWithoutACurrencyIsAed();
             Debug.WriteLine("PCR DISCOUNT SELF-CHECKS PASSED");
             CrashLog.Write("PCR DISCOUNT SELF-CHECKS PASSED");
         }
@@ -349,6 +350,33 @@ internal static class PcrDiscountSelfCheck
 
     /// <summary>Alpha (EUR) discounts line A by 10 a unit (10 NOS: 100 off); Beta (AED) discounts line B
     /// by 20 a unit (4 NOS: 80 off). Rate EUR to AED is 4 in every check.</summary>
+    // ---- a historical price with no currency saved -------------------------------------------------
+
+    /// <summary>No currency saved on a historical price means AED - on screen, in Excel and in the PDF. The
+    /// PDF used to print it in the first selected quote's currency, so a EUR quote turned the same figure
+    /// into "EUR 86.75" while Excel and the board said AED.</summary>
+    private static void HistoricalPriceWithoutACurrencyIsAed()
+    {
+        var pr = NewPr(("A", 2m), ("B", 3m));
+        pr.Items[0].EstimatedUnitPrice = 86.75m;            // the requisition's own historical price, no currency
+        var eur = Rfq(pr, "Eur Vendor", "EUR", Line(pr.Items[0], 100m, null), Line(pr.Items[1], 200m, null));
+        eur.Items[1].LastPrice = 70m;                       // a quote line's last price, no currency
+        var rfqs = new List<RequestForQuotation> { eur };
+
+        var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), rfqs, "x", null, null));
+        Assert(sheet.Contains("86.75 AED") && sheet.Contains("70.00 AED"), "Excel prints both historical prices in AED");
+        Assert(!sheet.Contains("86.75 EUR") && !sheet.Contains("70.00 EUR"), "and never in the quote's currency");
+
+        var pdf = Latin1(PcrPdfExporter.GeneratePdf(pr, Pcr(pr), rfqs, "x"));
+        Assert(pdf.Contains("(86.75) Tj") && pdf.Contains("(70.00) Tj"), "the PDF prints both historical figures");
+        Assert(pdf.Contains("(AED) Tj"), "and in AED, like Excel");
+
+        // a price that does carry its currency keeps it
+        pr.Items[0].EstimatedCurrency = "USD";
+        var usd = Latin1(PcrPdfExporter.GeneratePdf(pr, Pcr(pr), rfqs, "x"));
+        Assert(usd.Contains("(USD) Tj"), "a historical price with its own currency prints that currency");
+    }
+
     private static (PurchaseRequisition, List<RequestForQuotation>) Mixed()
     {
         var pr = NewPr(("A", 10m), ("B", 4m));

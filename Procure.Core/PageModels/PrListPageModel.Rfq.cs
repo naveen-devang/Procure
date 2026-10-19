@@ -797,6 +797,7 @@ namespace Procure.PageModels
                     Quantity = stray.Quantity,
                     Unit = stray.Unit,
                     EstimatedUnitPrice = stray.LastPrice,
+                    EstimatedCurrency = stray.LastPriceCurrency,
                     SortOrder = sortOrder++
                 };
                 pr.Items.Add(prItem);

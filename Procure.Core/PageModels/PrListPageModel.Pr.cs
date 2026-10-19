@@ -217,6 +217,9 @@ namespace Procure.PageModels
                     Quantity = i.Quantity,
                     Unit = string.IsNullOrWhiteSpace(i.Unit) ? "pcs" : StripControlChars(i.Unit),
                     EstimatedUnitPrice = i.EstimatedUnitPrice,
+                    // The currency belongs to the price. Left out, every line reopened as AED and Save
+                    // wrote that back, quietly turning each USD or EUR historical price into AED.
+                    EstimatedCurrency = i.EstimatedCurrency,
                     Notes = i.Notes,
                     SortOrder = i.SortOrder
                 }).ToList();
@@ -255,23 +258,13 @@ namespace Procure.PageModels
         {
             if (CurrentEditingPr == null) return;
 
-            // Commit the buffered header fields onto the live PR now — the modal edits buffers so
-            // typing does not repaint the board card behind it.
-            CurrentEditingPr.PrNo = EditingPrNo;
-            CurrentEditingPr.Requestor = EditingPrRequestor;
-            CurrentEditingPr.RequestedFor = EditingPrRequestedFor?.Trim() ?? string.Empty;
-            CurrentEditingPr.Description = EditingPrDescription;
-            CurrentEditingPr.Notes = EditingPrNotes;
-
-            if (string.IsNullOrWhiteSpace(CurrentEditingPr.PrNo))
+            // Everything that can refuse the save is checked first, against the modal's own buffers, so a
+            // refused save leaves the live requisition (and the board card behind the modal) untouched.
+            // The header used to be written onto the live PR before these checks, so a blank PR number
+            // showed on the card until the dialog was cancelled.
+            if (FirstEditError() is { } editError)
             {
-                    await _dialogs.DisplayAlertAsync("Validation", "PR Number is required.", "OK");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(CurrentEditingPr.PrType))
-            {
-                    await _dialogs.DisplayAlertAsync("Validation", "PR Type is required. Please select a PR Type.", "OK");
+                await _dialogs.DisplayAlertAsync(editError.Title, editError.Message, "OK");
                 return;
             }
 
@@ -280,6 +273,14 @@ namespace Procure.PageModels
             // Cutting a line below what is already ordered is allowed, but not silently: the PR then
             // carries a visible Over-ordered state instead of the old "Complete".
             if (!await ConfirmQuantityCutsAsync(CurrentEditingPr, validItems)) return;
+
+            // Commit the buffered header fields onto the live PR now — the modal edits buffers so
+            // typing does not repaint the board card behind it.
+            CurrentEditingPr.PrNo = EditingPrNo;
+            CurrentEditingPr.Requestor = EditingPrRequestor;
+            CurrentEditingPr.RequestedFor = EditingPrRequestedFor?.Trim() ?? string.Empty;
+            CurrentEditingPr.Description = EditingPrDescription;
+            CurrentEditingPr.Notes = EditingPrNotes;
 
             // The pre-edit lines, kept back before the new list replaces them: the quote sync below
             // resolves against these, which is the only way it can tell a rename from a deletion
@@ -299,7 +300,19 @@ namespace Procure.PageModels
             {
                 CurrentEditingPr.CustomValues = new ObservableCollection<CustomFieldValue>(EditingCustomValues);
                 await _prRepo.SaveAsync(CurrentEditingPr);
+            }
+            catch (Exception ex)
+            {
+                // Nothing reached the database: put the live requisition back as it was, so the card does
+                // not keep showing edits that were never saved. The modal stays open with the user's text
+                // in it, to try again or cancel.
+                if (_editSnapshot is { } snapshot) RestoreFromSnapshot(CurrentEditingPr, snapshot);
+                _errorHandler.HandleError(ex);
+                return;
+            }
 
+            try
+            {
                 // Only now: a quote line references a PR line by foreign key, so a line added to the
                 // requisition has to be in the database before a quote can point at it.
                 var syncSummary = await SyncQuotesToPrAsync(CurrentEditingPr, preEditItems, validItems);
@@ -320,23 +333,43 @@ namespace Procure.PageModels
             }
         }
 
+        /// <summary>The first reason the Edit PR box cannot be saved, or null. Reads only the modal's buffers
+        /// and rows, so it changes nothing.</summary>
+        internal (string Title, string Message)? FirstEditError()
+        {
+            if (string.IsNullOrWhiteSpace(EditingPrNo))
+                return ("Validation", "PR Number is required.");
+
+            if (string.IsNullOrWhiteSpace(CurrentEditingPr?.PrType))
+                return ("Validation", "PR Type is required. Please select a PR Type.");
+
+            if (EditingPrItems.FirstOrDefault(i => !string.IsNullOrWhiteSpace(i.ItemName) && i.HasInvalidPriceText) is { } bad)
+                return ("Price not understood",
+                    $"The price on \"{bad.ItemName.Trim()}\" is not a number. Type one price, like 86.75 or 86.75 usd, or clear the box.");
+
+            return null;
+        }
+
+        private static void RestoreFromSnapshot(PurchaseRequisition pr, PrEditSnapshot s)
+        {
+            pr.PrNo = s.PrNo;
+            pr.Requestor = s.Requestor;
+            pr.RequestedFor = s.RequestedFor;
+            pr.Plant = s.Plant;
+            pr.PrType = s.PrType;
+            pr.Description = s.Description;
+            pr.Priority = s.Priority;
+            pr.Status = s.Status;
+            pr.Notes = s.Notes;
+            pr.Items = s.Items;
+            pr.CustomValues = s.CustomValues;
+        }
+
         [RelayCommand]
         public void CloseEditModal()
         {
             if (CurrentEditingPr is { } pr && _editSnapshot is { } s)
-            {
-                pr.PrNo = s.PrNo;
-                pr.Requestor = s.Requestor;
-                pr.RequestedFor = s.RequestedFor;
-                pr.Plant = s.Plant;
-                pr.PrType = s.PrType;
-                pr.Description = s.Description;
-                pr.Priority = s.Priority;
-                pr.Status = s.Status;
-                pr.Notes = s.Notes;
-                pr.Items = s.Items;
-                pr.CustomValues = s.CustomValues;
-            }
+                RestoreFromSnapshot(pr, s);
             _editSnapshot = null;
             IsEditModalVisible = false;
         }

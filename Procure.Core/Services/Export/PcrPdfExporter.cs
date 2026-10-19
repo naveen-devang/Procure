@@ -156,6 +156,11 @@ namespace Procure.Services.Export
         private static string CurrencyOf(RequestForQuotation rf) =>
             string.IsNullOrWhiteSpace(rf.Currency) ? "AED" : rf.Currency.Trim();
 
+        /// <summary>A historical (last) price with no currency saved is AED - what the Edit PR box, the board
+        /// and the Excel export all say. It used to take the first selected quote's currency here, so the
+        /// same line printed as AED in Excel and as that quote's currency in the PDF.</summary>
+        private const string HistoricalFallbackCurrency = "AED";
+
         private static string DefaultCurrencyOf(IReadOnlyList<RequestForQuotation> rfqs) =>
             rfqs.Count == 0 ? "AED" : CurrencyOf(rfqs[0]);
 
@@ -221,13 +226,13 @@ namespace Procure.Services.Export
                 }
                 if (rowLast > 0)
                 {
-                    var rowLastCurrency = string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? defaultCurrency : item.EstimatedCurrency.Trim();
+                    var rowLastCurrency = string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? HistoricalFallbackCurrency : item.EstimatedCurrency.Trim();
                     for (int i = 0; i < n; i++)
                     {
                         var ri = matched[p, i];
                         if (ri?.LastPrice > 0)
                         {
-                            rowLastCurrency = string.IsNullOrWhiteSpace(ri.LastPriceCurrency) ? defaultCurrency : ri.LastPriceCurrency.Trim();
+                            rowLastCurrency = string.IsNullOrWhiteSpace(ri.LastPriceCurrency) ? HistoricalFallbackCurrency : ri.LastPriceCurrency.Trim();
                             break;
                         }
                     }
@@ -1091,11 +1096,11 @@ namespace Procure.Services.Export
                     if (rfqItem?.QuotedUnitPrice is > 0 || (rfq.BaseAmount > 0 && prItems.Count == 1))
                         currencies.Add(CurrencyOf(rfq));
                     if (rfqItem?.LastPrice is > 0)
-                        currencies.Add(string.IsNullOrWhiteSpace(rfqItem.LastPriceCurrency) ? defaultCur : rfqItem.LastPriceCurrency);
+                        currencies.Add(string.IsNullOrWhiteSpace(rfqItem.LastPriceCurrency) ? HistoricalFallbackCurrency : rfqItem.LastPriceCurrency);
                 }
 
                 if (item.EstimatedUnitPrice is > 0)
-                    currencies.Add(string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? defaultCur : item.EstimatedCurrency);
+                    currencies.Add(string.IsNullOrWhiteSpace(item.EstimatedCurrency) ? HistoricalFallbackCurrency : item.EstimatedCurrency);
 
                 return PcrCurrencyConversion.RowNeedsTwoLines(conversion, currencies);
             }
@@ -1283,7 +1288,7 @@ namespace Procure.Services.Export
                         // Always carries its own currency in the cell, never the column heading -
                         // unlike a vendor's quote, this figure's currency can differ row to row (the
                         // PR's estimate or a past purchase, not this RFQ's own quote currency).
-                        var rowCur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? defaultCur : rowLastPriceCurrency;
+                        var rowCur = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? HistoricalFallbackCurrency : rowLastPriceCurrency;
                         DrawMoneyCell(colX[HistoricalColIdx()], historicalWidth, singleLineCenterY, rowCur, rowLastPrice,
                             fontSize: 7.5, showZeroAsDash: true, rowTwoLines: itemRowNeedsConversion[itemPos],
                             rowTop: curY, rowHeight: rowH);

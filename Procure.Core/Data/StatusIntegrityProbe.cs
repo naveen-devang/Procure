@@ -119,6 +119,7 @@ namespace Procure.Data
                 var vm = services.GetRequiredService<PrListPageModel>();
                 _repo = services.GetRequiredService<IPurchaseRequisitionRepository>();
                 var undo = services.GetRequiredService<UndoDeleteService>();
+                var db = services.GetRequiredService<SqliteDatabase>();
                 _run = Guid.NewGuid().ToString("N")[..5].ToUpperInvariant();
                 Log.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  status integrity probe");
 
@@ -303,6 +304,124 @@ namespace Procure.Data
                     Check(await StatusOf(pr.Id) == ProcurementStatus.RfqSent, "the only quote set back to Sent -> RFQ Sent");
                     await vm.UpdateRfqStatusDirectAsync(LiveRfq(), RfqStatus.QuoteReceived);
                     Check(await StatusOf(pr.Id) == ProcurementStatus.QuotesReceived, "and received again -> Quotes Received");
+                }
+
+                // ------------------------------------------------------ 8 historical price currency
+                Section("8. A historical price keeps its currency through Edit PR");
+                {
+                    var pr = await NewPr("H01", ProcurementStatus.PrRaised);
+                    pr.Items.Add(new PrItem { Id = Guid.NewGuid(), PrId = pr.Id, ItemName = "probe usd item", Quantity = 2, Unit = "pcs", EstimatedUnitPrice = 86.75m, EstimatedCurrency = "USD", SortOrder = 0 });
+                    pr.Items.Add(new PrItem { Id = Guid.NewGuid(), PrId = pr.Id, ItemName = "probe eur item", Quantity = 1, Unit = "pcs", EstimatedUnitPrice = 12m, EstimatedCurrency = "EUR", SortOrder = 1 });
+                    pr.Items.Add(new PrItem { Id = Guid.NewGuid(), PrId = pr.Id, ItemName = "probe aed item", Quantity = 1, Unit = "pcs", EstimatedUnitPrice = 5m, SortOrder = 2 });
+                    await _repo.SaveAsync(pr);
+
+                    // an open quote that carries the requisition's prices as its Last price
+                    var rfq = new RequestForQuotation { Id = Guid.NewGuid(), PrId = pr.Id, RfqNo = pr.PrNo + "-r", Vendor = "probe vendor", Currency = "AED", VatType = "5%", Status = RfqStatus.Sent, SentDate = DateTime.Today };
+                    foreach (var i in pr.Items)
+                        rfq.Items.Add(new RfqItem { Id = Guid.NewGuid(), RfqId = rfq.Id, PrItemId = i.Id, ItemName = i.ItemName, Quantity = i.Quantity, Unit = i.Unit, IsQuoted = true, LastPrice = i.EstimatedUnitPrice, LastPriceCurrency = i.EstimatedCurrency, SortOrder = i.SortOrder });
+                    await _repo.SaveRfqAsync(rfq);
+
+                    vm.SearchAnyOf(pr.PrNo); await Settled(vm);
+                    var card = vm.FilteredPrs.First(p => p.Id == pr.Id);
+                    await vm.OpenEditPrModalCommand.ExecuteAsync(card);
+                    var open = vm.EditingPrItems.ToDictionary(i => i.ItemName, i => i.EstimatedPriceText);
+                    Check(open["probe usd item"] == "86.75 USD" && open["probe eur item"] == "12 EUR" && open["probe aed item"] == "5 AED",
+                          $"the box reopens as '{open["probe usd item"]}', '{open["probe eur item"]}', '{open["probe aed item"]}'");
+
+                    // save without touching a price
+                    await vm.SavePrModalCommand.ExecuteAsync(null); await Settled(vm);
+                    var saved = (await _repo.GetByIdsAsync(new[] { pr.Id })).Single().Items.ToDictionary(i => i.ItemName);
+                    Check(saved["probe usd item"].EstimatedCurrency == "USD" && saved["probe usd item"].EstimatedUnitPrice == 86.75m
+                          && saved["probe eur item"].EstimatedCurrency == "EUR" && saved["probe eur item"].EstimatedUnitPrice == 12m,
+                          $"saving an edit that touched no price keeps USD and EUR (found {saved["probe usd item"].EstimatedCurrency}, {saved["probe eur item"].EstimatedCurrency})");
+
+                    // new values: a new price in the same currency, then a currency-only correction
+                    card = vm.FilteredPrs.First(p => p.Id == pr.Id);
+                    await vm.OpenEditPrModalCommand.ExecuteAsync(card);
+                    vm.EditingPrItems.First(i => i.ItemName == "probe usd item").EstimatedPriceText = "90";
+                    vm.EditingPrItems.First(i => i.ItemName == "probe eur item").EstimatedPriceText = "12 gbp";
+                    await vm.SavePrModalCommand.ExecuteAsync(null); await Settled(vm);
+                    var edited = (await _repo.GetByIdsAsync(new[] { pr.Id })).Single().Items.ToDictionary(i => i.ItemName);
+                    Check(edited["probe usd item"].EstimatedUnitPrice == 90m && edited["probe usd item"].EstimatedCurrency == "USD",
+                          $"a bare new price keeps the currency: 90 {edited["probe usd item"].EstimatedCurrency}");
+                    Check(edited["probe eur item"].EstimatedUnitPrice == 12m && edited["probe eur item"].EstimatedCurrency == "GBP",
+                          $"correcting only the currency saves: 12 {edited["probe eur item"].EstimatedCurrency}");
+
+                    var quote = (await _repo.GetByIdsAsync(new[] { pr.Id })).Single().Rfqs.Single().Items.ToDictionary(i => i.ItemName);
+                    Check(quote["probe usd item"].LastPrice == 90m && quote["probe usd item"].LastPriceCurrency == "USD",
+                          $"the open quote's Last price follows: 90 {quote["probe usd item"].LastPriceCurrency}");
+                    Check(quote["probe eur item"].LastPrice == 12m && quote["probe eur item"].LastPriceCurrency == "GBP",
+                          $"and follows a currency-only change: 12 {quote["probe eur item"].LastPriceCurrency}");
+                    Check(quote["probe aed item"].LastPrice == 5m, "an untouched line is left alone");
+
+                    // a line added in the edit reaches the open quote with its currency
+                    card = vm.FilteredPrs.First(p => p.Id == pr.Id);
+                    await vm.OpenEditPrModalCommand.ExecuteAsync(card);
+                    vm.AddEditingPrItemCommand.Execute(null);
+                    var added = vm.EditingPrItems.Last();
+                    added.ItemName = "probe new item"; added.EstimatedPriceText = "7 usd";
+                    await vm.SavePrModalCommand.ExecuteAsync(null); await Settled(vm);
+                    var quote2 = (await _repo.GetByIdsAsync(new[] { pr.Id })).Single().Rfqs.Single().Items.FirstOrDefault(i => i.ItemName == "probe new item");
+                    Check(quote2 is not null && quote2.LastPrice == 7m && quote2.LastPriceCurrency == "USD",
+                          $"a line added in the edit reaches the open quote as 7 {quote2?.LastPriceCurrency}");
+                }
+
+                // ------------------------------------------------------ 9 price box and failed save
+                Section("9. The price box refuses what it cannot read; a refused or failed save leaves the card alone");
+                {
+                    var box = new PrItem { ItemName = "box" };
+                    box.EstimatedPriceText = "86.75 usd";
+                    box.EstimatedPriceText = "12 - 15";
+                    Check(box.EstimatedUnitPrice == 86.75m && box.EstimatedCurrency == "USD" && box.HasInvalidPriceText, "a range leaves the price as it was and flags the box");
+                    box.EstimatedPriceText = "86.75 x 2";
+                    Check(box.EstimatedUnitPrice == 86.75m && box.HasInvalidPriceText, "a multiplication is not stored as 86.752");
+                    box.EstimatedPriceText = "90";
+                    Check(box.EstimatedUnitPrice == 90m && box.EstimatedCurrency == "USD" && !box.HasInvalidPriceText, "then a real price clears the flag and keeps the currency");
+                    box.EstimatedPriceText = "1.234,56 eur";
+                    Check(box.EstimatedUnitPrice == 1234.56m && box.EstimatedCurrency == "EUR", "a European price is read as 1234.56 EUR");
+                    box.EstimatedPriceText = "";
+                    Check(box.EstimatedUnitPrice is null && !box.HasInvalidPriceText, "an empty box clears the price");
+
+                    var pr = await NewPr("J01", ProcurementStatus.PrRaised);
+                    var original = pr.PrNo;
+                    pr.Items.Add(new PrItem { Id = Guid.NewGuid(), PrId = pr.Id, ItemName = "probe line", Quantity = 1, Unit = "pcs", EstimatedUnitPrice = 86.75m, EstimatedCurrency = "USD", SortOrder = 0 });
+                    await _repo.SaveAsync(pr);
+                    vm.SearchAnyOf(original); await Settled(vm);
+                    var card = vm.FilteredPrs.First(p => p.Id == pr.Id);
+                    var originalDescription = card.Description;
+                    await vm.OpenEditPrModalCommand.ExecuteAsync(card);
+
+                    vm.EditingPrNo = "";
+                    Check(vm.FirstEditError() is { Title: "Validation" } && card.PrNo == original, "a blank PR number is refused and the card keeps its number");
+                    vm.EditingPrNo = original;
+                    vm.EditingPrItems[0].EstimatedPriceText = "12 - 15";
+                    Check(vm.FirstEditError() is { Title: "Price not understood" }, "an unreadable price blocks the save");
+                    vm.EditingPrItems[0].EstimatedPriceText = "86.75 usd";
+                    Check(vm.FirstEditError() is null, "and fixing it unblocks it");
+
+                    // a save that fails: another connection holds the write lock past the busy timeout
+                    vm.EditingPrNo = original + "X";
+                    vm.EditingPrDescription = "changed description";
+                    vm.EditingPrItems[0].EstimatedPriceText = "99 eur";
+                    var sw = Stopwatch.StartNew();
+                    using (var blocker = db.CreateConnection())
+                    {
+                        await blocker.OpenAsync().ConfigureAwait(true);
+                        using (var begin = blocker.CreateCommand()) { begin.CommandText = "BEGIN IMMEDIATE;"; await begin.ExecuteNonQueryAsync().ConfigureAwait(true); }
+                        await vm.SavePrModalCommand.ExecuteAsync(null);
+                        using (var end = blocker.CreateCommand()) { end.CommandText = "ROLLBACK;"; await end.ExecuteNonQueryAsync().ConfigureAwait(true); }
+                    }
+                    Check(sw.ElapsedMilliseconds > 3000, $"the save really was blocked ({sw.ElapsedMilliseconds} ms)");
+                    Check(card.PrNo == original && card.Description == originalDescription, $"after the failed save the card still shows '{card.PrNo}' and its old description");
+                    Check(card.Items.Count == 1 && card.Items[0].EstimatedUnitPrice == 86.75m && card.Items[0].EstimatedCurrency == "USD", "and its old line and price");
+                    Check(vm.IsEditModalVisible && vm.EditingPrNo == original + "X" && vm.EditingPrDescription == "changed description", "while the box stays open with the typed text");
+                    Check((await _repo.GetByIdsAsync(new[] { pr.Id })).Single().PrNo == original, "and nothing reached the database");
+
+                    // try again once the lock is gone
+                    await vm.SavePrModalCommand.ExecuteAsync(null); await Settled(vm);
+                    var after = (await _repo.GetByIdsAsync(new[] { pr.Id })).Single();
+                    Check(after.PrNo == original + "X" && after.Description == "changed description" && after.Items.Single().EstimatedUnitPrice == 99m && after.Items.Single().EstimatedCurrency == "EUR",
+                          "saving again works: the new number, description and 99 EUR are stored");
                 }
 
                 // ------------------------------------------------------ 7 settings

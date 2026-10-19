@@ -25,6 +25,11 @@ namespace Procure.PageModels
 
         private void CapturePrItemsSnapshot(PurchaseRequisition pr) => _prItemsToPurgeFromQuotes.Clear();
 
+        /// <summary>No currency means AED everywhere a price is shown, so the two read as the same.</summary>
+        private static bool SameCurrency(string? a, string? b) =>
+            string.Equals(string.IsNullOrWhiteSpace(a) ? "AED" : a.Trim(), string.IsNullOrWhiteSpace(b) ? "AED" : b.Trim(),
+                StringComparison.OrdinalIgnoreCase);
+
         /// <summary>A quote is "open" while no PO has been raised from it. Open quotes follow the
         /// requisition; once an order exists, the quote is part of that order's paper trail and is
         /// left exactly as it was.</summary>
@@ -216,7 +221,10 @@ namespace Procure.PageModels
                     // The one place a value travels down without having just been edited: a quote line
                     // that has never carried a last price at all. Quotes written before this synced
                     // would otherwise show an empty column until someone typed the estimate twice.
+                    // The price or its currency: correcting only the currency (86.75 USD to 86.75 EUR) is
+                    // a change to the figure too, and used to stop at the requisition.
                     if (oldLine.EstimatedUnitPrice != updated.EstimatedUnitPrice
+                        || !SameCurrency(oldLine.EstimatedCurrency, updated.EstimatedCurrency)
                         || (line.LastPrice is null && updated.EstimatedUnitPrice.HasValue))
                     {
                         line.LastPrice = updated.EstimatedUnitPrice;
@@ -283,6 +291,7 @@ namespace Procure.PageModels
                         IsQuoted = true,
                         QuotedUnitPrice = null,
                         LastPrice = item.EstimatedUnitPrice,
+                        LastPriceCurrency = item.EstimatedCurrency,
                         SortOrder = sortOrder++
                     });
                     addedLines++;
