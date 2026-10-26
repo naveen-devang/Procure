@@ -1716,6 +1716,19 @@ namespace Procure.Data
             var pdf = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, rfqs, "flow check");
             Assert(pdf.Length > 1000, $"the PDF is produced; got {pdf.Length} bytes");
 
+            // A long payment term / warranty on one vendor wraps onto more lines - the Excel row
+            // grows (merged cells never auto-height) and the PDF still builds, taller, instead of
+            // shrinking the text.
+            var longTerm = string.Join(" ", Enumerable.Repeat("30% advance, 60% on delivery, 10% after commissioning.", 4));
+            var origTerms = rfqs[0].PaymentTerms;
+            rfqs[0].PaymentTerms = longTerm;
+            var longSheet = ReadSheetXml(Services.Export.PcrExcelExporter.GenerateExcel(read, read.Pcr ?? pcr, rfqs, "flow check"));
+            var termsRow = System.Text.RegularExpressions.Regex.Match(longSheet, @"<row r=""\d+"" ht=""(\d+)"">(?:(?!</row>).)*?>Payment Terms<", System.Text.RegularExpressions.RegexOptions.Singleline);
+            Assert(termsRow.Success && int.Parse(termsRow.Groups[1].Value) > 20, "a long payment term makes its Excel row taller than one line");
+            var longPdf = Services.Export.PcrPdfExporter.GeneratePdf(read, read.Pcr ?? pcr, rfqs, "flow check");
+            Assert(longPdf.Length > 1000, "and the PDF still builds with it");
+            rfqs[0].PaymentTerms = origTerms;
+
             // The preview no longer rasterizes every page up front - it opens the document once and
             // draws pages on request, so page one reaches the screen before the rest are done. Every
             // page has to come back as a real PNG from that path, in any order, or the preview shows

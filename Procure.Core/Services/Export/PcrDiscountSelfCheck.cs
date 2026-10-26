@@ -40,6 +40,8 @@ internal static class PcrDiscountSelfCheck
             TotalsRows();
             TotalsRowsSurviveEveryLayout();
             HistoricalPriceWithoutACurrencyIsAed();
+            LongTermsWrapInsteadOfOverflowing();
+            LongItemNamesShowInFull();
             Debug.WriteLine("PCR DISCOUNT SELF-CHECKS PASSED");
             CrashLog.Write("PCR DISCOUNT SELF-CHECKS PASSED");
         }
@@ -392,6 +394,76 @@ internal static class PcrDiscountSelfCheck
             ["KWD"] = eurRate,
         });
 
+    // A payment term / warranty too long for the vendor's column wraps onto more lines in both
+    // exports - never shrunk to nothing, never run across into the next vendor.
+    private static void LongTermsWrapInsteadOfOverflowing()
+    {
+        var pr = NewPr(("A", 1m));
+        var a = Rfq(pr, "Alpha", "AED", Line(pr.Items[0], 10m, null));
+        var b = Rfq(pr, "Beta", "AED", Line(pr.Items[0], 12m, null));
+        a.Warranty = new string('e', 300);
+        b.PaymentTerms = string.Join(" ", Enumerable.Repeat("30% advance, 60% on delivery,", 8));
+        var rfqs = new List<RequestForQuotation> { a, b };
+
+        var pdf = Latin1(PcrPdfExporter.GeneratePdf(pr, Pcr(pr), rfqs, "x"));
+        var runs = System.Text.RegularExpressions.Regex.Matches(pdf, @"\((e{10,})\) Tj").Select(m => m.Groups[1].Length).ToList();
+        Assert(runs.Count >= 2 && runs.Sum() == 300, $"the 300-character warranty is split over several lines with nothing lost; got {string.Join("+", runs)}");
+        Assert(runs.Max() < 150, $"no line of the warranty is wider than the column; longest has {runs.Max()} characters");
+        Assert(pdf.Contains("30% advance"), "a long payment term still prints");
+
+        var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), rfqs, "x"));
+        var rows = System.Text.RegularExpressions.Regex.Matches(sheet, @"<row r=""\d+"" ht=""(\d+)"">(?:(?!</row>).)*?>(Payment Terms|Warranty)<", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert(rows.Count == 2 && rows.All(m => int.Parse(m.Groups[1].Value) > 20), "both rows are taller than one line in the spreadsheet");
+
+        // Room to spare (two vendors): a long but ordinary warranty widens its own column and
+        // prints on one line. Five vendors share the page with nothing spare: it wraps instead.
+        const string warranty = "Twelve months from commissioning against manufacturing defects";
+        List<RequestForQuotation> Vendors(int n)
+        {
+            var list = Enumerable.Range(0, n).Select(k => Rfq(pr, "V" + k, "AED", Line(pr.Items[0], 10m + k, null))).ToList();
+            list[0].Warranty = warranty;
+            return list;
+        }
+        var few = Latin1(PcrPdfExporter.GeneratePdf(pr, Pcr(pr), Vendors(2), "x"));
+        var many = Latin1(PcrPdfExporter.GeneratePdf(pr, Pcr(pr), Vendors(5), "x"));
+        Assert(few.Contains("(" + warranty + ") Tj"), "with two vendors the warranty column widens and the text stays on one line");
+        Assert(!many.Contains("(" + warranty + ") Tj") && many.Contains("(Twelve months"), "with five vendors it wraps instead of widening");
+        var fewSheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), Vendors(2), "x"));
+        var manySheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), Vendors(5), "x"));
+        Assert(System.Text.RegularExpressions.Regex.Matches(fewSheet, @"<col min=""5"" max=""5"" width=""(\d+)""").Single().Groups[1].Value != "18", "the spreadsheet widens that vendor's column with two vendors");
+        Assert(System.Text.RegularExpressions.Regex.Matches(manySheet, @"<col min=""5"" max=""5"" width=""(\d+)""").Single().Groups[1].Value == "18", "and keeps it standard with five");
+    }
+
+    // An item name prints in full in both exports - the row grows to fit. Only a name taller than a
+    // whole page (PDF) or Excel's own row limit is cut, and the PDF says so with " ..".
+    private static void LongItemNamesShowInFull()
+    {
+        string Spec(int lines) => string.Join("\n", Enumerable.Range(0, lines).Select(k => "SPEC LINE " + k));
+        List<RequestForQuotation> Quotes(PurchaseRequisition p) => new() { Rfq(p, "Alpha", "AED", Line(p.Items[0], 10m, null)) };
+
+        var tall = NewPr((Spec(30), 1m), ("SHORT", 1m));
+        var pdf = Latin1(PcrPdfExporter.GeneratePdf(tall, Pcr(tall), Quotes(tall), "x"));
+        Assert(Enumerable.Range(0, 30).All(k => pdf.Contains("(SPEC LINE " + k + ") Tj")), "all 30 lines of a tall item name print in the PDF");
+        Assert(!pdf.Contains(" ..) Tj"), "and none of them is cut with an ellipsis");
+
+        var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(tall, Pcr(tall), Quotes(tall), "x"));
+        Assert(sheet.Contains("SPEC LINE 29"), "the spreadsheet cell carries every line");
+        var row = System.Text.RegularExpressions.Regex.Match(sheet, @"<row r=""\d+"" ht=""(\d+)"">(?:(?!</row>).)*?SPEC LINE 0", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert(row.Success && int.Parse(row.Groups[1].Value) is > 300 and <= 409, $"its row is tall, but never past Excel's 409 pt limit; got {(row.Success ? row.Groups[1].Value : "none")}");
+
+        // Longer than any page can hold: still builds, and says it was cut.
+        var huge = NewPr((Spec(400), 1m));
+        var hugePdf = Latin1(PcrPdfExporter.GeneratePdf(huge, Pcr(huge), Quotes(huge), "x"));
+        Assert(hugePdf.Contains(" ..) Tj") && hugePdf.Contains("(SPEC LINE 0) Tj"), "a name taller than a page ends in an ellipsis instead of running off it");
+        Assert(PcrPdfExporter.GeneratePdf(huge, Pcr(huge), Quotes(huge), "x", new PcrPdfOptions { LayoutMode = PdfLayoutMode.ShrinkToFit }, null, null).Length > 1000,
+            "and fit-to-one-page copes with it too");
+
+        // A part number with no break point is split across lines, not cut.
+        var wide = NewPr((new string('x', 400), 1m));
+        var widePdf = Latin1(PcrPdfExporter.GeneratePdf(wide, Pcr(wide), Quotes(wide), "x"));
+        var runs = System.Text.RegularExpressions.Regex.Matches(widePdf, @"\((x{10,})\) Tj").Select(m => m.Groups[1].Length).ToList();
+        Assert(runs.Sum() == 400 && runs.Count >= 2, $"an unbroken 400-character name is split with nothing lost; got {string.Join("+", runs)}");
+    }
     private static PurchaseRequisition NewPr(params (string Name, decimal Qty)[] items)
     {
         var pr = new PurchaseRequisition { Id = Guid.NewGuid(), PrNo = "PR-DISCOUNT-CHECK", Description = "discount check", Requestor = "check" };

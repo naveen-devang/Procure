@@ -161,7 +161,7 @@ namespace Procure.Services.Export
         <!-- 9: Summary Row Value (Bold 10pt, Border, Right, #,##0.00) -->
         <xf numFmtId=""164"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyNumberFormat=""1"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""right"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 10: Summary Row Center Value (Bold 10pt, Border, Center) -->
-        <xf numFmtId=""0"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center""/></xf>
+        <xf numFmtId=""0"" fontId=""1"" fillId=""0"" borderId=""1"" xfId=""0"" applyFont=""1"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center"" wrapText=""1""/></xf>
         <!-- 11: Signature Box Title (Bold 10pt, Fill, Border, Center) -->
         <xf numFmtId=""0"" fontId=""1"" fillId=""3"" borderId=""1"" xfId=""0"" applyFont=""1"" applyFill=""1"" applyBorder=""1""><alignment horizontal=""center"" vertical=""center""/></xf>
         <!-- 12: Signature Box Space (Border, Center) -->
@@ -171,6 +171,9 @@ namespace Procure.Services.Export
     </cellXfs>
 </styleSheet>");
         }
+
+        // Excel's maximum row height in points.
+        private const int MaxExcelRowHeight = 409;
 
         // No live text measurement is available in this hand-written OOXML writer, so wrapping is
         // estimated from character count against the column's own fixed width (set in <cols>
@@ -296,6 +299,15 @@ namespace Procure.Services.Export
             var widestItemNameLength = exportItems.Count > 0 ? exportItems.Max(i => LongestLineLength(i.ItemName)) : 0;
             int descColWidth = Math.Clamp(widestItemNameLength + 4, descColWidthFloor, descColWidthCap);
 
+            // A vendor whose payment terms / warranty / etc. run long widens its own Unit Price
+            // column - but only while few vendors share the sheet (few vendors = room to spare); with
+            // five or more every column keeps its width and the text wraps taller instead.
+            int pairCharCap = supplierCount <= 2 ? 60 : supplierCount == 3 ? 45 : supplierCount == 4 ? 35
+                : vendorQtyColWidth + vendorPriceColWidth;
+            var vendorPriceColWidths = selectedRfqs.Select(rf => Math.Max(vendorPriceColWidth,
+                Math.Min(new[] { rf.PaymentTerms, rf.Incoterms, rf.DeliveryLeadTime, rf.Warranty, rf.TechnicalApproval }
+                    .Max(LongestLineLength) + 4, pairCharCap) - vendorQtyColWidth)).ToArray();
+
             var sb = new StringBuilder();
             sb.Append(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
 <worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"">
@@ -312,7 +324,7 @@ namespace Procure.Services.Export
             {
                 sb.Append($@"
         <col min=""{VendorQtyCol(i)}"" max=""{VendorQtyCol(i)}"" width=""{vendorQtyColWidth}"" customWidth=""1""/>
-        <col min=""{VendorPriceCol(i)}"" max=""{VendorPriceCol(i)}"" width=""{vendorPriceColWidth}"" customWidth=""1""/>");
+        <col min=""{VendorPriceCol(i)}"" max=""{VendorPriceCol(i)}"" width=""{vendorPriceColWidths[i]}"" customWidth=""1""/>");
             }
             sb.Append($@"
         <col min=""{totalCols}"" max=""{totalCols}"" width=""{vendorPriceColWidth}"" customWidth=""1""/>");
@@ -458,13 +470,13 @@ namespace Procure.Services.Export
             if (prItems.Count == 0)
             {
                 // Fallback for PRs with no item rows
-                var fallbackDescLines = EstimateWrappedLineCount(pr.Description, descColWidth - 2, maxLines: 8);
+                var fallbackDescLines = EstimateWrappedLineCount(pr.Description, descColWidth - 2, int.MaxValue);
                 var fallbackCurrencies = selectedRfqs
                     .Where(rf => rf.BaseAmount > 0 || rf.QuoteAmount > 0)
                     .Select(rf => rf.Currency)
                     .ToList();
                 var fallbackTwoLines = RowNeedsConversion(fallbackCurrencies);
-                var fallbackRowHeight = Math.Max(22, 20 + fallbackDescLines * 16 + (fallbackTwoLines ? 16 : 0));
+                var fallbackRowHeight = Math.Clamp(20 + fallbackDescLines * 16 + (fallbackTwoLines ? 16 : 0), 22, MaxExcelRowHeight);
                 sb.Append($@"
         <row r=""{r}"" ht=""{fallbackRowHeight}"">
             <c r=""A{r}"" s=""6"" t=""inlineStr""><is><t>1</t></is></c>
@@ -524,11 +536,11 @@ namespace Procure.Services.Export
                     // Sized per-row from this item's own name only, not uniformly across every
                     // item row - a five-word item three rows down growing its own row shouldn't
                     // change the height of every short one-word row around it.
-                    var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, maxLines: 8);
+                    var descLines = EstimateWrappedLineCount(item.ItemName, descCharsPerLine, int.MaxValue);
                     var itemTwoLines = ItemRowNeedsConversion(item);
                     var itemHasDiscount = Enumerable.Range(0, supplierCount).Any(i =>
                         quoteByVendorAndLine[i].TryGetValue(item.Id, out var q) && q.HasLineDiscount);
-                    var itemRowHeight = 20 + (descLines * 16) + (itemTwoLines ? 16 : 0) + (itemHasDiscount ? 16 : 0);
+                    var itemRowHeight = Math.Min(MaxExcelRowHeight, 20 + (descLines * 16) + (itemTwoLines ? 16 : 0) + (itemHasDiscount ? 16 : 0));
 
                     sb.Append($@"
         <row r=""{r}"" ht=""{itemRowHeight}"">
@@ -633,8 +645,17 @@ namespace Procure.Services.Export
                     .Where(rf => valSelector(rf).isNum)
                     .Select(rf => rf.Currency))
                     || (lastPriceVal.isNum && hasHistoricalConversion);
+                // Text values (payment terms, warranty...) sit merged across the vendor's Qty+Price
+                // columns, which Excel never auto-heights - so size the row to the vendor with the
+                // most lines. Bold 10pt runs ~4 chars narrower than the columns' nominal width.
+                var textLines = selectedRfqs
+                    .Select((rf, i) => (val: valSelector(rf), width: vendorQtyColWidth + vendorPriceColWidths[i] - 4))
+                    .Where(v => !v.val.isNum)
+                    .Select(v => EstimateWrappedLineCount(NormalizeCellText(v.val.strVal), v.width, int.MaxValue))
+                    .DefaultIfEmpty(1).Max();
+                var rowHeight = Math.Min(MaxExcelRowHeight, Math.Max(summaryTwoLines ? 36 : 20, textLines * 13 + 6));
                 sb.Append($@"
-        <row r=""{r}"" ht=""{(summaryTwoLines ? 36 : 20)}"">
+        <row r=""{r}"" ht=""{rowHeight}"">
             <c r=""A{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
             <c r=""B{r}"" s=""8"" t=""inlineStr""><is><t>{EscapeXml(label)}</t></is></c>
             <c r=""C{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
@@ -658,7 +679,7 @@ namespace Procure.Services.Export
                     else
                     {
                         sb.Append($@"
-            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(val.strVal)}</t></is></c>
+            <c r=""{qtyColLetter}{r}"" s=""10"" t=""inlineStr""><is><t xml:space=""preserve"">{EscapeXml(NormalizeCellText(val.strVal))}</t></is></c>
             <c r=""{priceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
                     }
                 }

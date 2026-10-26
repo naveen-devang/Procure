@@ -40,10 +40,6 @@ namespace Procure.Services.Export
         // The list price a discount was taken off: grey, with a line through it.
         private const string StruckInkHex = "6B6B6B";
 
-        // A multi-line item name grows its row downward; past this many lines it truncates with an
-        // ellipsis rather than letting one row swallow a page.
-        private const int MaxItemNameLines = 8;
-
         /// <summary>The narrowest a vendor's Qty + Unit Price pair can be before a quantity and a price
         /// collide. A4 portrait with five suppliers lays its pairs out at ~42.6 pt, which is cramped but
         /// does not overlap, so it is deliberately just under that: every sheet that prints cleanly today
@@ -151,7 +147,7 @@ namespace Procure.Services.Export
         /// <summary>What each column's own content needs, measured once and shared by the fit scale,
         /// the column layout and the borrow pass - so the preview's "prints at N pt" can never
         /// disagree with the sheet.</summary>
-        private sealed record ColumnNeeds(double[] Qty, double[] Price, double[] Pair, double PrQty, double Hist);
+        private sealed record ColumnNeeds(double[] Qty, double[] Price, double[] Pair, double PrQty, double Hist, double[] Text);
 
         private static string CurrencyOf(RequestForQuotation rf) =>
             string.IsNullOrWhiteSpace(rf.Currency) ? "AED" : rf.Currency.Trim();
@@ -209,6 +205,7 @@ namespace Procure.Services.Export
             var qty = new double[n];
             var price = new double[n];
             var pair = new double[n];
+            var textWidth = new double[n];
             string Cell(string cur) => currencyInHeader ? string.Empty : cur;
 
             double prqNeed = 0, histNeed = 0;
@@ -268,7 +265,7 @@ namespace Procure.Services.Export
                 // The summary rows draw across the vendor's whole pair, so they constrain the pair
                 // rather than either half.
                 var baseAmt = rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m);
-                double pairNeed = 0;
+                double pairNeed = 0, textNeed = 0;
                 foreach (var amt in new[] { baseAmt, rf.Discount ?? 0m, baseAmt - (rf.Discount ?? 0m),
                                             rf.Freight ?? 0m, rf.OtherCharges ?? 0m, rf.NetTaxableAmount,
                                             rf.EffectiveVatAmount, rf.ReverseChargeVatAmount, rf.TotalLandedCost })
@@ -283,7 +280,13 @@ namespace Procure.Services.Export
                     string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty,
                     string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval })
                 {
-                    pairNeed = Math.Max(pairNeed, CellPad + MeasureTextWidth(text, "F1", 7.5));
+                    // The widest line the text would print on, uncapped: only spare width may satisfy
+                    // it (see the text-growth pass). The pair itself is only ever asked for up to the
+                    // standard maximum, so long text wraps instead of widening it at the description's
+                    // expense.
+                    var wanted = CellPad + text.Replace("\r\n", "\n").Split('\n').Max(l => MeasureTextWidth(l.Trim(), "F1", 7.5));
+                    textNeed = Math.Max(textNeed, wanted);
+                    pairNeed = Math.Max(pairNeed, Math.Min(wanted, MaxVendorPairWidth));
                 }
 
                 // A fitted sheet sizes each vendor to its own content, so its headings count too: the
@@ -303,12 +306,13 @@ namespace Procure.Services.Export
                 qty[i] = qtyNeed;
                 price[i] = priceNeed;
                 pair[i] = pairNeed;
+                textWidth[i] = textNeed;
             }
 
             if (fitVendors)
                 histNeed = Math.Max(histNeed, CellPad + MeasureTextWidth(currencyInHeader ? $"Price ({defaultCurrency})" : "Unit Price", "F2", 7));
 
-            return new ColumnNeeds(qty, price, pair, prqNeed, histNeed);
+            return new ColumnNeeds(qty, price, pair, prqNeed, histNeed, textWidth);
         }
 
         private static double NaturalPairWidth(ColumnNeeds needs, int i) =>
@@ -453,7 +457,7 @@ namespace Procure.Services.Export
             // The widest single LINE of any item name - never the whole multi-line string - so a
             // tall spec grows the row down without ever widening this column.
             double widestItemTextWidth = prItems
-                .SelectMany(item => HardLines(item.ItemName, MaxItemNameLines))
+                .SelectMany(item => HardLines(item.ItemName, int.MaxValue))
                 .Select(line => MeasureTextWidth(line, "F1", 7.5))
                 .DefaultIfEmpty(0)
                 .Max();
@@ -505,6 +509,7 @@ namespace Procure.Services.Export
             int VendorPriceColIdx(int i) => 3 + (i * 2) + 1;
             int HistoricalColIdx() => 3 + (supplierCount * 2);
 
+            double spareUsed = 0;
             // ---- Borrow pass -------------------------------------------------------------------
             // Every column is a fixed slice decided before a single value is measured, so a value
             // wider than its slice used to just overflow: a money cell pins the currency to its left
@@ -561,7 +566,27 @@ namespace Procure.Services.Export
                         historicalWidth += dHist * f; granted += dHist * f;
                         // The cap's spare width goes first; only the rest comes out of description.
                         descWidth -= Math.Max(0, granted - spareWidth);
+                        spareUsed = Math.Min(granted, spareWidth);
                     }
+                }
+            }
+
+            // ---- Text growth pass --------------------------------------------------------------
+            // Long payment terms / warranty / etc. would rather print on fewer lines. A vendor's
+            // column grows toward the widest line its text has - but ONLY out of width nobody else
+            // needed (what the vendor cap left over, after the borrow pass), never out of the
+            // description, and only up to a limit that shrinks as vendors are added: with five or
+            // more the sheet is as tight as it ever was and the text simply wraps taller.
+            {
+                double textPairCap = supplierCount <= 2 ? 260 : supplierCount == 3 ? 200 : supplierCount == 4 ? 160 : MaxVendorPairWidth;
+                var want = new double[supplierCount];
+                for (int i = 0; i < supplierCount; i++)
+                    want[i] = Math.Max(0, Math.Min(needs.Text[i], textPairCap) - VendorPairW(i));
+                double wantTotal = want.Sum(), spareLeft = spareWidth - spareUsed;
+                if (wantTotal > 0 && spareLeft > 0)
+                {
+                    double f = Math.Min(1.0, spareLeft / wantTotal);
+                    for (int i = 0; i < supplierCount; i++) vendorPriceW[i] += want[i] * f;
                 }
             }
 
@@ -1062,19 +1087,29 @@ namespace Procure.Services.Export
             // own hard line breaks (HardLines); each of those is then soft-wrapped to the column.
             const double itemDescLineHeight = 9.0;
 
+            // No fixed cap: a name prints in full, the row growing to fit. The only limit is what one
+            // page can physically hold - a row is never split across pages, so one taller than a
+            // continuation page's table area (less a line of slack for a struck or converted price)
+            // would run off the bottom. Past that, and only then, the name ends in " ..".
+            int maxItemNameLines = Math.Max(8, (int)Math.Floor(
+                (pageHeight - marginTop + 4 - continuationHeaderGap - tableHeaderRowH1 - tableHeaderRowH2
+                    - bottomLimit - 10 - itemRowH - 17) / itemDescLineHeight) + 1);
+
             List<string> WrapItemName(string? name)
             {
                 var outLines = new List<string>();
-                foreach (var hard in HardLines(name, MaxItemNameLines))
+                foreach (var hard in HardLines(name, int.MaxValue))
                 {
                     if (hard.Length == 0) { outLines.Add(string.Empty); continue; }
-                    outLines.AddRange(WrapText(hard, "F1", 7.5, descWidth - 8, maxLines: MaxItemNameLines, truncate: true));
-                    if (outLines.Count >= MaxItemNameLines) break;
+                    // Non-truncating: a run with no break point (a long part number) is split across
+                    // lines at the column width instead of being cut off.
+                    outLines.AddRange(WrapText(hard, "F1", 7.5, descWidth - 8, int.MaxValue, truncate: false));
+                    if (outLines.Count > maxItemNameLines) break;
                 }
                 if (outLines.Count == 0) outLines.Add(string.Empty);
-                if (outLines.Count > MaxItemNameLines)
+                if (outLines.Count > maxItemNameLines)
                 {
-                    outLines = outLines.Take(MaxItemNameLines).ToList();
+                    outLines = outLines.Take(maxItemNameLines).ToList();
                     var last = outLines[^1];
                     while (last.Length > 0 && MeasureTextWidth(last + " ..", "F1", 7.5) > descWidth - 8) last = last[..^1];
                     outLines[^1] = last.TrimEnd() + " ..";
@@ -1134,6 +1169,23 @@ namespace Procure.Services.Export
                 remarksLines.AddRange(WrapText(hard, "F2", 8.5, contentWidth, int.MaxValue, truncate: false));
             double remarksBlockH = remarksLines.Count * remarksLineH;
 
+            // The text summary rows (payment terms, warranty...) wrap inside each vendor's column pair
+            // - never shrunk, never cut - so the more vendors share the page the taller they grow.
+            // Each row is as tall as its busiest vendor; the extra lines feed the footer budget.
+            List<string> SummaryTextLines(string text, int vendor) =>
+                HardLines(text, int.MaxValue)
+                    .SelectMany(hard => WrapText(hard, "F1", 7.5, VendorPairW(vendor) - 6, int.MaxValue, truncate: false))
+                    .ToList();
+            string Dash(string? s) => string.IsNullOrWhiteSpace(s) ? "-" : s;
+            var summaryTextSelectors = new Func<RequestForQuotation, string>[]
+            {
+                rf => Dash(rf.PaymentTerms), rf => Dash(rf.Incoterms), rf => Dash(rf.DeliveryLeadTime),
+                rf => Dash(rf.Warranty), rf => Dash(rf.TechnicalApproval),
+            };
+            int SummaryTextRowLines(Func<RequestForQuotation, string> valFunc) =>
+                Enumerable.Range(0, supplierCount).Select(i => SummaryTextLines(valFunc(selectedRfqs[i]), i).Count).DefaultIfEmpty(1).Max();
+            double summaryTextExtra = summaryTextSelectors.Sum(sel => (SummaryTextRowLines(sel) - 1) * vendorHeaderLineHeight);
+
             const int summaryRowsCount = 12;
             // "Taxable Amount" - what VAT is charged on - only earns a row when freight or other
             // charges make it differ from the discounted total above it; otherwise the sheet is
@@ -1145,7 +1197,7 @@ namespace Procure.Services.Export
                 && selectedRfqs.Any(rfq => conversion.HasConversion(CurrencyOf(rfq)))
                 ? (8 + (showTaxableRow ? 1 : 0)) * conversionLineHeight
                 : 0;
-            double footerBlockNeeded = ((summaryRowsCount + (showTaxableRow ? 1 : 0)) * summaryRowH) + summaryConversionExtra + afterTableGap + remarksBlockH + remarksGap
+            double footerBlockNeeded = ((summaryRowsCount + (showTaxableRow ? 1 : 0)) * summaryRowH) + summaryConversionExtra + summaryTextExtra + afterTableGap + remarksBlockH + remarksGap
                 + (options.IncludeSignatureBoxes ? signatureBoxHeight : 0);
 
             // "Fit sheet to one page": work out how much the WHOLE natural-size page needs to shrink to
@@ -1352,17 +1404,15 @@ namespace Procure.Services.Export
 
             void DrawSummaryTextRow(string label, Func<RequestForQuotation, string> valFunc, bool isBold = false)
             {
-                double rowH = summaryRowH;
+                var cellLines = Enumerable.Range(0, supplierCount).Select(i => SummaryTextLines(valFunc(selectedRfqs[i]), i)).ToList();
+                double rowH = summaryRowH + (cellLines.Select(l => l.Count).DefaultIfEmpty(1).Max() - 1) * vendorHeaderLineHeight;
                 DrawRect(marginLeft, curY - rowH, tableWidth, rowH, lineWidth: 0.5);
                 var textY = SummaryTextY(rowH);
 
                 DrawText(label, colX[1] + 4, textY, font: isBold ? "F2" : "F1", fontSize: 7.5);
 
                 for (int i = 0; i < supplierCount; i++)
-                {
-                    var text = valFunc(selectedRfqs[i]);
-                    DrawFittedText(text, colX[VendorQtyColIdx(i)] + 3, textY, font: isBold ? "F2" : "F1", baseFontSize: 7.5, align: "center", maxWidth: VendorPairW(i) - 6, minFontSize: 5.0);
-                }
+                    DrawCenteredBlock(cellLines[i], colX[VendorQtyColIdx(i)] + 3, curY, rowH, vendorHeaderLineHeight, isBold ? "F2" : "F1", 7.5, VendorPairW(i) - 6);
 
                 curY -= rowH;
             }
