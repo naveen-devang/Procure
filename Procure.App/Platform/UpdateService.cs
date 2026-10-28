@@ -201,7 +201,15 @@ public sealed class UpdateService : IUpdateService
             // in front of the update window this app just showed. Same work, no stock dialog:
             // hand over, then exit so Update.exe can swap the files - which is exactly what
             // ApplyUpdatesAndRestart does internally, minus the box.
-            mgr.WaitExitThenApplyUpdates(_pendingUpdate.TargetFullRelease, silent: true, restart: true);
+            // Velopack's own "wait for this process to exit" step fails here ("Access is denied ...
+            // Continuing" in velopack_Procure.log), so Update.exe starts swapping files the instant it is
+            // launched while this process may still hold them - and a swap that loses that race leaves the
+            // old version in place, silently. So Update.exe is started a few seconds LATER by a hidden
+            // helper, after this process has exited. Same arguments Velopack itself passes (restart is its
+            // default); if the helper cannot start, fall back to the plain call.
+            UpdateStateStore.SetPendingApplyVersion(_pendingUpdate.TargetFullRelease.Version.ToString());
+            if (!TryStartDelayedApply(_pendingUpdate.TargetFullRelease))
+                mgr.WaitExitThenApplyUpdates(_pendingUpdate.TargetFullRelease, silent: true, restart: true);
             _logger?.LogInformation("Velopack update handed over; exiting for the swap.");
             Environment.Exit(0);
             return true;
@@ -209,6 +217,34 @@ public sealed class UpdateService : IUpdateService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to apply Velopack update.");
+            return false;
+        }
+    }
+
+    private bool TryStartDelayedApply(VelopackAsset target)
+    {
+        try
+        {
+            var loc = Velopack.Locators.VelopackLocator.Current;
+            var package = System.IO.Path.Combine(loc.PackagesDir!, target.FileName);
+            if (!System.IO.File.Exists(package) || !System.IO.File.Exists(loc.UpdateExePath)) return false;
+
+            // ping is the no-console "sleep" that works from a hidden cmd (timeout.exe needs a console).
+            var apply = $"\"{loc.UpdateExePath}\" --silent apply --package \"{package}\" " +
+                        $"--rootDir \"{loc.RootAppDir}\" --packageDir \"{loc.PackagesDir}\"";
+            Process.Start(new ProcessStartInfo("cmd.exe", $"/s /c \"ping -n 5 127.0.0.1 >nul & {apply}\"")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WorkingDirectory = loc.RootAppDir!,   // not current\: the swap renames that folder
+                WindowStyle = ProcessWindowStyle.Hidden,
+            });
+            CrashLog.Write($"UPDATE APPLY {target.Version}: Update.exe scheduled 4s after exit");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Could not schedule the delayed apply; using Velopack's own handover.");
             return false;
         }
     }

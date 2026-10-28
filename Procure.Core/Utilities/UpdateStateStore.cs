@@ -16,6 +16,29 @@ namespace Procure.Utilities
         private static readonly string LastUpdateCheckFile = Path.Combine(AppPaths.AppData, "last-update-check.txt");
         private static readonly string LastWhatsNewVersionFile = Path.Combine(AppPaths.AppData, "last-whats-new-version.txt");
 
+        private static readonly string PendingApplyFile = Path.Combine(AppPaths.AppData, "pending-apply-version.txt");
+
+        // Written just before the app hands over to the updater, read on the next launch: if the
+        // installed version is still older than this, the swap did not happen.
+        public static string? GetPendingApplyVersion()
+        {
+            try { return File.Exists(PendingApplyFile) ? File.ReadAllText(PendingApplyFile).Trim() : null; }
+            catch { return null; }
+        }
+
+        public static void SetPendingApplyVersion(string? version)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(version)) File.Delete(PendingApplyFile);
+                else File.WriteAllText(PendingApplyFile, version);
+            }
+            catch
+            {
+                // Best-effort - worst case a failed update is not announced.
+            }
+        }
+
         public static DateTime GetLastUpdateCheckUtc()
         {
             try

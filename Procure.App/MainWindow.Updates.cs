@@ -20,6 +20,49 @@ public sealed partial class MainWindow
     {
         _ = CheckForUpdatesInBackgroundAsync();
         _ = ShowWhatsNewIfJustUpdatedAsync();
+        _ = ReportFailedUpdateAsync();
+    }
+
+    // The last launch handed over to the updater for version X. If we are still older than X the swap
+    // did not happen (it is silent, so nobody was told): say so once and offer a retry or the installer.
+    private async Task ReportFailedUpdateAsync()
+    {
+        try
+        {
+            var target = UpdateStateStore.GetPendingApplyVersion();
+            if (string.IsNullOrEmpty(target)) return;
+            UpdateStateStore.SetPendingApplyVersion(null);   // announce once
+
+            var updates = App.Services.GetRequiredService<IUpdateService>();
+            if (updates.CurrentVersionString == "Dev build") return;
+            if (Version.TryParse(target.Split('-')[0], out var want) && updates.CurrentVersion >= want) return;
+
+            await Task.Delay(4000);   // after the first screen and the background check
+            var dialogs = App.Services.GetRequiredService<IDialogService>();
+            var choice = await dialogs.DisplayActionSheetAsync(
+                $"The update to v{target} did not install",
+                "Not now", null, "Try again", "Download the installer");
+
+            if (choice == "Try again")
+            {
+                var update = await updates.CheckForUpdatesAsync(AppConstants.GitHubRepository);
+                if (update.IsUpdateAvailable)
+                {
+                    await updates.DownloadUpdateAsync(update);
+                    if (updates.DownloadStatus == UpdateDownloadStatus.Done)
+                        DispatcherQueue.TryEnqueue(ShowUpdateDialog);
+                }
+            }
+            else if (choice == "Download the installer")
+            {
+                await updates.OpenReleaseInBrowserAsync(
+                    updates.LastKnownUpdate?.ReleaseUrl ?? $"https://github.com/{AppConstants.GitHubRepository}/releases/latest");
+            }
+        }
+        catch
+        {
+            // A courtesy message; never worth disturbing startup.
+        }
     }
 
     private async Task CheckForUpdatesInBackgroundAsync()
