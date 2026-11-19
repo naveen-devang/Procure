@@ -89,13 +89,22 @@ public sealed class NumericTextConverter : IValueConverter
     {
         if (value is not null
             && _typingBox is not null && _typingBox.TryGetTarget(out var typing)
-            && ReferenceEquals(FocusedTextBox(), typing) && typing.Text is { Length: > 0 } text
-            && !text.Contains('%')
-            && Procure.App.Platform.MoneyBox.TryParseAmount(text, out var typed)
-            && value switch { decimal d => d == typed, double f => (decimal)f == typed, int i => i == typed, _ => false })
-            return text;
+            && ReferenceEquals(FocusedTextBox(), typing))
+        {
+            var text = typing.Text ?? string.Empty;
+            // A box just cleared (Qty is never empty underneath, so it reads 0) stays empty while typing.
+            if (string.IsNullOrWhiteSpace(text)
+                && value switch { decimal d => d == 0, double f => f == 0, int i => i == 0, _ => false })
+                return string.Empty;
+            if (text.Length > 0 && TypedMatches(text, value)) return text;
+        }
         return value?.ToString() ?? string.Empty;
     }
+
+    private static bool TypedMatches(string text, object value) =>
+        !text.Contains('%')
+            && Procure.App.Platform.MoneyBox.TryParseAmount(text, out var typed)
+            && value switch { decimal d => d == typed, double f => (decimal)f == typed, int i => i == typed, _ => false };
 
     public object ConvertBack(object value, Type t, object p, string l)
     {
