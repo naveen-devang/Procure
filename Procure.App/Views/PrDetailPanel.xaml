@@ -245,6 +245,12 @@
                                                         Visibility="{x:Bind IsTechnicallyNotApproved, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="Tech: Not Approved" Style="{StaticResource ChipText}" Foreground="{ThemeResource FluentCritical}" />
                                                 </Border>
+                                                <Border Style="{StaticResource Chip}" BorderBrush="{ThemeResource FluentCaution}" Background="{ThemeResource FluentCautionBg}" MaxWidth="360"
+                                                        Visibility="{x:Bind IsTechnicallyCustom, Mode=OneWay, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Style="{StaticResource ChipText}" Foreground="{ThemeResource FluentCaution}" TextWrapping="Wrap">
+                                                        <Run Text="Tech: " /><Run Text="{x:Bind TechnicalApproval, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Border>
                                             </views:WrapPanel>
                                         </StackPanel>
                                     </Border>

@@ -172,6 +172,7 @@ namespace Procure.PageModels
 
             _settingsService.SettingsChanged += OnSettingsChanged;
             _appHost.ThemeChanged += OnAppRequestedThemeChanged;
+            AttachLineNumbers();
 
             Current = this;
         }

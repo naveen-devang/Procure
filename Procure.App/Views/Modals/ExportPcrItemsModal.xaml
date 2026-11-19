@@ -74,7 +74,14 @@
                                         <DataTemplate x:DataType="models:ExportItemSelection">
                                             <Border Padding="10,6" Margin="0,0,0,6" CornerRadius="4" BorderThickness="1"
                                                     BorderBrush="{ThemeResource AppHairline}" Background="{ThemeResource AppSecondaryBackground}">
-                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                                <!-- Sl No. the item gets on the sheet; a dash when left out. -->
+                                                <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="22" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind LineNo, Mode=OneWay}" Width="22" TextAlignment="Right" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource AppTextPrimary}" IsTextSelectionEnabled="False" />
+                                                <CheckBox Grid.Column="1" IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
                                                           VerticalAlignment="Center"
                                                           VerticalContentAlignment="Center"
                                                           Padding="8,0,0,0">
@@ -82,6 +89,7 @@
                                                                VerticalAlignment="Center"
                                                                Foreground="{ThemeResource AppTextPrimary}" />
                                                 </CheckBox>
+                                                </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

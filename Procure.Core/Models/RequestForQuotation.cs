@@ -107,6 +107,7 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(HasTechnicalApproval))]
         [NotifyPropertyChangedFor(nameof(IsTechnicallyApproved))]
         [NotifyPropertyChangedFor(nameof(IsTechnicallyNotApproved))]
+        [NotifyPropertyChangedFor(nameof(IsTechnicallyCustom))]
         public partial string TechnicalApproval { get; set; } = string.Empty;
 
         public bool HasTechnicalApproval => !string.IsNullOrWhiteSpace(TechnicalApproval);
@@ -114,6 +115,39 @@ namespace Procure.Models
         public bool IsTechnicallyApproved => string.Equals(TechnicalApproval, "Approved", StringComparison.OrdinalIgnoreCase);
 
         public bool IsTechnicallyNotApproved => string.Equals(TechnicalApproval, "Not Approved", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Anything typed through "Custom…", e.g. "Only item 1 approved – item 2 failed the test".</summary>
+        public bool IsTechnicallyCustom => HasTechnicalApproval && !IsTechnicallyApproved && !IsTechnicallyNotApproved;
+
+        // A custom approval is one string ("what – reason") so the PCR prints it as-is and no column is added.
+        public const string ApprovalReasonSeparator = " – ";
+
+        public static string JoinApproval(string? what, string? reason)
+        {
+            what = what?.Trim() ?? string.Empty;
+            reason = reason?.Trim() ?? string.Empty;
+            return what.Length == 0 ? reason : reason.Length == 0 ? what : what + ApprovalReasonSeparator + reason;
+        }
+
+        public static (string What, string Reason) SplitApproval(string? text)
+        {
+            text = text?.Trim() ?? string.Empty;
+            int i = text.IndexOf(ApprovalReasonSeparator, StringComparison.Ordinal);
+            return i < 0 ? (text, string.Empty) : (text[..i], text[(i + ApprovalReasonSeparator.Length)..]);
+        }
+
+        internal static void ApprovalSelfCheck()
+        {
+            static void Check(bool ok, string what) { if (!ok) throw new InvalidOperationException("Technical approval: " + what); }
+            Check(JoinApproval(" Only item 1 approved ", " item 2 failed ") == "Only item 1 approved – item 2 failed", "join both");
+            Check(JoinApproval("Only item 1 approved", "") == "Only item 1 approved", "join what only");
+            Check(JoinApproval("", "pending drawing") == "pending drawing", "join reason only");
+            Check(JoinApproval(" ", null) == "", "join nothing");
+            Check(SplitApproval("Only item 1 approved – item 2 failed – retest") == ("Only item 1 approved", "item 2 failed – retest"), "split at first");
+            Check(SplitApproval("Old free text") == ("Old free text", ""), "split legacy");
+            Check(new RequestForQuotation { TechnicalApproval = "Items 1, 3 approved" }.IsTechnicallyCustom, "custom flag");
+            Check(!new RequestForQuotation { TechnicalApproval = "approved" }.IsTechnicallyCustom, "standard is not custom");
+        }
 
         [ObservableProperty]
         public partial string SharedPrs { get; set; } = string.Empty;
@@ -442,6 +476,7 @@ namespace Procure.Models
             OnPropertyChanged(nameof(HasTechnicalApproval));
             OnPropertyChanged(nameof(IsTechnicallyApproved));
             OnPropertyChanged(nameof(IsTechnicallyNotApproved));
+            OnPropertyChanged(nameof(IsTechnicallyCustom));
             // Chip visibility/text in the expanded panel; without these an RFQ edit leaves the
             // shared/payment-terms/lead-time chips showing pre-edit values until a full rebuild.
             OnPropertyChanged(nameof(IsSharedRfq));

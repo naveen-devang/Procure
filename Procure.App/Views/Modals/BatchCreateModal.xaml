@@ -20,7 +20,7 @@
                 <EntranceThemeTransition FromVerticalOffset="18" />
             </TransitionCollection>
         </Grid.ChildrenTransitions>
-        <Border MaxWidth="1020" MaxHeight="840" Margin="24" Padding="24" CornerRadius="10"
+        <Border MaxWidth="1070" MaxHeight="840" Margin="24" Padding="24" CornerRadius="10"
                 VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <Grid RowSpacing="16">
@@ -194,7 +194,11 @@
                                     <ColumnDefinition Width="95" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="ITEM" />
+                                <!-- Sl No.: the line's number once saved (blank lines are dropped, so they show a dash). -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="#" Width="22" TextAlignment="Right" />
+                                    <TextBlock Text="ITEM" />
+                                </StackPanel>
                                 <TextBlock Grid.Column="1" Text="QTY" HorizontalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Text="UNIT" HorizontalAlignment="Center" />
                                 <TextBlock Grid.Column="3" Text="EST. UNIT PRICE" />
@@ -211,8 +215,15 @@
                                                 <ColumnDefinition Width="95" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110" PlaceholderText="Item name / spec..."
+                                            <Grid ColumnSpacing="8" VerticalAlignment="Top">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="22" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind LineNo, Mode=OneWay}" TextAlignment="Right" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,9,0,0" Foreground="{ThemeResource AppTextPrimary}" IsTextSelectionEnabled="False" />
+                                                <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110" PlaceholderText="Item name / spec..."
                                                      FontSize="12" VerticalAlignment="Top" LostFocus="ItemName_LostFocus" />
+                                            </Grid>
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="1" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12" TextAlignment="Center" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Unit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="pcs" FontSize="12" TextAlignment="Center" />
                                             <StackPanel Grid.Column="3" VerticalAlignment="Top">

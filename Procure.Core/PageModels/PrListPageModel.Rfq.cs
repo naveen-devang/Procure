@@ -67,7 +67,8 @@ namespace Procure.PageModels
         // content renders its DataContext - the box read "Procure.PageModels.PrListPageModel".
         // Stored as an empty string either way; see TechnicalApprovalNotSet.
         public const string TechnicalApprovalNotSet = "Not set";
-        public List<string> AvailableTechnicalApprovals { get; } = new() { TechnicalApprovalNotSet, "Approved", "Not Approved" };
+        // Anything else is a custom entry typed through the picker's "Custom…" panel.
+        public static readonly string[] StandardTechnicalApprovals = { TechnicalApprovalNotSet, "Approved", "Not Approved" };
 
         private static string StoredApproval(string? shown) =>
             string.IsNullOrWhiteSpace(shown) || shown == TechnicalApprovalNotSet ? string.Empty : shown.Trim();
@@ -599,12 +600,7 @@ namespace Procure.PageModels
 
             if (TargetPrForRfq == null) return;
 
-            if (string.IsNullOrWhiteSpace(NewRfqNo))
-            {
-                    await _dialogs.DisplayAlertAsync("Validation", "Please enter an RFQ Number.", "OK");
-                return;
-            }
-
+            // RFQ Number is optional: a blank one prints as "-" on the PCR.
             if (string.IsNullOrWhiteSpace(NewRfqVendor))
             {
                     await _dialogs.DisplayAlertAsync("Validation", "Please enter a Vendor name.", "OK");
@@ -641,7 +637,7 @@ namespace Procure.PageModels
                     }).ToList() ?? new List<RfqItem>();
 
                     // Update existing RFQ
-                    EditingRfq.RfqNo = string.IsNullOrWhiteSpace(NewRfqNo) ? EditingRfq.RfqNo : NewRfqNo.Trim();
+                    EditingRfq.RfqNo = NewRfqNo?.Trim() ?? string.Empty;
                     EditingRfq.Vendor = NewRfqVendor.Trim();
                     EditingRfq.Currency = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency.Trim();
                     EditingRfq.QuoteAmount = CalculatedRfqBaseTotal > 0 ? CalculatedRfqBaseTotal : NewRfqQuoteAmount;
@@ -700,7 +696,7 @@ namespace Procure.PageModels
                 {
                     Id = Guid.NewGuid(),
                     PrId = TargetPrForRfq.Id,
-                    RfqNo = string.IsNullOrWhiteSpace(NewRfqNo) ? $"RFQ-{TargetPrForRfq.Rfqs.Count + 1}" : NewRfqNo,
+                    RfqNo = NewRfqNo?.Trim() ?? string.Empty,
                     Vendor = NewRfqVendor.Trim(),
                     Currency = string.IsNullOrWhiteSpace(NewRfqCurrency) ? "AED" : NewRfqCurrency.Trim(),
                     QuoteAmount = CalculatedRfqBaseTotal > 0 ? CalculatedRfqBaseTotal : NewRfqQuoteAmount,

@@ -39,6 +39,14 @@ namespace Procure.Models
         [ObservableProperty]
         public partial ObservableCollection<PrItem> Items { get; set; } = new();
 
+        // Sl No. beside each line, as for a single PR (see PrListPageModel.LineNumbers.cs).
+        private readonly Utilities.LineNumbers<PrItem> _lineNumbers =
+            new(i => !string.IsNullOrWhiteSpace(i.ItemName), (i, no) => i.LineNo = no, nameof(PrItem.ItemName));
+
+        public BatchPrEntry() => _lineNumbers.Attach(Items);
+
+        partial void OnItemsChanged(ObservableCollection<PrItem> value) => _lineNumbers.Attach(value);
+
         [ObservableProperty]
         public partial ObservableCollection<CustomFieldValue> CustomValues { get; set; } = new();
 

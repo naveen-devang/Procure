@@ -1188,7 +1188,9 @@ UPDATE RequestForQuotation
 SET SharedPrs = '' 
 WHERE Id = @Id OR (@RfqNo IS NOT NULL AND RfqNo = @RfqNo);";
                 updateCmd.Parameters.AddWithValue("@Id", rfqId.ToString());
-                updateCmd.Parameters.AddWithValue("@RfqNo", (object?)rfqNo ?? DBNull.Value);
+                // A blank number links nothing: without this, unlinking one quote with no RFQ number
+                // would unlink every other blank-numbered shared quote in the database.
+                updateCmd.Parameters.AddWithValue("@RfqNo", string.IsNullOrWhiteSpace(rfqNo) ? DBNull.Value : rfqNo);
                 await updateCmd.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
 

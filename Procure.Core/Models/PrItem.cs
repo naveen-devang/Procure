@@ -27,6 +27,11 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FulfillmentBadgeText))]
         public partial decimal Quantity { get; set; } = 1;
 
+        /// <summary>The Sl No. shown beside the line while editing (see Utilities.LineNumbers).
+        /// Display only, never saved.</summary>
+        [ObservableProperty]
+        public partial string LineNo { get; set; } = string.Empty;
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(FormattedQuantity))]
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]

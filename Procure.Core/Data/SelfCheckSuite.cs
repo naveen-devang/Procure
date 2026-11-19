@@ -43,6 +43,8 @@ namespace Procure.Data
                 PriceAnalysis.SelfCheck();
                 TaskReminders.SelfCheck();
                 RfqOrder.SelfCheck();
+                LineNumbersSelfCheck.Run();
+                Procure.Models.RequestForQuotation.ApprovalSelfCheck();
                 ReleaseNotesFormat.SelfCheck();
                 UpdateDownloadCoordinatorSelfCheck.Run();
             }

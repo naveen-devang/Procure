@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:Procure.Models"
+    xmlns:views="using:Procure.App.Views"
     xmlns:platform="using:Procure.App.Platform">
 
     <UserControl.Resources>
@@ -26,7 +27,7 @@
                 <EntranceThemeTransition FromVerticalOffset="18" />
             </TransitionCollection>
         </Grid.ChildrenTransitions>
-        <Border MaxWidth="950" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
+        <Border MaxWidth="1150" MaxHeight="780" Margin="24" Padding="24" CornerRadius="10"
                 VerticalAlignment="Center" HorizontalAlignment="Stretch" BorderThickness="1"
                 BorderBrush="{ThemeResource AppControlBorder}" Background="{ThemeResource AppSecondaryBackground}">
             <Grid RowSpacing="16">
@@ -79,8 +80,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Spacing="4">
                                     <TextBlock Text="Technical Approval" Style="{StaticResource Lbl}" />
-                                    <ComboBox HorizontalAlignment="Stretch" PlaceholderText="Not set" ItemTemplate="{StaticResource StringItemTemplate}" ItemsSource="{Binding AvailableTechnicalApprovals}"
-                                              SelectedItem="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
+                                    <views:TechnicalApprovalPicker Value="{Binding NewRfqTechnicalApproval, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>
                             <Grid ColumnSpacing="10">
@@ -153,7 +153,7 @@
                                     </Style>
                                 </Grid.Resources>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="64" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="72" />
                                     <ColumnDefinition Width="64" />
@@ -163,6 +163,8 @@
                                     <ColumnDefinition Width="90" />
                                     <ColumnDefinition Width="34" />
                                 </Grid.ColumnDefinitions>
+                                <!-- Sl No.: what the line becomes in Copy for email (PrListPageModel.LineNumbers.cs). -->
+                                <TextBlock Text="#" Width="22" TextAlignment="Right" HorizontalAlignment="Left" />
                                 <TextBlock Grid.Column="1" Text="ITEM" />
                                 <TextBlock Grid.Column="2" Text="QTY" HorizontalAlignment="Right" />
                                 <TextBlock Grid.Column="3" Text="UNIT" />
@@ -177,7 +179,7 @@
                                     <DataTemplate x:DataType="models:RfqItem">
                                         <Grid ColumnSpacing="8" Padding="4,2" Margin="0,0,0,4">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="36" />
+                                                <ColumnDefinition Width="64" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="72" />
                                                 <ColumnDefinition Width="64" />
@@ -187,7 +189,10 @@
                                                 <ColumnDefinition Width="90" />
                                                 <ColumnDefinition Width="34" />
                                             </Grid.ColumnDefinitions>
-                                            <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                                                <TextBlock Text="{x:Bind LineNo, Mode=OneWay}" Width="22" TextAlignment="Right" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,14,0,0" Foreground="{ThemeResource AppTextPrimary}" IsTextSelectionEnabled="False" />
+                                                <CheckBox IsChecked="{x:Bind IsQuoted, Mode=TwoWay}" MinWidth="0" VerticalAlignment="Top" Margin="0,8,0,0" />
+                                            </StackPanel>
                                             <TextBox Grid.Column="1" Text="{x:Bind ItemName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="36" MaxHeight="110"
                                                      PlaceholderText="Item name / spec..." FontSize="12" VerticalAlignment="Top" />
                                             <TextBox Height="36" VerticalAlignment="Top" Grid.Column="2" Text="{x:Bind Quantity, Mode=TwoWay, Converter={StaticResource Num}, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Qty" FontSize="12"

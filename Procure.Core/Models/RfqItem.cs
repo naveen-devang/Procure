@@ -53,6 +53,11 @@ namespace Procure.Models
         [NotifyPropertyChangedFor(nameof(FormattedDisplay))]
         public partial decimal? Discount { get; set; }
 
+        /// <summary>The Sl No. shown beside the line while editing (see Utilities.LineNumbers): the
+        /// number it gets on the PCR / in Copy for email, or a dash. Display only, never saved.</summary>
+        [ObservableProperty]
+        public partial string LineNo { get; set; } = string.Empty;
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(FormattedLastPrice))]
         public partial decimal? LastPrice { get; set; }

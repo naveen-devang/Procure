@@ -415,7 +415,10 @@ namespace Procure.PageModels
         {
             if (string.IsNullOrWhiteSpace(BatchRfqNo))
             {
-                    await _dialogs.DisplayAlertAsync("Validation", "RFQ Number is required.", "OK");
+                    // The number is what ties the copies on each PR together (unlink and reorder find them
+                    // by it), so a shared quote still needs one. Add RFQ (one PR) leaves it optional.
+                    await _dialogs.DisplayAlertAsync("RFQ Number needed",
+                        "Add an RFQ number to share this quote across the selected PRs. The number is what links them together.", "OK");
                 return;
             }
 
