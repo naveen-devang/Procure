@@ -412,6 +412,8 @@ internal static class PcrDiscountSelfCheck
         Assert(pdf.Contains("30% advance"), "a long payment term still prints");
 
         var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), rfqs, "x"));
+        Assert(sheet.Contains($"-{pr.PrType.ToUpperInvariant().Replace("&", "&amp;")}</t>") && pdf.Contains($"-{pr.PrType.ToUpperInvariant()})"),
+            "both titles end in the PR type, in capitals");
         Assert(System.Text.RegularExpressions.Regex.IsMatch(sheet, @"<col min=""2"" max=""2"" width=""\d+"""),
             "the Item Description column has a real width (an unfilled placeholder hides it in Excel)");
         var rows =System.Text.RegularExpressions.Regex.Matches(sheet, @"<row r=""\d+"" ht=""(\d+)""[^>]*>(?:(?!</row>).)*?>(Payment Terms|Warranty)<", System.Text.RegularExpressions.RegexOptions.Singleline);

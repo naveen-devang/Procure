@@ -336,9 +336,8 @@ namespace Procure.Services.Export
             int r = 2; // Start row
             var merges = new List<string>();
 
-            // 1. Title: PRICE COMPARISON-{Plant}
-            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
-            var title = $"PRICE COMPARISON-{plantCode}";
+            // 1. Title: PRICE COMPARISON-{Plant}-{PR TYPE}
+            var title = PcrPdfExporter.Title(pr);
             sb.Append($@"
         <row r=""{r}"" ht=""28"">
             <c r=""B{r}"" s=""1"" t=""inlineStr""><is><t>{EscapeXml(title)}</t></is></c>

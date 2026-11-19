@@ -149,6 +149,15 @@ namespace Procure.Services.Export
         /// disagree with the sheet.</summary>
         private sealed record ColumnNeeds(double[] Qty, double[] Price, double[] Pair, double PrQty, double Hist, double[] Text);
 
+        /// <summary>"PRICE COMPARISON-RW01-STORES&amp;SPARES": plant, then the PR type in capitals when the
+        /// PR has one. Shared with the Excel sheet so both titles read the same.</summary>
+        internal static string Title(PurchaseRequisition pr)
+        {
+            var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
+            var type = string.IsNullOrWhiteSpace(pr.PrType) ? "" : "-" + pr.PrType.Trim().ToUpperInvariant();
+            return $"PRICE COMPARISON-{plant}{type}";
+        }
+
         private static string CurrencyOf(RequestForQuotation rf) =>
             string.IsNullOrWhiteSpace(rf.Currency) ? "AED" : rf.Currency.Trim();
 
@@ -612,7 +621,7 @@ namespace Procure.Services.Export
             // keep using the full contentWidth.
             double tableWidth = colX[^1] - marginLeft;
 
-            var plantCode = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
+            var title = Title(pr);
             var cleanRfqList = selectedRfqs
                 .Select(rf => rf.RfqNo.Replace("RFQ-", "").Trim())
                 .Where(num => !string.IsNullOrWhiteSpace(num))
@@ -995,7 +1004,6 @@ namespace Procure.Services.Export
                     curY = pageHeight - marginTop;
 
                     // Title
-                    var title = $"PRICE COMPARISON-{plantCode}";
                     DrawText(title, marginLeft, curY, font: "F2", fontSize: 13, align: "center", width: contentWidth);
                     curY -= titleGap;
 
@@ -1027,7 +1035,7 @@ namespace Procure.Services.Export
                     curY = pageHeight - (marginTop - 4);
 
                     // Running Header on continuation pages (ASCII hyphen to avoid font substitution)
-                    var runningHeader = $"PRICE COMPARISON-{plantCode} - Requisition {pr.PrNo}";
+                    var runningHeader = $"{title} - Requisition {pr.PrNo}";
                     DrawText(runningHeader, marginLeft, curY, font: "F2", fontSize: 9.5);
                     curY -= continuationHeaderGap;
                 }
