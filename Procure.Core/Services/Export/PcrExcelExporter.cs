@@ -309,7 +309,7 @@ namespace Procure.Services.Export
                     .Max(LongestLineLength) + 4, pairCharCap) - vendorQtyColWidth)).ToArray();
 
             var sb = new StringBuilder();
-            sb.Append(@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
+            sb.Append($@"<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>
 <worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"">
     <sheetViews>
         <sheetView tabSelected=""1"" workbookViewId=""0""/>
@@ -462,10 +462,6 @@ namespace Procure.Services.Export
             // 6. Line Item Rows
             var prItems = exportItems;
             int itemIndex = 1;
-            decimal totalLastPriceSum = 0m;
-            decimal totalLastPriceLocalSum = 0m;
-            bool totalLastPriceLocalComplete = true;
-            bool hasHistoricalConversion = false;
 
             if (prItems.Count == 0)
             {
@@ -600,17 +596,6 @@ namespace Procure.Services.Export
                         }
                     }
 
-                    totalLastPriceSum += (item.Quantity * rowLastPrice);
-                    var rowCurrency = string.IsNullOrWhiteSpace(rowLastPriceCurrency) ? "AED" : rowLastPriceCurrency;
-                    hasHistoricalConversion |= rowLastPrice > 0m && conversion.HasConversion(rowCurrency);
-                    if (conversion.ShowLocalEquivalent && conversion.TryConvert(rowCurrency, rowLastPrice, out var localLastPrice))
-                        totalLastPriceLocalSum += item.Quantity * localLastPrice;
-                    else
-                    {
-                        totalLastPriceLocalSum += item.Quantity * rowLastPrice;
-                        totalLastPriceLocalComplete &= !conversion.HasConversion(rowCurrency);
-                    }
-
                     if (rowLastPrice > 0)
                     {
                         // Printed as its own currency, not a bare number under one column-wide
@@ -639,12 +624,13 @@ namespace Procure.Services.Export
 
             // 7. Financial Summary Rows
             // Helper for summary rows
-            void AddSummaryRow(string label, Func<RequestForQuotation, (bool isNum, decimal numVal, string strVal)> valSelector, (bool isNum, decimal numVal, string strVal) lastPriceVal)
+            // Historical Price is left empty from here down, as on the PDF: it's a per-item reference
+            // price, not a quote carried through the discount/VAT/total math.
+            void AddSummaryRow(string label, Func<RequestForQuotation, (bool isNum, decimal numVal, string strVal)> valSelector)
             {
                 var summaryTwoLines = RowNeedsConversion(selectedRfqs
                     .Where(rf => valSelector(rf).isNum)
-                    .Select(rf => rf.Currency))
-                    || (lastPriceVal.isNum && hasHistoricalConversion);
+                    .Select(rf => rf.Currency));
                 // Text values (payment terms, warranty...) sit merged across the vendor's Qty+Price
                 // columns, which Excel never auto-heights - so size the row to the vendor with the
                 // most lines. Bold 10pt runs ~4 chars narrower than the columns' nominal width.
@@ -654,8 +640,10 @@ namespace Procure.Services.Export
                     .Select(v => EstimateWrappedLineCount(NormalizeCellText(v.val.strVal), v.width, int.MaxValue))
                     .DefaultIfEmpty(1).Max();
                 var rowHeight = Math.Min(MaxExcelRowHeight, Math.Max(summaryTwoLines ? 36 : 20, textLines * 13 + 6));
+                // customHeight: without it Excel re-fits the row on open, skips the merged value cells,
+                // and shrinks the row back to one line - hiding the local-currency line.
                 sb.Append($@"
-        <row r=""{r}"" ht=""{rowHeight}"">
+        <row r=""{r}"" ht=""{rowHeight}"" customHeight=""1"">
             <c r=""A{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
             <c r=""B{r}"" s=""8"" t=""inlineStr""><is><t>{EscapeXml(label)}</t></is></c>
             <c r=""C{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
@@ -684,16 +672,8 @@ namespace Procure.Services.Export
                     }
                 }
 
-                if (lastPriceVal.isNum)
-                {
-                    sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""9""><v>{lastPriceVal.numVal.ToString(CultureInfo.InvariantCulture)}</v></c>");
-                }
-                else
-                {
-                    sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(lastPriceVal.strVal)}</t></is></c>");
-                }
+                sb.Append($@"
+            <c r=""{lastPriceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
 
                 sb.Append(@"
         </row>");
@@ -707,47 +687,31 @@ namespace Procure.Services.Export
                 (rf.IsQuoteReceived || rf.PricedItemsCount > 0) ? (true, value, "") : (false, 0m, "-");
 
             // Row 1: Total Price Excl. VAT
-            var historicalSummaryTotal = conversion.ShowLocalEquivalent && totalLastPriceLocalComplete
-                ? totalLastPriceLocalSum
-                : totalLastPriceSum;
             AddSummaryRow("Total Price Excl. VAT",
-                rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)),
-                (true, historicalSummaryTotal, ""));
+                rf => MoneyOrDash(rf, rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)));
 
             // Row 2: Discount
             AddSummaryRow("Discount",
-                rf => (rf.Discount.HasValue && rf.Discount.Value > 0) ? (true, rf.Discount.Value, "") : (false, 0m, "-"),
-                (false, 0m, "-"));
+                rf => (rf.Discount.HasValue && rf.Discount.Value > 0) ? (true, rf.Discount.Value, "") : (false, 0m, "-"));
 
             // Row 3: Total Price Excl. VAT After Discount (unclamped — the model clamps only the
             // final NetTaxable, and an early clamp made the printed rows fail arithmetic checks)
             AddSummaryRow("Total Price Excl. VAT After Discount",
-                rf => MoneyOrDash(rf, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)),
-                (true, historicalSummaryTotal, ""));
+                rf => MoneyOrDash(rf, (rf.BaseAmount > 0 ? rf.BaseAmount : (rf.QuoteAmount ?? 0m)) - (rf.Discount ?? 0m)));
 
             // Row 4: Freight/Shipping Charges
             AddSummaryRow("Freight/Shipping Charges",
-                rf => (rf.Freight.HasValue && rf.Freight.Value > 0) ? (true, rf.Freight.Value, "") : (false, 0m, "-"),
-                (false, 0m, "-"));
+                rf => (rf.Freight.HasValue && rf.Freight.Value > 0) ? (true, rf.Freight.Value, "") : (false, 0m, "-"));
 
             // Row 5: Other Charges
             AddSummaryRow("Other Charges",
-                rf => (rf.OtherCharges.HasValue && rf.OtherCharges.Value > 0) ? (true, rf.OtherCharges.Value, "") : (false, 0m, "-"),
-                (false, 0m, "-"));
+                rf => (rf.OtherCharges.HasValue && rf.OtherCharges.Value > 0) ? (true, rf.OtherCharges.Value, "") : (false, 0m, "-"));
 
             // Discounted total + freight + other charges: the figure VAT is worked out on. Only when
             // some vendor has freight or other charges; otherwise it would repeat the row above.
             if (selectedRfqs.Any(rf => rf.HasFreight || rf.HasOtherCharges))
                 AddSummaryRow("Taxable Amount",
-                    rf => MoneyOrDash(rf, rf.NetTaxableAmount),
-                    (true, historicalSummaryTotal, ""));
-
-            // The historical column's VAT treatment follows the compared quotes' predominant
-            // VatType instead of a hardcoded 5% (which inflated it against RC/V0 quotes).
-            var historicalVatType = selectedRfqs.Count > 0
-                ? selectedRfqs.GroupBy(rf => string.IsNullOrWhiteSpace(rf.VatType) ? "5%" : rf.VatType)
-                    .OrderByDescending(g => g.Count()).Select(g => g.Key).First()
-                : "5%";
+                    rf => MoneyOrDash(rf, rf.NetTaxableAmount));
 
             // Row 6: VAT. A vendor charging VAT shows the rate in the Qty column and the amount in
             // the price column (so the money stays a number); anything else ("RC", "V0", no quote
@@ -761,7 +725,7 @@ namespace Procure.Services.Export
 
                 var vatTwoLines = RowNeedsConversion(selectedRfqs.Where(ShowsVatAmount).Select(rf => rf.Currency));
                 sb.Append($@"
-        <row r=""{r}"" ht=""{(vatTwoLines ? 36 : 20)}"">
+        <row r=""{r}"" ht=""{(vatTwoLines ? 36 : 20)}"" customHeight=""1"">
             <c r=""A{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
             <c r=""B{r}"" s=""8"" t=""inlineStr""><is><t>VAT</t></is></c>
             <c r=""C{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>");
@@ -797,42 +761,35 @@ namespace Procure.Services.Export
                 }
 
                 sb.Append($@"
-            <c r=""{lastPriceColLetter}{r}"" s=""10"" t=""inlineStr""><is><t>{EscapeXml(historicalVatType)}</t></is></c>
+            <c r=""{lastPriceColLetter}{r}"" s=""8"" t=""inlineStr""><is><t></t></is></c>
         </row>");
                 r++;
             }
 
             // Row 7: Total Price Incl. VAT
-            decimal lastPriceInclVat = historicalVatType == "5%" ? historicalSummaryTotal * 1.05m : historicalSummaryTotal;
             AddSummaryRow("Total Price Incl. VAT",
-                rf => MoneyOrDash(rf, rf.TotalLandedCost),
-                (true, lastPriceInclVat, ""));
+                rf => MoneyOrDash(rf, rf.TotalLandedCost));
 
             // Row 8: Payment Terms
             AddSummaryRow("Payment Terms",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "-" : rf.PaymentTerms),
-                (false, 0m, "-"));
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.PaymentTerms) ? "-" : rf.PaymentTerms));
 
             // Row 9: Delivery Terms
             AddSummaryRow("Delivery Terms",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Incoterms) ? "-" : rf.Incoterms),
-                (false, 0m, "-"));
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Incoterms) ? "-" : rf.Incoterms));
 
             // Row 10: Lead Time (Days)
             AddSummaryRow("Lead Time (Days)",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime),
-                (false, 0m, "-"));
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.DeliveryLeadTime) ? "-" : rf.DeliveryLeadTime));
 
             // Row 11: Warranty
             AddSummaryRow("Warranty",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty),
-                (false, 0m, "-"));
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.Warranty) ? "-" : rf.Warranty));
 
             // Row 12: Technical Approval — blank means "not recorded"; substituting "Approved"
             // fabricated approval status on a signature document.
             AddSummaryRow("Technical Approval",
-                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval),
-                (false, 0m, "-"));
+                rf => (false, 0m, string.IsNullOrWhiteSpace(rf.TechnicalApproval) ? "-" : rf.TechnicalApproval));
 
             r += 1; // Gap before remarks
 

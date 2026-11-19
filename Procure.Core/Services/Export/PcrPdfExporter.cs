@@ -943,8 +943,11 @@ namespace Procure.Services.Export
             for (int i = 0; i < supplierCount; i++)
             {
                 // Vendor name spans the whole pair (Qty + Unit Price), same as the merged header
-                // cell the Excel version already draws.
-                vendorHeaderLines.Add(WrapText(selectedRfqs[i].Vendor, "F2", 7.5, VendorPairW(i) - 6, maxLines: fitVendors ? 3 : 2, splitLongWords: true));
+                // cell the Excel version already draws. "Name (USD)" as on the Excel sheet, unless the
+                // sub-heading already says "Price (USD)".
+                var vendorName = string.IsNullOrWhiteSpace(selectedRfqs[i].Vendor) ? $"Supplier {i + 1}" : selectedRfqs[i].Vendor;
+                var vendorHeading = currencyInHeader ? vendorName : $"{vendorName} ({CurrencyOf(selectedRfqs[i])})";
+                vendorHeaderLines.Add(WrapText(vendorHeading, "F2", 7.5, VendorPairW(i) - 6, maxLines: fitVendors ? 3 : 2, splitLongWords: true));
             }
             var historicalHeaderLines = WrapText("Historical Price", "F2", 7.5, historicalWidth - 6, maxLines: 2);
 

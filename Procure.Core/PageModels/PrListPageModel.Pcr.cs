@@ -387,7 +387,7 @@ namespace Procure.PageModels
             // The comparison prints every quote's lines.
             pr = await EnsureHydratedAsync(pr);
             ExportTargetPr = pr;
-            ExportPcrShowLocalEquivalent = false;
+            ExportPcrShowLocalEquivalent = true;   // no-op for an all-local sheet: only foreign amounts get a local line
             var plant = string.IsNullOrWhiteSpace(pr.Plant) ? "-" : pr.Plant.Trim();
             ExportPcrSubtitle = $"Requisition {pr.PrNo} — {plant}";
 

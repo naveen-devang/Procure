@@ -280,8 +280,8 @@ internal static class PcrDiscountSelfCheck
         Assert(!silent.IsQuoteReceived, "the fixture vendor really has not quoted");
         var both = new List<RequestForQuotation> { quoted, silent };
         var mixSheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(prN, Pcr(prN), both, "x"));
-        // ">5%<" three times: the quoted vendor's rate, the silent vendor's text, the historical column.
-        Assert(Count(mixSheet, ">5%<") == 3 && mixSheet.Contains("<v>52.5"),
+        // ">5%<" twice: the quoted vendor's rate and the silent vendor's text (Historical is blank, as on the PDF).
+        Assert(Count(mixSheet, ">5%<") == 2 && mixSheet.Contains("<v>52.5"),
             "the unquoted vendor shows the rate text only; the quoted one shows 5% and 52.50");
         Assert(Count(mixSheet, "<v>123") == 1 && !mixSheet.Contains("<v>6.15"),
             "the unquoted vendor's freight shows once and no taxable amount or VAT is worked out for it");
@@ -412,7 +412,9 @@ internal static class PcrDiscountSelfCheck
         Assert(pdf.Contains("30% advance"), "a long payment term still prints");
 
         var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(pr, Pcr(pr), rfqs, "x"));
-        var rows = System.Text.RegularExpressions.Regex.Matches(sheet, @"<row r=""\d+"" ht=""(\d+)"">(?:(?!</row>).)*?>(Payment Terms|Warranty)<", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert(System.Text.RegularExpressions.Regex.IsMatch(sheet, @"<col min=""2"" max=""2"" width=""\d+"""),
+            "the Item Description column has a real width (an unfilled placeholder hides it in Excel)");
+        var rows =System.Text.RegularExpressions.Regex.Matches(sheet, @"<row r=""\d+"" ht=""(\d+)""[^>]*>(?:(?!</row>).)*?>(Payment Terms|Warranty)<", System.Text.RegularExpressions.RegexOptions.Singleline);
         Assert(rows.Count == 2 && rows.All(m => int.Parse(m.Groups[1].Value) > 20), "both rows are taller than one line in the spreadsheet");
 
         // Room to spare (two vendors): a long but ordinary warranty widens its own column and
@@ -448,7 +450,7 @@ internal static class PcrDiscountSelfCheck
 
         var sheet = ReadSheetXml(PcrExcelExporter.GenerateExcel(tall, Pcr(tall), Quotes(tall), "x"));
         Assert(sheet.Contains("SPEC LINE 29"), "the spreadsheet cell carries every line");
-        var row = System.Text.RegularExpressions.Regex.Match(sheet, @"<row r=""\d+"" ht=""(\d+)"">(?:(?!</row>).)*?SPEC LINE 0", System.Text.RegularExpressions.RegexOptions.Singleline);
+        var row = System.Text.RegularExpressions.Regex.Match(sheet, @"<row r=""\d+"" ht=""(\d+)""[^>]*>(?:(?!</row>).)*?SPEC LINE 0", System.Text.RegularExpressions.RegexOptions.Singleline);
         Assert(row.Success && int.Parse(row.Groups[1].Value) is > 300 and <= 409, $"its row is tall, but never past Excel's 409 pt limit; got {(row.Success ? row.Groups[1].Value : "none")}");
 
         // Longer than any page can hold: still builds, and says it was cut.
